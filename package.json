@@ -23,6 +23,7 @@
     ]
   },
   "dependencies": {
+    "@codehz/rpc": "^0.1.4",
     "bun-plugin-tailwind": "^0.1.2",
     "drizzle-orm": "^0.45.2",
     "react": "^19",

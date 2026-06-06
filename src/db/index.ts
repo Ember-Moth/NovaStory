@@ -24,4 +24,4 @@ export const db = drizzle(sqlite, { schema });
 // Automatically run pending migrations on startup
 migrate(db, { migrationsFolder: "./drizzle" });
 
-export { sqlite };
+export { sqlite, schema };
