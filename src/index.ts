@@ -1,5 +1,6 @@
 import { serve } from "bun";
 
+import "./db";
 import index from "./index.html";
 
 const server = serve({
