@@ -127,8 +127,8 @@ export function nextAuxDirName(siblings: AuxTreeNodeVM[]): string {
 export function nextAuxFileName(siblings: AuxTreeNodeVM[]): string {
   const existing = new Set(siblings.map((node) => node.name));
   let index = 1;
-  while (existing.has(`新文件 ${index}.md`)) {
+  while (existing.has(`新文件 ${index}`)) {
     index += 1;
   }
-  return `新文件 ${index}.md`;
+  return `新文件 ${index}`;
 }
