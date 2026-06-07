@@ -25,6 +25,7 @@ import {
   readAuxByIdAt,
   readAuxByPathAt,
   updateContentNode,
+  updateTimelinePoint,
   writeFileAt,
 } from "@/workspace/service";
 
@@ -122,6 +123,19 @@ export const timeline = {
       ctx.invalidate(`timeline:${workspaceId}`);
     },
   ),
+  update: mutation<
+    {
+      workspaceId: string;
+      pointId: string;
+      label?: string;
+      description?: string | null;
+    },
+    ReturnType<typeof updateTimelinePoint>
+  >((input, ctx) => {
+    const point = updateTimelinePoint(input);
+    ctx.invalidate(`timeline:${input.workspaceId}`);
+    return point;
+  }),
 };
 
 export const content = {

@@ -56,6 +56,7 @@ export function useProjectWorkspace(projectId: string) {
   const createTimeline = rpc.useMutation("timeline.create");
   const moveTimeline = rpc.useMutation("timeline.move");
   const deleteTimeline = rpc.useMutation("timeline.delete");
+  const updateTimeline = rpc.useMutation("timeline.update");
 
   const contentTree = useMemo(
     () => normalizeContentNodes(contentQuery.data?.nodes ?? []),
@@ -107,7 +108,10 @@ export function useProjectWorkspace(projectId: string) {
 
   const contentBusy = createContent.isPending || deleteContent.isPending;
   const timelineBusy =
-    createTimeline.isPending || moveTimeline.isPending || deleteTimeline.isPending;
+    createTimeline.isPending ||
+    moveTimeline.isPending ||
+    deleteTimeline.isPending ||
+    updateTimeline.isPending;
   const pageError =
     workspaceQuery.error?.message ??
     contentQuery.error?.message ??
@@ -129,6 +133,7 @@ export function useProjectWorkspace(projectId: string) {
     createTimeline,
     moveTimeline,
     deleteTimeline,
+    updateTimeline,
     contentTree,
     timelinePoints,
     auxTree,

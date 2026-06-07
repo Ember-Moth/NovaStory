@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { InlineEditableText } from "./InlineEditableText";
 import type { TimelinePointVM } from "./types";
 
 export function TimelinePanel({
@@ -9,6 +10,7 @@ export function TimelinePanel({
   onSelect,
   onReorder,
   onDelete,
+  onRename,
 }: {
   points: TimelinePointVM[];
   activeId: string | null;
@@ -16,6 +18,7 @@ export function TimelinePanel({
   onSelect: (_id: string) => void;
   onReorder: (_fromIndex: number, _toIndex: number) => void;
   onDelete: (_id: string) => void;
+  onRename: (_pointId: string, _label: string) => Promise<boolean>;
 }) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -30,7 +33,7 @@ export function TimelinePanel({
         return (
           <div
             key={point.id}
-            className={`flex cursor-pointer items-center gap-1 py-0.75 pr-1 text-[13px] ${
+            className={`flex h-7 cursor-pointer items-center gap-1 pr-1 text-[13px] ${
               isDragging ? "opacity-40" : ""
             } ${isDragOver ? "border-t border-t-drag-border" : ""} ${
               isActive
@@ -74,7 +77,16 @@ export function TimelinePanel({
             onClick={() => onSelect(point.id)}
           >
             <span className="icon-[material-symbols--radio-button-checked] shrink-0 text-sm text-foreground-muted" />
-            <span className="truncate">{point.label}</span>
+            <div className="flex min-w-0 flex-1 items-center">
+              <InlineEditableText
+                value={point.label}
+                editable={!point.isImplicitOrigin}
+                disabled={isBusy}
+                onEditStart={() => onSelect(point.id)}
+                onCommit={(label) => onRename(point.id, label)}
+                className="min-w-0 flex-1 truncate leading-5.5"
+              />
+            </div>
             {point.description ? (
               <span className="truncate text-[11px] text-foreground-muted">
                 {point.description}

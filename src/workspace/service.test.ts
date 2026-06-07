@@ -239,3 +239,35 @@ test("timeline point deletion is blocked when content still anchors to it", () =
     "Timeline point is still referenced by content nodes",
   );
 });
+
+test("timeline point label can be updated", () => {
+  const workspace = seedProject("project_timeline_update");
+  const point = service.createTimelinePoint({
+    workspaceId: workspace.id,
+    afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
+    key: "before_update",
+    label: "Before update",
+  });
+
+  service.updateTimelinePoint({
+    workspaceId: workspace.id,
+    pointId: point.id,
+    label: "After update",
+  });
+
+  const points = service.listTimelinePoints(workspace.id);
+  const updated = points.find((entry) => entry.id === point.id);
+  expect(updated?.label).toBe("After update");
+});
+
+test("implicit origin timeline point cannot be updated", () => {
+  const workspace = seedProject("project_timeline_origin_guard");
+
+  expect(() =>
+    service.updateTimelinePoint({
+      workspaceId: workspace.id,
+      pointId: service.ORIGIN_TIMELINE_POINT_ID,
+      label: "Forbidden",
+    }),
+  ).toThrow("Cannot update implicit origin timeline point");
+});

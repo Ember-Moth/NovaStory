@@ -885,6 +885,35 @@ export function moveTimelinePoint(input: {
   });
 }
 
+export function updateTimelinePoint(input: {
+  workspaceId: string;
+  pointId: string;
+  label?: string;
+  description?: string | null;
+}) {
+  return db.transaction((tx) => {
+    invariant(
+      input.pointId !== ORIGIN_TIMELINE_POINT_ID,
+      "Cannot update implicit origin timeline point",
+    );
+
+    const workspace = getWorkspaceOrThrow(tx, input.workspaceId);
+    const point = getTimelinePointOrThrow(tx, workspace.id, input.pointId);
+
+    tx.update(schema.timelinePoints)
+      .set({
+        label: input.label === undefined ? point.label : input.label,
+        description: input.description === undefined ? point.description : input.description,
+        updatedAt: now(),
+      })
+      .where(eq(schema.timelinePoints.id, point.id))
+      .run();
+
+    touchWorkspace(tx, workspace.id);
+    return getTimelinePointOrThrow(tx, workspace.id, point.id);
+  });
+}
+
 export function deleteTimelinePoint(workspaceId: string, pointId: string) {
   return db.transaction((tx) => {
     const workspace = getWorkspaceOrThrow(tx, workspaceId);

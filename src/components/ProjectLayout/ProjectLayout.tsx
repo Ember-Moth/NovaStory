@@ -191,6 +191,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
               onSelect={actions.setActiveTimelinePointId}
               onReorder={actions.handleTimelineReorder}
               onDelete={actions.handleTimelineDelete}
+              onRename={actions.handleTimelineRename}
             />
           )}
         </SidebarSection>

@@ -50,6 +50,7 @@ export function useProjectActions(workspace: ProjectWorkspace) {
     createTimeline,
     moveTimeline,
     deleteTimeline,
+    updateTimeline,
   } = workspace;
 
   const flushBodySave = useCallback(
@@ -353,6 +354,34 @@ export function useProjectActions(workspace: ProjectWorkspace) {
     [setContentError, updateContent, workspaceId],
   );
 
+  const handleTimelineRename = useCallback(
+    async (pointId: string, label: string) => {
+      if (!workspaceId || pointId === ORIGIN_TIMELINE_POINT_ID) {
+        return false;
+      }
+
+      const normalizedLabel = label.trim();
+      if (!normalizedLabel) {
+        return false;
+      }
+
+      setTimelineError(null);
+
+      try {
+        await updateTimeline.mutate({
+          workspaceId,
+          pointId,
+          label: normalizedLabel,
+        });
+        return true;
+      } catch (error) {
+        setTimelineError(error instanceof Error ? error.message : "重命名时间点失败，请稍后重试。");
+        return false;
+      }
+    },
+    [setTimelineError, updateTimeline, workspaceId],
+  );
+
   const handleTimelineAdd = useCallback(async () => {
     if (!workspaceId || !activeTimelinePointId) {
       return;
@@ -461,6 +490,7 @@ export function useProjectActions(workspace: ProjectWorkspace) {
     handleContentCreateChild,
     handleContentDelete,
     handleTimelineAdd,
+    handleTimelineRename,
     handleTimelineReorder,
     handleTimelineDelete,
     setActiveAuxNodeId,
