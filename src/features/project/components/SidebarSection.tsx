@@ -1,28 +1,33 @@
-import { type ReactNode, useState } from "react";
+import { type ReactNode } from "react";
 
 export function SidebarSection({
   title,
   actions,
-  defaultExpanded = true,
+  collapsed,
+  onToggleCollapse,
+  height,
   children,
 }: {
   title: string;
   actions?: ReactNode;
-  defaultExpanded?: boolean;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+  height?: number;
   children: ReactNode;
 }) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
-
   return (
-    <div className="flex shrink-0 flex-col">
+    <div
+      className="flex shrink-0 flex-col overflow-hidden"
+      style={collapsed || height == null ? undefined : { height }}
+    >
       <div
-        className="flex shrink-0 cursor-pointer items-center gap-1 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-foreground-muted hover:text-foreground"
-        onClick={() => setExpanded((value) => !value)}
+        className="flex h-7 shrink-0 cursor-pointer items-center gap-1 px-2 text-[11px] font-semibold uppercase tracking-wider text-foreground-muted hover:text-foreground"
+        onClick={onToggleCollapse}
         role="button"
         tabIndex={0}
       >
         <span
-          className={`w-4 shrink-0 text-base ${expanded ? "icon-[material-symbols--keyboard-arrow-down]" : "icon-[material-symbols--keyboard-arrow-right]"}`}
+          className={`w-4 shrink-0 text-base ${!collapsed ? "icon-[material-symbols--keyboard-arrow-down]" : "icon-[material-symbols--keyboard-arrow-right]"}`}
         />
         <span className="truncate">{title}</span>
         {actions ? (
@@ -34,7 +39,7 @@ export function SidebarSection({
           </span>
         ) : null}
       </div>
-      {expanded ? <div className="overflow-auto">{children}</div> : null}
+      {!collapsed ? <div className="flex-1 overflow-auto">{children}</div> : null}
     </div>
   );
 }
