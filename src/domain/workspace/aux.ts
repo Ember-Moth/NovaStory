@@ -11,6 +11,7 @@ import {
 import {
   buildReachableAuxSnapshot,
   exportAuxNode,
+  gcOrphanAuxNodes,
   listAuxLayerChangesAtTimelinePoint,
   listChildrenFromSnapshot,
   putAuxLayer,
@@ -254,6 +255,7 @@ export function deleteAuxNodeAt(input: {
       symlinkTargetAuxNodeId: null,
     });
 
+    gcOrphanAuxNodes(tx, workspace.id);
     touchWorkspace(tx, workspace.id);
   });
 }

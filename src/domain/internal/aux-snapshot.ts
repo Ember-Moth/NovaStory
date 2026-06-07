@@ -6,7 +6,7 @@ import { ORIGIN_TIMELINE_POINT_ID } from "@/shared/constants";
 
 import type { ExportedAuxNode, ResolvedAuxSnapshotNode } from "../types";
 import type { AuxLayerChangeView } from "../types";
-import { getTimelinePointOrThrow } from "./access";
+import { getTimelinePointOrThrow, getWorkspaceOrThrow } from "./access";
 import { createId, invariant, now } from "./ids";
 import { resolveTimelineChainIds } from "./timeline-chain";
 import { pointCondition, pointIdOrOrigin } from "./timeline-point";
@@ -376,6 +376,96 @@ export function purgeAuxLayersAtTimelinePoint(
       ),
     )
     .run();
+  gcOrphanAuxNodes(executor, workspaceId);
+}
+
+export function gcOrphanAuxNodes(executor: DatabaseExecutor, workspaceId: string) {
+  const workspace = getWorkspaceOrThrow(executor, workspaceId);
+  const auxRootId = workspace.auxRootId;
+  if (!auxRootId) {
+    return 0;
+  }
+
+  let removed = 0;
+  let changed = true;
+
+  while (changed) {
+    changed = false;
+    const nodes = executor
+      .select({ id: schema.auxNodes.id })
+      .from(schema.auxNodes)
+      .where(eq(schema.auxNodes.workspaceId, workspaceId))
+      .all();
+
+    for (const node of nodes) {
+      if (node.id === auxRootId) {
+        continue;
+      }
+
+      const referencedAsParent = executor
+        .select({ id: schema.auxNodeLayers.id })
+        .from(schema.auxNodeLayers)
+        .where(
+          and(
+            eq(schema.auxNodeLayers.workspaceId, workspaceId),
+            eq(schema.auxNodeLayers.parentAuxNodeId, node.id),
+          ),
+        )
+        .get();
+      if (referencedAsParent) {
+        continue;
+      }
+
+      const referencedAsSymlink = executor
+        .select({ id: schema.auxNodeLayers.id })
+        .from(schema.auxNodeLayers)
+        .where(
+          and(
+            eq(schema.auxNodeLayers.workspaceId, workspaceId),
+            eq(schema.auxNodeLayers.symlinkTargetAuxNodeId, node.id),
+          ),
+        )
+        .get();
+      if (referencedAsSymlink) {
+        continue;
+      }
+
+      const layers = executor
+        .select({ isDeleted: schema.auxNodeLayers.isDeleted })
+        .from(schema.auxNodeLayers)
+        .where(
+          and(
+            eq(schema.auxNodeLayers.workspaceId, workspaceId),
+            eq(schema.auxNodeLayers.auxNodeId, node.id),
+          ),
+        )
+        .all();
+
+      if (layers.length === 0) {
+        executor.delete(schema.auxNodes).where(eq(schema.auxNodes.id, node.id)).run();
+        removed += 1;
+        changed = true;
+        continue;
+      }
+
+      if (layers.every((layer) => layer.isDeleted)) {
+        executor
+          .delete(schema.auxNodeLayers)
+          .where(
+            and(
+              eq(schema.auxNodeLayers.workspaceId, workspaceId),
+              eq(schema.auxNodeLayers.auxNodeId, node.id),
+            ),
+          )
+          .run();
+        executor.delete(schema.auxNodes).where(eq(schema.auxNodes.id, node.id)).run();
+        removed += 1;
+        changed = true;
+      }
+    }
+  }
+
+  return removed;
 }
 
 export function validateUniqueAuxName(

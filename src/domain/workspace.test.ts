@@ -382,7 +382,7 @@ test("timeline point deletion purges auxiliary layers when requested", () => {
     label: "Purge point",
   });
 
-  service.mkdirAt({
+  const notesDir = service.mkdirAt({
     workspaceId: workspace.id,
     timelinePointId: point.id,
     parentDirId: auxRootId,
@@ -399,6 +399,136 @@ test("timeline point deletion purges auxiliary layers when requested", () => {
       .where(eq(schema.auxNodeLayers.timelinePointId, point.id))
       .all(),
   ).toEqual([]);
+  expect(db.select().from(schema.auxNodes).where(eq(schema.auxNodes.id, notesDir.id)).get()).toBe(
+    undefined,
+  );
+});
+
+test("deleteAuxNodeAt garbage-collects the aux node and tombstone layers", () => {
+  const workspace = seedProject("project_aux_gc_delete");
+  const auxRootId = workspace.auxRootId!;
+
+  const notesDir = service.mkdirAt({
+    workspaceId: workspace.id,
+    timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: auxRootId,
+    name: "notes",
+  });
+
+  service.deleteAuxNodeAt({
+    workspaceId: workspace.id,
+    timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+    nodeId: notesDir.id,
+  });
+
+  expect(db.select().from(schema.auxNodes).where(eq(schema.auxNodes.id, notesDir.id)).get()).toBe(
+    undefined,
+  );
+  expect(
+    db
+      .select()
+      .from(schema.auxNodeLayers)
+      .where(eq(schema.auxNodeLayers.auxNodeId, notesDir.id))
+      .all(),
+  ).toEqual([]);
+});
+
+test("aux gc keeps parent while a child layer still references it", () => {
+  const workspace = seedProject("project_aux_gc_parent_guard");
+  const auxRootId = workspace.auxRootId!;
+
+  const parentDir = service.mkdirAt({
+    workspaceId: workspace.id,
+    timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: auxRootId,
+    name: "state",
+  });
+  const childFile = service.writeFileAt({
+    workspaceId: workspace.id,
+    timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: parentDir.id,
+    name: "location.md",
+    content: "home",
+  });
+
+  service.deleteAuxNodeAt({
+    workspaceId: workspace.id,
+    timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+    nodeId: parentDir.id,
+  });
+
+  expect(
+    db.select().from(schema.auxNodes).where(eq(schema.auxNodes.id, parentDir.id)).get(),
+  ).not.toBe(undefined);
+  expect(
+    db.select().from(schema.auxNodes).where(eq(schema.auxNodes.id, childFile.id)).get(),
+  ).not.toBe(undefined);
+});
+
+test("aux gc keeps symlink target while a symlink still references it", () => {
+  const workspace = seedProject("project_aux_gc_symlink_guard");
+  const auxRootId = workspace.auxRootId!;
+
+  const targetDir = service.mkdirAt({
+    workspaceId: workspace.id,
+    timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: auxRootId,
+    name: "places",
+  });
+  const link = service.linkAt({
+    workspaceId: workspace.id,
+    timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: auxRootId,
+    name: "current",
+    targetNodeId: targetDir.id,
+  });
+
+  service.deleteAuxNodeAt({
+    workspaceId: workspace.id,
+    timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+    nodeId: link.id,
+  });
+
+  expect(
+    db.select().from(schema.auxNodes).where(eq(schema.auxNodes.id, targetDir.id)).get(),
+  ).not.toBe(undefined);
+});
+
+test("aux gc removes deleted subtrees bottom-up", () => {
+  const workspace = seedProject("project_aux_gc_subtree");
+  const auxRootId = workspace.auxRootId!;
+
+  const parentDir = service.mkdirAt({
+    workspaceId: workspace.id,
+    timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: auxRootId,
+    name: "state",
+  });
+  const childFile = service.writeFileAt({
+    workspaceId: workspace.id,
+    timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: parentDir.id,
+    name: "location.md",
+    content: "home",
+  });
+
+  service.deleteAuxNodeAt({
+    workspaceId: workspace.id,
+    timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+    nodeId: childFile.id,
+  });
+  service.deleteAuxNodeAt({
+    workspaceId: workspace.id,
+    timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+    nodeId: parentDir.id,
+  });
+
+  expect(db.select().from(schema.auxNodes).where(eq(schema.auxNodes.id, childFile.id)).get()).toBe(
+    undefined,
+  );
+  expect(db.select().from(schema.auxNodes).where(eq(schema.auxNodes.id, parentDir.id)).get()).toBe(
+    undefined,
+  );
 });
 
 test("timeline point label can be updated", () => {
