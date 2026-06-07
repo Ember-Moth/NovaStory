@@ -10,6 +10,7 @@ export function App() {
       <Route path="/">
         <HomePage />
       </Route>
+      <Route path="/project/:id">{({ id }) => <ProjectLayout id={id} />}</Route>
       <Route path="/projects/:id">{({ id }) => <ProjectLayout id={id} />}</Route>
       <Route>404: No such page!</Route>
     </Switch>
