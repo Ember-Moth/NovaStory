@@ -162,6 +162,13 @@ export function deleteContentNode(input: { workspaceId: string; nodeId: string }
     const oldPrev = getContentPrevSibling(tx, workspace.id, node.id);
     const timestamp = now();
 
+    if (oldPrev && node.nextSiblingId) {
+      tx.update(schema.contentNodes)
+        .set({ nextSiblingId: null, updatedAt: timestamp })
+        .where(eq(schema.contentNodes.id, node.id))
+        .run();
+    }
+
     if (oldPrev) {
       tx.update(schema.contentNodes)
         .set({ nextSiblingId: node.nextSiblingId, updatedAt: timestamp })

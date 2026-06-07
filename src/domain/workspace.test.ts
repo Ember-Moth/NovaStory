@@ -217,6 +217,39 @@ test("content node deletion removes subtree and preserves sibling order", () => 
   expect(exported.nodes.map((node) => node.title)).toEqual(["Chapter 2"]);
 });
 
+test("deleting a middle content sibling rewires next sibling without violating uniqueness", () => {
+  const workspace = seedProject("project_content_delete_middle");
+  const rootId = workspace.contentRootId!;
+
+  const chapter1 = service.createContentNode({
+    workspaceId: workspace.id,
+    parentId: rootId,
+    kind: "chapter",
+    title: "Chapter 1",
+  });
+  const chapter2 = service.createContentNode({
+    workspaceId: workspace.id,
+    parentId: rootId,
+    afterSiblingId: chapter1.id,
+    kind: "chapter",
+    title: "Chapter 2",
+  });
+  service.createContentNode({
+    workspaceId: workspace.id,
+    parentId: rootId,
+    afterSiblingId: chapter2.id,
+    kind: "chapter",
+    title: "Chapter 3",
+  });
+
+  expect(() =>
+    service.deleteContentNode({ workspaceId: workspace.id, nodeId: chapter2.id }),
+  ).not.toThrow();
+
+  const exported = service.exportContentSubtree(workspace.id);
+  expect(exported.nodes.map((node) => node.title)).toEqual(["Chapter 1", "Chapter 3"]);
+});
+
 test("timeline point deletion is blocked when content still anchors to it", () => {
   const workspace = seedProject("project_guard");
   const contentRootId = workspace.contentRootId!;
