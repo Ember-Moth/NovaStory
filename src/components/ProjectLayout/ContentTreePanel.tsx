@@ -138,7 +138,7 @@ function ContentTreeNodeRow({
           className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-foreground-muted opacity-0 transition hover:bg-button-hover-background hover:text-foreground group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-30"
           title="删除节点"
         >
-          <span className="icon-[material-symbols--close] text-sm leading-none" />
+          <span className="icon-[material-symbols--delete] text-sm leading-none" />
         </button>
         <span className="shrink-0 self-center text-[10px] leading-none text-accent-foreground opacity-70">
           {timelineLabelMap.get(node.anchorTimelinePointId) ?? node.anchorTimelinePointId}
