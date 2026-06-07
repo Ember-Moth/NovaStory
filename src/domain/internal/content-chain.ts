@@ -93,6 +93,36 @@ export function collectContentSubtreeIds(
   return collected;
 }
 
+export function buildContentNodeTitlePath(
+  executor: DatabaseExecutor,
+  workspaceId: string,
+  nodeId: string,
+  contentRootId: string,
+) {
+  const segments: string[] = [];
+  let currentId: string | null = nodeId;
+
+  while (currentId && currentId !== contentRootId) {
+    const node = executor
+      .select()
+      .from(schema.contentNodes)
+      .where(
+        and(
+          eq(schema.contentNodes.workspaceId, workspaceId),
+          eq(schema.contentNodes.id, currentId),
+        ),
+      )
+      .get();
+    if (!node) {
+      break;
+    }
+    segments.unshift(node.title?.trim() || "未命名节点");
+    currentId = node.parentId;
+  }
+
+  return segments.join(" / ");
+}
+
 export function exportContentNode(
   executor: DatabaseExecutor,
   workspaceId: string,

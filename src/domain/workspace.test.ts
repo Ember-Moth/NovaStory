@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterAll, beforeEach, expect, test } from "bun:test";
+import { eq } from "drizzle-orm";
 
 const tempDir = mkdtempSync(join(tmpdir(), "novel-evolver-"));
 const dbPath = join(tempDir, "workspace-test.sqlite");
@@ -303,8 +304,101 @@ test("timeline point deletion is blocked when content still anchors to it", () =
   });
 
   expect(() => service.deleteTimelinePoint(workspace.id, point.id)).toThrow(
-    "Timeline point is still referenced by content nodes",
+    "无法删除：章节「Guarded」仍锚定在此时间点。",
   );
+});
+
+test("listAuxChangesAt only returns layer changes at the requested timeline point", () => {
+  const workspace = seedProject("project_aux_changes");
+  const rootId = workspace.auxRootId!;
+
+  const stateDir = service.mkdirAt({
+    workspaceId: workspace.id,
+    timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: rootId,
+    name: "state",
+  });
+  const locationFile = service.writeFileAt({
+    workspaceId: workspace.id,
+    timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: stateDir.id,
+    name: "location.md",
+    content: "home",
+  });
+  const point = service.createTimelinePoint({
+    workspaceId: workspace.id,
+    afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
+    key: "overlay_point",
+    label: "Overlay point",
+  });
+  service.writeFileAt({
+    workspaceId: workspace.id,
+    timelinePointId: point.id,
+    nodeId: locationFile.id,
+    content: "park",
+  });
+  service.mkdirAt({
+    workspaceId: workspace.id,
+    timelinePointId: point.id,
+    parentDirId: rootId,
+    name: "delta-only",
+  });
+
+  expect(service.listAuxChangesAt(workspace.id, point.id)).toEqual([
+    { path: "/delta-only", isDeleted: false },
+    { path: "/state/location.md", isDeleted: false },
+  ]);
+});
+
+test("timeline point deletion is blocked when auxiliary layers exist without purge", () => {
+  const workspace = seedProject("project_aux_guard");
+  const auxRootId = workspace.auxRootId!;
+  const point = service.createTimelinePoint({
+    workspaceId: workspace.id,
+    afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
+    key: "aux_point",
+    label: "Aux point",
+  });
+
+  service.mkdirAt({
+    workspaceId: workspace.id,
+    timelinePointId: point.id,
+    parentDirId: auxRootId,
+    name: "notes",
+  });
+
+  expect(() => service.deleteTimelinePoint(workspace.id, point.id)).toThrow(
+    "无法删除：该时间点仍有关联的辅助信息，请先确认是否一并删除。",
+  );
+});
+
+test("timeline point deletion purges auxiliary layers when requested", () => {
+  const workspace = seedProject("project_aux_purge");
+  const auxRootId = workspace.auxRootId!;
+  const point = service.createTimelinePoint({
+    workspaceId: workspace.id,
+    afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
+    key: "purge_point",
+    label: "Purge point",
+  });
+
+  service.mkdirAt({
+    workspaceId: workspace.id,
+    timelinePointId: point.id,
+    parentDirId: auxRootId,
+    name: "notes",
+  });
+
+  service.deleteTimelinePoint(workspace.id, point.id, { purgeAuxLayers: true });
+
+  expect(service.listTimelinePoints(workspace.id).some((item) => item.id === point.id)).toBe(false);
+  expect(
+    db
+      .select()
+      .from(schema.auxNodeLayers)
+      .where(eq(schema.auxNodeLayers.timelinePointId, point.id))
+      .all(),
+  ).toEqual([]);
 });
 
 test("timeline point label can be updated", () => {

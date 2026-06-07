@@ -76,7 +76,7 @@ export function ActionErrorBubble({
   return createPortal(
     <div
       role="alert"
-      className={`fixed z-50 flex max-w-[min(16rem,calc(100vw-1rem))] items-start gap-2 rounded-md border border-border bg-editor-background px-3 py-2 shadow-lg ${textClass} text-accent-foreground`}
+      className={`fixed z-50 flex max-w-[min(24rem,calc(100vw-1rem))] items-start gap-2 rounded-md border border-border bg-editor-background px-3 py-2 shadow-lg ${textClass} text-accent-foreground`}
       style={{
         top: position.top,
         right: position.right,
@@ -84,7 +84,7 @@ export function ActionErrorBubble({
       }}
     >
       <span className={`icon-[material-symbols--warning] mt-0.5 shrink-0 ${iconClass}`} />
-      <span className="min-w-0 flex-1 leading-snug">{error.message}</span>
+      <span className="min-w-0 flex-1 whitespace-pre-line leading-snug">{error.message}</span>
       <button
         type="button"
         onClick={onDismiss}

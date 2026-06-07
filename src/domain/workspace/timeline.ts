@@ -1,9 +1,16 @@
 import { eq } from "drizzle-orm";
 
-import { db, schema } from "@/db";
+import { type DatabaseExecutor, db, schema } from "@/db";
 import { ORIGIN_TIMELINE_POINT_ID } from "@/shared/constants";
 
-import { getTimelinePointOrThrow, getWorkspaceOrThrow, touchWorkspace } from "../internal/access";
+import {
+  assertContentRoot,
+  getTimelinePointOrThrow,
+  getWorkspaceOrThrow,
+  touchWorkspace,
+} from "../internal/access";
+import { purgeAuxLayersAtTimelinePoint } from "../internal/aux-snapshot";
+import { buildContentNodeTitlePath } from "../internal/content-chain";
 import { createId, invariant, now } from "../internal/ids";
 import {
   getTimelineSuccessor,
@@ -153,23 +160,56 @@ export function updateTimelinePoint(input: {
   });
 }
 
-export function deleteTimelinePoint(workspaceId: string, pointId: string) {
+function formatContentAnchorBlockMessage(
+  tx: DatabaseExecutor,
+  workspaceId: string,
+  contentRootId: string,
+  anchors: Array<{ id: string }>,
+) {
+  const paths = anchors.map((anchor) =>
+    buildContentNodeTitlePath(tx, workspaceId, anchor.id, contentRootId),
+  );
+
+  if (paths.length === 1) {
+    return `无法删除：章节「${paths[0]}」仍锚定在此时间点。`;
+  }
+
+  return `无法删除：以下章节仍锚定在此时间点：${paths.map((path) => `「${path}」`).join("、")}。`;
+}
+
+export function deleteTimelinePoint(
+  workspaceId: string,
+  pointId: string,
+  options?: { purgeAuxLayers?: boolean },
+) {
   return db.transaction((tx) => {
     const workspace = getWorkspaceOrThrow(tx, workspaceId);
+    const contentRootId = assertContentRoot(workspace);
     const point = getTimelinePointOrThrow(tx, workspace.id, pointId);
-    const contentUse = tx
+    const contentAnchors = tx
       .select()
       .from(schema.contentNodes)
       .where(eq(schema.contentNodes.anchorTimelinePointId, point.id))
-      .get();
-    invariant(!contentUse, "Timeline point is still referenced by content nodes");
+      .all();
+    invariant(
+      contentAnchors.length === 0,
+      contentAnchors.length > 0
+        ? formatContentAnchorBlockMessage(tx, workspace.id, contentRootId, contentAnchors)
+        : "无法删除：仍有章节锚定在此时间点。",
+    );
 
-    const auxUse = tx
+    const auxLayers = tx
       .select()
       .from(schema.auxNodeLayers)
       .where(eq(schema.auxNodeLayers.timelinePointId, point.id))
-      .get();
-    invariant(!auxUse, "Timeline point is still referenced by auxiliary layers");
+      .all();
+    if (auxLayers.length > 0) {
+      invariant(
+        options?.purgeAuxLayers === true,
+        "无法删除：该时间点仍有关联的辅助信息，请先确认是否一并删除。",
+      );
+      purgeAuxLayersAtTimelinePoint(tx, workspace.id, point.id);
+    }
 
     const successor = getTimelineSuccessor(tx, workspace.id, point.id);
     const timestamp = now();

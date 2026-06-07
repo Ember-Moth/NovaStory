@@ -1,6 +1,6 @@
 import { useMolecule } from "bunshi/react";
 import { useAtom, useSetAtom } from "jotai";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 
 import {
   actionAnchorId,
@@ -8,6 +8,7 @@ import {
   setActionError,
 } from "@/features/project/model/action-error";
 import {
+  buildContentNodePath,
   collectContentSubtreeIds,
   findAuxNode,
   findContentDeleteFallback,
@@ -18,12 +19,37 @@ import {
   omitRecordKey,
 } from "@/features/project/model/tree";
 import type { AuxTreeNodeVM, ContentTreeNodeVM } from "@/features/project/model/types";
+import { rpc } from "@/server/rpc/client";
 import { ORIGIN_TIMELINE_POINT_ID } from "@/shared/constants";
 
 import { EditorMolecule } from "../molecules/editor";
 import { ErrorsMolecule } from "../molecules/errors";
 import { SelectionMolecule } from "../molecules/selection";
 import type { ProjectWorkspace } from "./useProjectWorkspace";
+
+type TimelineDeleteDialogState = {
+  pointId: string;
+  pointLabel: string;
+  auxPaths: string[];
+  anchorId: string;
+};
+
+function formatTimelineContentAnchorError(
+  anchors: ContentTreeNodeVM[],
+  contentParentMap: Map<string, string | null>,
+  contentNodeMap: Map<string, ContentTreeNodeVM>,
+  contentRootId: string | null,
+) {
+  const paths = anchors.map((node) =>
+    buildContentNodePath(node.id, contentParentMap, contentNodeMap, contentRootId),
+  );
+
+  if (paths.length === 1) {
+    return `无法删除：章节「${paths[0]}」仍锚定在此时间点。`;
+  }
+
+  return `无法删除：以下章节仍锚定在此时间点：${paths.map((path) => `「${path}」`).join("、")}。`;
+}
 
 export function useProjectActions(workspace: ProjectWorkspace) {
   const selection = useMolecule(SelectionMolecule);
@@ -53,6 +79,7 @@ export function useProjectActions(workspace: ProjectWorkspace) {
     auxRootId,
     auxParentMap,
     flatContentNodes,
+    contentNodeMap,
     contentParentMap,
     timelinePoints,
     activeContentNode,
@@ -71,6 +98,19 @@ export function useProjectActions(workspace: ProjectWorkspace) {
     moveAux,
     deleteAux,
   } = workspace;
+
+  const [timelineDeleteDialog, setTimelineDeleteDialog] =
+    useState<TimelineDeleteDialogState | null>(null);
+
+  const finishTimelineDelete = useCallback(
+    (pointId: string) => {
+      if (activeTimelinePointId === pointId) {
+        setActiveTimelinePointId(ORIGIN_TIMELINE_POINT_ID);
+        setActiveAuxNodeId(null);
+      }
+    },
+    [activeTimelinePointId, setActiveAuxNodeId, setActiveTimelinePointId],
+  );
 
   const flushBodySave = useCallback(
     async (nodeId: string, body: string) => {
@@ -985,14 +1025,47 @@ export function useProjectActions(workspace: ProjectWorkspace) {
 
       clearActionError(setTimelineError);
 
+      const anchoredNodes = flatContentNodes.filter(
+        (node) => node.anchorTimelinePointId === pointId,
+      );
+      if (anchoredNodes.length > 0) {
+        setActionError(
+          setTimelineError,
+          formatTimelineContentAnchorError(
+            anchoredNodes,
+            contentParentMap,
+            contentNodeMap,
+            contentRootId,
+          ),
+          anchorId,
+        );
+        return;
+      }
+
       try {
+        const { data: auxChanges } = await rpc.callQuery("aux.listChangesAt", {
+          workspaceId,
+          pointId,
+        });
+        const pointLabel = timelinePoints.find((point) => point.id === pointId)?.label ?? pointId;
+
+        if ((auxChanges?.length ?? 0) > 0) {
+          setTimelineDeleteDialog({
+            pointId,
+            pointLabel,
+            auxPaths: (auxChanges ?? []).map((change) =>
+              change.isDeleted ? `${change.path}（已删除）` : change.path,
+            ),
+            anchorId,
+          });
+          return;
+        }
+
         await deleteTimeline.mutate({
           workspaceId,
           pointId,
         });
-        if (activeTimelinePointId === pointId) {
-          setActiveTimelinePointId(ORIGIN_TIMELINE_POINT_ID);
-        }
+        finishTimelineDelete(pointId);
       } catch (error) {
         setActionError(
           setTimelineError,
@@ -1002,13 +1075,50 @@ export function useProjectActions(workspace: ProjectWorkspace) {
       }
     },
     [
-      activeTimelinePointId,
+      contentNodeMap,
+      contentParentMap,
+      contentRootId,
       deleteTimeline,
-      setActiveTimelinePointId,
+      finishTimelineDelete,
+      flatContentNodes,
       setTimelineError,
+      timelinePoints,
       workspaceId,
     ],
   );
+
+  const handleTimelineDeleteCancel = useCallback(() => {
+    if (deleteTimeline.isPending) {
+      return;
+    }
+    setTimelineDeleteDialog(null);
+  }, [deleteTimeline.isPending]);
+
+  const handleTimelineDeleteConfirm = useCallback(async () => {
+    if (!workspaceId || !timelineDeleteDialog) {
+      return;
+    }
+
+    const { pointId, anchorId } = timelineDeleteDialog;
+    clearActionError(setTimelineError);
+
+    try {
+      await deleteTimeline.mutate({
+        workspaceId,
+        pointId,
+        purgeAuxLayers: true,
+      });
+      finishTimelineDelete(pointId);
+      setTimelineDeleteDialog(null);
+    } catch (error) {
+      setTimelineDeleteDialog(null);
+      setActionError(
+        setTimelineError,
+        error instanceof Error ? error.message : "删除时间点失败，请稍后重试。",
+        anchorId,
+      );
+    }
+  }, [deleteTimeline, finishTimelineDelete, setTimelineError, timelineDeleteDialog, workspaceId]);
 
   return {
     flushBodySave,
@@ -1029,6 +1139,9 @@ export function useProjectActions(workspace: ProjectWorkspace) {
     handleTimelineRename,
     handleTimelineReorder,
     handleTimelineDelete,
+    handleTimelineDeleteCancel,
+    handleTimelineDeleteConfirm,
+    timelineDeleteDialog,
     handleAuxCreateSiblingDir,
     handleAuxCreateSiblingFile,
     handleAuxCreateChildDir,

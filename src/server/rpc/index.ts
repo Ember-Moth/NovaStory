@@ -45,4 +45,5 @@ export const aux = {
   readByPath: auxHandlers.readByPath,
   listDir: auxHandlers.listDir,
   snapshotTree: auxHandlers.snapshotTree,
+  listChangesAt: auxHandlers.listChangesAt,
 };

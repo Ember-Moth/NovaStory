@@ -51,6 +51,11 @@ export interface ExportedAuxSnapshotTree {
   nodes: ExportedAuxNode[];
 }
 
+export interface AuxLayerChangeView {
+  path: string;
+  isDeleted: boolean;
+}
+
 export interface ResolvedAuxNode {
   id: string;
   nodeType: AuxNodeType;

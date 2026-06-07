@@ -45,12 +45,16 @@ export const move = mutation<
   return point;
 });
 
-export const deleteMutation = mutation<{ workspaceId: string; pointId: string }, void>(
-  ({ workspaceId, pointId }, ctx) => {
-    deleteTimelinePoint(workspaceId, pointId);
-    ctx.invalidate(`timeline:${workspaceId}`);
-  },
-);
+export const deleteMutation = mutation<
+  { workspaceId: string; pointId: string; purgeAuxLayers?: boolean },
+  void
+>(({ workspaceId, pointId, purgeAuxLayers }, ctx) => {
+  deleteTimelinePoint(workspaceId, pointId, { purgeAuxLayers });
+  ctx.invalidate(`timeline:${workspaceId}`);
+  if (purgeAuxLayers) {
+    ctx.invalidate(`aux:${workspaceId}`);
+  }
+});
 
 export const update = mutation<
   {

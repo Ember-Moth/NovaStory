@@ -5,6 +5,8 @@ import { type DatabaseExecutor, schema } from "@/db";
 import { ORIGIN_TIMELINE_POINT_ID } from "@/shared/constants";
 
 import type { ExportedAuxNode, ResolvedAuxSnapshotNode } from "../types";
+import type { AuxLayerChangeView } from "../types";
+import { getTimelinePointOrThrow } from "./access";
 import { createId, invariant, now } from "./ids";
 import { resolveTimelineChainIds } from "./timeline-chain";
 import { pointCondition, pointIdOrOrigin } from "./timeline-point";
@@ -296,6 +298,84 @@ export function validateAuxParent(
     "Aux parent must be a directory",
   );
   return parent;
+}
+
+export function listAuxLayerChangesAtTimelinePoint(
+  executor: DatabaseExecutor,
+  workspace: WorkspaceRow,
+  timelinePointId: string,
+): AuxLayerChangeView[] {
+  const layers = executor
+    .select()
+    .from(schema.auxNodeLayers)
+    .where(
+      and(
+        eq(schema.auxNodeLayers.workspaceId, workspace.id),
+        eq(schema.auxNodeLayers.timelinePointId, timelinePointId),
+      ),
+    )
+    .all();
+
+  if (layers.length === 0) {
+    return [];
+  }
+
+  const point = getTimelinePointOrThrow(executor, workspace.id, timelinePointId);
+  const snapshotAtPoint = buildReachableAuxSnapshot(executor, workspace, timelinePointId);
+  const snapshotAtPrev = buildReachableAuxSnapshot(executor, workspace, point.prevPointId);
+
+  const changes: AuxLayerChangeView[] = [];
+
+  for (const layer of layers) {
+    if (layer.auxNodeId === workspace.auxRootId) {
+      continue;
+    }
+
+    const nodeAtPoint = snapshotAtPoint.get(layer.auxNodeId);
+    if (nodeAtPoint) {
+      changes.push({ path: nodeAtPoint.path, isDeleted: false });
+      continue;
+    }
+
+    if (layer.isDeleted) {
+      const nodeAtPrev = snapshotAtPrev.get(layer.auxNodeId);
+      changes.push({
+        path: nodeAtPrev?.path ?? layer.auxNodeId,
+        isDeleted: true,
+      });
+      continue;
+    }
+
+    const parent = layer.parentAuxNodeId
+      ? (snapshotAtPoint.get(layer.parentAuxNodeId) ?? snapshotAtPrev.get(layer.parentAuxNodeId))
+      : null;
+    const parentPath = parent?.path ?? "/";
+    const path =
+      layer.name && parentPath
+        ? parentPath === "/"
+          ? `/${layer.name}`
+          : `${parentPath}/${layer.name}`
+        : layer.auxNodeId;
+    changes.push({ path, isDeleted: false });
+  }
+
+  return changes.sort((left, right) => left.path.localeCompare(right.path));
+}
+
+export function purgeAuxLayersAtTimelinePoint(
+  executor: DatabaseExecutor,
+  workspaceId: string,
+  timelinePointId: string,
+) {
+  executor
+    .delete(schema.auxNodeLayers)
+    .where(
+      and(
+        eq(schema.auxNodeLayers.workspaceId, workspaceId),
+        eq(schema.auxNodeLayers.timelinePointId, timelinePointId),
+      ),
+    )
+    .run();
 }
 
 export function validateUniqueAuxName(

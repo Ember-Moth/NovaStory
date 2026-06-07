@@ -1,5 +1,26 @@
 import type { AuxTreeNodeVM, ContentTreeNodeVM } from "./types";
 
+export function buildContentNodePath(
+  nodeId: string,
+  contentParentMap: Map<string, string | null>,
+  contentNodeMap: Map<string, ContentTreeNodeVM>,
+  contentRootId: string | null,
+) {
+  const segments: string[] = [];
+  let currentId: string | null = nodeId;
+
+  while (currentId && currentId !== contentRootId) {
+    const node = contentNodeMap.get(currentId);
+    if (!node) {
+      break;
+    }
+    segments.unshift(node.title);
+    currentId = contentParentMap.get(currentId) ?? null;
+  }
+
+  return segments.join(" / ");
+}
+
 export function collectAncestorIds(
   parentMap: Map<string, string | null>,
   nodeId: string,

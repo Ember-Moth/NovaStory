@@ -11,6 +11,7 @@ import {
 import {
   buildReachableAuxSnapshot,
   exportAuxNode,
+  listAuxLayerChangesAtTimelinePoint,
   listChildrenFromSnapshot,
   putAuxLayer,
   readAuxByIdAtInternal,
@@ -291,6 +292,13 @@ export function listAuxDirAt(
   invariant(dir.nodeType === "dir" || dir.nodeType === "root", "Target is not a directory");
 
   return listChildrenFromSnapshot(snapshot, dir.id);
+}
+
+export function listAuxChangesAt(workspaceId: string, pointId: TimelinePointRef) {
+  const workspace = getWorkspaceOrThrow(db, workspaceId);
+  const timelinePointId = validateTimelinePointRef(db, workspace.id, pointId);
+  invariant(timelinePointId, "Cannot list auxiliary changes at implicit origin");
+  return listAuxLayerChangesAtTimelinePoint(db, workspace, timelinePointId);
 }
 
 export function exportAuxSnapshotTree(workspaceId: string, pointId?: TimelinePointRef) {

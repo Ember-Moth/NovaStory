@@ -2,6 +2,7 @@ import { ScopeProvider, useMolecule } from "bunshi/react";
 import { useSetAtom } from "jotai";
 
 import { ActionErrorBubble } from "@/features/project/components/ActionErrorBubble";
+import { ConfirmDialog } from "@/features/project/components/ConfirmDialog";
 import { FullPageMessage } from "@/features/project/components/FullPageMessage";
 import { PanelPlaceholder } from "@/features/project/components/PanelPlaceholder";
 import { SidebarPanels } from "@/features/project/components/SidebarPanels";
@@ -120,6 +121,21 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
         error={pageErrorBubble}
         onDismiss={() => setPageErrorDismissed(true)}
         size="sm"
+      />
+      <ConfirmDialog
+        open={actions.timelineDeleteDialog !== null}
+        title={
+          actions.timelineDeleteDialog
+            ? `删除时间点「${actions.timelineDeleteDialog.pointLabel}」`
+            : ""
+        }
+        description="该时间点下存在以下辅助信息变动，删除时间点将撤销这些变动（不影响其他时间点的继承内容）。"
+        items={actions.timelineDeleteDialog?.auxPaths ?? []}
+        confirmLabel="删除时间点及辅助信息"
+        cancelLabel="取消"
+        isPending={timelineBusy}
+        onConfirm={actions.handleTimelineDeleteConfirm}
+        onCancel={actions.handleTimelineDeleteCancel}
       />
 
       <div className="flex w-12 shrink-0 flex-col items-center gap-1 bg-activity-bar-background pt-2">

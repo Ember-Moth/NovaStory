@@ -5,6 +5,7 @@ import {
   deleteAuxNodeAt,
   exportAuxSnapshotTree,
   linkAt,
+  listAuxChangesAt,
   listAuxDirAt,
   mkdirAt,
   moveAuxNodeAt,
@@ -93,6 +94,16 @@ export const snapshotTree = query<
   ReturnType<typeof exportAuxSnapshotTree>
 >(({ workspaceId, pointId }, ctx) => {
   const result = exportAuxSnapshotTree(workspaceId, pointId);
+  ctx.watch(`aux:${workspaceId}`);
+  ctx.watch(`timeline:${workspaceId}`);
+  return result;
+});
+
+export const listChangesAt = query<
+  { workspaceId: string; pointId: string },
+  ReturnType<typeof listAuxChangesAt>
+>(({ workspaceId, pointId }, ctx) => {
+  const result = listAuxChangesAt(workspaceId, pointId);
   ctx.watch(`aux:${workspaceId}`);
   ctx.watch(`timeline:${workspaceId}`);
   return result;
