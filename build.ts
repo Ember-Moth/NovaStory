@@ -6,7 +6,7 @@ import tailwind from "bun-plugin-tailwind";
 const outdir = path.join(process.cwd(), "dist");
 await rm(outdir, { recursive: true, force: true });
 
-const entrypoints = [...new Bun.Glob("src/**/*.html").scanSync()];
+const entrypoints = [...new Bun.Glob("src/client/**/*.html").scanSync()];
 
 const result = await Bun.build({
   entrypoints,
