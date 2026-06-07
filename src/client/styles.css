@@ -1,6 +1,18 @@
 @import "tailwindcss";
 @plugin "@iconify/tailwind4";
 
+@layer base {
+  dialog:modal {
+    position: fixed;
+    inset: 0;
+    width: fit-content;
+    height: fit-content;
+    max-width: calc(100% - 2rem);
+    max-height: calc(100% - 2rem);
+    margin: auto;
+  }
+}
+
 @theme {
   /* Editor area */
   --color-editor-background: #1e1e1e;
