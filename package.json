@@ -31,7 +31,8 @@
     "nanoid": "^5.1.11",
     "react": "^19",
     "react-dom": "^19",
-    "tailwindcss": "^4.3.0"
+    "tailwindcss": "^4.3.0",
+    "wouter": "^3.10.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

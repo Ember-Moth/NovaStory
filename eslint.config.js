@@ -57,5 +57,17 @@ export default [
     },
     rules: reactHooks.configs.flat.recommended.rules,
   },
+  {
+    files,
+    rules: {
+      "no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+        },
+      ],
+    },
+  },
   eslintConfigPrettier,
 ];
