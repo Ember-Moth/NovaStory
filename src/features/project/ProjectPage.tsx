@@ -122,7 +122,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
                 <button
                   type="button"
                   onClick={actions.handleContentCreateSibling}
-                  disabled={contentBusy || !contentRootId}
+                  disabled={contentBusy || !contentRootId || !activeTimelinePointId}
                   className="icon-[material-symbols--add] text-base hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                   title="添加同级节点"
                 />
@@ -149,6 +149,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
                       onCreateChild={actions.handleContentCreateChild}
                       onDelete={actions.handleContentDelete}
                       isBusy={contentBusy}
+                      canCreate={!!activeTimelinePointId}
                     />
                   </>
                 ),

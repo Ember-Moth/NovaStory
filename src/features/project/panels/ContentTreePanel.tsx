@@ -26,6 +26,7 @@ function ContentTreeNodeRow({
   onDelete,
   timelineLabelMap,
   isBusy,
+  canCreate,
 }: {
   node: ContentTreeNodeVM;
   depth: number;
@@ -39,6 +40,7 @@ function ContentTreeNodeRow({
   onDelete: (_id: string) => void;
   timelineLabelMap: ReadonlyMap<string, string>;
   isBusy: boolean;
+  canCreate: boolean;
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const hasBody = node.body.trim().length > 0;
@@ -81,7 +83,7 @@ function ContentTreeNodeRow({
             <>
               <RowActionButton
                 onClick={() => onCreateChild(node)}
-                disabled={isBusy || isEditing}
+                disabled={isBusy || isEditing || !canCreate}
                 title="添加子节点"
                 icon="icon-[material-symbols--add]"
               />
@@ -110,6 +112,7 @@ export function ContentTreePanel({
   activeId,
   timelineLabelMap,
   isBusy,
+  canCreate,
 }: {
   tree: ContentTreeNodeVM[];
   expandedIds: Set<string>;
@@ -121,6 +124,7 @@ export function ContentTreePanel({
   activeId: string | null;
   timelineLabelMap: ReadonlyMap<string, string>;
   isBusy: boolean;
+  canCreate: boolean;
 }) {
   if (tree.length === 0) {
     return (
@@ -145,6 +149,7 @@ export function ContentTreePanel({
       onDelete={onDelete}
       timelineLabelMap={timelineLabelMap}
       isBusy={isBusy}
+      canCreate={canCreate}
     />
   );
 

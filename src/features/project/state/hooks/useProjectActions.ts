@@ -525,12 +525,11 @@ export function useProjectActions(workspace: ProjectWorkspace) {
   );
 
   const handleContentCreateSibling = useCallback(async () => {
-    if (!workspaceId || !contentRootId) {
+    if (!workspaceId || !contentRootId || !activeTimelinePointId) {
       return;
     }
 
-    const anchorPointId =
-      activeContentNode?.anchorTimelinePointId ?? activeTimelinePointId ?? ORIGIN_TIMELINE_POINT_ID;
+    const anchorPointId = activeTimelinePointId;
     const parentId = activeContentNode
       ? (contentParentMap.get(activeContentNode.id) ?? contentRootId)
       : contentRootId;
@@ -568,7 +567,7 @@ export function useProjectActions(workspace: ProjectWorkspace) {
 
   const handleContentCreateChild = useCallback(
     async (parentNode: ContentTreeNodeVM) => {
-      if (!workspaceId) {
+      if (!workspaceId || !activeTimelinePointId) {
         return;
       }
 
@@ -580,7 +579,7 @@ export function useProjectActions(workspace: ProjectWorkspace) {
         const node = await createContent.mutate({
           workspaceId,
           parentId: parentNode.id,
-          anchorPointId: parentNode.anchorTimelinePointId,
+          anchorPointId: activeTimelinePointId,
           title,
         });
         setActiveContentNodeId(node.id);
@@ -591,6 +590,7 @@ export function useProjectActions(workspace: ProjectWorkspace) {
       }
     },
     [
+      activeTimelinePointId,
       createContent,
       expandContentParent,
       flatContentNodes.length,
