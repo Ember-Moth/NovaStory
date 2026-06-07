@@ -58,7 +58,7 @@ function ContentTreeNodeRow({
   return (
     <div>
       <div
-        className={`group flex w-full items-center gap-1 py-0.75 pr-2 text-[13px] ${
+        className={`group flex w-full items-center gap-1 h-7 pr-2 text-[13px] ${
           isActive
             ? "bg-list-active-background text-foreground"
             : "text-foreground hover:bg-list-hover-background"
@@ -98,7 +98,7 @@ function ContentTreeNodeRow({
                   onRenameCancel();
                 }
               }}
-              className="min-w-0 flex-1 rounded border border-border bg-editor-background px-1.5 py-0.5 text-[13px] text-foreground outline-none select-text focus:border-accent-foreground"
+              className="min-w-0 flex-1 rounded border border-border bg-editor-background px-1.5 text-[13px] leading-5.5 text-foreground outline-none select-text focus:border-accent-foreground"
               placeholder="未命名节点"
             />
           </div>
@@ -112,25 +112,21 @@ function ContentTreeNodeRow({
                 onToggle(node.id);
               }
             }}
+            onDoubleClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onRenameStart(node);
+            }}
           >
             <ContentNodeIcon hasBody={hasBody} hasChildren={hasChildren} />
-            <span
-              className="truncate"
-              onDoubleClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                onRenameStart(node);
-              }}
-            >
-              {node.title}
-            </span>
+            <span className="truncate">{node.title}</span>
           </button>
         )}
         <button
           type="button"
           onClick={() => onCreateChild(node)}
           disabled={isBusy || isRenaming}
-          className="shrink-0 rounded p-0.5 text-foreground-muted opacity-0 transition hover:bg-button-hover-background hover:text-foreground group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-30"
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-foreground-muted opacity-0 transition hover:bg-button-hover-background hover:text-foreground group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-30"
           title="添加子节点"
         >
           <span className="icon-[material-symbols--add] text-sm leading-none" />
@@ -139,12 +135,12 @@ function ContentTreeNodeRow({
           type="button"
           onClick={() => onDelete(node.id)}
           disabled={isBusy || isRenaming}
-          className="shrink-0 rounded p-0.5 text-foreground-muted opacity-0 transition hover:bg-button-hover-background hover:text-foreground group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-30"
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-foreground-muted opacity-0 transition hover:bg-button-hover-background hover:text-foreground group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-30"
           title="删除节点"
         >
           <span className="icon-[material-symbols--close] text-sm leading-none" />
         </button>
-        <span className="shrink-0 text-[10px] text-accent-foreground opacity-70">
+        <span className="shrink-0 self-center text-[10px] leading-none text-accent-foreground opacity-70">
           {timelineLabelMap.get(node.anchorTimelinePointId) ?? node.anchorTimelinePointId}
         </span>
       </div>
