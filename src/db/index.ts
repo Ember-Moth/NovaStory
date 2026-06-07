@@ -11,7 +11,7 @@ import * as schema from "./schema";
 const dbDir = join(import.meta.dir, "../../data");
 mkdirSync(dbDir, { recursive: true });
 
-const sqlite = new Database(join(dbDir, "sqlite.db"), { create: true });
+const sqlite = new Database(process.env.DATABASE_URL ?? join(dbDir, "sqlite.db"), { create: true });
 
 // Enforce relational integrity for Drizzle foreign keys.
 sqlite.run("PRAGMA foreign_keys = ON;");
@@ -23,5 +23,10 @@ export const db = drizzle(sqlite, { schema });
 
 // Automatically run pending migrations on startup
 migrate(db, { migrationsFolder: "./drizzle" });
+
+export type DatabaseClient = typeof db;
+export type DatabaseExecutor =
+  | DatabaseClient
+  | Parameters<Parameters<DatabaseClient["transaction"]>[0]>[0];
 
 export { sqlite, schema };
