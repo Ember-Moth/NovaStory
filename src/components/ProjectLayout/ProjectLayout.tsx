@@ -1,7 +1,9 @@
-import { skipToken } from "@codehz/rpc";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ScopeProvider } from "bunshi/react";
 
-import { rpc } from "@/api/client";
+import { useProjectActions } from "@/state/project/hooks/useProjectActions";
+import { useProjectWorkspace } from "@/state/project/hooks/useProjectWorkspace";
+import { useProjectWorkspaceEffects } from "@/state/project/hooks/useProjectWorkspaceEffects";
+import { ProjectScope } from "@/state/scopes";
 
 import { AuxTreePanel } from "./AuxTreePanel";
 import { ContentTreePanel } from "./ContentTreePanel";
@@ -10,557 +12,46 @@ import { FullPageMessage } from "./FullPageMessage";
 import { PanelPlaceholder } from "./PanelPlaceholder";
 import { SidebarSection } from "./SidebarSection";
 import { TimelinePanel } from "./TimelinePanel";
-import type { ContentTreeNodeVM } from "./types";
-import {
-  buildContentParentMap,
-  collectAncestorIds,
-  collectContentSubtreeIds,
-  findContentNode,
-  findPreferredContentNode,
-  flattenAuxNodes,
-  flattenContentNodes,
-  normalizeAuxNodes,
-  normalizeContentNodes,
-  normalizeTimelinePoints,
-  omitRecordKey,
-} from "./utils";
-
-const ORIGIN_TIMELINE_POINT_ID = "origin";
-const AUTOSAVE_DELAY_MS = 600;
 
 export function ProjectLayout({ id: projectId }: { id: string }) {
-  const [expandedContentIds, setExpandedContentIds] = useState<Set<string>>(() => new Set());
-  const [activeContentNodeId, setActiveContentNodeId] = useState<string | null>(null);
-  const [expandedAuxIds, setExpandedAuxIds] = useState<Set<string>>(() => new Set());
-  const [activeAuxNodeId, setActiveAuxNodeId] = useState<string | null>(null);
-  const [activeTimelinePointId, setActiveTimelinePointId] = useState<string | null>(null);
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const [committedBodies, setCommittedBodies] = useState<Record<string, string>>({});
-  const [pendingSaveCounts, setPendingSaveCounts] = useState<Record<string, number>>({});
-  const [saveErrors, setSaveErrors] = useState<Record<string, string>>({});
-  const [timelineError, setTimelineError] = useState<string | null>(null);
-  const [contentError, setContentError] = useState<string | null>(null);
-
-  const workspaceQuery = rpc.useQuery("workspaces.default", { projectId });
-  const workspaceId = workspaceQuery.data?.id;
-  const contentRootId = workspaceQuery.data?.contentRootId ?? null;
-
-  const timelineQuery = rpc.useQuery("timeline.list", workspaceId ? { workspaceId } : skipToken);
-  const contentQuery = rpc.useQuery(
-    "content.exportSubtree",
-    workspaceId ? { workspaceId } : skipToken,
+  return (
+    <ScopeProvider scope={ProjectScope} value={projectId}>
+      <ProjectWorkspace projectId={projectId} />
+    </ScopeProvider>
   );
-  const auxQuery = rpc.useQuery(
-    "aux.snapshotTree",
-    workspaceId && activeTimelinePointId
-      ? { workspaceId, pointId: activeTimelinePointId }
-      : skipToken,
-  );
-
-  const updateContent = rpc.useMutation("content.update");
-  const createContent = rpc.useMutation("content.create");
-  const deleteContent = rpc.useMutation("content.delete");
-  const createTimeline = rpc.useMutation("timeline.create");
-  const moveTimeline = rpc.useMutation("timeline.move");
-  const deleteTimeline = rpc.useMutation("timeline.delete");
-
-  const workspaceIdRef = useRef<string | null>(workspaceId ?? null);
-  const draftsRef = useRef(drafts);
-  const committedBodiesRef = useRef(committedBodies);
-  const updateContentRef = useRef(updateContent);
-
-  useEffect(() => {
-    workspaceIdRef.current = workspaceId ?? null;
-  }, [workspaceId]);
-
-  useEffect(() => {
-    draftsRef.current = drafts;
-  }, [drafts]);
-
-  useEffect(() => {
-    committedBodiesRef.current = committedBodies;
-  }, [committedBodies]);
-
-  useEffect(() => {
-    updateContentRef.current = updateContent;
-  }, [updateContent]);
-
-  const contentTree = useMemo(
-    () => normalizeContentNodes(contentQuery.data?.nodes ?? []),
-    [contentQuery.data],
-  );
-  const timelinePoints = useMemo(
-    () => normalizeTimelinePoints(timelineQuery.data ?? []),
-    [timelineQuery.data],
-  );
-  const auxTree = useMemo(() => normalizeAuxNodes(auxQuery.data?.nodes ?? []), [auxQuery.data]);
-
-  const flatContentNodes = useMemo(() => flattenContentNodes(contentTree), [contentTree]);
-  const contentNodeMap = useMemo(
-    () => new Map(flatContentNodes.map((node) => [node.id, node])),
-    [flatContentNodes],
-  );
-  const contentParentMap = useMemo(() => buildContentParentMap(contentTree), [contentTree]);
-  const timelineLabelMap = useMemo(
-    () => new Map(timelinePoints.map((point) => [point.id, point.label])),
-    [timelinePoints],
-  );
-  const timelinePointIdSet = useMemo(
-    () => new Set(timelinePoints.map((point) => point.id)),
-    [timelinePoints],
-  );
-  const auxNodeIdSet = useMemo(
-    () => new Set(flattenAuxNodes(auxTree).map((node) => node.id)),
-    [auxTree],
-  );
-
-  const activeContentNode = activeContentNodeId
-    ? (contentNodeMap.get(activeContentNodeId) ?? null)
-    : null;
-  const editorBody = activeContentNode
-    ? (drafts[activeContentNode.id] ?? activeContentNode.body)
-    : "";
-  const activeTimelineLabel =
-    (activeContentNode && timelineLabelMap.get(activeContentNode.anchorTimelinePointId)) ||
-    (activeTimelinePointId ? timelineLabelMap.get(activeTimelinePointId) : undefined) ||
-    "原点";
-  const activeSaveBaseline = activeContentNode
-    ? (committedBodies[activeContentNode.id] ?? activeContentNode.body)
-    : "";
-  const activeSaveState = {
-    isSaving: activeContentNode ? (pendingSaveCounts[activeContentNode.id] ?? 0) > 0 : false,
-    isDirty: activeContentNode ? editorBody !== activeSaveBaseline : false,
-    error: activeContentNode ? (saveErrors[activeContentNode.id] ?? null) : null,
-  };
-
-  useEffect(() => {
-    if (flatContentNodes.length === 0) {
-      setActiveContentNodeId(null);
-      return;
-    }
-
-    if (activeContentNodeId && contentNodeMap.has(activeContentNodeId)) {
-      return;
-    }
-
-    const preferredNode = findPreferredContentNode(contentTree) ?? flatContentNodes[0] ?? null;
-    if (preferredNode) {
-      setActiveContentNodeId(preferredNode.id);
-    }
-  }, [activeContentNodeId, contentNodeMap, contentTree, flatContentNodes]);
-
-  useEffect(() => {
-    if (!activeContentNodeId) {
-      return;
-    }
-
-    setExpandedContentIds((previous) => {
-      const next = new Set(previous);
-      let changed = false;
-
-      for (const ancestorId of collectAncestorIds(contentParentMap, activeContentNodeId)) {
-        if (!next.has(ancestorId)) {
-          next.add(ancestorId);
-          changed = true;
-        }
-      }
-
-      return changed ? next : previous;
-    });
-  }, [activeContentNodeId, contentParentMap]);
-
-  useEffect(() => {
-    if (timelinePoints.length === 0) {
-      setActiveTimelinePointId(null);
-      return;
-    }
-
-    setActiveTimelinePointId((previous) => {
-      if (previous && timelinePointIdSet.has(previous)) {
-        return previous;
-      }
-
-      const preferredId = activeContentNode?.anchorTimelinePointId;
-      if (preferredId && timelinePointIdSet.has(preferredId)) {
-        return preferredId;
-      }
-
-      return timelinePoints[0]?.id ?? null;
-    });
-  }, [activeContentNode, timelinePointIdSet, timelinePoints]);
-
-  useEffect(() => {
-    if (auxTree.length === 0) {
-      setActiveAuxNodeId(null);
-      return;
-    }
-
-    if (activeAuxNodeId && auxNodeIdSet.has(activeAuxNodeId)) {
-      return;
-    }
-
-    setActiveAuxNodeId(null);
-  }, [activeAuxNodeId, auxNodeIdSet, auxTree]);
-
-  useEffect(() => {
-    if (auxTree.length === 0) {
-      return;
-    }
-
-    const hasVisibleExpandedNode = [...expandedAuxIds].some((id) => auxNodeIdSet.has(id));
-    if (hasVisibleExpandedNode) {
-      return;
-    }
-
-    const nextExpandedIds = auxTree
-      .filter((node) => node.nodeType === "dir")
-      .slice(0, 2)
-      .map((node) => node.id);
-    if (nextExpandedIds.length > 0) {
-      setExpandedAuxIds(new Set(nextExpandedIds));
-    }
-  }, [auxNodeIdSet, auxTree, expandedAuxIds]);
-
-  useEffect(() => {
-    setCommittedBodies((previous) => {
-      let changed = false;
-      const next = { ...previous };
-
-      for (const [nodeId, committedBody] of Object.entries(previous)) {
-        const node = contentNodeMap.get(nodeId);
-        if (node?.body === committedBody) {
-          delete next[nodeId];
-          changed = true;
-        }
-      }
-
-      return changed ? next : previous;
-    });
-  }, [contentNodeMap]);
-
-  const flushBodySave = useCallback(async (nodeId: string, body: string) => {
-    const currentWorkspaceId = workspaceIdRef.current;
-    if (!currentWorkspaceId) {
-      return;
-    }
-
-    setPendingSaveCounts((previous) => ({
-      ...previous,
-      [nodeId]: (previous[nodeId] ?? 0) + 1,
-    }));
-    setSaveErrors((previous) => omitRecordKey(previous, nodeId));
-
-    try {
-      await updateContentRef.current.mutate({
-        workspaceId: currentWorkspaceId,
-        nodeId,
-        body,
-      });
-      setCommittedBodies((previous) => ({
-        ...previous,
-        [nodeId]: body,
-      }));
-    } catch (error) {
-      setSaveErrors((previous) => ({
-        ...previous,
-        [nodeId]: error instanceof Error ? error.message : "保存失败，请稍后重试。",
-      }));
-    } finally {
-      setPendingSaveCounts((previous) => {
-        const nextCount = (previous[nodeId] ?? 1) - 1;
-        if (nextCount <= 0) {
-          return omitRecordKey(previous, nodeId);
-        }
-
-        return {
-          ...previous,
-          [nodeId]: nextCount,
-        };
-      });
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!workspaceId || !activeContentNode) {
-      return;
-    }
-
-    const draft = drafts[activeContentNode.id];
-    if (draft === undefined) {
-      return;
-    }
-
-    const baseline = committedBodies[activeContentNode.id] ?? activeContentNode.body;
-    if (draft === baseline) {
-      return;
-    }
-
-    const timeout = setTimeout(() => {
-      void flushBodySave(activeContentNode.id, draft);
-    }, AUTOSAVE_DELAY_MS);
-
-    return () => clearTimeout(timeout);
-  }, [activeContentNode, committedBodies, drafts, flushBodySave, workspaceId]);
-
-  const toggleContentExpanded = (nodeId: string) => {
-    setExpandedContentIds((previous) => {
-      const next = new Set(previous);
-      if (next.has(nodeId)) {
-        next.delete(nodeId);
-      } else {
-        next.add(nodeId);
-      }
-      return next;
-    });
-  };
-
-  const toggleAuxExpanded = (nodeId: string) => {
-    setExpandedAuxIds((previous) => {
-      const next = new Set(previous);
-      if (next.has(nodeId)) {
-        next.delete(nodeId);
-      } else {
-        next.add(nodeId);
-      }
-      return next;
-    });
-  };
-
-  const handleContentSelect = (node: ContentTreeNodeVM) => {
-    if (activeContentNode && activeContentNode.id !== node.id) {
-      const currentBody = draftsRef.current[activeContentNode.id] ?? activeContentNode.body;
-      const currentBaseline =
-        committedBodiesRef.current[activeContentNode.id] ?? activeContentNode.body;
-      if (currentBody !== currentBaseline) {
-        void flushBodySave(activeContentNode.id, currentBody);
-      }
-    }
-
-    setActiveContentNodeId(node.id);
-    setActiveTimelinePointId(node.anchorTimelinePointId);
-  };
-
-  const handleBodyChange = (nextBody: string) => {
-    if (!activeContentNode) {
-      return;
-    }
-
-    setDrafts((previous) => ({
-      ...previous,
-      [activeContentNode.id]: nextBody,
-    }));
-    setSaveErrors((previous) => omitRecordKey(previous, activeContentNode.id));
-  };
-
-  const expandContentParent = (parentId: string) => {
-    setExpandedContentIds((previous) => {
-      if (previous.has(parentId)) {
-        return previous;
-      }
-
-      const next = new Set(previous);
-      next.add(parentId);
-      return next;
-    });
-  };
-
-  const handleContentCreateSibling = async () => {
-    if (!workspaceId || !contentRootId) {
-      return;
-    }
-
-    const anchorPointId =
-      activeContentNode?.anchorTimelinePointId ?? activeTimelinePointId ?? ORIGIN_TIMELINE_POINT_ID;
-    const parentId = activeContentNode
-      ? (contentParentMap.get(activeContentNode.id) ?? contentRootId)
-      : contentRootId;
-    const title = `新节点 ${flatContentNodes.length + 1}`;
-
-    setContentError(null);
-
-    try {
-      const node = await createContent.mutate({
-        workspaceId,
-        parentId,
-        afterSiblingId: activeContentNode?.id,
-        anchorPointId,
-        title,
-      });
-      setActiveContentNodeId(node.id);
-      setActiveTimelinePointId(node.anchorTimelinePointId ?? ORIGIN_TIMELINE_POINT_ID);
-      expandContentParent(parentId);
-    } catch (error) {
-      setContentError(error instanceof Error ? error.message : "创建正文节点失败，请稍后重试。");
-    }
-  };
-
-  const handleContentCreateChild = async (parentNode: ContentTreeNodeVM) => {
-    if (!workspaceId) {
-      return;
-    }
-
-    const title = `新节点 ${flatContentNodes.length + 1}`;
-
-    setContentError(null);
-
-    try {
-      const node = await createContent.mutate({
-        workspaceId,
-        parentId: parentNode.id,
-        anchorPointId: parentNode.anchorTimelinePointId,
-        title,
-      });
-      setActiveContentNodeId(node.id);
-      setActiveTimelinePointId(node.anchorTimelinePointId ?? ORIGIN_TIMELINE_POINT_ID);
-      expandContentParent(parentNode.id);
-    } catch (error) {
-      setContentError(error instanceof Error ? error.message : "创建正文节点失败，请稍后重试。");
-    }
-  };
-
-  const clearContentNodeLocalState = (nodeIds: Set<string>) => {
-    const omitMany = <TValue,>(record: Record<string, TValue>) => {
-      let changed = false;
-      const next = { ...record };
-
-      for (const nodeId of nodeIds) {
-        if (nodeId in next) {
-          delete next[nodeId];
-          changed = true;
-        }
-      }
-
-      return changed ? next : record;
-    };
-
-    setDrafts((previous) => omitMany(previous));
-    setCommittedBodies((previous) => omitMany(previous));
-    setPendingSaveCounts((previous) => omitMany(previous));
-    setSaveErrors((previous) => omitMany(previous));
-    setExpandedContentIds((previous) => {
-      let changed = false;
-      const next = new Set(previous);
-
-      for (const nodeId of nodeIds) {
-        if (next.delete(nodeId)) {
-          changed = true;
-        }
-      }
-
-      return changed ? next : previous;
-    });
-  };
-
-  const handleContentDelete = async (nodeId: string) => {
-    if (!workspaceId) {
-      return;
-    }
-
-    const targetNode = findContentNode(contentTree, nodeId);
-    if (!targetNode) {
-      return;
-    }
-
-    const deletedIds = collectContentSubtreeIds(targetNode);
-
-    setContentError(null);
-
-    try {
-      await deleteContent.mutate({ workspaceId, nodeId });
-      clearContentNodeLocalState(deletedIds);
-      if (activeContentNodeId && deletedIds.has(activeContentNodeId)) {
-        setActiveContentNodeId(null);
-      }
-    } catch (error) {
-      setContentError(error instanceof Error ? error.message : "删除正文节点失败，请稍后重试。");
-    }
-  };
-
-  const handleTimelineAdd = async () => {
-    if (!workspaceId || !activeTimelinePointId) {
-      return;
-    }
-
-    const newIndex = timelinePoints.filter((point) => !point.isImplicitOrigin).length + 1;
-    setTimelineError(null);
-
-    try {
-      const point = await createTimeline.mutate({
-        workspaceId,
-        afterPointId: activeTimelinePointId,
-        key: `timeline_${crypto.randomUUID().replaceAll("-", "").slice(0, 10)}`,
-        label: `新时间点 ${newIndex}`,
-        description: "",
-      });
-      setActiveTimelinePointId(point.id);
-    } catch (error) {
-      setTimelineError(error instanceof Error ? error.message : "创建时间点失败，请稍后重试。");
-    }
-  };
-
-  const handleTimelineReorder = async (fromIndex: number, toIndex: number) => {
-    if (!workspaceId) {
-      return;
-    }
-
-    const movedPoint = timelinePoints[fromIndex];
-    if (!movedPoint || movedPoint.isImplicitOrigin) {
-      return;
-    }
-
-    const reorderedPoints = [...timelinePoints];
-    reorderedPoints.splice(fromIndex, 1);
-    reorderedPoints.splice(toIndex, 0, movedPoint);
-
-    const orderedMovablePoints = reorderedPoints.filter((point) => !point.isImplicitOrigin);
-    const newIndex = orderedMovablePoints.findIndex((point) => point.id === movedPoint.id);
-    const afterPointId =
-      newIndex <= 0
-        ? ORIGIN_TIMELINE_POINT_ID
-        : (orderedMovablePoints[newIndex - 1]?.id ?? ORIGIN_TIMELINE_POINT_ID);
-
-    setTimelineError(null);
-
-    try {
-      await moveTimeline.mutate({
-        workspaceId,
-        pointId: movedPoint.id,
-        afterPointId,
-      });
-    } catch (error) {
-      setTimelineError(error instanceof Error ? error.message : "调整时间轴顺序失败，请稍后重试。");
-    }
-  };
-
-  const handleTimelineDelete = async (pointId: string) => {
-    if (!workspaceId || pointId === ORIGIN_TIMELINE_POINT_ID) {
-      return;
-    }
-
-    setTimelineError(null);
-
-    try {
-      await deleteTimeline.mutate({
-        workspaceId,
-        pointId,
-      });
-      if (activeTimelinePointId === pointId) {
-        setActiveTimelinePointId(ORIGIN_TIMELINE_POINT_ID);
-      }
-    } catch (error) {
-      setTimelineError(error instanceof Error ? error.message : "删除时间点失败，请稍后重试。");
-    }
-  };
-
-  const contentBusy = createContent.isPending || deleteContent.isPending;
-  const timelineBusy =
-    createTimeline.isPending || moveTimeline.isPending || deleteTimeline.isPending;
-  const pageError =
-    workspaceQuery.error?.message ??
-    contentQuery.error?.message ??
-    timelineQuery.error?.message ??
-    auxQuery.error?.message ??
-    null;
+}
+
+function ProjectWorkspace({ projectId }: { projectId: string }) {
+  const workspace = useProjectWorkspace(projectId);
+  const actions = useProjectActions(workspace);
+  useProjectWorkspaceEffects(workspace, actions.flushBodySave);
+
+  const {
+    workspaceQuery,
+    workspaceId,
+    contentRootId,
+    contentQuery,
+    timelineQuery,
+    auxQuery,
+    contentTree,
+    timelinePoints,
+    auxTree,
+    timelineLabelMap,
+    activeContentNodeId,
+    activeAuxNodeId,
+    activeTimelinePointId,
+    expandedContentIds,
+    expandedAuxIds,
+    activeContentNode,
+    editorBody,
+    activeTimelineLabel,
+    activeSaveState,
+    contentError,
+    timelineError,
+    contentBusy,
+    timelineBusy,
+    pageError,
+  } = workspace;
 
   if (workspaceQuery.isLoading) {
     return (
@@ -622,7 +113,7 @@ export function ProjectLayout({ id: projectId }: { id: string }) {
           actions={
             <button
               type="button"
-              onClick={handleContentCreateSibling}
+              onClick={actions.handleContentCreateSibling}
               disabled={contentBusy || !contentRootId}
               className="icon-[material-symbols--add] text-base hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
               title="添加同级节点"
@@ -641,12 +132,12 @@ export function ProjectLayout({ id: projectId }: { id: string }) {
             <ContentTreePanel
               tree={contentTree}
               expandedIds={expandedContentIds}
-              onToggle={toggleContentExpanded}
-              onSelect={handleContentSelect}
+              onToggle={actions.toggleContentExpanded}
+              onSelect={actions.handleContentSelect}
               activeId={activeContentNodeId}
               timelineLabelMap={timelineLabelMap}
-              onCreateChild={handleContentCreateChild}
-              onDelete={handleContentDelete}
+              onCreateChild={actions.handleContentCreateChild}
+              onDelete={actions.handleContentDelete}
               isBusy={contentBusy}
             />
           )}
@@ -663,9 +154,9 @@ export function ProjectLayout({ id: projectId }: { id: string }) {
             <AuxTreePanel
               tree={auxTree}
               expandedIds={expandedAuxIds}
-              onToggle={toggleAuxExpanded}
+              onToggle={actions.toggleAuxExpanded}
               activeId={activeAuxNodeId}
-              onSelect={(node) => setActiveAuxNodeId(node.id)}
+              onSelect={(node) => actions.setActiveAuxNodeId(node.id)}
             />
           )}
         </SidebarSection>
@@ -676,7 +167,7 @@ export function ProjectLayout({ id: projectId }: { id: string }) {
           actions={
             <button
               type="button"
-              onClick={handleTimelineAdd}
+              onClick={actions.handleTimelineAdd}
               disabled={timelineBusy || !activeTimelinePointId}
               className="icon-[material-symbols--add] text-base hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
               title="添加时间点"
@@ -696,9 +187,9 @@ export function ProjectLayout({ id: projectId }: { id: string }) {
               points={timelinePoints}
               activeId={activeTimelinePointId}
               isBusy={timelineBusy}
-              onSelect={setActiveTimelinePointId}
-              onReorder={handleTimelineReorder}
-              onDelete={handleTimelineDelete}
+              onSelect={actions.setActiveTimelinePointId}
+              onReorder={actions.handleTimelineReorder}
+              onDelete={actions.handleTimelineDelete}
             />
           )}
         </SidebarSection>
@@ -710,7 +201,7 @@ export function ProjectLayout({ id: projectId }: { id: string }) {
           body={editorBody}
           timelineLabel={activeTimelineLabel}
           saveState={activeSaveState}
-          onBodyChange={handleBodyChange}
+          onBodyChange={actions.handleBodyChange}
         />
       </div>
     </div>
