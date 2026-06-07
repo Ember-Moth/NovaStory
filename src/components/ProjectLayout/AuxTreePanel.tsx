@@ -1,92 +1,59 @@
 import { PanelPlaceholder } from "./PanelPlaceholder";
 import { AuxNodeIcon } from "./icons";
+import { ExpandToggle, SidebarListRow, TreeNodePanel, type TreeRowContext } from "./nodes";
 import type { AuxTreeNodeVM } from "./types";
 
 function AuxTreeNodeRow({
   node,
   depth,
-  expandedIds,
+  isExpanded,
+  isActive,
   onToggle,
-  activeId,
   onSelect,
 }: {
   node: AuxTreeNodeVM;
   depth: number;
-  expandedIds: Set<string>;
+  isExpanded: boolean;
+  isActive: boolean;
   onToggle: (_id: string) => void;
   onSelect: (_node: AuxTreeNodeVM) => void;
-  activeId: string | null;
 }) {
   const isDir = node.nodeType === "dir";
-  const isExpanded = expandedIds.has(node.id);
-  const isActive = activeId === node.id;
 
   if (isDir) {
     return (
-      <div>
-        <button
-          type="button"
-          className={`flex w-full items-center gap-1 py-0.75 pr-2 text-[13px] ${
-            isActive
-              ? "bg-list-active-background text-foreground"
-              : "text-foreground hover:bg-list-hover-background"
-          }`}
-          style={{ paddingLeft: `${8 + depth * 16}px` }}
-          onClick={() => {
-            onSelect(node);
-            onToggle(node.id);
-          }}
-        >
-          <span
-            className={`w-4 shrink-0 text-base ${
-              isExpanded
-                ? "icon-[material-symbols--keyboard-arrow-down]"
-                : "icon-[material-symbols--keyboard-arrow-right]"
-            }`}
-          />
-          <AuxNodeIcon nodeType={isExpanded ? "dir-open" : "dir"} />
-          <span className="truncate">{node.name}</span>
-        </button>
-        {isExpanded ? (
-          <div>
-            {node.children.map((child) => (
-              <AuxTreeNodeRow
-                key={child.id}
-                node={child}
-                depth={depth + 1}
-                expandedIds={expandedIds}
-                onToggle={onToggle}
-                activeId={activeId}
-                onSelect={onSelect}
-              />
-            ))}
-          </div>
-        ) : null}
-      </div>
+      <SidebarListRow
+        depth={depth}
+        isActive={isActive}
+        onClick={() => {
+          onSelect(node);
+          onToggle(node.id);
+        }}
+        leading={
+          <ExpandToggle hasChildren expanded={isExpanded} onToggle={() => onToggle(node.id)} />
+        }
+        icon={<AuxNodeIcon nodeType={isExpanded ? "dir-open" : "dir"} />}
+        label={<span className="truncate">{node.name}</span>}
+      />
     );
   }
 
   return (
-    <button
-      type="button"
-      className={`flex w-full items-center gap-1 py-0.75 pr-2 text-[13px] ${
-        isActive
-          ? "bg-list-active-background text-foreground"
-          : "text-foreground hover:bg-list-hover-background"
-      }`}
-      style={{ paddingLeft: `${8 + depth * 16 + 16}px` }}
+    <SidebarListRow
+      depth={depth + 1}
+      isActive={isActive}
       onClick={() => onSelect(node)}
-      title={node.path}
-    >
-      <span className="w-4 shrink-0" />
-      <AuxNodeIcon nodeType={node.nodeType} />
-      <span className="truncate">{node.name}</span>
-      {node.nodeType === "symlink" && node.symlinkTargetPath ? (
-        <span className="ml-1 truncate text-[11px] text-accent-foreground">
-          → {node.symlinkTargetPath}
-        </span>
-      ) : null}
-    </button>
+      leading={<ExpandToggle hasChildren={false} expanded={false} />}
+      icon={<AuxNodeIcon nodeType={node.nodeType} />}
+      label={<span className="truncate">{node.name}</span>}
+      trailing={
+        node.nodeType === "symlink" && node.symlinkTargetPath ? (
+          <span className="ml-1 truncate text-[11px] text-accent-foreground">
+            → {node.symlinkTargetPath}
+          </span>
+        ) : undefined
+      }
+    />
   );
 }
 
@@ -112,19 +79,27 @@ export function AuxTreePanel({
     );
   }
 
+  const renderRow = (ctx: TreeRowContext<AuxTreeNodeVM>) => (
+    <AuxTreeNodeRow
+      node={ctx.node}
+      depth={ctx.depth}
+      isExpanded={ctx.isExpanded}
+      isActive={ctx.isActive}
+      onToggle={onToggle}
+      onSelect={onSelect}
+    />
+  );
+
   return (
     <div className="pb-2">
-      {tree.map((node) => (
-        <AuxTreeNodeRow
-          key={node.id}
-          node={node}
-          depth={0}
-          expandedIds={expandedIds}
-          onToggle={onToggle}
-          activeId={activeId}
-          onSelect={onSelect}
-        />
-      ))}
+      <TreeNodePanel
+        nodes={tree}
+        expandedIds={expandedIds}
+        activeId={activeId}
+        getId={(node) => node.id}
+        getChildren={(node) => node.children}
+        renderRow={renderRow}
+      />
     </div>
   );
 }
