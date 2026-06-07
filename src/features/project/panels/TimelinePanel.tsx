@@ -47,7 +47,7 @@ export function TimelinePanel({
             <SidebarListRow
               depth={0}
               isActive={isActive}
-              group={showSetAnchor || !point.isImplicitOrigin}
+              group={!!showSetAnchor || !point.isImplicitOrigin}
               className={point.isImplicitOrigin ? "opacity-90" : ""}
               onClick={() => onSelect(point.id)}
               draggable={draggable}
@@ -65,16 +65,10 @@ export function TimelinePanel({
                   className={`min-w-0 flex-1 truncate leading-5.5${isAnchored ? " font-bold text-accent-foreground" : ""}`}
                 />
               }
-              trailing={
-                point.description ? (
-                  <span className="truncate text-[11px] text-foreground-muted">
-                    {point.description}
-                  </span>
-                ) : undefined
-              }
+              trailing={point.description || undefined}
               actions={
                 showSetAnchor || showDelete ? (
-                  <div className="ml-auto flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
+                  <>
                     {showSetAnchor ? (
                       <RowActionButton
                         onClick={() => onSetAnchor(point.id)}
@@ -91,7 +85,7 @@ export function TimelinePanel({
                         icon="icon-[material-symbols--close]"
                       />
                     ) : null}
-                  </div>
+                  </>
                 ) : undefined
               }
             />

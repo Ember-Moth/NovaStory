@@ -1,5 +1,6 @@
 import { type DragEvent, type ReactNode } from "react";
 
+import { RowHoverSlot } from "./RowHoverSlot";
 import type { DragRowProps } from "./useDragReorder";
 
 export const ROW_BASE = "flex w-full items-center gap-1 h-7 pr-2 text-[13px]";
@@ -38,7 +39,8 @@ export function SidebarListRow({
   actions?: ReactNode;
 }) {
   const stateClass = isActive ? ROW_ACTIVE : ROW_INACTIVE;
-  const groupClass = group ? "group" : "";
+  const hasHoverSlot = trailing != null || actions != null;
+  const groupClass = group || hasHoverSlot ? "group" : "";
   const interactiveClass = onClick ? "cursor-pointer" : "";
 
   const dragClass = dragProps?.isDragging
@@ -82,8 +84,7 @@ export function SidebarListRow({
       {leading}
       {icon}
       <div className="flex min-w-0 flex-1 items-center gap-1">{label}</div>
-      {trailing}
-      {actions}
+      <RowHoverSlot badge={trailing} actions={actions} />
     </div>
   );
 }

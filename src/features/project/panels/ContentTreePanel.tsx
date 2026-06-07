@@ -6,7 +6,6 @@ import { ContentNodeIcon } from "@/features/project/components/icons";
 import {
   ExpandToggle,
   RowActionButton,
-  RowHoverSlot,
   SidebarListRow,
   TreeNodePanel,
   type TreeRowContext,
@@ -76,26 +75,22 @@ function ContentTreeNodeRow({
           className="truncate"
         />
       }
+      trailing={timelineLabelMap.get(node.anchorTimelinePointId) ?? node.anchorTimelinePointId}
       actions={
-        <RowHoverSlot
-          badge={timelineLabelMap.get(node.anchorTimelinePointId) ?? node.anchorTimelinePointId}
-          actions={
-            <>
-              <RowActionButton
-                onClick={() => onCreateChild(node)}
-                disabled={isBusy || isEditing || !canCreate}
-                title="添加子节点"
-                icon="icon-[material-symbols--add]"
-              />
-              <RowActionButton
-                onClick={() => onDelete(node.id)}
-                disabled={isBusy || isEditing}
-                title="删除节点"
-                icon="icon-[material-symbols--close]"
-              />
-            </>
-          }
-        />
+        <>
+          <RowActionButton
+            onClick={() => onCreateChild(node)}
+            disabled={isBusy || isEditing || !canCreate}
+            title="添加子节点"
+            icon="icon-[material-symbols--add]"
+          />
+          <RowActionButton
+            onClick={() => onDelete(node.id)}
+            disabled={isBusy || isEditing}
+            title="删除节点"
+            icon="icon-[material-symbols--close]"
+          />
+        </>
       }
     />
   );

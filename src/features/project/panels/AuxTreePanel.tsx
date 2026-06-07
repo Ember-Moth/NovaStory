@@ -6,7 +6,6 @@ import { AuxNodeIcon } from "@/features/project/components/icons";
 import {
   ExpandToggle,
   RowActionButton,
-  RowHoverSlot,
   SidebarListRow,
   TreeNodePanel,
   type TreeRowContext,
@@ -68,30 +67,26 @@ function AuxTreeNodeRow({
         icon={<AuxNodeIcon nodeType={isExpanded ? "dir-open" : "dir"} />}
         label={label}
         actions={
-          <RowHoverSlot
-            actions={
-              <>
-                <RowActionButton
-                  onClick={() => onCreateChildDir(node)}
-                  disabled={isBusy || isEditing}
-                  title="添加子文件夹"
-                  icon="icon-[material-symbols--create-new-folder]"
-                />
-                <RowActionButton
-                  onClick={() => onCreateChildFile(node)}
-                  disabled={isBusy || isEditing}
-                  title="添加子文件"
-                  icon="icon-[material-symbols--note-add]"
-                />
-                <RowActionButton
-                  onClick={() => onDelete(node.id)}
-                  disabled={isBusy || isEditing}
-                  title="删除节点"
-                  icon="icon-[material-symbols--close]"
-                />
-              </>
-            }
-          />
+          <>
+            <RowActionButton
+              onClick={() => onCreateChildDir(node)}
+              disabled={isBusy || isEditing}
+              title="添加子文件夹"
+              icon="icon-[material-symbols--create-new-folder]"
+            />
+            <RowActionButton
+              onClick={() => onCreateChildFile(node)}
+              disabled={isBusy || isEditing}
+              title="添加子文件"
+              icon="icon-[material-symbols--note-add]"
+            />
+            <RowActionButton
+              onClick={() => onDelete(node.id)}
+              disabled={isBusy || isEditing}
+              title="删除节点"
+              icon="icon-[material-symbols--close]"
+            />
+          </>
         }
       />
     );
@@ -107,22 +102,16 @@ function AuxTreeNodeRow({
       icon={<AuxNodeIcon nodeType={node.nodeType} />}
       label={label}
       trailing={
-        node.nodeType === "symlink" && node.symlinkTargetPath ? (
-          <span className="ml-1 truncate text-[11px] text-accent-foreground">
-            → {node.symlinkTargetPath}
-          </span>
-        ) : undefined
+        node.nodeType === "symlink" && node.symlinkTargetPath
+          ? `→ ${node.symlinkTargetPath}`
+          : undefined
       }
       actions={
-        <RowHoverSlot
-          actions={
-            <RowActionButton
-              onClick={() => onDelete(node.id)}
-              disabled={isBusy || isEditing}
-              title="删除节点"
-              icon="icon-[material-symbols--close]"
-            />
-          }
+        <RowActionButton
+          onClick={() => onDelete(node.id)}
+          disabled={isBusy || isEditing}
+          title="删除节点"
+          icon="icon-[material-symbols--close]"
         />
       }
     />
