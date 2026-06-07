@@ -5,6 +5,7 @@ import { useCallback } from "react";
 import {
   collectContentSubtreeIds,
   findAuxNode,
+  findContentDeleteFallback,
   findContentNode,
   listAuxSiblings,
   nextAuxDirName,
@@ -619,22 +620,39 @@ export function useProjectActions(workspace: ProjectWorkspace) {
       }
 
       const deletedIds = collectContentSubtreeIds(targetNode);
+      const shouldReselect = Boolean(activeContentNodeId && deletedIds.has(activeContentNodeId));
+      const fallbackNode = shouldReselect
+        ? findContentDeleteFallback(
+            contentTree,
+            contentParentMap,
+            contentRootId,
+            nodeId,
+            deletedIds,
+          )
+        : null;
 
       setContentError(null);
 
       try {
         await deleteContent.mutate({ workspaceId, nodeId });
         clearContentNodeLocalState(deletedIds);
-        if (activeContentNodeId && deletedIds.has(activeContentNodeId)) {
-          setActiveContentNodeId(null);
+        if (shouldReselect) {
+          if (fallbackNode) {
+            activateContentNode(fallbackNode.id, fallbackNode.anchorTimelinePointId);
+          } else {
+            setActiveContentNodeId(null);
+          }
         }
       } catch (error) {
         setContentError(error instanceof Error ? error.message : "删除正文节点失败，请稍后重试。");
       }
     },
     [
+      activateContentNode,
       activeContentNodeId,
       clearContentNodeLocalState,
+      contentParentMap,
+      contentRootId,
       contentTree,
       deleteContent,
       setActiveContentNodeId,

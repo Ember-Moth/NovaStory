@@ -15,6 +15,44 @@ export function collectAncestorIds(
   return ancestors;
 }
 
+export function listContentSiblings(
+  tree: ContentTreeNodeVM[],
+  parentId: string | null,
+  contentRootId: string | null,
+): ContentTreeNodeVM[] {
+  if (!parentId || parentId === contentRootId) {
+    return tree;
+  }
+
+  const parent = findContentNode(tree, parentId);
+  return parent?.children ?? [];
+}
+
+export function findContentDeleteFallback(
+  tree: ContentTreeNodeVM[],
+  parentMap: Map<string, string | null>,
+  contentRootId: string | null,
+  nodeId: string,
+  excludedIds: Set<string>,
+): ContentTreeNodeVM | null {
+  const parentId = parentMap.get(nodeId) ?? contentRootId;
+  const siblings = listContentSiblings(tree, parentId, contentRootId);
+  const nodeIndex = siblings.findIndex((sibling) => sibling.id === nodeId);
+
+  if (nodeIndex > 0) {
+    const previousSibling = siblings[nodeIndex - 1];
+    if (previousSibling && !excludedIds.has(previousSibling.id)) {
+      return previousSibling;
+    }
+  }
+
+  if (parentId && parentId !== contentRootId && !excludedIds.has(parentId)) {
+    return findContentNode(tree, parentId);
+  }
+
+  return null;
+}
+
 export function findContentNode(
   nodes: ContentTreeNodeVM[],
   nodeId: string,
