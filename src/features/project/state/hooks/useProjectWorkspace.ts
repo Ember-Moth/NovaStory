@@ -11,6 +11,7 @@ import {
   normalizeContentNodes,
   normalizeTimelinePoints,
 } from "@/features/project/model/normalize";
+import { buildAuxParentMap } from "@/features/project/model/tree";
 import type { ContentTreeNodeVM, SaveState } from "@/features/project/model/types";
 import { rpc } from "@/server/rpc/client";
 
@@ -34,6 +35,7 @@ export function useProjectWorkspace(projectId: string) {
   const [saveErrors] = useAtom(editor.saveErrorsAtom);
   const [contentError] = useAtom(errors.contentErrorAtom);
   const [timelineError] = useAtom(errors.timelineErrorAtom);
+  const [auxError] = useAtom(errors.auxErrorAtom);
 
   const workspaceQuery = rpc.useQuery("workspaces.default", { projectId });
   const workspaceId = workspaceQuery.data?.id;
@@ -58,6 +60,9 @@ export function useProjectWorkspace(projectId: string) {
   const moveTimeline = rpc.useMutation("timeline.move");
   const deleteTimeline = rpc.useMutation("timeline.delete");
   const updateTimeline = rpc.useMutation("timeline.update");
+  const mkdirAux = rpc.useMutation("aux.mkdir");
+  const writeFileAux = rpc.useMutation("aux.writeFile");
+  const deleteAux = rpc.useMutation("aux.delete");
 
   const contentTree = useMemo(
     () => normalizeContentNodes(contentQuery.data?.nodes ?? []),
@@ -68,6 +73,7 @@ export function useProjectWorkspace(projectId: string) {
     [timelineQuery.data],
   );
   const auxTree = useMemo(() => normalizeAuxNodes(auxQuery.data?.nodes ?? []), [auxQuery.data]);
+  const auxRootId = auxQuery.data?.rootNodeId ?? null;
 
   const flatContentNodes = useMemo(() => flattenContentNodes(contentTree), [contentTree]);
   const contentNodeMap = useMemo(
@@ -75,6 +81,7 @@ export function useProjectWorkspace(projectId: string) {
     [flatContentNodes],
   );
   const contentParentMap = useMemo(() => buildContentParentMap(contentTree), [contentTree]);
+  const auxParentMap = useMemo(() => buildAuxParentMap(auxTree), [auxTree]);
   const timelineLabelMap = useMemo(
     () => new Map(timelinePoints.map((point) => [point.id, point.label])),
     [timelinePoints],
@@ -113,6 +120,7 @@ export function useProjectWorkspace(projectId: string) {
     moveTimeline.isPending ||
     deleteTimeline.isPending ||
     updateTimeline.isPending;
+  const auxBusy = mkdirAux.isPending || writeFileAux.isPending || deleteAux.isPending;
   const pageError =
     workspaceQuery.error?.message ??
     contentQuery.error?.message ??
@@ -135,12 +143,17 @@ export function useProjectWorkspace(projectId: string) {
     moveTimeline,
     deleteTimeline,
     updateTimeline,
+    mkdirAux,
+    writeFileAux,
+    deleteAux,
     contentTree,
     timelinePoints,
     auxTree,
+    auxRootId,
     flatContentNodes,
     contentNodeMap,
     contentParentMap,
+    auxParentMap,
     timelineLabelMap,
     timelinePointIdSet,
     auxNodeIdSet,
@@ -157,8 +170,10 @@ export function useProjectWorkspace(projectId: string) {
     activeSaveState,
     contentError,
     timelineError,
+    auxError,
     contentBusy,
     timelineBusy,
+    auxBusy,
     pageError,
   };
 }

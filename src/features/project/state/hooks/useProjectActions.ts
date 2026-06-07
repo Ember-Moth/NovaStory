@@ -5,9 +5,12 @@ import { useCallback } from "react";
 import {
   collectContentSubtreeIds,
   findContentNode,
+  listAuxSiblings,
+  nextAuxDirName,
+  nextAuxFileName,
   omitRecordKey,
 } from "@/features/project/model/tree";
-import type { ContentTreeNodeVM } from "@/features/project/model/types";
+import type { AuxTreeNodeVM, ContentTreeNodeVM } from "@/features/project/model/types";
 import { ORIGIN_TIMELINE_POINT_ID } from "@/shared/constants";
 
 import { EditorMolecule } from "../molecules/editor";
@@ -33,16 +36,21 @@ export function useProjectActions(workspace: ProjectWorkspace) {
   const setSaveErrors = useSetAtom(editor.saveErrorsAtom);
   const setContentError = useSetAtom(errors.contentErrorAtom);
   const setTimelineError = useSetAtom(errors.timelineErrorAtom);
+  const setAuxError = useSetAtom(errors.auxErrorAtom);
 
   const {
     workspaceId,
     contentRootId,
     contentTree,
+    auxTree,
+    auxRootId,
+    auxParentMap,
     flatContentNodes,
     contentParentMap,
     timelinePoints,
     activeContentNode,
     activeContentNodeId,
+    activeAuxNodeId,
     activeTimelinePointId,
     createContent,
     deleteContent,
@@ -51,6 +59,9 @@ export function useProjectActions(workspace: ProjectWorkspace) {
     moveTimeline,
     deleteTimeline,
     updateTimeline,
+    mkdirAux,
+    writeFileAux,
+    deleteAux,
   } = workspace;
 
   const flushBodySave = useCallback(
@@ -140,6 +151,109 @@ export function useProjectActions(workspace: ProjectWorkspace) {
       });
     },
     [setExpandedContentIds],
+  );
+
+  const expandAuxParent = useCallback(
+    (parentId: string) => {
+      setExpandedAuxIds((previous) => {
+        if (previous.has(parentId)) {
+          return previous;
+        }
+
+        const next = new Set(previous);
+        next.add(parentId);
+        return next;
+      });
+    },
+    [setExpandedAuxIds],
+  );
+
+  const resolveAuxParentForSibling = useCallback(
+    (activeId: string | null): string | null => {
+      if (!auxRootId) {
+        return null;
+      }
+
+      if (!activeId) {
+        return auxRootId;
+      }
+
+      return auxParentMap.get(activeId) ?? auxRootId;
+    },
+    [auxParentMap, auxRootId],
+  );
+
+  const createAuxDir = useCallback(
+    async (parentDirId: string) => {
+      if (!workspaceId || !activeTimelinePointId) {
+        return;
+      }
+
+      const siblings = listAuxSiblings(auxTree, parentDirId, auxRootId);
+      const name = nextAuxDirName(siblings);
+
+      setAuxError(null);
+
+      try {
+        const node = await mkdirAux.mutate({
+          workspaceId,
+          timelinePointId: activeTimelinePointId,
+          parentDirId,
+          name,
+        });
+        setActiveAuxNodeId(node.id);
+        expandAuxParent(parentDirId);
+      } catch (error) {
+        setAuxError(error instanceof Error ? error.message : "创建辅助文件夹失败，请稍后重试。");
+      }
+    },
+    [
+      activeTimelinePointId,
+      auxRootId,
+      auxTree,
+      expandAuxParent,
+      mkdirAux,
+      setActiveAuxNodeId,
+      setAuxError,
+      workspaceId,
+    ],
+  );
+
+  const createAuxFile = useCallback(
+    async (parentDirId: string) => {
+      if (!workspaceId || !activeTimelinePointId) {
+        return;
+      }
+
+      const siblings = listAuxSiblings(auxTree, parentDirId, auxRootId);
+      const name = nextAuxFileName(siblings);
+
+      setAuxError(null);
+
+      try {
+        const node = await writeFileAux.mutate({
+          workspaceId,
+          timelinePointId: activeTimelinePointId,
+          parentDirId,
+          name,
+          content: "",
+        });
+        setActiveAuxNodeId(node.id);
+        expandAuxParent(parentDirId);
+      } catch (error) {
+        setAuxError(error instanceof Error ? error.message : "创建辅助文件失败，请稍后重试。");
+      }
+    },
+    [
+      activeTimelinePointId,
+      auxRootId,
+      auxTree,
+      expandAuxParent,
+      setActiveAuxNodeId,
+      setAuxError,
+      workspaceId,
+      writeFileAux,
+    ],
   );
 
   const handleContentSelect = useCallback(
@@ -450,6 +564,77 @@ export function useProjectActions(workspace: ProjectWorkspace) {
     [moveTimeline, setTimelineError, timelinePoints, workspaceId],
   );
 
+  const handleAuxCreateSiblingDir = useCallback(async () => {
+    const parentDirId = resolveAuxParentForSibling(activeAuxNodeId);
+    if (!parentDirId) {
+      return;
+    }
+
+    await createAuxDir(parentDirId);
+  }, [activeAuxNodeId, createAuxDir, resolveAuxParentForSibling]);
+
+  const handleAuxCreateSiblingFile = useCallback(async () => {
+    const parentDirId = resolveAuxParentForSibling(activeAuxNodeId);
+    if (!parentDirId) {
+      return;
+    }
+
+    await createAuxFile(parentDirId);
+  }, [activeAuxNodeId, createAuxFile, resolveAuxParentForSibling]);
+
+  const handleAuxCreateChildDir = useCallback(
+    async (parentNode: AuxTreeNodeVM) => {
+      if (parentNode.nodeType !== "dir") {
+        return;
+      }
+
+      await createAuxDir(parentNode.id);
+    },
+    [createAuxDir],
+  );
+
+  const handleAuxCreateChildFile = useCallback(
+    async (parentNode: AuxTreeNodeVM) => {
+      if (parentNode.nodeType !== "dir") {
+        return;
+      }
+
+      await createAuxFile(parentNode.id);
+    },
+    [createAuxFile],
+  );
+
+  const handleAuxDelete = useCallback(
+    async (nodeId: string) => {
+      if (!workspaceId || !activeTimelinePointId) {
+        return;
+      }
+
+      setAuxError(null);
+
+      try {
+        await deleteAux.mutate({
+          workspaceId,
+          timelinePointId: activeTimelinePointId,
+          nodeId,
+        });
+        if (activeAuxNodeId === nodeId) {
+          setActiveAuxNodeId(null);
+        }
+      } catch (error) {
+        setAuxError(error instanceof Error ? error.message : "删除辅助节点失败，请稍后重试。");
+      }
+    },
+    [
+      activeAuxNodeId,
+      activeTimelinePointId,
+      deleteAux,
+      setActiveAuxNodeId,
+      setAuxError,
+      workspaceId,
+    ],
+  );
+
   const handleTimelineDelete = useCallback(
     async (pointId: string) => {
       if (!workspaceId || pointId === ORIGIN_TIMELINE_POINT_ID) {
@@ -493,6 +678,11 @@ export function useProjectActions(workspace: ProjectWorkspace) {
     handleTimelineRename,
     handleTimelineReorder,
     handleTimelineDelete,
+    handleAuxCreateSiblingDir,
+    handleAuxCreateSiblingFile,
+    handleAuxCreateChildDir,
+    handleAuxCreateChildFile,
+    handleAuxDelete,
     setActiveAuxNodeId,
     setActiveTimelinePointId,
   };

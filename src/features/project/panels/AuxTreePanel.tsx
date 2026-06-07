@@ -2,6 +2,8 @@ import { PanelPlaceholder } from "@/features/project/components/PanelPlaceholder
 import { AuxNodeIcon } from "@/features/project/components/icons";
 import {
   ExpandToggle,
+  RowActionButton,
+  RowHoverSlot,
   SidebarListRow,
   TreeNodePanel,
   type TreeRowContext,
@@ -15,6 +17,10 @@ function AuxTreeNodeRow({
   isActive,
   onToggle,
   onSelect,
+  onCreateChildDir,
+  onCreateChildFile,
+  onDelete,
+  isBusy,
 }: {
   node: AuxTreeNodeVM;
   depth: number;
@@ -22,6 +28,10 @@ function AuxTreeNodeRow({
   isActive: boolean;
   onToggle: (_id: string) => void;
   onSelect: (_node: AuxTreeNodeVM) => void;
+  onCreateChildDir: (_node: AuxTreeNodeVM) => void;
+  onCreateChildFile: (_node: AuxTreeNodeVM) => void;
+  onDelete: (_id: string) => void;
+  isBusy: boolean;
 }) {
   const isDir = node.nodeType === "dir";
 
@@ -30,6 +40,7 @@ function AuxTreeNodeRow({
       <SidebarListRow
         depth={depth}
         isActive={isActive}
+        group
         onClick={() => {
           onSelect(node);
           onToggle(node.id);
@@ -39,14 +50,41 @@ function AuxTreeNodeRow({
         }
         icon={<AuxNodeIcon nodeType={isExpanded ? "dir-open" : "dir"} />}
         label={<span className="truncate">{node.name}</span>}
+        actions={
+          <RowHoverSlot
+            actions={
+              <>
+                <RowActionButton
+                  onClick={() => onCreateChildDir(node)}
+                  disabled={isBusy}
+                  title="添加子文件夹"
+                  icon="icon-[material-symbols--create-new-folder]"
+                />
+                <RowActionButton
+                  onClick={() => onCreateChildFile(node)}
+                  disabled={isBusy}
+                  title="添加子文件"
+                  icon="icon-[material-symbols--note-add]"
+                />
+                <RowActionButton
+                  onClick={() => onDelete(node.id)}
+                  disabled={isBusy}
+                  title="删除节点"
+                  icon="icon-[material-symbols--close]"
+                />
+              </>
+            }
+          />
+        }
       />
     );
   }
 
   return (
     <SidebarListRow
-      depth={depth + 1}
+      depth={depth}
       isActive={isActive}
+      group
       onClick={() => onSelect(node)}
       leading={<ExpandToggle hasChildren={false} expanded={false} />}
       icon={<AuxNodeIcon nodeType={node.nodeType} />}
@@ -58,6 +96,18 @@ function AuxTreeNodeRow({
           </span>
         ) : undefined
       }
+      actions={
+        <RowHoverSlot
+          actions={
+            <RowActionButton
+              onClick={() => onDelete(node.id)}
+              disabled={isBusy}
+              title="删除节点"
+              icon="icon-[material-symbols--close]"
+            />
+          }
+        />
+      }
     />
   );
 }
@@ -68,18 +118,26 @@ export function AuxTreePanel({
   onToggle,
   activeId,
   onSelect,
+  onCreateChildDir,
+  onCreateChildFile,
+  onDelete,
+  isBusy,
 }: {
   tree: AuxTreeNodeVM[];
   expandedIds: Set<string>;
   onToggle: (_id: string) => void;
   activeId: string | null;
   onSelect: (_node: AuxTreeNodeVM) => void;
+  onCreateChildDir: (_node: AuxTreeNodeVM) => void;
+  onCreateChildFile: (_node: AuxTreeNodeVM) => void;
+  onDelete: (_id: string) => void;
+  isBusy: boolean;
 }) {
   if (tree.length === 0) {
     return (
       <PanelPlaceholder
         icon="icon-[material-symbols--folder-off]"
-        label="该时间点下暂无辅助信息。"
+        label="还没有辅助信息。点击上方按钮创建。"
       />
     );
   }
@@ -92,6 +150,10 @@ export function AuxTreePanel({
       isActive={ctx.isActive}
       onToggle={onToggle}
       onSelect={onSelect}
+      onCreateChildDir={onCreateChildDir}
+      onCreateChildFile={onCreateChildFile}
+      onDelete={onDelete}
+      isBusy={isBusy}
     />
   );
 

@@ -1,4 +1,4 @@
-import type { ContentTreeNodeVM } from "./types";
+import type { AuxTreeNodeVM, ContentTreeNodeVM } from "./types";
 
 export function collectAncestorIds(
   parentMap: Map<string, string | null>,
@@ -69,4 +69,66 @@ export function omitRecordKey<TValue>(record: Record<string, TValue>, key: strin
   const next = { ...record };
   delete next[key];
   return next;
+}
+
+export function buildAuxParentMap(
+  nodes: AuxTreeNodeVM[],
+  parentId: string | null = null,
+): Map<string, string | null> {
+  const map = new Map<string, string | null>();
+
+  for (const node of nodes) {
+    map.set(node.id, parentId);
+    for (const [childId, childParentId] of buildAuxParentMap(node.children, node.id)) {
+      map.set(childId, childParentId);
+    }
+  }
+
+  return map;
+}
+
+export function findAuxNode(nodes: AuxTreeNodeVM[], nodeId: string): AuxTreeNodeVM | null {
+  for (const node of nodes) {
+    if (node.id === nodeId) {
+      return node;
+    }
+
+    const found = findAuxNode(node.children, nodeId);
+    if (found) {
+      return found;
+    }
+  }
+
+  return null;
+}
+
+export function listAuxSiblings(
+  tree: AuxTreeNodeVM[],
+  parentId: string,
+  auxRootId: string | null,
+): AuxTreeNodeVM[] {
+  if (auxRootId && parentId === auxRootId) {
+    return tree;
+  }
+
+  const parent = findAuxNode(tree, parentId);
+  return parent?.children ?? [];
+}
+
+export function nextAuxDirName(siblings: AuxTreeNodeVM[]): string {
+  const existing = new Set(siblings.map((node) => node.name));
+  let index = 1;
+  while (existing.has(`新文件夹 ${index}`)) {
+    index += 1;
+  }
+  return `新文件夹 ${index}`;
+}
+
+export function nextAuxFileName(siblings: AuxTreeNodeVM[]): string {
+  const existing = new Set(siblings.map((node) => node.name));
+  let index = 1;
+  while (existing.has(`新文件 ${index}.md`)) {
+    index += 1;
+  }
+  return `新文件 ${index}.md`;
 }

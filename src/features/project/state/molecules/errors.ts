@@ -9,5 +9,6 @@ export const ErrorsMolecule = molecule((_, getScope) => {
   return {
     contentErrorAtom: atom<string | null>(null),
     timelineErrorAtom: atom<string | null>(null),
+    auxErrorAtom: atom<string | null>(null),
   };
 });

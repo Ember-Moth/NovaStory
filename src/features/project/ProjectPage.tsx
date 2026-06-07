@@ -45,10 +45,13 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
     editorBody,
     activeTimelineLabel,
     activeSaveState,
+    auxRootId,
     contentError,
     timelineError,
+    auxError,
     contentBusy,
     timelineBusy,
+    auxBusy,
     pageError,
   } = workspace;
 
@@ -144,7 +147,33 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
         </SidebarSection>
 
         <div className="border-t border-border" />
-        <SidebarSection title="辅助信息">
+        <SidebarSection
+          title="辅助信息"
+          actions={
+            <>
+              <button
+                type="button"
+                onClick={actions.handleAuxCreateSiblingDir}
+                disabled={auxBusy || !auxRootId || !activeTimelinePointId}
+                className="icon-[material-symbols--create-new-folder] text-base hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                title="添加文件夹"
+              />
+              <button
+                type="button"
+                onClick={actions.handleAuxCreateSiblingFile}
+                disabled={auxBusy || !auxRootId || !activeTimelinePointId}
+                className="icon-[material-symbols--note-add] text-base hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                title="添加文件"
+              />
+            </>
+          }
+        >
+          {auxError ? (
+            <div className="mx-2 mb-2 flex items-start gap-2 rounded-md border border-border bg-editor-background px-3 py-2 text-xs text-accent-foreground">
+              <span className="icon-[material-symbols--warning] mt-0.5 shrink-0 text-sm" />
+              <span>{auxError}</span>
+            </div>
+          ) : null}
           {auxQuery.isLoading && auxTree.length === 0 ? (
             <PanelPlaceholder
               icon="icon-[material-symbols--sync]"
@@ -157,6 +186,10 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
               onToggle={actions.toggleAuxExpanded}
               activeId={activeAuxNodeId}
               onSelect={(node) => actions.setActiveAuxNodeId(node.id)}
+              onCreateChildDir={actions.handleAuxCreateChildDir}
+              onCreateChildFile={actions.handleAuxCreateChildFile}
+              onDelete={actions.handleAuxDelete}
+              isBusy={auxBusy}
             />
           )}
         </SidebarSection>
