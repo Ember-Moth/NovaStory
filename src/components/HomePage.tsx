@@ -76,69 +76,87 @@ export function HomePage() {
   };
 
   return (
-    <main className="min-h-screen bg-white px-4 py-6 text-stone-900">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+    <main className="min-h-dvh select-none bg-editor-background text-foreground">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-8">
+        {/* Header */}
         <section className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">项目</h1>
-            <p className="mt-0.5 text-sm text-stone-500">{projectList.length} 个项目</p>
+          <div className="flex items-center gap-3">
+            <span className="icon-[material-symbols--description] text-2xl text-foreground-muted" />
+            <div>
+              <h1 className="text-lg font-semibold tracking-tight">项目</h1>
+              <p className="mt-0.5 text-xs text-foreground-muted">{projectList.length} 个项目</p>
+            </div>
           </div>
           <button
             type="button"
             onClick={openCreateDialog}
-            className="rounded-lg bg-stone-900 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-stone-700"
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-sidebar-background px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-list-hover-background"
           >
+            <span className="icon-[material-symbols--add] text-base" />
             新建
           </button>
         </section>
 
+        {/* Error banner */}
         {error ? (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <div className="flex items-center gap-2 rounded-md border border-border bg-sidebar-background px-3 py-2 text-sm text-accent-foreground">
+            <span className="icon-[material-symbols--info] text-base shrink-0" />
             {error.message}
           </div>
         ) : null}
 
+        {/* Loading state */}
         {isLoading ? (
-          <div className="rounded-lg border border-dashed border-stone-300 px-4 py-8 text-center text-sm text-stone-500">
+          <div className="flex items-center justify-center gap-2 rounded-md border border-dashed border-border px-4 py-10 text-sm text-foreground-muted">
+            <span className="icon-[material-symbols--sync] text-base animate-spin" />
             加载中...
           </div>
         ) : null}
 
+        {/* Empty state */}
         {!isLoading && projectList.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-stone-300 px-4 py-8 text-center text-sm text-stone-500">
-            还没有项目，点击「新建」创建一个。
+          <div className="flex flex-col items-center gap-3 rounded-md border border-dashed border-border px-4 py-12 text-sm text-foreground-muted">
+            <span className="icon-[material-symbols--edit-note] text-3xl" />
+            <span>还没有项目，点击「新建」创建一个。</span>
           </div>
         ) : null}
 
+        {/* Project list */}
         {!isLoading ? (
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col">
             {projectList.map((project) => (
               <div
                 key={project.id}
-                className="group -mx-2 flex items-start gap-2 rounded-lg px-2 py-2 transition hover:bg-stone-100"
+                className="group flex items-start gap-2 rounded-md px-3 py-2 transition hover:bg-list-hover-background"
               >
                 <button
                   type="button"
                   onClick={() => navigate(`/project/${project.id}`)}
-                  className="flex-1 text-left"
+                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium text-stone-900">{project.name}</span>
-                    <span className="shrink-0 text-xs text-stone-400">
-                      {dateFormatter.format(project.updatedAt)}
-                    </span>
+                  <span className="icon-[material-symbols--folder] mt-0.5 shrink-0 text-lg text-icon-folder" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-sm font-medium text-foreground">
+                        {project.name}
+                      </span>
+                      <span className="shrink-0 text-[11px] text-foreground-muted">
+                        {dateFormatter.format(project.updatedAt)}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 truncate text-xs text-foreground-muted">
+                      {project.description?.trim() || "暂无描述"}
+                    </p>
                   </div>
-                  <p className="mt-0.5 line-clamp-1 text-sm text-stone-500">
-                    {project.description?.trim() || "暂无描述"}
-                  </p>
                 </button>
                 <button
                   type="button"
                   onClick={() => handleDeleteProject(project.id, project.name)}
                   disabled={deleteProject.isPending && deletingId === project.id}
-                  className="shrink-0 rounded px-2 py-1 text-xs text-stone-400 opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-30"
+                  className="shrink-0 rounded p-1 text-foreground-muted opacity-0 transition hover:bg-button-hover-background hover:text-foreground group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-30"
+                  title="删除项目"
                 >
-                  {deleteProject.isPending && deletingId === project.id ? "..." : "删除"}
+                  <span className="icon-[material-symbols--delete] text-base leading-none" />
                 </button>
               </div>
             ))}
@@ -146,58 +164,77 @@ export function HomePage() {
         ) : null}
       </div>
 
+      {/* New project dialog */}
       <dialog
         ref={dialogRef}
-        className="w-[min(28rem,calc(100vw-2rem))] rounded-xl border border-stone-200 bg-white p-0 text-stone-900 shadow-lg backdrop:bg-stone-900/30"
+        className="w-[min(28rem,calc(100vw-2rem))] rounded-lg border border-border bg-sidebar-background p-0 text-foreground shadow-lg backdrop:bg-black/50"
       >
-        <form onSubmit={handleCreateProject} className="space-y-4 p-5">
-          <div>
-            <h2 className="text-base font-semibold">新建项目</h2>
-            <p className="mt-0.5 text-sm text-stone-500">创建一个新的故事项目。</p>
-          </div>
-
-          <label className="block space-y-1.5">
-            <span className="text-sm font-medium text-stone-700">项目名</span>
-            <input
-              autoFocus
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="例如：雾港编年史"
-              className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-stone-500"
-            />
-          </label>
-
-          <label className="block space-y-1.5">
-            <span className="text-sm font-medium text-stone-700">描述</span>
-            <textarea
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              rows={3}
-              placeholder="可选"
-              className="w-full resize-none rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm leading-relaxed outline-none transition focus:border-stone-500"
-            />
-          </label>
-
-          {formError || createProject.error ? (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              {formError ?? createProject.error?.message}
-            </div>
-          ) : null}
-
-          <div className="flex items-center justify-end gap-2">
+        <form onSubmit={handleCreateProject}>
+          {/* Dialog title bar */}
+          <div className="flex items-center gap-2 border-b border-border px-4 py-2">
+            <span className="icon-[material-symbols--add-circle-outline] text-base text-accent-foreground" />
+            <span className="text-sm font-medium">新建项目</span>
             <button
               type="button"
               onClick={closeCreateDialog}
-              className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm font-medium text-stone-600 transition hover:bg-stone-50"
+              className="ml-auto rounded p-0.5 text-foreground-muted transition hover:bg-button-hover-background hover:text-foreground"
+            >
+              <span className="icon-[material-symbols--close] text-base leading-none" />
+            </button>
+          </div>
+
+          <div className="space-y-4 p-4">
+            <label className="block space-y-1.5">
+              <span className="text-xs font-medium text-foreground-muted">项目名</span>
+              <input
+                autoFocus
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="例如：雾港编年史"
+                className="w-full rounded-md border border-border bg-editor-background px-3 py-1.5 text-sm text-foreground outline-none transition placeholder:text-foreground-muted/50 focus:border-accent-foreground"
+              />
+            </label>
+
+            <label className="block space-y-1.5">
+              <span className="text-xs font-medium text-foreground-muted">描述</span>
+              <textarea
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                rows={3}
+                placeholder="可选"
+                className="w-full resize-none rounded-md border border-border bg-editor-background px-3 py-1.5 text-sm text-foreground leading-relaxed outline-none transition placeholder:text-foreground-muted/50 focus:border-accent-foreground"
+              />
+            </label>
+
+            {formError || createProject.error ? (
+              <div className="flex items-center gap-2 rounded-md border border-border bg-editor-background px-3 py-2 text-sm text-accent-foreground">
+                <span className="icon-[material-symbols--warning] text-base shrink-0" />
+                {formError ?? createProject.error?.message}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
+            <button
+              type="button"
+              onClick={closeCreateDialog}
+              className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-list-hover-background"
             >
               取消
             </button>
             <button
               type="submit"
               disabled={createProject.isPending}
-              className="rounded-lg bg-stone-900 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-stone-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-md bg-accent-foreground px-3 py-1.5 text-sm font-medium text-foreground transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {createProject.isPending ? "创建中" : "创建"}
+              {createProject.isPending ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="icon-[material-symbols--sync] text-base animate-spin" />
+                  创建中
+                </span>
+              ) : (
+                "创建"
+              )}
             </button>
           </div>
         </form>
