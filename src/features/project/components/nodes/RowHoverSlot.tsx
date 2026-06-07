@@ -13,7 +13,9 @@ export function RowHoverSlot({ actions, badge }: { actions?: ReactNode; badge?: 
         </div>
       ) : null}
       {badge ? (
-        <span className="col-start-1 row-start-1 justify-self-end self-center max-w-20 truncate text-[10px] leading-none text-accent-foreground opacity-70 transition group-hover:pointer-events-none group-hover:opacity-0">
+        <span
+          className={`col-start-1 row-start-1 justify-self-end self-center max-w-20 truncate text-[10px] leading-none text-accent-foreground opacity-70 transition${actions ? " group-hover:pointer-events-none group-hover:opacity-0" : ""}`}
+        >
           {badge}
         </span>
       ) : null}
