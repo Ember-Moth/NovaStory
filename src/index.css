@@ -1,2 +1,45 @@
 @import "tailwindcss";
 @plugin "@iconify/tailwind4";
+
+@theme {
+  /* Editor area */
+  --color-editor-background: #1e1e1e;
+  --color-editor-foreground: #d4d4d4;
+
+  /* Activity bar */
+  --color-activity-bar-background: #333333;
+  --color-activity-bar-foreground: #858585;
+  --color-activity-bar-active-foreground: #ffffff;
+
+  /* Sidebar */
+  --color-sidebar-background: #252526;
+  --color-sidebar-foreground: #cccccc;
+  --color-sidebar-border: #3c3c3c;
+
+  /* Title bar */
+  --color-title-bar-background: #252526;
+
+  /* List */
+  --color-list-active-background: #37373d;
+  --color-list-hover-background: #2a2d2e;
+
+  /* Button */
+  --color-button-hover-background: #3c3c3c;
+
+  /* Borders */
+  --color-border: #3c3c3c;
+  --color-drag-border: #007fd4;
+
+  /* Foreground */
+  --color-foreground: #cccccc;
+  --color-foreground-muted: #858585;
+
+  /* Accent */
+  --color-accent-foreground: #6db3d1;
+
+  /* Icon node colors */
+  --color-icon-empty: #4a4a4a;
+  --color-icon-leaf: #7ec97e;
+  --color-icon-folder: #dcb67a;
+  --color-icon-mixed: #c99b4b;
+}

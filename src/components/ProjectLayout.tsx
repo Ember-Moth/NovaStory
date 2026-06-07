@@ -457,25 +457,25 @@ function ContentNodeIcon({ hasBody, hasChildren }: { hasBody: boolean; hasChildr
   // 仅有内容的叶子节点 / 仅有子树的结构节点 / 混合节点 / 空节点
   const icon =
     !hasBody && !hasChildren
-      ? "icon-[material-symbols--circle] text-[#4a4a4a]"
+      ? "icon-[material-symbols--circle] text-icon-empty"
       : hasBody && !hasChildren
-        ? "icon-[material-symbols--description] text-[#7ec97e]"
+        ? "icon-[material-symbols--description] text-icon-leaf"
         : !hasBody && hasChildren
-          ? "icon-[material-symbols--account-tree] text-[#dcb67a]"
-          : "icon-[material-symbols--overview] text-[#c99b4b]";
+          ? "icon-[material-symbols--account-tree] text-icon-folder"
+          : "icon-[material-symbols--overview] text-icon-mixed";
   return <span className={`${icon} text-base shrink-0`} />;
 }
 
 function AuxNodeIcon({ nodeType }: { nodeType: string }) {
   const iconMap: Record<string, string> = {
-    dir: "icon-[material-symbols--folder] text-[#dcb67a]",
-    "dir-open": "icon-[material-symbols--folder-open] text-[#dcb67a]",
-    file: "icon-[material-symbols--description] text-[#858585]",
-    symlink: "icon-[material-symbols--link] text-[#6db3d1]",
+    dir: "icon-[material-symbols--folder] text-icon-folder",
+    "dir-open": "icon-[material-symbols--folder-open] text-icon-folder",
+    file: "icon-[material-symbols--description] text-foreground-muted",
+    symlink: "icon-[material-symbols--link] text-accent-foreground",
   };
   return (
     <span
-      className={`${iconMap[nodeType] ?? "icon-[material-symbols--description] text-[#858585]"} text-base shrink-0`}
+      className={`${iconMap[nodeType] ?? "icon-[material-symbols--description] text-foreground-muted"} text-base shrink-0`}
     />
   );
 }
@@ -499,7 +499,7 @@ function SidebarSection({
   return (
     <div className="flex flex-col shrink-0">
       <div
-        className="flex items-center gap-1 pl-2 pr-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#858585] hover:text-[#cccccc] shrink-0 cursor-pointer"
+        className="flex items-center gap-1 pl-2 pr-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-foreground-muted hover:text-foreground shrink-0 cursor-pointer"
         onClick={() => setExpanded((v) => !v)}
         role="button"
         tabIndex={0}
@@ -553,7 +553,9 @@ function ContentTreeNodeRow({
     <div>
       <button
         className={`flex w-full items-center gap-1 pr-2 py-0.75 text-[13px] ${
-          isActive ? "bg-[#37373d] text-[#cccccc]" : "text-[#cccccc] hover:bg-[#2a2d2e]"
+          isActive
+            ? "bg-list-active-background text-foreground"
+            : "text-foreground hover:bg-list-hover-background"
         }`}
         style={{ paddingLeft: `${8 + depth * 16}px` }}
         onClick={() => {
@@ -578,7 +580,7 @@ function ContentTreeNodeRow({
         )}
         <ContentNodeIcon hasBody={node.body.length > 0} hasChildren={node.children.length > 0} />
         <span className="truncate">{node.title}</span>
-        <span className="ml-auto text-[10px] text-[#6db3d1] opacity-70 shrink-0">
+        <span className="ml-auto text-[10px] text-accent-foreground opacity-70 shrink-0">
           {timelinePointLabel}
         </span>
       </button>
@@ -660,7 +662,7 @@ function AuxTreeNodeRow({
     return (
       <div>
         <button
-          className="flex w-full items-center gap-1 pr-2 py-0.75 text-[13px] text-[#cccccc] hover:bg-[#2a2d2e]"
+          className="flex w-full items-center gap-1 pr-2 py-0.75 text-[13px] text-foreground hover:bg-list-hover-background"
           style={{ paddingLeft: `${8 + depth * 16}px` }}
           onClick={() => {
             onSelect(node);
@@ -699,7 +701,9 @@ function AuxTreeNodeRow({
   return (
     <button
       className={`flex w-full items-center gap-1 pr-2 py-0.75 text-[13px] ${
-        isActive ? "bg-[#37373d] text-[#cccccc]" : "text-[#cccccc] hover:bg-[#2a2d2e]"
+        isActive
+          ? "bg-list-active-background text-foreground"
+          : "text-foreground hover:bg-list-hover-background"
       }`}
       style={{ paddingLeft: `${8 + depth * 16 + 16}px` }}
       onClick={() => onSelect(node)}
@@ -708,7 +712,9 @@ function AuxTreeNodeRow({
       <AuxNodeIcon nodeType={node.nodeType} />
       <span className="truncate">{node.name}</span>
       {node.nodeType === "symlink" && node.symlinkTargetPath && (
-        <span className="truncate text-[11px] text-[#6db3d1] ml-1">→ {node.symlinkTargetPath}</span>
+        <span className="truncate text-[11px] text-accent-foreground ml-1">
+          → {node.symlinkTargetPath}
+        </span>
       )}
     </button>
   );
@@ -813,8 +819,10 @@ function TimelinePanel({
             key={pt.id}
             className={`flex items-center gap-1 pr-1 py-0.75 text-[13px] cursor-pointer ${
               isDragging ? "opacity-40" : ""
-            } ${isDragOver ? "border-t border-t-[#007fd4]" : ""} ${
-              isActive ? "bg-[#37373d] text-[#cccccc]" : "text-[#cccccc] hover:bg-[#2a2d2e]"
+            } ${isDragOver ? "border-t border-t-drag-border" : ""} ${
+              isActive
+                ? "bg-list-active-background text-foreground"
+                : "text-foreground hover:bg-list-hover-background"
             }`}
             style={{ paddingLeft: "8px" }}
             draggable
@@ -825,10 +833,10 @@ function TimelinePanel({
             onDragEnd={handleDragEnd}
             onClick={() => onSelect(pt.id)}
           >
-            <span className="icon-[material-symbols--radio-button-checked] text-sm text-[#858585] shrink-0" />
+            <span className="icon-[material-symbols--radio-button-checked] text-sm text-foreground-muted shrink-0" />
             <span className="truncate">{pt.label}</span>
             <button
-              className="ml-auto rounded p-px text-[#858585] opacity-0 hover:opacity-100 hover:bg-[#3c3c3c]"
+              className="ml-auto rounded p-px text-foreground-muted opacity-0 hover:opacity-100 hover:bg-button-hover-background"
               onClick={(e) => {
                 e.stopPropagation();
                 onDelete(pt.id);
@@ -859,7 +867,7 @@ function EditorArea({
 }) {
   if (!node) {
     return (
-      <div className="flex h-full items-center justify-center text-[#858585] text-sm">
+      <div className="flex h-full items-center justify-center text-foreground-muted text-sm">
         选择一个正文节点开始编辑
       </div>
     );
@@ -868,10 +876,10 @@ function EditorArea({
   return (
     <div className="flex h-full flex-col">
       {/* Title bar */}
-      <div className="flex items-center gap-2 px-4 py-2 shrink-0 bg-[#252526] border-b border-[#3c3c3c]">
+      <div className="flex items-center gap-2 px-4 py-2 shrink-0 bg-title-bar-background border-b border-border">
         <ContentNodeIcon hasBody={node.body.length > 0} hasChildren={node.children.length > 0} />
-        <span className="text-[14px] text-[#cccccc]">{node.title}</span>
-        <span className="ml-auto text-[11px] text-[#6db3d1]">
+        <span className="text-[14px] text-foreground">{node.title}</span>
+        <span className="ml-auto text-[11px] text-accent-foreground">
           时间锚点:{" "}
           {mockTimelinePoints.find((p) => p.id === node.anchorTimelinePointId)?.label ??
             node.anchorTimelinePointId}
@@ -879,7 +887,7 @@ function EditorArea({
       </div>
       {/* Body */}
       <textarea
-        className="flex-1 bg-[#1e1e1e] text-[14px] text-[#d4d4d4] font-mono leading-7 p-4 resize-none outline-none border-none"
+        className="flex-1 bg-editor-background text-[14px] text-editor-foreground font-mono leading-7 p-4 resize-none outline-none border-none"
         value={body}
         onChange={(e) => onBodyChange(e.target.value)}
         placeholder="开始写作..."
@@ -1008,25 +1016,25 @@ export function ProjectLayout(_: { id: string }) {
   });
 
   return (
-    <div className="flex h-dvh w-full overflow-hidden bg-[#1e1e1e] text-[#cccccc] select-none">
+    <div className="flex h-dvh w-full overflow-hidden bg-editor-background text-foreground select-none">
       {/* Activity Bar */}
-      <div className="flex w-12 shrink-0 flex-col items-center gap-1 bg-[#333333] pt-2">
-        <div className="flex w-full items-center justify-center border-l-2 border-l-[#ffffff] py-1">
-          <span className="icon-[material-symbols--description] text-2xl text-[#ffffff]" />
+      <div className="flex w-12 shrink-0 flex-col items-center gap-1 bg-activity-bar-background pt-2">
+        <div className="flex w-full items-center justify-center border-l-2 border-l-activity-bar-active-foreground py-1">
+          <span className="icon-[material-symbols--description] text-2xl text-activity-bar-active-foreground" />
         </div>
         <div className="flex w-full items-center justify-center py-1">
-          <span className="icon-[material-symbols--search] text-2xl text-[#858585]" />
+          <span className="icon-[material-symbols--search] text-2xl text-activity-bar-foreground" />
         </div>
         <div className="flex w-full items-center justify-center py-1">
-          <span className="icon-[material-symbols--source-control] text-2xl text-[#858585]" />
+          <span className="icon-[material-symbols--source-control] text-2xl text-activity-bar-foreground" />
         </div>
         <div className="mt-auto flex w-full items-center justify-center py-2">
-          <span className="icon-[material-symbols--settings] text-2xl text-[#858585]" />
+          <span className="icon-[material-symbols--settings] text-2xl text-activity-bar-foreground" />
         </div>
       </div>
 
       {/* Left Sidebar – three stacked panels */}
-      <div className="flex w-72 shrink-0 flex-col bg-[#252526] border-r border-[#3c3c3c] overflow-hidden">
+      <div className="flex w-72 shrink-0 flex-col bg-sidebar-background border-r border-border overflow-hidden">
         {/* 正文 */}
         <SidebarSection title="正文">
           <ContentTreePanel
@@ -1039,7 +1047,7 @@ export function ProjectLayout(_: { id: string }) {
         </SidebarSection>
 
         {/* 辅助信息 */}
-        <div className="border-t border-[#3c3c3c]" />
+        <div className="border-t border-border" />
         <SidebarSection title="辅助信息">
           <AuxTreePanel
             tree={currentAuxTree}
@@ -1051,13 +1059,13 @@ export function ProjectLayout(_: { id: string }) {
         </SidebarSection>
 
         {/* 时间轴 */}
-        <div className="border-t border-[#3c3c3c]" />
+        <div className="border-t border-border" />
         <SidebarSection
           title="时间轴"
           actions={
             <button
               onClick={handleTimelineAdd}
-              className="icon-[material-symbols--add] text-base hover:text-[#cccccc]"
+              className="icon-[material-symbols--add] text-base hover:text-foreground"
               title="添加时间点"
             />
           }
