@@ -1,3 +1,6 @@
+import { useState } from "react";
+
+import { InlineEditableText } from "@/features/project/components/InlineEditableText";
 import { PanelPlaceholder } from "@/features/project/components/PanelPlaceholder";
 import { AuxNodeIcon } from "@/features/project/components/icons";
 import {
@@ -17,6 +20,7 @@ function AuxTreeNodeRow({
   isActive,
   onToggle,
   onSelect,
+  onRename,
   onCreateChildDir,
   onCreateChildFile,
   onDelete,
@@ -28,12 +32,25 @@ function AuxTreeNodeRow({
   isActive: boolean;
   onToggle: (_id: string) => void;
   onSelect: (_node: AuxTreeNodeVM) => void;
+  onRename: (_nodeId: string, _name: string) => Promise<boolean>;
   onCreateChildDir: (_node: AuxTreeNodeVM) => void;
   onCreateChildFile: (_node: AuxTreeNodeVM) => void;
   onDelete: (_id: string) => void;
   isBusy: boolean;
 }) {
+  const [isEditing, setIsEditing] = useState(false);
   const isDir = node.nodeType === "dir";
+
+  const label = (
+    <InlineEditableText
+      value={node.name}
+      disabled={isBusy}
+      onEditStart={() => onSelect(node)}
+      onEditingChange={setIsEditing}
+      onCommit={async (next) => onRename(node.id, next)}
+      className="truncate"
+    />
+  );
 
   if (isDir) {
     return (
@@ -49,26 +66,26 @@ function AuxTreeNodeRow({
           <ExpandToggle hasChildren expanded={isExpanded} onToggle={() => onToggle(node.id)} />
         }
         icon={<AuxNodeIcon nodeType={isExpanded ? "dir-open" : "dir"} />}
-        label={<span className="truncate">{node.name}</span>}
+        label={label}
         actions={
           <RowHoverSlot
             actions={
               <>
                 <RowActionButton
                   onClick={() => onCreateChildDir(node)}
-                  disabled={isBusy}
+                  disabled={isBusy || isEditing}
                   title="添加子文件夹"
                   icon="icon-[material-symbols--create-new-folder]"
                 />
                 <RowActionButton
                   onClick={() => onCreateChildFile(node)}
-                  disabled={isBusy}
+                  disabled={isBusy || isEditing}
                   title="添加子文件"
                   icon="icon-[material-symbols--note-add]"
                 />
                 <RowActionButton
                   onClick={() => onDelete(node.id)}
-                  disabled={isBusy}
+                  disabled={isBusy || isEditing}
                   title="删除节点"
                   icon="icon-[material-symbols--close]"
                 />
@@ -88,7 +105,7 @@ function AuxTreeNodeRow({
       onClick={() => onSelect(node)}
       leading={<ExpandToggle hasChildren={false} expanded={false} />}
       icon={<AuxNodeIcon nodeType={node.nodeType} />}
-      label={<span className="truncate">{node.name}</span>}
+      label={label}
       trailing={
         node.nodeType === "symlink" && node.symlinkTargetPath ? (
           <span className="ml-1 truncate text-[11px] text-accent-foreground">
@@ -101,7 +118,7 @@ function AuxTreeNodeRow({
           actions={
             <RowActionButton
               onClick={() => onDelete(node.id)}
-              disabled={isBusy}
+              disabled={isBusy || isEditing}
               title="删除节点"
               icon="icon-[material-symbols--close]"
             />
@@ -118,6 +135,7 @@ export function AuxTreePanel({
   onToggle,
   activeId,
   onSelect,
+  onRename,
   onCreateChildDir,
   onCreateChildFile,
   onDelete,
@@ -128,6 +146,7 @@ export function AuxTreePanel({
   onToggle: (_id: string) => void;
   activeId: string | null;
   onSelect: (_node: AuxTreeNodeVM) => void;
+  onRename: (_nodeId: string, _name: string) => Promise<boolean>;
   onCreateChildDir: (_node: AuxTreeNodeVM) => void;
   onCreateChildFile: (_node: AuxTreeNodeVM) => void;
   onDelete: (_id: string) => void;
@@ -150,6 +169,7 @@ export function AuxTreePanel({
       isActive={ctx.isActive}
       onToggle={onToggle}
       onSelect={onSelect}
+      onRename={onRename}
       onCreateChildDir={onCreateChildDir}
       onCreateChildFile={onCreateChildFile}
       onDelete={onDelete}

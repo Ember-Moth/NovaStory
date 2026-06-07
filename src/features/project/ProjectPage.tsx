@@ -188,6 +188,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
               onSelect={(node) => actions.setActiveAuxNodeId(node.id)}
               onCreateChildDir={actions.handleAuxCreateChildDir}
               onCreateChildFile={actions.handleAuxCreateChildFile}
+              onRename={actions.handleAuxRename}
               onDelete={actions.handleAuxDelete}
               isBusy={auxBusy}
             />

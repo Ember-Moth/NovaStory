@@ -62,6 +62,7 @@ export function useProjectWorkspace(projectId: string) {
   const updateTimeline = rpc.useMutation("timeline.update");
   const mkdirAux = rpc.useMutation("aux.mkdir");
   const writeFileAux = rpc.useMutation("aux.writeFile");
+  const moveAux = rpc.useMutation("aux.move");
   const deleteAux = rpc.useMutation("aux.delete");
 
   const contentTree = useMemo(
@@ -120,7 +121,8 @@ export function useProjectWorkspace(projectId: string) {
     moveTimeline.isPending ||
     deleteTimeline.isPending ||
     updateTimeline.isPending;
-  const auxBusy = mkdirAux.isPending || writeFileAux.isPending || deleteAux.isPending;
+  const auxBusy =
+    mkdirAux.isPending || writeFileAux.isPending || moveAux.isPending || deleteAux.isPending;
   const pageError =
     workspaceQuery.error?.message ??
     contentQuery.error?.message ??
@@ -145,6 +147,7 @@ export function useProjectWorkspace(projectId: string) {
     updateTimeline,
     mkdirAux,
     writeFileAux,
+    moveAux,
     deleteAux,
     contentTree,
     timelinePoints,

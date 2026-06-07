@@ -61,6 +61,7 @@ export function useProjectActions(workspace: ProjectWorkspace) {
     updateTimeline,
     mkdirAux,
     writeFileAux,
+    moveAux,
     deleteAux,
   } = workspace;
 
@@ -604,6 +605,41 @@ export function useProjectActions(workspace: ProjectWorkspace) {
     [createAuxFile],
   );
 
+  const handleAuxRename = useCallback(
+    async (nodeId: string, name: string) => {
+      if (!workspaceId || !activeTimelinePointId) {
+        return false;
+      }
+
+      const parentDirId = auxParentMap.get(nodeId) ?? auxRootId;
+      if (!parentDirId) {
+        return false;
+      }
+
+      const normalized = name.trim();
+      if (!normalized) {
+        return false;
+      }
+
+      setAuxError(null);
+
+      try {
+        await moveAux.mutate({
+          workspaceId,
+          timelinePointId: activeTimelinePointId,
+          nodeId,
+          newParentDirId: parentDirId,
+          newName: normalized,
+        });
+        return true;
+      } catch (error) {
+        setAuxError(error instanceof Error ? error.message : "重命名辅助节点失败，请稍后重试。");
+        return false;
+      }
+    },
+    [activeTimelinePointId, auxParentMap, auxRootId, moveAux, setAuxError, workspaceId],
+  );
+
   const handleAuxDelete = useCallback(
     async (nodeId: string) => {
       if (!workspaceId || !activeTimelinePointId) {
@@ -682,6 +718,7 @@ export function useProjectActions(workspace: ProjectWorkspace) {
     handleAuxCreateSiblingFile,
     handleAuxCreateChildDir,
     handleAuxCreateChildFile,
+    handleAuxRename,
     handleAuxDelete,
     setActiveAuxNodeId,
     setActiveTimelinePointId,
