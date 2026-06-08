@@ -8,11 +8,23 @@ import type { ExportedAuxNode, ResolvedAuxSnapshotNode } from "../types";
 import type { AuxLayerChangeView } from "../types";
 import { getTimelinePointOrThrow, getWorkspaceOrThrow } from "./access";
 import { createId, invariant, now } from "./ids";
-import { resolveTimelineChainIds } from "./timeline-chain";
+import { listOrderedTimelinePointIds, resolveTimelineChainIds } from "./timeline-chain";
 import { pointCondition, pointIdOrOrigin } from "./timeline-point";
 
 type WorkspaceRow = InferSelectModel<typeof schema.workspaces>;
 type AuxNodeLayerRow = InferSelectModel<typeof schema.auxNodeLayers>;
+
+function formatAuxSnapshotPointLabel(
+  executor: DatabaseExecutor,
+  workspaceId: string,
+  pointId: string | null,
+) {
+  if (pointId == null) {
+    return "原点";
+  }
+
+  return getTimelinePointOrThrow(executor, workspaceId, pointId).label;
+}
 
 function getAuxLayerAtPoint(
   executor: DatabaseExecutor,
@@ -611,10 +623,59 @@ export function validateUniqueAuxName(
   parentAuxNodeId: string,
   name: string,
   ignoreNodeId?: string,
+  action = "保存辅助信息",
 ) {
-  const snapshot = buildReachableAuxSnapshot(executor, workspace, timelinePointId);
+  const normalizedName = name.trim();
+  invariant(normalizedName, `无法${action}：辅助信息名称不能为空。请输入名称后再保存。`);
+  for (const pointId of listAffectedAuxSnapshotPointIds(executor, workspace.id, timelinePointId)) {
+    const snapshot = buildReachableAuxSnapshot(executor, workspace, pointId);
+    if (!snapshot.has(parentAuxNodeId)) {
+      continue;
+    }
+    validateUniqueAuxNameInSnapshot(
+      snapshot,
+      parentAuxNodeId,
+      normalizedName,
+      ignoreNodeId,
+      action,
+      formatAuxSnapshotPointLabel(executor, workspace.id, pointId),
+    );
+  }
+  return normalizedName;
+}
+
+export function listAffectedAuxSnapshotPointIds(
+  executor: DatabaseExecutor,
+  workspaceId: string,
+  timelinePointId: string | null,
+) {
+  const orderedIds = listOrderedTimelinePointIds(executor, workspaceId);
+  if (timelinePointId == null) {
+    return [null, ...orderedIds];
+  }
+
+  const startIndex = orderedIds.indexOf(timelinePointId);
+  invariant(startIndex >= 0, `Timeline point not found: ${timelinePointId}`);
+  return orderedIds.slice(startIndex);
+}
+
+export function validateUniqueAuxNameInSnapshot(
+  snapshot: Map<string, ResolvedAuxSnapshotNode>,
+  parentAuxNodeId: string,
+  name: string,
+  ignoreNodeId?: string,
+  action = "保存辅助信息",
+  timelineLabel?: string,
+) {
+  const normalizedName = name.trim();
+  invariant(normalizedName, `无法${action}：辅助信息名称不能为空。请输入名称后再保存。`);
   const conflict = listChildrenFromSnapshot(snapshot, parentAuxNodeId).find(
-    (node) => node.name === name && node.id !== ignoreNodeId,
+    (node) => node.name?.trim() === normalizedName && node.id !== ignoreNodeId,
   );
-  invariant(!conflict, `Aux node name already exists: ${name}`);
+  const conflictScope = timelineLabel ? `时间点「${timelineLabel}」的` : "";
+  invariant(
+    !conflict,
+    `无法${action}：${conflictScope}同一文件夹中已存在名为「${normalizedName}」的辅助信息（${conflict?.path ?? normalizedName}）。请换一个名称后再保存。`,
+  );
+  return normalizedName;
 }

@@ -193,6 +193,112 @@ test("symlink keeps following the same aux node after rename and move", () => {
   expect(exported.nodes[1]?.children.map((node) => node.name)).toEqual(["home", "villa"]);
 });
 
+test("aux node names must stay unique within the same parent", () => {
+  const workspace = seedProject("project_aux_unique_names");
+  const rootId = workspace.auxRootId!;
+
+  const notesFile = service.writeFileAt({
+    workspaceId: workspace.id,
+    timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: rootId,
+    name: "notes.md",
+    content: "notes",
+  });
+  const stateDir = service.mkdirAt({
+    workspaceId: workspace.id,
+    timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: rootId,
+    name: "state",
+  });
+
+  expect(() =>
+    service.moveAuxNodeAt({
+      workspaceId: workspace.id,
+      timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+      nodeId: stateDir.id,
+      newParentDirId: rootId,
+      newName: "notes.md",
+    }),
+  ).toThrow(
+    "无法重命名辅助信息：时间点「原点」的同一文件夹中已存在名为「notes.md」的辅助信息（/notes.md）。请换一个名称后再保存。",
+  );
+
+  expect(() =>
+    service.mkdirAt({
+      workspaceId: workspace.id,
+      timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+      parentDirId: rootId,
+      name: " notes.md ",
+    }),
+  ).toThrow(
+    "无法创建辅助文件夹：时间点「原点」的同一文件夹中已存在名为「notes.md」的辅助信息（/notes.md）。请换一个名称后再保存。",
+  );
+
+  expect(() =>
+    service.writeFileAt({
+      workspaceId: workspace.id,
+      timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+      parentDirId: rootId,
+      name: "notes.md",
+      content: "duplicate",
+    }),
+  ).toThrow(
+    "无法创建辅助文件：时间点「原点」的同一文件夹中已存在名为「notes.md」的辅助信息（/notes.md）。请换一个名称后再保存。",
+  );
+
+  expect(() =>
+    service.linkAt({
+      workspaceId: workspace.id,
+      timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+      parentDirId: rootId,
+      name: "notes.md",
+      targetNodeId: notesFile.id,
+    }),
+  ).toThrow(
+    "无法创建辅助符号链接：时间点「原点」的同一文件夹中已存在名为「notes.md」的辅助信息（/notes.md）。请换一个名称后再保存。",
+  );
+
+  expect(service.exportAuxSnapshotTree(workspace.id).nodes.map((node) => node.path)).toEqual([
+    "/notes.md",
+    "/state",
+  ]);
+});
+
+test("origin aux creation rejects names that would duplicate in descendant timeline points", () => {
+  const workspace = seedProject("project_aux_origin_descendant_duplicate");
+  const rootId = workspace.auxRootId!;
+  const point = service.createTimelinePoint({
+    workspaceId: workspace.id,
+    afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
+    key: "point_1",
+    label: "Point 1",
+  });
+
+  service.writeFileAt({
+    workspaceId: workspace.id,
+    timelinePointId: point.id,
+    parentDirId: rootId,
+    name: "新文件 1",
+    content: "point file",
+  });
+
+  expect(() =>
+    service.writeFileAt({
+      workspaceId: workspace.id,
+      timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+      parentDirId: rootId,
+      name: "新文件 1",
+      content: "origin file",
+    }),
+  ).toThrow(
+    "无法创建辅助文件：时间点「Point 1」的同一文件夹中已存在名为「新文件 1」的辅助信息（/新文件 1）。请换一个名称后再保存。",
+  );
+
+  expect(
+    service.exportAuxSnapshotTree(workspace.id, point.id).nodes.map((node) => node.path),
+  ).toEqual(["/新文件 1"]);
+});
+
 test("aux snapshot marks visible nodes with layers at the active timeline point", () => {
   const workspace = seedProject("project_aux_snapshot_changes");
   const rootId = workspace.auxRootId!;
@@ -375,6 +481,102 @@ test("restoreAuxNodeAt restores deleted aux nodes by removing the tombstone laye
   expect(restored?.path).toBe("/notes.md");
   expect(restored?.isDeleted).toBe(false);
   expect(restored?.hasTimelineChange).toBe(false);
+});
+
+test("restoreAuxNodeAt rejects restore when it would reveal a renamed duplicate", () => {
+  const workspace = seedProject("project_aux_restore_rename_duplicate");
+  const rootId = workspace.auxRootId!;
+
+  const notesFile = service.writeFileAt({
+    workspaceId: workspace.id,
+    timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: rootId,
+    name: "notes.md",
+    content: "origin",
+  });
+  const point = service.createTimelinePoint({
+    workspaceId: workspace.id,
+    afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
+    key: "after_rename_notes",
+    label: "After rename notes",
+  });
+  service.moveAuxNodeAt({
+    workspaceId: workspace.id,
+    timelinePointId: point.id,
+    nodeId: notesFile.id,
+    newParentDirId: rootId,
+    newName: "archive.md",
+  });
+  service.writeFileAt({
+    workspaceId: workspace.id,
+    timelinePointId: point.id,
+    parentDirId: rootId,
+    name: "notes.md",
+    content: "current point notes",
+  });
+
+  expect(() =>
+    service.restoreAuxNodeAt({
+      workspaceId: workspace.id,
+      timelinePointId: point.id,
+      nodeId: notesFile.id,
+    }),
+  ).toThrow(
+    "无法恢复辅助信息：时间点「After rename notes」的同一文件夹中已存在名为「notes.md」的辅助信息（/notes.md）。请换一个名称后再保存。",
+  );
+
+  expect(
+    service.exportAuxSnapshotTree(workspace.id, point.id).nodes.map((node) => node.path),
+  ).toEqual(["/archive.md", "/notes.md"]);
+});
+
+test("restoreAuxNodeAt rejects restore when it would reveal a deleted duplicate", () => {
+  const workspace = seedProject("project_aux_restore_delete_duplicate");
+  const rootId = workspace.auxRootId!;
+
+  const notesFile = service.writeFileAt({
+    workspaceId: workspace.id,
+    timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: rootId,
+    name: "notes.md",
+    content: "origin",
+  });
+  const point = service.createTimelinePoint({
+    workspaceId: workspace.id,
+    afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
+    key: "after_delete_duplicate_notes",
+    label: "After delete duplicate notes",
+  });
+  service.deleteAuxNodeAt({
+    workspaceId: workspace.id,
+    timelinePointId: point.id,
+    nodeId: notesFile.id,
+  });
+  service.writeFileAt({
+    workspaceId: workspace.id,
+    timelinePointId: point.id,
+    parentDirId: rootId,
+    name: "notes.md",
+    content: "replacement",
+  });
+
+  expect(() =>
+    service.restoreAuxNodeAt({
+      workspaceId: workspace.id,
+      timelinePointId: point.id,
+      nodeId: notesFile.id,
+    }),
+  ).toThrow(
+    "无法恢复辅助信息：时间点「After delete duplicate notes」的同一文件夹中已存在名为「notes.md」的辅助信息（/notes.md）。请换一个名称后再保存。",
+  );
+
+  const snapshot = service.exportAuxSnapshotTree(workspace.id, point.id);
+  expect(flattenAuxNodes(snapshot.nodes).find((node) => node.id === notesFile.id)?.isDeleted).toBe(
+    true,
+  );
+  expect(
+    flattenAuxNodes(snapshot.nodes).some((node) => node.path === "/notes.md" && !node.isDeleted),
+  ).toBe(true);
 });
 
 test("content node deletion removes subtree and preserves sibling order", () => {

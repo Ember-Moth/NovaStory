@@ -11,6 +11,7 @@ import {
   buildContentNodePath,
   collectContentSubtreeIds,
   findContentDeleteFallback,
+  getAuxRenameValidationError,
   listAuxSiblings,
   nextAuxDirName,
   nextAuxFileName,
@@ -975,7 +976,17 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
       }
 
       const normalized = name.trim();
-      if (!normalized) {
+      const anchorId = actionAnchorId("aux", "row", nodeId);
+      const validationError = getAuxRenameValidationError({
+        tree: auxTree,
+        nodeMap: auxNodeMap,
+        parentMap: auxParentMap,
+        auxRootId,
+        nodeId,
+        name,
+      });
+      if (validationError) {
+        setActionError(setAuxError, validationError, anchorId);
         return false;
       }
 
@@ -994,12 +1005,21 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         setActionError(
           setAuxError,
           error instanceof Error ? error.message : "重命名辅助节点失败，请稍后重试。",
-          actionAnchorId("aux", "row", nodeId),
+          anchorId,
         );
         return false;
       }
     },
-    [activeTimelinePointId, auxParentMap, auxRootId, moveAux, setAuxError, workspaceId],
+    [
+      activeTimelinePointId,
+      auxNodeMap,
+      auxParentMap,
+      auxRootId,
+      auxTree,
+      moveAux,
+      setAuxError,
+      workspaceId,
+    ],
   );
 
   const handleAuxDelete = useCallback(

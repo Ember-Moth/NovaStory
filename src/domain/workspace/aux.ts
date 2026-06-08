@@ -15,6 +15,7 @@ import {
   collectDeletedAuxNodeIds,
   exportAuxChildren,
   gcOrphanAuxNodes,
+  listAffectedAuxSnapshotPointIds,
   listAuxLayerChangesAtTimelinePoint,
   listChildrenFromSnapshot,
   putAuxLayer,
@@ -22,6 +23,7 @@ import {
   resolveAuxNodeIdFromPath,
   validateAuxParent,
   validateUniqueAuxName,
+  validateUniqueAuxNameInSnapshot,
 } from "../internal/aux-snapshot";
 import { createId, invariant, now } from "../internal/ids";
 import { pointIdOrOrigin, validateTimelinePointRef } from "../internal/timeline-point";
@@ -37,7 +39,15 @@ export function mkdirAt(input: {
     const workspace = getWorkspaceOrThrow(tx, input.workspaceId);
     const timelinePointId = validateTimelinePointRef(tx, workspace.id, input.timelinePointId);
     validateAuxParent(tx, workspace, timelinePointId, input.parentDirId);
-    validateUniqueAuxName(tx, workspace, timelinePointId, input.parentDirId, input.name);
+    const name = validateUniqueAuxName(
+      tx,
+      workspace,
+      timelinePointId,
+      input.parentDirId,
+      input.name,
+      undefined,
+      "创建辅助文件夹",
+    );
 
     const nodeId = createId("aux");
     const timestamp = now();
@@ -57,7 +67,7 @@ export function mkdirAt(input: {
       auxNodeId: nodeId,
       isDeleted: false,
       parentAuxNodeId: input.parentDirId,
-      name: input.name,
+      name,
       content: null,
       symlinkTargetAuxNodeId: null,
     });
@@ -105,7 +115,15 @@ export function writeFileAt(input: {
     invariant(input.parentDirId, "parentDirId is required when creating a file");
     invariant(input.name, "name is required when creating a file");
     validateAuxParent(tx, workspace, timelinePointId, input.parentDirId);
-    validateUniqueAuxName(tx, workspace, timelinePointId, input.parentDirId, input.name);
+    const name = validateUniqueAuxName(
+      tx,
+      workspace,
+      timelinePointId,
+      input.parentDirId,
+      input.name,
+      undefined,
+      "创建辅助文件",
+    );
 
     const nodeId = createId("aux");
     tx.insert(schema.auxNodes)
@@ -123,7 +141,7 @@ export function writeFileAt(input: {
       auxNodeId: nodeId,
       isDeleted: false,
       parentAuxNodeId: input.parentDirId,
-      name: input.name,
+      name,
       content: input.content,
       symlinkTargetAuxNodeId: null,
     });
@@ -144,7 +162,15 @@ export function linkAt(input: {
     const workspace = getWorkspaceOrThrow(tx, input.workspaceId);
     const timelinePointId = validateTimelinePointRef(tx, workspace.id, input.timelinePointId);
     validateAuxParent(tx, workspace, timelinePointId, input.parentDirId);
-    validateUniqueAuxName(tx, workspace, timelinePointId, input.parentDirId, input.name);
+    const name = validateUniqueAuxName(
+      tx,
+      workspace,
+      timelinePointId,
+      input.parentDirId,
+      input.name,
+      undefined,
+      "创建辅助符号链接",
+    );
     const target = readAuxByIdAtInternal(tx, workspace, timelinePointId, input.targetNodeId);
     invariant(target, `Symlink target is not visible: ${input.targetNodeId}`);
 
@@ -166,7 +192,7 @@ export function linkAt(input: {
       auxNodeId: nodeId,
       isDeleted: false,
       parentAuxNodeId: input.parentDirId,
-      name: input.name,
+      name,
       content: null,
       symlinkTargetAuxNodeId: target.id,
     });
@@ -209,13 +235,14 @@ export function moveAuxNodeAt(input: {
       !subtree.has(input.newParentDirId),
       "Cannot move an aux node under its own descendant",
     );
-    validateUniqueAuxName(
+    const newName = validateUniqueAuxName(
       tx,
       workspace,
       timelinePointId,
       input.newParentDirId,
       input.newName,
       current.id,
+      "重命名辅助信息",
     );
 
     putAuxLayer(tx, {
@@ -224,7 +251,7 @@ export function moveAuxNodeAt(input: {
       auxNodeId: current.id,
       isDeleted: false,
       parentAuxNodeId: input.newParentDirId,
-      name: input.newName,
+      name: newName,
       content: current.content,
       symlinkTargetAuxNodeId: current.symlinkTargetAuxNodeId,
     });
@@ -272,6 +299,7 @@ export function restoreAuxNodeAt(input: {
     const workspace = getWorkspaceOrThrow(tx, input.workspaceId);
     const timelinePointId = validateTimelinePointRef(tx, workspace.id, input.timelinePointId);
     invariant(timelinePointId, "Cannot restore auxiliary changes at implicit origin");
+    const point = getTimelinePointOrThrow(tx, workspace.id, timelinePointId);
 
     const layer = tx
       .select({ id: schema.auxNodeLayers.id })
@@ -285,6 +313,26 @@ export function restoreAuxNodeAt(input: {
       )
       .get();
     invariant(layer, `Aux change not found: ${input.nodeId}`);
+
+    const currentSnapshot = buildReachableAuxSnapshot(tx, workspace, timelinePointId);
+    const previousSnapshot = buildReachableAuxSnapshot(tx, workspace, point.prevPointId);
+    const restored = previousSnapshot.get(input.nodeId) ?? null;
+    if (restored?.parentAuxNodeId && restored.name) {
+      for (const pointId of listAffectedAuxSnapshotPointIds(tx, workspace.id, timelinePointId)) {
+        const snapshot =
+          pointId === timelinePointId
+            ? currentSnapshot
+            : buildReachableAuxSnapshot(tx, workspace, pointId);
+        validateUniqueAuxNameInSnapshot(
+          snapshot,
+          restored.parentAuxNodeId,
+          restored.name,
+          restored.id,
+          "恢复辅助信息",
+          pointId == null ? "原点" : getTimelinePointOrThrow(tx, workspace.id, pointId).label,
+        );
+      }
+    }
 
     tx.delete(schema.auxNodeLayers).where(eq(schema.auxNodeLayers.id, layer.id)).run();
     gcOrphanAuxNodes(tx, workspace.id);

@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 
 import { buildAuxTreeState, buildContentTreeState, buildTimelineState } from "./normalize";
+import { getAuxRenameValidationError } from "./tree";
 
 test("buildContentTreeState normalizes defaults and builds content indexes in preorder", () => {
   const state = buildContentTreeState([
@@ -115,4 +116,66 @@ test("buildAuxTreeState filters unsupported nodes and builds aux indexes", () =>
   expect(state.parentMap.get("file")).toBe("dir");
   expect([...state.idSet]).toEqual(["dir", "file"]);
   expect(state.nodeMap.has("ignored-child")).toBe(false);
+});
+
+test("getAuxRenameValidationError reports empty and duplicate aux names", () => {
+  const state = buildAuxTreeState([
+    {
+      id: "notes",
+      nodeType: "file",
+      name: "notes.md",
+      content: "notes",
+      path: "/notes.md",
+      symlinkTargetPath: null,
+      hasTimelineChange: false,
+      isDeleted: false,
+      children: [],
+    },
+    {
+      id: "state",
+      nodeType: "dir",
+      name: "state",
+      content: null,
+      path: "/state",
+      symlinkTargetPath: null,
+      hasTimelineChange: false,
+      isDeleted: false,
+      children: [],
+    },
+  ]);
+
+  expect(
+    getAuxRenameValidationError({
+      tree: state.tree,
+      nodeMap: state.nodeMap,
+      parentMap: state.parentMap,
+      auxRootId: "aux_root",
+      nodeId: "state",
+      name: "  ",
+    }),
+  ).toBe("无法重命名辅助信息：辅助信息名称不能为空。请输入名称后再保存。");
+
+  expect(
+    getAuxRenameValidationError({
+      tree: state.tree,
+      nodeMap: state.nodeMap,
+      parentMap: state.parentMap,
+      auxRootId: "aux_root",
+      nodeId: "state",
+      name: " notes.md ",
+    }),
+  ).toBe(
+    "无法重命名辅助信息：同一文件夹中已存在名为「notes.md」的辅助信息（/notes.md）。请换一个名称后再保存。",
+  );
+
+  expect(
+    getAuxRenameValidationError({
+      tree: state.tree,
+      nodeMap: state.nodeMap,
+      parentMap: state.parentMap,
+      auxRootId: "aux_root",
+      nodeId: "state",
+      name: "archive",
+    }),
+  ).toBeNull();
 });

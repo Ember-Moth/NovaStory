@@ -192,3 +192,38 @@ export function nextAuxFileName(siblings: AuxTreeNodeVM[]): string {
   }
   return `新文件 ${index}`;
 }
+
+export function getAuxRenameValidationError({
+  tree,
+  nodeMap,
+  parentMap,
+  auxRootId,
+  nodeId,
+  name,
+}: {
+  tree: AuxTreeNodeVM[];
+  nodeMap: ReadonlyMap<string, AuxTreeNodeVM>;
+  parentMap: ReadonlyMap<string, string | null>;
+  auxRootId: string | null;
+  nodeId: string;
+  name: string;
+}) {
+  const normalizedName = name.trim();
+  if (!normalizedName) {
+    return "无法重命名辅助信息：辅助信息名称不能为空。请输入名称后再保存。";
+  }
+
+  const parentId = parentMap.get(nodeId) ?? auxRootId;
+  if (!parentId) {
+    return null;
+  }
+
+  const conflict = listAuxSiblings(tree, nodeMap, parentId, auxRootId).find(
+    (node) => node.id !== nodeId && node.name.trim() === normalizedName && !node.isDeleted,
+  );
+  if (!conflict) {
+    return null;
+  }
+
+  return `无法重命名辅助信息：同一文件夹中已存在名为「${normalizedName}」的辅助信息（${conflict.path}）。请换一个名称后再保存。`;
+}
