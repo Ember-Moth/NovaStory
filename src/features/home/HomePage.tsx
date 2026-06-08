@@ -5,6 +5,7 @@ import { useLocation } from "wouter";
 import { AppShell } from "@/client/components/AppShell";
 import { lastProjectIdAtom } from "@/client/state/lastProject";
 import { rpc } from "@/server/rpc/client";
+import { LoadingBlock } from "@/shared/components/Loading";
 
 const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
   dateStyle: "medium",
@@ -101,10 +102,7 @@ export function HomePage() {
           ) : null}
 
           {isLoading ? (
-            <div className="flex items-center justify-center gap-2 rounded-md border border-dashed border-border px-4 py-10 text-sm text-foreground-muted">
-              <span className="icon-[material-symbols--sync] animate-spin text-base" />
-              加载中...
-            </div>
+            <LoadingBlock />
           ) : (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4">
               <button

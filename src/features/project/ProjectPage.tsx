@@ -84,7 +84,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
     return (
       <AppShell active="project">
         <FullPageMessage
-          icon="icon-[material-symbols--sync]"
+          icon="icon-[material-symbols--sync] animate-spin"
           title="正在加载项目"
           description="正在解析默认工作区并准备编辑数据。"
           embedded
@@ -179,7 +179,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
                   content:
                     contentQuery.isLoading && contentTree.length === 0 ? (
                       <PanelPlaceholder
-                        icon="icon-[material-symbols--sync]"
+                        icon="icon-[material-symbols--sync] animate-spin"
                         label="正在加载正文..."
                       />
                     ) : (
@@ -223,7 +223,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
                   content:
                     auxQuery.isLoading && auxTree.length === 0 ? (
                       <PanelPlaceholder
-                        icon="icon-[material-symbols--sync]"
+                        icon="icon-[material-symbols--sync] animate-spin"
                         label="正在根据当前时间点加载辅助信息..."
                       />
                     ) : (
@@ -256,7 +256,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
                   content:
                     timelineQuery.isLoading && timelinePoints.length === 0 ? (
                       <PanelPlaceholder
-                        icon="icon-[material-symbols--sync]"
+                        icon="icon-[material-symbols--sync] animate-spin"
                         label="正在加载时间轴..."
                       />
                     ) : (

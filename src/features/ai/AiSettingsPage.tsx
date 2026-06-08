@@ -12,6 +12,7 @@ import type {
 import { OverlayScrollbar } from "@/features/project/components/OverlayScrollbar";
 import { SidebarListRow } from "@/features/project/components/nodes/SidebarListRow";
 import { rpc } from "@/server/rpc/client";
+import { LoadingBlock, LoadingInline } from "@/shared/components/Loading";
 
 interface ConnectionFormData {
   kind: "registry" | "custom";
@@ -68,7 +69,7 @@ function CatalogProviderModels({ catalogProviderId }: { catalogProviderId: strin
   });
 
   if (isLoading) {
-    return <div className="py-4 text-sm text-foreground-muted">加载模型中...</div>;
+    return <LoadingInline label="加载模型中..." />;
   }
 
   return (
@@ -384,9 +385,11 @@ function ConnectionModelsList({
     includeDisabled: true,
   });
   const toggleCatalogModel = rpc.useMutation("ai.setCatalogModelEnabled");
+  const hasLoadedModels = models !== undefined;
+  const isRefreshing = hasLoadedModels && isLoading;
 
-  if (isLoading) {
-    return <div className="py-4 text-sm text-foreground-muted">加载模型中...</div>;
+  if (!hasLoadedModels && isLoading) {
+    return <LoadingInline label="加载模型中..." />;
   }
 
   if ((models ?? []).length === 0) {
@@ -394,24 +397,32 @@ function ConnectionModelsList({
   }
 
   return (
-    <div className="space-y-2">
-      {(models ?? []).map((model) => (
-        <ConnectionModelRow
-          key={model.id}
-          model={model}
-          isBusy={toggleCatalogModel.isPending}
-          onToggleCatalogModel={async (currentModel, enabled) => {
-            if (!currentModel.catalogModelId) return;
-            await toggleCatalogModel.mutate({
-              connectionId: connection.id,
-              catalogModelId: currentModel.catalogModelId,
-              enabled,
-            });
-          }}
-          onEditCustomModel={(model) => onOpenEditCustomModel(connection, model)}
-          onDeleteCustomModel={(model) => onDeleteCustomModel(connection, model)}
-        />
-      ))}
+    <div className="relative" aria-busy={isRefreshing}>
+      {isRefreshing ? (
+        <div className="pointer-events-none absolute right-0 top-0 flex items-center gap-1 rounded-full bg-sidebar-background/90 px-2 py-0.5 text-[10px] text-foreground-muted">
+          <span className="icon-[material-symbols--sync] animate-spin text-[10px]" />
+          刷新中...
+        </div>
+      ) : null}
+      <div className={`space-y-2 transition-opacity ${isRefreshing ? "opacity-80" : ""}`}>
+        {(models ?? []).map((model) => (
+          <ConnectionModelRow
+            key={model.id}
+            model={model}
+            isBusy={toggleCatalogModel.isPending}
+            onToggleCatalogModel={async (currentModel, enabled) => {
+              if (!currentModel.catalogModelId) return;
+              await toggleCatalogModel.mutate({
+                connectionId: connection.id,
+                catalogModelId: currentModel.catalogModelId,
+                enabled,
+              });
+            }}
+            onEditCustomModel={(model) => onOpenEditCustomModel(connection, model)}
+            onDeleteCustomModel={(model) => onDeleteCustomModel(connection, model)}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -1164,9 +1175,7 @@ export function AiSettingsPage() {
 
               <OverlayScrollbar variant="card">
                 {connectionsLoading ? (
-                  <div className="rounded-md border border-dashed border-border px-4 py-10 text-sm text-foreground-muted">
-                    连接加载中...
-                  </div>
+                  <LoadingBlock label="连接加载中..." />
                 ) : allConnections.length === 0 ? (
                   <div className="rounded-md border border-dashed border-border px-4 py-10 text-sm text-foreground-muted">
                     还没有任何连接。先创建一个 registry 或 custom connection。
@@ -1244,9 +1253,7 @@ export function AiSettingsPage() {
 
               <OverlayScrollbar variant="card">
                 {providersLoading ? (
-                  <div className="rounded-md border border-dashed border-border px-4 py-10 text-sm text-foreground-muted">
-                    Catalog 加载中...
-                  </div>
+                  <LoadingBlock label="Catalog 加载中..." />
                 ) : (
                   <div className="space-y-2">
                     {allProviders
