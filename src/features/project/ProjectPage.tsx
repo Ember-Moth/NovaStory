@@ -48,7 +48,6 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
     contentRootId,
     contentQuery,
     timelineQuery,
-    auxQuery,
     contentTree,
     timelinePoints,
     auxTree,
@@ -73,6 +72,8 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
     contentBusy,
     timelineBusy,
     auxBusy,
+    auxInitialLoading,
+    auxRefreshing,
     pageError,
     pageErrorDismissed,
     setPageErrorDismissed,
@@ -218,26 +219,26 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
                       />
                     </>
                   ),
-                  content:
-                    auxQuery.isLoading && auxTree.length === 0 ? (
-                      <PanelPlaceholder
-                        icon="icon-[material-symbols--sync] animate-spin"
-                        label="正在根据当前时间点加载辅助信息..."
-                      />
-                    ) : (
-                      <AuxTreePanel
-                        tree={auxTree}
-                        expandedIds={expandedAuxIds}
-                        onToggle={actions.toggleAuxExpanded}
-                        activeId={activeAuxNodeId}
-                        onSelect={actions.handleAuxSelect}
-                        onCreateChildDir={actions.handleAuxCreateChildDir}
-                        onCreateChildFile={actions.handleAuxCreateChildFile}
-                        onRename={actions.handleAuxRename}
-                        onDelete={actions.handleAuxDelete}
-                        isBusy={auxBusy}
-                      />
-                    ),
+                  content: auxInitialLoading ? (
+                    <PanelPlaceholder
+                      icon="icon-[material-symbols--sync] animate-spin"
+                      label="正在根据当前时间点加载辅助信息..."
+                    />
+                  ) : (
+                    <AuxTreePanel
+                      tree={auxTree}
+                      expandedIds={expandedAuxIds}
+                      onToggle={actions.toggleAuxExpanded}
+                      activeId={activeAuxNodeId}
+                      onSelect={actions.handleAuxSelect}
+                      onCreateChildDir={actions.handleAuxCreateChildDir}
+                      onCreateChildFile={actions.handleAuxCreateChildFile}
+                      onRename={actions.handleAuxRename}
+                      onDelete={actions.handleAuxDelete}
+                      isBusy={auxBusy}
+                      isRefreshing={auxRefreshing}
+                    />
+                  ),
                 },
                 {
                   title: "时间轴",
@@ -289,6 +290,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
           timelineLabel={activeTimelineLabel}
           contentSaveState={activeSaveState}
           auxSaveState={auxSaveState}
+          auxRefreshing={auxRefreshing}
           onBodyChange={actions.handleBodyChange}
           onAuxContentChange={actions.handleAuxContentChange}
         />

@@ -19,6 +19,10 @@ import { EditorMolecule } from "../molecules/editor";
 import { ErrorsMolecule } from "../molecules/errors";
 import { SelectionMolecule } from "../molecules/selection";
 
+type AuxSnapshotData = NonNullable<ReturnType<typeof rpc.useQuery<"aux.snapshotTree">>["data"]>;
+
+const lastAuxSnapshotByWorkspace = new Map<string, AuxSnapshotData>();
+
 export function useProjectWorkspace(projectId: string) {
   const selection = useMolecule(SelectionMolecule);
   const editor = useMolecule(EditorMolecule);
@@ -53,7 +57,12 @@ export function useProjectWorkspace(projectId: string) {
       ? { workspaceId, pointId: activeTimelinePointId }
       : skipToken,
   );
+  if (workspaceId && auxQuery.data) {
+    lastAuxSnapshotByWorkspace.set(workspaceId, auxQuery.data);
+  }
 
+  const visibleAuxSnapshot =
+    auxQuery.data ?? (workspaceId ? lastAuxSnapshotByWorkspace.get(workspaceId) : undefined);
   const createContent = rpc.useMutation("content.create");
   const deleteContent = rpc.useMutation("content.delete");
   const updateContent = rpc.useMutation("content.update");
@@ -74,8 +83,11 @@ export function useProjectWorkspace(projectId: string) {
     () => normalizeTimelinePoints(timelineQuery.data ?? []),
     [timelineQuery.data],
   );
-  const auxTree = useMemo(() => normalizeAuxNodes(auxQuery.data?.nodes ?? []), [auxQuery.data]);
-  const auxRootId = auxQuery.data?.rootNodeId ?? null;
+  const auxTree = useMemo(
+    () => normalizeAuxNodes(visibleAuxSnapshot?.nodes ?? []),
+    [visibleAuxSnapshot],
+  );
+  const auxRootId = visibleAuxSnapshot?.rootNodeId ?? null;
 
   const flatContentNodes = useMemo(() => flattenContentNodes(contentTree), [contentTree]);
   const contentNodeMap = useMemo(
@@ -146,6 +158,13 @@ export function useProjectWorkspace(projectId: string) {
     updateTimeline.isPending;
   const auxBusy =
     mkdirAux.isPending || writeFileAux.isPending || moveAux.isPending || deleteAux.isPending;
+  const auxInitialLoading =
+    !auxQuery.isSkipped && !visibleAuxSnapshot && auxQuery.isLoading && !auxQuery.error;
+  const auxRefreshing =
+    !auxQuery.isSkipped &&
+    !!visibleAuxSnapshot &&
+    (auxQuery.isLoading || auxQuery.isStale) &&
+    !auxQuery.error;
   const pageError =
     workspaceQuery.error?.message ??
     contentQuery.error?.message ??
@@ -211,6 +230,8 @@ export function useProjectWorkspace(projectId: string) {
     contentBusy,
     timelineBusy,
     auxBusy,
+    auxInitialLoading,
+    auxRefreshing,
     pageError,
     pageErrorDismissed,
     setPageErrorDismissed,

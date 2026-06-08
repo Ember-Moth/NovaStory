@@ -140,6 +140,7 @@ export function AuxTreePanel({
   onCreateChildFile,
   onDelete,
   isBusy,
+  isRefreshing,
 }: {
   tree: AuxTreeNodeVM[];
   expandedIds: Set<string>;
@@ -151,6 +152,7 @@ export function AuxTreePanel({
   onCreateChildFile: (_node: AuxTreeNodeVM, _anchorId: string) => void;
   onDelete: (_id: string, _anchorId: string) => void;
   isBusy: boolean;
+  isRefreshing: boolean;
 }) {
   if (tree.length === 0) {
     return (
@@ -178,7 +180,15 @@ export function AuxTreePanel({
   );
 
   return (
-    <div className="pb-2">
+    <div className="relative pb-2">
+      {isRefreshing ? (
+        <div className="pointer-events-none absolute right-2 top-2 z-10">
+          <div className="inline-flex items-center gap-1 rounded-full border border-border bg-sidebar-background/92 px-2 py-1 text-[11px] text-foreground-muted shadow-sm backdrop-blur-sm">
+            <span className="icon-[material-symbols--sync] animate-spin text-xs" />
+            刷新中...
+          </div>
+        </div>
+      ) : null}
       <TreeNodePanel
         nodes={tree}
         expandedIds={expandedIds}

@@ -31,6 +31,7 @@ export function EditorArea({
   timelineLabel,
   contentSaveState,
   auxSaveState,
+  auxRefreshing,
   onBodyChange,
   onAuxContentChange,
 }: {
@@ -42,6 +43,7 @@ export function EditorArea({
   timelineLabel: string;
   contentSaveState: SaveState;
   auxSaveState: SaveState;
+  auxRefreshing: boolean;
   onBodyChange: (_value: string) => void;
   onAuxContentChange: (_value: string) => void;
 }) {
@@ -88,6 +90,9 @@ export function EditorArea({
             <span className="shrink-0 text-[11px] text-accent-foreground">
               时间点: {timelineLabel}
             </span>
+            {auxRefreshing ? (
+              <span className="shrink-0 text-[11px] text-foreground-muted">刷新中...</span>
+            ) : null}
           </div>
           <textarea
             className="flex-1 resize-none border-none bg-editor-background p-4 font-mono text-[14px] leading-7 text-editor-foreground outline-none"
@@ -116,6 +121,9 @@ export function EditorArea({
           <span className="ml-auto shrink-0 text-[11px] text-accent-foreground">
             时间点: {timelineLabel}
           </span>
+          {auxRefreshing ? (
+            <span className="shrink-0 text-[11px] text-foreground-muted">刷新中...</span>
+          ) : null}
         </div>
         <div className="flex flex-1 items-center justify-center px-4 text-sm text-foreground-muted">
           {placeholder}

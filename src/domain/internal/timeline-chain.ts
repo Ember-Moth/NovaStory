@@ -75,6 +75,52 @@ export function resolveTimelineChainIds(
   return chain;
 }
 
+export function listOrderedTimelinePointIds(executor: DatabaseExecutor, workspaceId: string) {
+  return orderTimelineRows(listTimelineRows(executor, workspaceId)).map((row) => row.id);
+}
+
+export function listAffectedTimelinePointIdsForInsert(
+  executor: DatabaseExecutor,
+  workspaceId: string,
+  afterPointId: string | null,
+  newPointId: string,
+) {
+  const orderedIds = listOrderedTimelinePointIds(executor, workspaceId);
+  const startIndex = afterPointId == null ? 0 : Math.max(orderedIds.indexOf(afterPointId) + 1, 0);
+  return [...new Set([newPointId, ...orderedIds.slice(startIndex)])];
+}
+
+export function listAffectedTimelinePointIdsForDelete(
+  executor: DatabaseExecutor,
+  workspaceId: string,
+  pointId: string,
+) {
+  const orderedIds = listOrderedTimelinePointIds(executor, workspaceId);
+  const startIndex = orderedIds.indexOf(pointId);
+  invariant(startIndex >= 0, `Timeline point not found: ${pointId}`);
+  return orderedIds.slice(startIndex);
+}
+
+export function listAffectedTimelinePointIdsForMove(
+  executor: DatabaseExecutor,
+  workspaceId: string,
+  pointId: string,
+  afterPointId: string | null,
+) {
+  const orderedIds = listOrderedTimelinePointIds(executor, workspaceId);
+  const fromIndex = orderedIds.indexOf(pointId);
+  invariant(fromIndex >= 0, `Timeline point not found: ${pointId}`);
+
+  const reorderedIds = [...orderedIds];
+  reorderedIds.splice(fromIndex, 1);
+  const insertIndex =
+    afterPointId == null ? 0 : Math.max(reorderedIds.indexOf(afterPointId) + 1, 0);
+  reorderedIds.splice(insertIndex, 0, pointId);
+
+  const affectedStart = Math.min(fromIndex, insertIndex);
+  return orderedIds.slice(affectedStart);
+}
+
 export function getTimelineSuccessor(
   executor: DatabaseExecutor,
   workspaceId: string,

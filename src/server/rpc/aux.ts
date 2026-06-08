@@ -13,6 +13,7 @@ import {
   readAuxByPathAt,
   writeFileAt,
 } from "@/domain";
+import { auxSnapshotWatchKey, normalizeTimelinePointId } from "@/domain/internal/timeline-point";
 
 export const mkdir = mutation<Parameters<typeof mkdirAt>[0], ReturnType<typeof mkdirAt>>(
   (input, ctx) => {
@@ -60,7 +61,7 @@ export const readById = query<
 >(({ workspaceId, pointId, nodeId }, ctx) => {
   const result = readAuxByIdAt(workspaceId, pointId, nodeId);
   ctx.watch(`aux:${workspaceId}`);
-  ctx.watch(`timeline:${workspaceId}`);
+  ctx.watch(auxSnapshotWatchKey(workspaceId, normalizeTimelinePointId(pointId)));
   return result;
 });
 
@@ -70,7 +71,7 @@ export const readByPath = query<
 >(({ workspaceId, pointId, path }, ctx) => {
   const result = readAuxByPathAt(workspaceId, pointId, path);
   ctx.watch(`aux:${workspaceId}`);
-  ctx.watch(`timeline:${workspaceId}`);
+  ctx.watch(auxSnapshotWatchKey(workspaceId, normalizeTimelinePointId(pointId)));
   return result;
 });
 
@@ -85,7 +86,7 @@ export const listDir = query<
 >(({ workspaceId, pointId, dirId, path }, ctx) => {
   const result = listAuxDirAt(workspaceId, pointId, { dirId, path });
   ctx.watch(`aux:${workspaceId}`);
-  ctx.watch(`timeline:${workspaceId}`);
+  ctx.watch(auxSnapshotWatchKey(workspaceId, normalizeTimelinePointId(pointId)));
   return result;
 });
 
@@ -95,7 +96,7 @@ export const snapshotTree = query<
 >(({ workspaceId, pointId }, ctx) => {
   const result = exportAuxSnapshotTree(workspaceId, pointId);
   ctx.watch(`aux:${workspaceId}`);
-  ctx.watch(`timeline:${workspaceId}`);
+  ctx.watch(auxSnapshotWatchKey(workspaceId, normalizeTimelinePointId(pointId)));
   return result;
 });
 

@@ -1,5 +1,6 @@
 import { mutation, query } from "@codehz/rpc";
 
+import { db } from "@/db";
 import {
   ORIGIN_TIMELINE_POINT_ID,
   createTimelinePoint,
@@ -8,6 +9,12 @@ import {
   moveTimelinePoint,
   updateTimelinePoint,
 } from "@/domain";
+import {
+  listAffectedTimelinePointIdsForDelete,
+  listAffectedTimelinePointIdsForInsert,
+  listAffectedTimelinePointIdsForMove,
+} from "@/domain/internal/timeline-chain";
+import { auxSnapshotWatchKey, normalizeTimelinePointId } from "@/domain/internal/timeline-point";
 
 export const list = query<{ workspaceId: string }, ReturnType<typeof listTimelinePoints>>(
   ({ workspaceId }, ctx) => {
@@ -28,7 +35,17 @@ export const create = mutation<
   ReturnType<typeof createTimelinePoint>
 >((input, ctx) => {
   const point = createTimelinePoint(input);
-  ctx.invalidate(`timeline:${input.workspaceId}`);
+  const afterPointId = normalizeTimelinePointId(input.afterPointId);
+  const affectedPointIds = listAffectedTimelinePointIdsForInsert(
+    db,
+    input.workspaceId,
+    afterPointId,
+    point.id,
+  );
+  ctx.invalidate(
+    `timeline:${input.workspaceId}`,
+    ...affectedPointIds.map((pointId) => auxSnapshotWatchKey(input.workspaceId, pointId)),
+  );
   return point;
 });
 
@@ -40,8 +57,18 @@ export const move = mutation<
   },
   ReturnType<typeof moveTimelinePoint>
 >((input, ctx) => {
+  const afterPointId = normalizeTimelinePointId(input.afterPointId);
+  const affectedPointIds = listAffectedTimelinePointIdsForMove(
+    db,
+    input.workspaceId,
+    input.pointId,
+    afterPointId,
+  );
   const point = moveTimelinePoint(input);
-  ctx.invalidate(`timeline:${input.workspaceId}`);
+  ctx.invalidate(
+    `timeline:${input.workspaceId}`,
+    ...affectedPointIds.map((pointId) => auxSnapshotWatchKey(input.workspaceId, pointId)),
+  );
   return point;
 });
 
@@ -49,8 +76,12 @@ export const deleteMutation = mutation<
   { workspaceId: string; pointId: string; purgeAuxLayers?: boolean },
   void
 >(({ workspaceId, pointId, purgeAuxLayers }, ctx) => {
+  const affectedPointIds = listAffectedTimelinePointIdsForDelete(db, workspaceId, pointId);
   deleteTimelinePoint(workspaceId, pointId, { purgeAuxLayers });
   ctx.invalidate(`timeline:${workspaceId}`);
+  ctx.invalidate(
+    ...affectedPointIds.map((affectedPointId) => auxSnapshotWatchKey(workspaceId, affectedPointId)),
+  );
   if (purgeAuxLayers) {
     ctx.invalidate(`aux:${workspaceId}`);
   }

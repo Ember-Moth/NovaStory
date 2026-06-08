@@ -14,6 +14,10 @@ export function pointIdOrOrigin(pointId: string | null) {
   return pointId ?? ORIGIN_TIMELINE_POINT_ID;
 }
 
+export function auxSnapshotWatchKey(workspaceId: string, pointId: string | null) {
+  return `aux-snapshot:${workspaceId}:${pointIdOrOrigin(pointId)}`;
+}
+
 export function pointCondition(pointId: string | null) {
   return pointId == null
     ? isNull(schema.auxNodeLayers.timelinePointId)
