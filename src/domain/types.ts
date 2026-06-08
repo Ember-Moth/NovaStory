@@ -45,15 +45,6 @@ export interface AiCatalogModelView {
   isActive: boolean;
 }
 
-export interface AiSupportedSdkPackage {
-  sdkPackage: string;
-  label: string;
-  providerFactoryId: string;
-  requiresBaseUrl: boolean;
-  allowsCustomEndpoint: boolean;
-  supportsRegistryProvider: boolean;
-}
-
 export interface AiCatalogStatusView {
   lastAttemptAt: number | null;
   lastSuccessAt: number | null;

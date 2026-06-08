@@ -1,13 +1,17 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
 
 import { AppShell, AppSidebar } from "@/client/components/AppShell";
-import { getAiSdkPackageRecipe } from "@/domain/ai-packages";
+import {
+  type AiConnectionConfig,
+  normalizeAiConnectionConfig,
+  parseAiConnectionConfig,
+} from "@/domain/ai-config";
+import { type AiSupportedSdkPackage, getAiSdkPackageRecipe } from "@/domain/ai-packages";
 import type {
   AiCatalogProviderView,
   AiConnectionCustomModelRow,
   AiConnectionRow,
   AiResolvedModelView,
-  AiSupportedSdkPackage,
 } from "@/domain/types";
 import { OverlayScrollbar } from "@/features/project/components/OverlayScrollbar";
 import { SidebarListRow } from "@/features/project/components/nodes/SidebarListRow";
@@ -22,6 +26,7 @@ interface ConnectionFormData {
   baseUrl: string | null;
   apiKey: string | null;
   apiKeyChanged: boolean;
+  config: AiConnectionConfig;
   isEnabled: boolean;
 }
 
@@ -60,6 +65,14 @@ function maskApiKey(key: string | null): string {
   if (!key) return "未设置";
   if (key.length <= 8) return "••••••••";
   return `${key.slice(0, 3)}...${key.slice(-4)}`;
+}
+
+function normalizeFormConnectionConfig(
+  sdkPackage: string | null | undefined,
+  config: AiConnectionConfig | null | undefined,
+): AiConnectionConfig {
+  if (!sdkPackage) return {};
+  return normalizeAiConnectionConfig({ sdkPackage, config });
 }
 
 function CatalogProviderModels({ catalogProviderId }: { catalogProviderId: string }) {
@@ -513,8 +526,16 @@ function ConnectionDialogForm({
       : (supportedPackages[0]?.sdkPackage ?? "@ai-sdk/openai-compatible"),
   );
   const [baseUrl, setBaseUrl] = useState(connection?.baseUrl ?? quickConnectProvider?.apiUrl ?? "");
-  const [apiKey, setApiKey] = useState(connection ? "••••••••" : "");
+  const [apiKey, setApiKey] = useState(connection?.apiKey ? "••••••••" : "");
   const [apiKeyChanged, setApiKeyChanged] = useState(false);
+  const [config, setConfig] = useState<AiConnectionConfig>(() =>
+    normalizeFormConnectionConfig(
+      connection?.sdkPackage ??
+        quickConnectProvider?.sdkPackage ??
+        supportedPackages[0]?.sdkPackage,
+      connection ? parseAiConnectionConfig(connection.configJson) : {},
+    ),
+  );
   const [isEnabled, setIsEnabled] = useState(connection?.isEnabled ?? true);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -524,6 +545,9 @@ function ConnectionDialogForm({
     kind === "registry" ? (selectedRegistryProvider?.sdkPackage ?? null) : sdkPackage;
   const recipe = getAiSdkPackageRecipe(effectiveSdkPackage);
   const showBaseUrl = Boolean(recipe?.requiresBaseUrl || recipe?.allowsCustomEndpoint);
+  const normalizedConfig = normalizeFormConnectionConfig(effectiveSdkPackage, config);
+  const requiresApiKey = !connection || apiKeyChanged || !connection.apiKey;
+  const isAzureConfig = recipe?.configKind === "azure";
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -539,8 +563,16 @@ function ConnectionDialogForm({
       setFormError("请选择 AI SDK package。");
       return;
     }
+    if (requiresApiKey && !apiKey.trim()) {
+      setFormError("API Key 不能为空。");
+      return;
+    }
     if (recipe?.requiresBaseUrl && !baseUrl.trim()) {
       setFormError("这个 AI SDK package 需要填写 Base URL。");
+      return;
+    }
+    if (isAzureConfig && !baseUrl.trim() && !normalizedConfig.azure?.resourceName) {
+      setFormError("Azure 连接需要填写 Base URL 或 Resource Name。");
       return;
     }
 
@@ -552,6 +584,7 @@ function ConnectionDialogForm({
       baseUrl: showBaseUrl ? baseUrl.trim() || null : null,
       apiKey: apiKeyChanged ? apiKey : null,
       apiKeyChanged,
+      config: normalizedConfig,
       isEnabled,
     });
   };
@@ -650,6 +683,7 @@ function ConnectionDialogForm({
               factory: {recipe.providerFactoryId}
               {recipe.requiresBaseUrl ? " · 需要 Base URL" : ""}
               {recipe.allowsCustomEndpoint ? " · 允许自定义 endpoint" : ""}
+              {recipe.configKind === "azure" ? " · Azure 专用配置" : ""}
             </div>
           ) : (
             <div className="mt-1">这个 package 暂无受控 recipe。</div>
@@ -668,6 +702,64 @@ function ConnectionDialogForm({
           </label>
         ) : null}
 
+        {isAzureConfig ? (
+          <>
+            <label className="block space-y-1">
+              <span className="text-[11px] font-medium text-foreground-muted">Resource Name</span>
+              <input
+                value={config.azure?.resourceName ?? ""}
+                onChange={(event) =>
+                  setConfig((current) => ({
+                    ...current,
+                    azure: {
+                      ...current.azure,
+                      resourceName: event.target.value,
+                    },
+                  }))
+                }
+                placeholder="your-azure-resource"
+                className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-sm outline-none focus:border-accent-foreground"
+              />
+            </label>
+
+            <label className="block space-y-1">
+              <span className="text-[11px] font-medium text-foreground-muted">API Version</span>
+              <input
+                value={config.azure?.apiVersion ?? ""}
+                onChange={(event) =>
+                  setConfig((current) => ({
+                    ...current,
+                    azure: {
+                      ...current.azure,
+                      apiVersion: event.target.value,
+                    },
+                  }))
+                }
+                placeholder="preview"
+                className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-sm outline-none focus:border-accent-foreground"
+              />
+            </label>
+
+            <label className="flex items-center gap-2 text-sm text-foreground-muted">
+              <input
+                type="checkbox"
+                checked={config.azure?.useDeploymentBasedUrls ?? false}
+                onChange={(event) =>
+                  setConfig((current) => ({
+                    ...current,
+                    azure: {
+                      ...current.azure,
+                      useDeploymentBasedUrls: event.target.checked,
+                    },
+                  }))
+                }
+                className="rounded border-border bg-editor-background accent-accent-foreground"
+              />
+              使用 deployment-based URLs
+            </label>
+          </>
+        ) : null}
+
         <label className="block space-y-1">
           <span className="text-[11px] font-medium text-foreground-muted">API Key</span>
           <input
@@ -683,7 +775,7 @@ function ConnectionDialogForm({
                 setApiKeyChanged(true);
               }
             }}
-            placeholder={connection ? "留空则不修改" : "sk-..."}
+            placeholder={connection?.apiKey ? "留空则不修改" : "sk-..."}
             className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-sm outline-none focus:border-accent-foreground"
           />
         </label>
@@ -1046,6 +1138,7 @@ export function AiSettingsPage() {
         sdkPackage: data.kind === "custom" ? (data.sdkPackage ?? undefined) : undefined,
         baseUrl: data.baseUrl,
         apiKey: data.apiKeyChanged ? data.apiKey : undefined,
+        config: data.config,
         isEnabled: data.isEnabled,
       });
     } else if (data.kind === "registry" && data.catalogProviderId) {
@@ -1055,6 +1148,7 @@ export function AiSettingsPage() {
         catalogProviderId: data.catalogProviderId,
         baseUrl: data.baseUrl,
         apiKey: data.apiKeyChanged ? data.apiKey : null,
+        config: data.config,
         isEnabled: data.isEnabled,
       });
     } else if (data.kind === "custom" && data.sdkPackage) {
@@ -1064,6 +1158,7 @@ export function AiSettingsPage() {
         sdkPackage: data.sdkPackage,
         baseUrl: data.baseUrl,
         apiKey: data.apiKeyChanged ? data.apiKey : null,
+        config: data.config,
         isEnabled: data.isEnabled,
       });
     }

@@ -11,7 +11,17 @@ import {
   listResolvedModelsForConnection,
   refreshAiCatalog,
 } from "@/domain/ai-catalog";
-import { SUPPORTED_AI_SDK_PACKAGES, getAiSdkPackageRecipe } from "@/domain/ai-packages";
+import {
+  type AiConnectionConfig,
+  normalizeAiConnectionConfig,
+  parseAiConnectionConfig,
+  stringifyAiConnectionConfig,
+} from "@/domain/ai-config";
+import {
+  type AiSupportedSdkPackage,
+  SUPPORTED_AI_SDK_PACKAGES,
+  getAiSdkPackageRecipe,
+} from "@/domain/ai-packages";
 import { createId, invariant, now } from "@/domain/internal/ids";
 import type {
   AiCatalogModelView,
@@ -19,7 +29,6 @@ import type {
   AiCatalogStatusView,
   AiConnectionRow,
   AiResolvedModelView,
-  AiSupportedSdkPackage,
 } from "@/domain/types";
 
 type ConnectionInsert = InferInsertModel<typeof schema.aiConnections>;
@@ -32,6 +41,7 @@ interface CreateRegistryConnectionInput {
   catalogProviderId: string;
   baseUrl?: string | null;
   apiKey?: string | null;
+  config?: AiConnectionConfig;
   isEnabled?: boolean;
 }
 
@@ -41,6 +51,7 @@ interface CreateCustomConnectionInput {
   sdkPackage: string;
   baseUrl?: string | null;
   apiKey?: string | null;
+  config?: AiConnectionConfig;
   isEnabled?: boolean;
 }
 
@@ -53,6 +64,7 @@ type UpdateConnectionInput = {
   sdkPackage?: string;
   baseUrl?: string | null;
   apiKey?: string | null;
+  config?: AiConnectionConfig;
   isEnabled?: boolean;
 };
 
@@ -96,18 +108,44 @@ function sanitizeApiKey(apiKey: string | null | undefined): string | null {
   return trimmed ? trimmed : null;
 }
 
+function normalizeConnectionConfigForSdkPackage(
+  sdkPackage: string,
+  config: AiConnectionConfig | null | undefined,
+) {
+  return normalizeAiConnectionConfig({ sdkPackage, config });
+}
+
+function sanitizeConfigJson(
+  sdkPackage: string,
+  config: AiConnectionConfig | null | undefined,
+): string {
+  return stringifyAiConnectionConfig({ sdkPackage, config });
+}
+
 function validateSdkPackageForInput(sdkPackage: string) {
   const recipe = getAiSdkPackageRecipe(sdkPackage);
   invariant(recipe, "Unsupported AI SDK package");
   return recipe;
 }
 
-function validateConnectionBaseUrl({
+export function validateConnectionApiKey({
+  apiKey,
+  existingApiKey,
+}: {
+  apiKey: string | null;
+  existingApiKey?: string | null;
+}) {
+  invariant(apiKey || existingApiKey, "API Key is required");
+}
+
+export function validateConnectionBaseUrl({
   sdkPackage,
   baseUrl,
+  config,
 }: {
   sdkPackage: string;
   baseUrl: string | null;
+  config: AiConnectionConfig | null | undefined;
 }) {
   const recipe = validateSdkPackageForInput(sdkPackage);
   if (recipe.requiresBaseUrl) {
@@ -116,11 +154,18 @@ function validateConnectionBaseUrl({
   if (!recipe.requiresBaseUrl && !recipe.allowsCustomEndpoint) {
     invariant(baseUrl == null, "This AI SDK package does not allow custom endpoints");
   }
+  if (recipe.configKind === "azure") {
+    invariant(
+      baseUrl || config?.azure?.resourceName,
+      "Azure connections require either Base URL or Resource Name",
+    );
+  }
 }
 
 function buildConnectionInsert(input: CreateConnectionInput): ConnectionInsert {
   const timestamp = now();
   const name = sanitizeName(input.name);
+  const apiKey = sanitizeApiKey(input.apiKey);
 
   if (input.kind === "registry") {
     const provider = db.query.aiCatalogProviders
@@ -132,7 +177,9 @@ function buildConnectionInsert(input: CreateConnectionInput): ConnectionInsert {
     const recipe = validateSdkPackageForInput(provider.sdkPackage);
     invariant(recipe.supportsRegistryProvider, "Catalog provider package is not supported");
     const baseUrl = sanitizeBaseUrl(input.baseUrl);
-    validateConnectionBaseUrl({ sdkPackage: provider.sdkPackage, baseUrl });
+    const config = normalizeConnectionConfigForSdkPackage(provider.sdkPackage, input.config);
+    validateConnectionApiKey({ apiKey });
+    validateConnectionBaseUrl({ sdkPackage: provider.sdkPackage, baseUrl, config });
 
     return {
       id: createId("conn"),
@@ -141,8 +188,8 @@ function buildConnectionInsert(input: CreateConnectionInput): ConnectionInsert {
       sdkPackage: provider.sdkPackage,
       catalogProviderId: provider.id,
       baseUrl,
-      apiKey: sanitizeApiKey(input.apiKey),
-      configJson: "{}",
+      apiKey,
+      configJson: sanitizeConfigJson(provider.sdkPackage, config),
       isEnabled: input.isEnabled ?? true,
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -151,7 +198,9 @@ function buildConnectionInsert(input: CreateConnectionInput): ConnectionInsert {
 
   const sdkPackage = input.sdkPackage;
   const baseUrl = sanitizeBaseUrl(input.baseUrl);
-  validateConnectionBaseUrl({ sdkPackage, baseUrl });
+  const config = normalizeConnectionConfigForSdkPackage(sdkPackage, input.config);
+  validateConnectionApiKey({ apiKey });
+  validateConnectionBaseUrl({ sdkPackage, baseUrl, config });
 
   return {
     id: createId("conn"),
@@ -160,8 +209,8 @@ function buildConnectionInsert(input: CreateConnectionInput): ConnectionInsert {
     sdkPackage,
     catalogProviderId: null,
     baseUrl,
-    apiKey: sanitizeApiKey(input.apiKey),
-    configJson: "{}",
+    apiKey,
+    configJson: sanitizeConfigJson(sdkPackage, config),
     isEnabled: input.isEnabled ?? true,
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -283,19 +332,32 @@ export const updateConnection = mutation<UpdateConnectionInput, AiConnectionRow>
 
   const nextBaseUrl =
     input.baseUrl !== undefined ? sanitizeBaseUrl(input.baseUrl) : existing.baseUrl;
-  validateConnectionBaseUrl({ sdkPackage: nextSdkPackage, baseUrl: nextBaseUrl });
+  const nextApiKey =
+    input.apiKey !== undefined ? sanitizeApiKey(input.apiKey) : (existing.apiKey ?? null);
+  const nextConfig = normalizeConnectionConfigForSdkPackage(
+    nextSdkPackage,
+    input.config ?? parseAiConnectionConfig(existing.configJson),
+  );
+
+  validateConnectionApiKey({ apiKey: nextApiKey, existingApiKey: existing.apiKey });
+  validateConnectionBaseUrl({
+    sdkPackage: nextSdkPackage,
+    baseUrl: nextBaseUrl,
+    config: nextConfig,
+  });
 
   const nextValues: Partial<ConnectionInsert> = {
     name: nextName,
     sdkPackage: nextSdkPackage,
     catalogProviderId: nextCatalogProviderId,
     baseUrl: nextBaseUrl,
+    configJson: sanitizeConfigJson(nextSdkPackage, nextConfig),
     isEnabled: input.isEnabled ?? existing.isEnabled,
     updatedAt: timestamp,
   };
 
   if (input.apiKey !== undefined) {
-    nextValues.apiKey = sanitizeApiKey(input.apiKey);
+    nextValues.apiKey = nextApiKey;
   }
 
   db.update(schema.aiConnections)
