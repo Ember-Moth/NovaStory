@@ -639,6 +639,7 @@ export function useProjectActions(workspace: ProjectWorkspace) {
       }
 
       const title = `新节点 ${flatContentNodes.length + 1}`;
+      const lastChild = parentNode.children.at(-1);
 
       clearActionError(setContentError);
 
@@ -646,6 +647,7 @@ export function useProjectActions(workspace: ProjectWorkspace) {
         const node = await createContent.mutate({
           workspaceId,
           parentId: parentNode.id,
+          afterSiblingId: lastChild?.id,
           anchorPointId: activeTimelinePointId,
           title,
         });
