@@ -1020,7 +1020,9 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         if (activeAuxNodeId === nodeId) {
           setShouldAutoSelectContent(false);
           setActiveContentNodeId(null);
-          setActiveAuxNodeId(null);
+          if (activeTimelinePointId === ORIGIN_TIMELINE_POINT_ID) {
+            setActiveAuxNodeId(null);
+          }
         }
       } catch (error) {
         setActionError(
