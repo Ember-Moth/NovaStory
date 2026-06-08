@@ -58,6 +58,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
   const setActiveContentNodeId = useSetAtom(selection.activeContentNodeIdAtom);
   const activeAuxNodeId = useAtomValue(selection.activeAuxNodeIdAtom);
   const setActiveAuxNodeId = useSetAtom(selection.activeAuxNodeIdAtom);
+  const setShouldAutoSelectContent = useSetAtom(selection.shouldAutoSelectContentAtom);
   const activeTimelinePointId = useAtomValue(selection.activeTimelinePointIdAtom);
   const setActiveTimelinePointId = useSetAtom(selection.activeTimelinePointIdAtom);
   const setExpandedContentIds = useSetAtom(selection.expandedContentIdsAtom);
@@ -335,6 +336,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
           parentDirId,
           name,
         });
+        setShouldAutoSelectContent(false);
         setActiveAuxNodeId(node.id);
         expandAuxParent(parentDirId);
       } catch (error) {
@@ -354,6 +356,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
       mkdirAux,
       setActiveAuxNodeId,
       setAuxError,
+      setShouldAutoSelectContent,
       workspaceId,
     ],
   );
@@ -377,6 +380,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
           name,
           content: "",
         });
+        setShouldAutoSelectContent(false);
         setActiveAuxNodeId(node.id);
         expandAuxParent(parentDirId);
       } catch (error) {
@@ -395,6 +399,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
       expandAuxParent,
       setActiveAuxNodeId,
       setAuxError,
+      setShouldAutoSelectContent,
       workspaceId,
       writeFileAux,
     ],
@@ -402,11 +407,17 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
 
   const activateContentNode = useCallback(
     (nodeId: string, anchorTimelinePointId: string) => {
+      setShouldAutoSelectContent(true);
       setActiveAuxNodeId(null);
       setActiveContentNodeId(nodeId);
       setActiveTimelinePointId(anchorTimelinePointId);
     },
-    [setActiveAuxNodeId, setActiveContentNodeId, setActiveTimelinePointId],
+    [
+      setActiveAuxNodeId,
+      setActiveContentNodeId,
+      setActiveTimelinePointId,
+      setShouldAutoSelectContent,
+    ],
   );
 
   const flushDirtyContentBeforeSwitch = useCallback(() => {
@@ -449,6 +460,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         }
       }
 
+      setShouldAutoSelectContent(false);
       setActiveContentNodeId(null);
       setActiveAuxNodeId(node.id);
     },
@@ -461,6 +473,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
       flushDirtyContent,
       setActiveAuxNodeId,
       setActiveContentNodeId,
+      setShouldAutoSelectContent,
     ],
   );
 
@@ -710,6 +723,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
           if (fallbackNode) {
             activateContentNode(fallbackNode.id, fallbackNode.anchorTimelinePointId);
           } else {
+            setShouldAutoSelectContent(false);
             setActiveContentNodeId(null);
           }
         }
@@ -732,6 +746,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
       deleteContent,
       setActiveContentNodeId,
       setContentError,
+      setShouldAutoSelectContent,
       workspaceId,
     ],
   );
@@ -1003,6 +1018,8 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         });
         clearAuxNodeLocalState(new Set([nodeId]));
         if (activeAuxNodeId === nodeId) {
+          setShouldAutoSelectContent(false);
+          setActiveContentNodeId(null);
           setActiveAuxNodeId(null);
         }
       } catch (error) {
@@ -1018,8 +1035,10 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
       activeTimelinePointId,
       clearAuxNodeLocalState,
       deleteAux,
+      setActiveContentNodeId,
       setActiveAuxNodeId,
       setAuxError,
+      setShouldAutoSelectContent,
       workspaceId,
     ],
   );

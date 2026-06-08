@@ -19,6 +19,7 @@ export function useProjectWorkspaceEffects(
 
   const setActiveContentNodeId = useSetAtom(selection.activeContentNodeIdAtom);
   const setActiveAuxNodeId = useSetAtom(selection.activeAuxNodeIdAtom);
+  const shouldAutoSelectContent = useAtomValue(selection.shouldAutoSelectContentAtom);
   const setActiveTimelinePointId = useSetAtom(selection.activeTimelinePointIdAtom);
   const setExpandedContentIds = useSetAtom(selection.expandedContentIdsAtom);
   const setExpandedAuxIds = useSetAtom(selection.expandedAuxIdsAtom);
@@ -49,6 +50,10 @@ export function useProjectWorkspaceEffects(
   } = workspace;
 
   useEffect(() => {
+    if (!shouldAutoSelectContent) {
+      return;
+    }
+
     if (activeAuxNodeId) {
       return;
     }
@@ -65,7 +70,14 @@ export function useProjectWorkspaceEffects(
     if (preferredNode) {
       setActiveContentNodeId(preferredNode.id);
     }
-  }, [activeAuxNodeId, activeContentNodeId, contentTree, flatContentNodes, setActiveContentNodeId]);
+  }, [
+    activeAuxNodeId,
+    activeContentNodeId,
+    contentTree,
+    flatContentNodes,
+    setActiveContentNodeId,
+    shouldAutoSelectContent,
+  ]);
 
   useEffect(() => {
     if (!activeContentNodeId) {

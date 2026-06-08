@@ -9,6 +9,7 @@ export const SelectionMolecule = molecule((_, getScope) => {
   return {
     activeContentNodeIdAtom: atom<string | null>(null),
     activeAuxNodeIdAtom: atom<string | null>(null),
+    shouldAutoSelectContentAtom: atom(true),
     activeTimelinePointIdAtom: atom<string | null>(null),
     expandedContentIdsAtom: atom<Set<string>>(new Set<string>()),
     expandedAuxIdsAtom: atom<Set<string>>(new Set<string>()),

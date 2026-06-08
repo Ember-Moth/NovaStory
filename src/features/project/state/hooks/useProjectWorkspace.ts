@@ -145,6 +145,7 @@ export function useProjectSelectionView(data: ProjectWorkspaceData) {
 
   const activeContentNodeId = useAtomValue(selection.activeContentNodeIdAtom);
   const activeAuxNodeId = useAtomValue(selection.activeAuxNodeIdAtom);
+  const shouldAutoSelectContent = useAtomValue(selection.shouldAutoSelectContentAtom);
   const activeTimelinePointId = useAtomValue(selection.activeTimelinePointIdAtom);
   const expandedContentIds = useAtomValue(selection.expandedContentIdsAtom);
   const expandedAuxIds = useAtomValue(selection.expandedAuxIdsAtom);
@@ -172,6 +173,7 @@ export function useProjectSelectionView(data: ProjectWorkspaceData) {
   return {
     activeContentNodeId,
     activeAuxNodeId,
+    shouldAutoSelectContent,
     activeTimelinePointId,
     expandedContentIds,
     expandedAuxIds,
@@ -180,7 +182,10 @@ export function useProjectSelectionView(data: ProjectWorkspaceData) {
 }
 
 export function useProjectEditorView(
-  selection: Pick<ProjectSelectionView, "activeContentNode" | "activeAuxNode">,
+  selection: Pick<
+    ProjectSelectionView,
+    "activeContentNode" | "activeAuxNode" | "shouldAutoSelectContent"
+  >,
 ) {
   const editor = useMolecule(EditorMolecule);
 
@@ -194,6 +199,7 @@ export function useProjectEditorView(
       deriveProjectEditorState({
         activeContentNode: selection.activeContentNode,
         activeAuxNode: selection.activeAuxNode,
+        shouldShowContent: selection.shouldAutoSelectContent,
         drafts,
         committedBodies,
         pendingSaveCounts,
@@ -206,6 +212,7 @@ export function useProjectEditorView(
       saveErrors,
       selection.activeAuxNode,
       selection.activeContentNode,
+      selection.shouldAutoSelectContent,
     ],
   );
 }

@@ -65,6 +65,7 @@ test("deriveProjectEditorState computes content and aux save state independently
   const editor = deriveProjectEditorState({
     activeContentNode,
     activeAuxNode,
+    shouldShowContent: true,
     drafts: {
       content_1: "Draft body",
       aux_1: "Draft aux",
@@ -93,4 +94,27 @@ test("deriveProjectEditorState computes content and aux save state independently
     isDirty: true,
     error: "Save failed",
   });
+});
+
+test("deriveProjectEditorState can keep the editor empty after aux selection is cleared", () => {
+  const activeContentNode: ContentTreeNodeVM = {
+    id: "content_1",
+    title: "Chapter 1",
+    body: "Committed body",
+    anchorTimelinePointId: "point_a",
+    children: [],
+  };
+
+  const editor = deriveProjectEditorState({
+    activeContentNode,
+    activeAuxNode: null,
+    shouldShowContent: false,
+    drafts: {},
+    committedBodies: {},
+    pendingSaveCounts: {},
+    saveErrors: {},
+  });
+
+  expect(editor.editorTarget).toBe(null);
+  expect(editor.editorBody).toBe("Committed body");
 });

@@ -35,6 +35,7 @@ export function deriveProjectSelectionState(input: {
 export function deriveProjectEditorState(input: {
   activeContentNode: ContentTreeNodeVM | null;
   activeAuxNode: AuxTreeNodeVM | null;
+  shouldShowContent: boolean;
   drafts: Record<string, string>;
   committedBodies: Record<string, string>;
   pendingSaveCounts: Record<string, number>;
@@ -74,7 +75,7 @@ export function deriveProjectEditorState(input: {
   };
   const editorTarget: "content" | "aux" | null = input.activeAuxNode
     ? "aux"
-    : input.activeContentNode
+    : input.shouldShowContent && input.activeContentNode
       ? "content"
       : null;
 
