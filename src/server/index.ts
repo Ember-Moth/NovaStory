@@ -3,6 +3,7 @@ import { serve } from "bun";
 
 import index from "@/client/index.html";
 import "@/db";
+import { ensureAiCatalogFresh } from "@/domain/ai-catalog";
 import * as api from "@/server/rpc";
 
 const server = serve({
@@ -18,3 +19,7 @@ const server = serve({
 });
 
 console.log(`🚀 Server running at ${server.url}`);
+
+void ensureAiCatalogFresh().catch((error) => {
+  console.error("Failed to refresh AI catalog on startup:", error);
+});

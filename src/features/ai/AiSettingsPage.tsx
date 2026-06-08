@@ -1,303 +1,1226 @@
-import { useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 
-import type { AiModelRow, AiProviderRow } from "@/domain/types";
+import { getAiSdkPackageRecipe } from "@/domain/ai-packages";
+import type {
+  AiCatalogProviderView,
+  AiConnectionCustomModelRow,
+  AiConnectionRow,
+  AiResolvedModelView,
+  AiSupportedSdkPackage,
+} from "@/domain/types";
 import { rpc } from "@/server/rpc/client";
 
-import { AiModelDialog, type AiModelFormData } from "./components/AiModelDialog";
-import { AiProviderCard } from "./components/AiProviderCard";
-import { AiProviderDialog, type AiProviderFormData } from "./components/AiProviderDialog";
+interface ConnectionFormData {
+  kind: "registry" | "custom";
+  name: string;
+  catalogProviderId: string | null;
+  sdkPackage: string | null;
+  baseUrl: string | null;
+  apiKey: string | null;
+  apiKeyChanged: boolean;
+  isEnabled: boolean;
+}
 
-export function AiSettingsPage() {
-  const [, navigate] = useLocation();
+interface CustomModelFormData {
+  modelId: string;
+  displayName: string;
+  contextWindow: number | null;
+  maxOutputTokens: number | null;
+  supportsVision: boolean;
+  supportsToolUse: boolean;
+  supportsReasoning: boolean;
+  supportsTemperature: boolean;
+  inputPricePer1m: number | null;
+  outputPricePer1m: number | null;
+  isEnabled: boolean;
+}
 
-  const { data: allProviders, isLoading: providersLoading } = rpc.useQuery("ai.listProviders");
-  const { data: allModels, isLoading: modelsLoading } = rpc.useQuery("ai.listModels");
+function normalizeConnectionKind(kind: string | null | undefined): "registry" | "custom" {
+  return kind === "custom" ? "custom" : "registry";
+}
 
-  const createProvider = rpc.useMutation("ai.createProvider");
-  const updateProvider = rpc.useMutation("ai.updateProvider");
-  const deleteProvider = rpc.useMutation("ai.deleteProvider");
-  const createModel = rpc.useMutation("ai.createModel");
-  const updateModel = rpc.useMutation("ai.updateModel");
-  const deleteModel = rpc.useMutation("ai.deleteModel");
-  const setDefaultModel = rpc.useMutation("ai.setDefaultModel");
-  const syncModels = rpc.useMutation("ai.syncModels");
+function fmtContextWindow(value: number | null): string {
+  if (value == null) return "—";
+  if (value >= 1_000_000) return `${Math.round(value / 1_000_000)}M`;
+  if (value >= 1_000) return `${Math.round(value / 1_000)}k`;
+  return `${value}`;
+}
 
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+function fmtPrice(value: number | null): string {
+  if (value == null) return "—";
+  if (value >= 1) return `$${value.toFixed(2)}`;
+  return `$${value.toFixed(3)}`;
+}
 
-  const [provDialogOpen, setProvDialogOpen] = useState(false);
-  const [editingProvider, setEditingProvider] = useState<AiProviderRow | undefined>();
+function maskApiKey(key: string | null): string {
+  if (!key) return "未设置";
+  if (key.length <= 8) return "••••••••";
+  return `${key.slice(0, 3)}...${key.slice(-4)}`;
+}
 
-  const [modelDialogOpen, setModelDialogOpen] = useState(false);
-  const [editingModel, setEditingModel] = useState<AiModelRow | undefined>();
-  const [modelProviderId, setModelProviderId] = useState<string | null>(null);
+function CatalogProviderModels({ catalogProviderId }: { catalogProviderId: string }) {
+  const { data: models, isLoading } = rpc.useQuery("ai.listCatalogModels", {
+    catalogProviderId,
+    activeOnly: false,
+  });
 
-  const [deleteTarget, setDeleteTarget] = useState<
-    { type: "provider"; provider: AiProviderRow } | { type: "model"; model: AiModelRow } | null
-  >(null);
+  if (isLoading) {
+    return <div className="py-4 text-sm text-foreground-muted">加载模型中...</div>;
+  }
 
-  const providers = allProviders ?? [];
-  const models = allModels ?? [];
-  const isLoading = providersLoading || modelsLoading;
+  return (
+    <div className="space-y-2">
+      {(models ?? []).map((model) => (
+        <div
+          key={model.id}
+          className="rounded-lg border border-border/60 bg-editor-background px-3 py-2 text-xs"
+        >
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-foreground">{model.displayName}</span>
+            <span className="font-mono text-foreground-muted">{model.modelId}</span>
+            {!model.isActive ? (
+              <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-foreground-muted">
+                已失活
+              </span>
+            ) : null}
+          </div>
+          <div className="mt-1 flex flex-wrap gap-3 text-[11px] text-foreground-muted">
+            <span>上下文 {fmtContextWindow(model.contextWindow)}</span>
+            <span>输出 {fmtContextWindow(model.maxOutputTokens)}</span>
+            <span>
+              价格 {fmtPrice(model.inputPricePer1m)}/{fmtPrice(model.outputPricePer1m)}
+            </span>
+            {model.supportsVision ? <span>视觉</span> : null}
+            {model.supportsToolUse ? <span>工具</span> : null}
+            {model.supportsReasoning ? <span>推理</span> : null}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
-  const toggleExpanded = (id: string) => {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
+function CatalogProviderCard({ provider }: { provider: AiCatalogProviderView }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-border bg-sidebar-background">
+      <button
+        type="button"
+        onClick={() => setExpanded((value) => !value)}
+        className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-list-hover-background"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="truncate text-sm font-semibold text-foreground">{provider.name}</span>
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                provider.isSupported
+                  ? "bg-emerald-500/10 text-emerald-300"
+                  : "bg-amber-500/10 text-amber-300"
+              }`}
+            >
+              {provider.isSupported ? "可接入" : "暂不支持"}
+            </span>
+            {!provider.isActive ? (
+              <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-foreground-muted">
+                已失活
+              </span>
+            ) : null}
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-foreground-muted">
+            <span className="font-mono">{provider.sdkPackage ?? "无 npm package"}</span>
+            <span>{provider.modelCount} 个模型</span>
+          </div>
+        </div>
+        <span
+          className={`text-xl text-foreground-muted ${expanded ? "icon-[material-symbols--keyboard-arrow-up]" : "icon-[material-symbols--keyboard-arrow-down]"}`}
+        />
+      </button>
+
+      {expanded ? (
+        <div className="border-t border-border/60 px-4 py-3">
+          <div className="mb-3 space-y-1 text-[11px] text-foreground-muted">
+            <div>API: {provider.apiUrl ?? "—"}</div>
+            <div>ENV: {provider.envKeys.length > 0 ? provider.envKeys.join(", ") : "—"}</div>
+            {provider.docsUrl ? (
+              <a
+                href={provider.docsUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-accent-foreground hover:underline"
+              >
+                文档
+                <span className="icon-[material-symbols--open-in-new] text-xs" />
+              </a>
+            ) : null}
+          </div>
+
+          <CatalogProviderModels catalogProviderId={provider.id} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ConnectionModelRow({
+  model,
+  isBusy,
+  onToggleCatalogModel,
+  onEditCustomModel,
+  onDeleteCustomModel,
+}: {
+  model: AiResolvedModelView;
+  isBusy: boolean;
+  onToggleCatalogModel: (_model: AiResolvedModelView, _enabled: boolean) => Promise<void>;
+  onEditCustomModel: (_model: AiResolvedModelView) => void;
+  onDeleteCustomModel: (_model: AiResolvedModelView) => void;
+}) {
+  return (
+    <div className="flex items-start gap-3 rounded-lg border border-border/60 bg-editor-background px-3 py-2">
+      <button
+        type="button"
+        disabled={isBusy}
+        onClick={() => {
+          if (model.origin !== "catalog") return;
+          void onToggleCatalogModel(model, !model.isEnabled);
+        }}
+        className={`mt-0.5 rounded-full px-2 py-0.5 text-[10px] font-medium transition ${
+          model.origin === "catalog"
+            ? model.isEnabled
+              ? "bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
+              : "bg-white/5 text-foreground-muted hover:bg-white/10"
+            : model.isEnabled
+              ? "bg-sky-500/10 text-sky-300"
+              : "bg-white/5 text-foreground-muted"
+        } disabled:cursor-not-allowed disabled:opacity-50`}
+      >
+        {model.origin === "catalog" ? (model.isEnabled ? "已启用" : "已隐藏") : "自定义"}
+      </button>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="truncate text-sm font-medium text-foreground">{model.displayName}</span>
+          <span className="font-mono text-[11px] text-foreground-muted">{model.modelId}</span>
+          {model.origin === "catalog" ? (
+            <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-foreground-muted">
+              Catalog
+            </span>
+          ) : null}
+        </div>
+        <div className="mt-1 flex flex-wrap gap-3 text-[11px] text-foreground-muted">
+          <span>上下文 {fmtContextWindow(model.contextWindow)}</span>
+          <span>输出 {fmtContextWindow(model.maxOutputTokens)}</span>
+          <span>
+            价格 {fmtPrice(model.inputPricePer1m)}/{fmtPrice(model.outputPricePer1m)}
+          </span>
+          {model.supportsVision ? <span>视觉</span> : null}
+          {model.supportsToolUse ? <span>工具</span> : null}
+          {model.supportsReasoning ? <span>推理</span> : null}
+        </div>
+      </div>
+      {model.origin === "custom" ? (
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => onEditCustomModel(model)}
+            className="rounded p-1 text-foreground-muted transition hover:bg-button-hover-background hover:text-foreground"
+            title="编辑自定义模型"
+          >
+            <span className="icon-[material-symbols--edit] text-sm" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onDeleteCustomModel(model)}
+            className="rounded p-1 text-foreground-muted transition hover:bg-button-hover-background hover:text-foreground"
+            title="删除自定义模型"
+          >
+            <span className="icon-[material-symbols--delete-outline] text-sm" />
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ConnectionCard({
+  connection,
+  providerName,
+  onEdit,
+  onDelete,
+  onOpenAddCustomModel,
+  onOpenEditCustomModel,
+  onDeleteCustomModel,
+}: {
+  connection: AiConnectionRow;
+  providerName: string | null;
+  onEdit: (_connection: AiConnectionRow) => void;
+  onDelete: (_connection: AiConnectionRow) => void;
+  onOpenAddCustomModel: (_connection: AiConnectionRow) => void;
+  onOpenEditCustomModel: (_connection: AiConnectionRow, _model: AiResolvedModelView) => void;
+  onDeleteCustomModel: (_connection: AiConnectionRow, _model: AiResolvedModelView) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-border bg-sidebar-background">
+      <button
+        type="button"
+        onClick={() => setExpanded((value) => !value)}
+        className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-list-hover-background"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="truncate text-sm font-semibold text-foreground">
+              {connection.name}
+            </span>
+            <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-foreground-muted">
+              {connection.kind === "registry" ? "Registry" : "Custom"}
+            </span>
+            {!connection.isEnabled ? (
+              <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-foreground-muted">
+                已禁用
+              </span>
+            ) : null}
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-foreground-muted">
+            <span className="font-mono">{connection.sdkPackage}</span>
+            {providerName ? <span>来源 {providerName}</span> : null}
+            <span>{maskApiKey(connection.apiKey)}</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onEdit(connection);
+            }}
+            className="rounded p-1 text-foreground-muted transition hover:bg-button-hover-background hover:text-foreground"
+            title="编辑连接"
+          >
+            <span className="icon-[material-symbols--edit] text-sm" />
+          </button>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onDelete(connection);
+            }}
+            className="rounded p-1 text-foreground-muted transition hover:bg-button-hover-background hover:text-foreground"
+            title="删除连接"
+          >
+            <span className="icon-[material-symbols--delete-outline] text-sm" />
+          </button>
+          <span
+            className={`text-xl text-foreground-muted ${expanded ? "icon-[material-symbols--keyboard-arrow-up]" : "icon-[material-symbols--keyboard-arrow-down]"}`}
+          />
+        </div>
+      </button>
+
+      {expanded ? (
+        <div className="border-t border-border/60 px-4 py-3">
+          <div className="mb-3 flex flex-wrap items-center gap-2 text-[11px] text-foreground-muted">
+            {connection.baseUrl ? <span>Endpoint {connection.baseUrl}</span> : null}
+            <button
+              type="button"
+              onClick={() => onOpenAddCustomModel(connection)}
+              className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-foreground transition hover:bg-list-hover-background"
+            >
+              <span className="icon-[material-symbols--add] text-sm" />
+              添加自定义模型
+            </button>
+          </div>
+
+          <ConnectionModelsList
+            connection={connection}
+            onOpenEditCustomModel={onOpenEditCustomModel}
+            onDeleteCustomModel={onDeleteCustomModel}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ConnectionModelsList({
+  connection,
+  onOpenEditCustomModel,
+  onDeleteCustomModel,
+}: {
+  connection: AiConnectionRow;
+  onOpenEditCustomModel: (_connection: AiConnectionRow, _model: AiResolvedModelView) => void;
+  onDeleteCustomModel: (_connection: AiConnectionRow, _model: AiResolvedModelView) => void;
+}) {
+  const { data: models, isLoading } = rpc.useQuery("ai.listResolvedModels", {
+    connectionId: connection.id,
+    includeDisabled: true,
+  });
+  const toggleCatalogModel = rpc.useMutation("ai.setCatalogModelEnabled");
+
+  if (isLoading) {
+    return <div className="py-4 text-sm text-foreground-muted">加载模型中...</div>;
+  }
+
+  if ((models ?? []).length === 0) {
+    return <div className="py-4 text-sm text-foreground-muted">这个连接当前没有可见模型。</div>;
+  }
+
+  return (
+    <div className="space-y-2">
+      {(models ?? []).map((model) => (
+        <ConnectionModelRow
+          key={model.id}
+          model={model}
+          isBusy={toggleCatalogModel.isPending}
+          onToggleCatalogModel={async (currentModel, enabled) => {
+            if (!currentModel.catalogModelId) return;
+            await toggleCatalogModel.mutate({
+              connectionId: connection.id,
+              catalogModelId: currentModel.catalogModelId,
+              enabled,
+            });
+          }}
+          onEditCustomModel={(model) => onOpenEditCustomModel(connection, model)}
+          onDeleteCustomModel={(model) => onDeleteCustomModel(connection, model)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ConnectionDialog({
+  open,
+  connection,
+  catalogProviders,
+  supportedPackages,
+  isPending,
+  onCancel,
+  onSave,
+}: {
+  open: boolean;
+  connection?: AiConnectionRow;
+  catalogProviders: AiCatalogProviderView[];
+  supportedPackages: AiSupportedSdkPackage[];
+  isPending: boolean;
+  onCancel: () => void;
+  onSave: (_data: ConnectionFormData) => void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (open && !dialog.open) dialog.showModal();
+    if (!open && dialog.open) dialog.close();
+  }, [open]);
+
+  return (
+    <dialog
+      ref={dialogRef}
+      onCancel={(event) => {
+        event.preventDefault();
+        if (!isPending) onCancel();
+      }}
+      className="w-[min(34rem,calc(100vw-2rem))] rounded-2xl border border-border bg-sidebar-background p-0 text-foreground shadow-lg backdrop:bg-black/50"
+    >
+      <ConnectionDialogForm
+        key={connection?.id ?? "new"}
+        connection={connection}
+        catalogProviders={catalogProviders}
+        supportedPackages={supportedPackages}
+        isPending={isPending}
+        onCancel={onCancel}
+        onSave={onSave}
+      />
+    </dialog>
+  );
+}
+
+function ConnectionDialogForm({
+  connection,
+  catalogProviders,
+  supportedPackages,
+  isPending,
+  onCancel,
+  onSave,
+}: {
+  connection?: AiConnectionRow;
+  catalogProviders: AiCatalogProviderView[];
+  supportedPackages: AiSupportedSdkPackage[];
+  isPending: boolean;
+  onCancel: () => void;
+  onSave: (_data: ConnectionFormData) => void;
+}) {
+  const editableProviders = catalogProviders.filter((provider) => provider.isSupported);
+  const defaultProvider = editableProviders[0] ?? null;
+  const [kind, setKind] = useState<"registry" | "custom">(
+    normalizeConnectionKind(connection?.kind),
+  );
+  const [name, setName] = useState(connection?.name ?? "");
+  const [catalogProviderId, setCatalogProviderId] = useState<string>(
+    connection?.catalogProviderId ?? defaultProvider?.id ?? "",
+  );
+  const [sdkPackage, setSdkPackage] = useState<string>(
+    normalizeConnectionKind(connection?.kind) === "custom"
+      ? (connection?.sdkPackage ?? supportedPackages[0]?.sdkPackage ?? "@ai-sdk/openai-compatible")
+      : (supportedPackages[0]?.sdkPackage ?? "@ai-sdk/openai-compatible"),
+  );
+  const [baseUrl, setBaseUrl] = useState(connection?.baseUrl ?? "");
+  const [apiKey, setApiKey] = useState(connection ? "••••••••" : "");
+  const [apiKeyChanged, setApiKeyChanged] = useState(false);
+  const [isEnabled, setIsEnabled] = useState(connection?.isEnabled ?? true);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const selectedRegistryProvider =
+    editableProviders.find((item) => item.id === catalogProviderId) ?? defaultProvider;
+  const effectiveSdkPackage =
+    kind === "registry" ? (selectedRegistryProvider?.sdkPackage ?? null) : sdkPackage;
+  const recipe = getAiSdkPackageRecipe(effectiveSdkPackage);
+  const showBaseUrl = Boolean(recipe?.requiresBaseUrl || recipe?.allowsCustomEndpoint);
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!name.trim()) {
+      setFormError("连接名称不能为空。");
+      return;
+    }
+    if (kind === "registry" && !selectedRegistryProvider) {
+      setFormError("请选择一个可接入的 catalog provider。");
+      return;
+    }
+    if (kind === "custom" && !sdkPackage) {
+      setFormError("请选择 AI SDK package。");
+      return;
+    }
+    if (recipe?.requiresBaseUrl && !baseUrl.trim()) {
+      setFormError("这个 AI SDK package 需要填写 Base URL。");
+      return;
+    }
+
+    onSave({
+      kind,
+      name: name.trim(),
+      catalogProviderId: kind === "registry" ? (selectedRegistryProvider?.id ?? null) : null,
+      sdkPackage: kind === "custom" ? sdkPackage : null,
+      baseUrl: showBaseUrl ? baseUrl.trim() || null : null,
+      apiKey: apiKeyChanged ? apiKey : null,
+      apiKeyChanged,
+      isEnabled,
     });
   };
 
-  const handleOpenAddProvider = () => {
-    setEditingProvider(undefined);
-    setProvDialogOpen(true);
+  return (
+    <form onSubmit={handleSubmit}>
+      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+        <span className="icon-[material-symbols--cable] text-base text-accent-foreground" />
+        <span className="text-sm font-medium">{connection ? "编辑连接" : "新建连接"}</span>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={isPending}
+          className="ml-auto rounded p-1 text-foreground-muted transition hover:bg-button-hover-background hover:text-foreground disabled:opacity-40"
+        >
+          <span className="icon-[material-symbols--close] text-base" />
+        </button>
+      </div>
+
+      <div className="space-y-4 p-4">
+        {!connection ? (
+          <div className="flex gap-2">
+            {(["registry", "custom"] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => {
+                  setKind(value);
+                  setFormError(null);
+                  if (value === "registry" && !catalogProviderId) {
+                    setCatalogProviderId(defaultProvider?.id ?? "");
+                  }
+                  if (value === "custom" && !sdkPackage) {
+                    setSdkPackage(supportedPackages[0]?.sdkPackage ?? "@ai-sdk/openai-compatible");
+                  }
+                }}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                  kind === value
+                    ? "bg-accent-foreground text-foreground"
+                    : "bg-editor-background text-foreground-muted hover:text-foreground"
+                }`}
+              >
+                {value === "registry" ? "Registry 连接" : "Custom 连接"}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        <label className="block space-y-1">
+          <span className="text-[11px] font-medium text-foreground-muted">名称</span>
+          <input
+            autoFocus
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="例如：OpenRouter 主账号"
+            className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-sm outline-none focus:border-accent-foreground"
+          />
+        </label>
+
+        {kind === "registry" ? (
+          <label className="block space-y-1">
+            <span className="text-[11px] font-medium text-foreground-muted">Catalog Provider</span>
+            <select
+              value={catalogProviderId}
+              onChange={(event) => setCatalogProviderId(event.target.value)}
+              className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-sm outline-none focus:border-accent-foreground"
+            >
+              {editableProviders.map((provider) => (
+                <option key={provider.id} value={provider.id}>
+                  {provider.name} · {provider.sdkPackage}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <label className="block space-y-1">
+            <span className="text-[11px] font-medium text-foreground-muted">AI SDK Package</span>
+            <select
+              value={sdkPackage}
+              onChange={(event) => setSdkPackage(event.target.value)}
+              className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-sm outline-none focus:border-accent-foreground"
+            >
+              {supportedPackages.map((item) => (
+                <option key={item.sdkPackage} value={item.sdkPackage}>
+                  {item.label} · {item.sdkPackage}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        <div className="rounded-lg border border-border/60 bg-editor-background px-3 py-2 text-xs text-foreground-muted">
+          <div className="font-mono text-foreground">{effectiveSdkPackage ?? "未选择 package"}</div>
+          {recipe ? (
+            <div className="mt-1">
+              factory: {recipe.providerFactoryId}
+              {recipe.requiresBaseUrl ? " · 需要 Base URL" : ""}
+              {recipe.allowsCustomEndpoint ? " · 允许自定义 endpoint" : ""}
+            </div>
+          ) : (
+            <div className="mt-1">这个 package 暂无受控 recipe。</div>
+          )}
+        </div>
+
+        {showBaseUrl ? (
+          <label className="block space-y-1">
+            <span className="text-[11px] font-medium text-foreground-muted">Base URL</span>
+            <input
+              value={baseUrl}
+              onChange={(event) => setBaseUrl(event.target.value)}
+              placeholder="https://api.example.com/v1"
+              className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-xs font-mono outline-none focus:border-accent-foreground"
+            />
+          </label>
+        ) : null}
+
+        <label className="block space-y-1">
+          <span className="text-[11px] font-medium text-foreground-muted">API Key</span>
+          <input
+            type="password"
+            value={apiKey}
+            onChange={(event) => {
+              setApiKey(event.target.value);
+              setApiKeyChanged(true);
+            }}
+            onFocus={() => {
+              if (!apiKeyChanged && connection) {
+                setApiKey("");
+                setApiKeyChanged(true);
+              }
+            }}
+            placeholder={connection ? "留空则不修改" : "sk-..."}
+            className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-sm outline-none focus:border-accent-foreground"
+          />
+        </label>
+
+        <label className="flex items-center gap-2 text-sm text-foreground-muted">
+          <input
+            type="checkbox"
+            checked={isEnabled}
+            onChange={(event) => setIsEnabled(event.target.checked)}
+            className="rounded border-border bg-editor-background accent-accent-foreground"
+          />
+          启用这个连接
+        </label>
+
+        {formError ? (
+          <div className="rounded-md border border-border bg-editor-background px-3 py-2 text-sm text-accent-foreground">
+            {formError}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={isPending}
+          className="rounded-md border border-border px-3 py-1.5 text-sm text-foreground transition hover:bg-list-hover-background disabled:opacity-40"
+        >
+          取消
+        </button>
+        <button
+          type="submit"
+          disabled={isPending}
+          className="rounded-md bg-accent-foreground px-3 py-1.5 text-sm font-medium text-foreground transition hover:brightness-110 disabled:opacity-50"
+        >
+          {isPending ? "保存中..." : "保存连接"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function CustomModelDialog({
+  open,
+  model,
+  isPending,
+  onCancel,
+  onSave,
+}: {
+  open: boolean;
+  model?: AiConnectionCustomModelRow;
+  isPending: boolean;
+  onCancel: () => void;
+  onSave: (_data: CustomModelFormData) => void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (open && !dialog.open) dialog.showModal();
+    if (!open && dialog.open) dialog.close();
+  }, [open]);
+
+  return (
+    <dialog
+      ref={dialogRef}
+      onCancel={(event) => {
+        event.preventDefault();
+        if (!isPending) onCancel();
+      }}
+      className="w-[min(34rem,calc(100vw-2rem))] rounded-2xl border border-border bg-sidebar-background p-0 text-foreground shadow-lg backdrop:bg-black/50"
+    >
+      <CustomModelDialogForm
+        key={model?.id ?? "new"}
+        model={model}
+        isPending={isPending}
+        onCancel={onCancel}
+        onSave={onSave}
+      />
+    </dialog>
+  );
+}
+
+function CustomModelDialogForm({
+  model,
+  isPending,
+  onCancel,
+  onSave,
+}: {
+  model?: AiConnectionCustomModelRow;
+  isPending: boolean;
+  onCancel: () => void;
+  onSave: (_data: CustomModelFormData) => void;
+}) {
+  const [modelId, setModelId] = useState(model?.modelId ?? "");
+  const [displayName, setDisplayName] = useState(model?.displayName ?? "");
+  const [contextWindow, setContextWindow] = useState(model?.contextWindow?.toString() ?? "");
+  const [maxOutputTokens, setMaxOutputTokens] = useState(model?.maxOutputTokens?.toString() ?? "");
+  const [supportsVision, setSupportsVision] = useState(model?.supportsVision ?? false);
+  const [supportsToolUse, setSupportsToolUse] = useState(model?.supportsToolUse ?? false);
+  const [supportsReasoning, setSupportsReasoning] = useState(model?.supportsReasoning ?? false);
+  const [supportsTemperature, setSupportsTemperature] = useState(
+    model?.supportsTemperature ?? false,
+  );
+  const [inputPrice, setInputPrice] = useState(model?.inputPricePer1m?.toString() ?? "");
+  const [outputPrice, setOutputPrice] = useState(model?.outputPricePer1m?.toString() ?? "");
+  const [isEnabled, setIsEnabled] = useState(model?.isEnabled ?? true);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!modelId.trim()) {
+      setFormError("模型 ID 不能为空。");
+      return;
+    }
+    if (!displayName.trim()) {
+      setFormError("显示名称不能为空。");
+      return;
+    }
+
+    onSave({
+      modelId: modelId.trim(),
+      displayName: displayName.trim(),
+      contextWindow: contextWindow ? Number(contextWindow) : null,
+      maxOutputTokens: maxOutputTokens ? Number(maxOutputTokens) : null,
+      supportsVision,
+      supportsToolUse,
+      supportsReasoning,
+      supportsTemperature,
+      inputPricePer1m: inputPrice ? Number(inputPrice) : null,
+      outputPricePer1m: outputPrice ? Number(outputPrice) : null,
+      isEnabled,
+    });
   };
 
-  const handleOpenEditProvider = (provider: AiProviderRow) => {
-    setEditingProvider(provider);
-    setProvDialogOpen(true);
+  return (
+    <form onSubmit={handleSubmit}>
+      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+        <span className="icon-[material-symbols--token] text-base text-accent-foreground" />
+        <span className="text-sm font-medium">{model ? "编辑自定义模型" : "添加自定义模型"}</span>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={isPending}
+          className="ml-auto rounded p-1 text-foreground-muted transition hover:bg-button-hover-background hover:text-foreground disabled:opacity-40"
+        >
+          <span className="icon-[material-symbols--close] text-base" />
+        </button>
+      </div>
+
+      <div className="space-y-4 p-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <label className="block space-y-1">
+            <span className="text-[11px] font-medium text-foreground-muted">模型 ID</span>
+            <input
+              autoFocus
+              value={modelId}
+              onChange={(event) => setModelId(event.target.value)}
+              placeholder="gpt-4o-mini"
+              className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-xs font-mono outline-none focus:border-accent-foreground"
+            />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-[11px] font-medium text-foreground-muted">显示名称</span>
+            <input
+              value={displayName}
+              onChange={(event) => setDisplayName(event.target.value)}
+              placeholder="My Fine-Tuned Model"
+              className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-sm outline-none focus:border-accent-foreground"
+            />
+          </label>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <label className="block space-y-1">
+            <span className="text-[11px] font-medium text-foreground-muted">上下文窗口</span>
+            <input
+              type="number"
+              value={contextWindow}
+              onChange={(event) => setContextWindow(event.target.value)}
+              className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-xs font-mono outline-none focus:border-accent-foreground"
+            />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-[11px] font-medium text-foreground-muted">最大输出</span>
+            <input
+              type="number"
+              value={maxOutputTokens}
+              onChange={(event) => setMaxOutputTokens(event.target.value)}
+              className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-xs font-mono outline-none focus:border-accent-foreground"
+            />
+          </label>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 text-sm text-foreground-muted sm:grid-cols-4">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={supportsVision}
+              onChange={(event) => setSupportsVision(event.target.checked)}
+              className="rounded border-border bg-editor-background accent-accent-foreground"
+            />
+            视觉
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={supportsToolUse}
+              onChange={(event) => setSupportsToolUse(event.target.checked)}
+              className="rounded border-border bg-editor-background accent-accent-foreground"
+            />
+            工具
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={supportsReasoning}
+              onChange={(event) => setSupportsReasoning(event.target.checked)}
+              className="rounded border-border bg-editor-background accent-accent-foreground"
+            />
+            推理
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={supportsTemperature}
+              onChange={(event) => setSupportsTemperature(event.target.checked)}
+              className="rounded border-border bg-editor-background accent-accent-foreground"
+            />
+            温度
+          </label>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <label className="block space-y-1">
+            <span className="text-[11px] font-medium text-foreground-muted">输入价格 / 1M</span>
+            <input
+              type="number"
+              step="0.001"
+              min="0"
+              value={inputPrice}
+              onChange={(event) => setInputPrice(event.target.value)}
+              className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-xs font-mono outline-none focus:border-accent-foreground"
+            />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-[11px] font-medium text-foreground-muted">输出价格 / 1M</span>
+            <input
+              type="number"
+              step="0.001"
+              min="0"
+              value={outputPrice}
+              onChange={(event) => setOutputPrice(event.target.value)}
+              className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-xs font-mono outline-none focus:border-accent-foreground"
+            />
+          </label>
+        </div>
+
+        <label className="flex items-center gap-2 text-sm text-foreground-muted">
+          <input
+            type="checkbox"
+            checked={isEnabled}
+            onChange={(event) => setIsEnabled(event.target.checked)}
+            className="rounded border-border bg-editor-background accent-accent-foreground"
+          />
+          启用这个自定义模型
+        </label>
+
+        {formError ? (
+          <div className="rounded-md border border-border bg-editor-background px-3 py-2 text-sm text-accent-foreground">
+            {formError}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={isPending}
+          className="rounded-md border border-border px-3 py-1.5 text-sm text-foreground transition hover:bg-list-hover-background disabled:opacity-40"
+        >
+          取消
+        </button>
+        <button
+          type="submit"
+          disabled={isPending}
+          className="rounded-md bg-accent-foreground px-3 py-1.5 text-sm font-medium text-foreground transition hover:brightness-110 disabled:opacity-50"
+        >
+          {isPending ? "保存中..." : "保存模型"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+export function AiSettingsPage() {
+  const [, navigate] = useLocation();
+  const { data: status } = rpc.useQuery("ai.getCatalogStatus");
+  const { data: catalogProviders, isLoading: providersLoading } = rpc.useQuery(
+    "ai.listCatalogProviders",
+    { activeOnly: false, supportedOnly: false },
+  );
+  const { data: supportedPackages } = rpc.useQuery("ai.listSupportedSdkPackages");
+  const { data: connections, isLoading: connectionsLoading } = rpc.useQuery("ai.listConnections");
+
+  const refreshCatalog = rpc.useMutation("ai.refreshCatalog");
+  const createConnection = rpc.useMutation("ai.createConnection");
+  const updateConnection = rpc.useMutation("ai.updateConnection");
+  const deleteConnection = rpc.useMutation("ai.deleteConnection");
+  const createCustomModel = rpc.useMutation("ai.createCustomModel");
+  const updateCustomModel = rpc.useMutation("ai.updateCustomModel");
+  const deleteCustomModel = rpc.useMutation("ai.deleteCustomModel");
+
+  const [connectionDialogOpen, setConnectionDialogOpen] = useState(false);
+  const [editingConnection, setEditingConnection] = useState<AiConnectionRow | undefined>();
+  const [customModelDialogOpen, setCustomModelDialogOpen] = useState(false);
+  const [editingCustomModel, setEditingCustomModel] = useState<
+    AiConnectionCustomModelRow | undefined
+  >();
+  const [customModelConnection, setCustomModelConnection] = useState<AiConnectionRow | undefined>();
+
+  const allProviders = catalogProviders ?? [];
+  const allConnections = connections ?? [];
+  const packageList = supportedPackages ?? [];
+  const providerMap = new Map(allProviders.map((provider) => [provider.id, provider]));
+
+  const handleSaveConnection = async (data: ConnectionFormData) => {
+    if (editingConnection) {
+      await updateConnection.mutate({
+        id: editingConnection.id,
+        name: data.name,
+        catalogProviderId:
+          data.kind === "registry" ? (data.catalogProviderId ?? undefined) : undefined,
+        sdkPackage: data.kind === "custom" ? (data.sdkPackage ?? undefined) : undefined,
+        baseUrl: data.baseUrl,
+        apiKey: data.apiKeyChanged ? data.apiKey : undefined,
+        isEnabled: data.isEnabled,
+      });
+    } else if (data.kind === "registry" && data.catalogProviderId) {
+      await createConnection.mutate({
+        kind: "registry",
+        name: data.name,
+        catalogProviderId: data.catalogProviderId,
+        baseUrl: data.baseUrl,
+        apiKey: data.apiKeyChanged ? data.apiKey : null,
+        isEnabled: data.isEnabled,
+      });
+    } else if (data.kind === "custom" && data.sdkPackage) {
+      await createConnection.mutate({
+        kind: "custom",
+        name: data.name,
+        sdkPackage: data.sdkPackage,
+        baseUrl: data.baseUrl,
+        apiKey: data.apiKeyChanged ? data.apiKey : null,
+        isEnabled: data.isEnabled,
+      });
+    }
+
+    setEditingConnection(undefined);
+    setConnectionDialogOpen(false);
   };
 
-  const handleSaveProvider = async (data: AiProviderFormData) => {
-    if (editingProvider) {
-      await updateProvider.mutate({
-        id: editingProvider.id,
+  const handleSaveCustomModel = async (data: CustomModelFormData) => {
+    if (!customModelConnection) return;
+    if (editingCustomModel) {
+      await updateCustomModel.mutate({
+        id: editingCustomModel.id,
         ...data,
       });
     } else {
-      const result = await createProvider.mutate(data);
-      setExpandedIds((prev) => new Set(prev).add(result.id));
-    }
-    setProvDialogOpen(false);
-  };
-
-  const handleDeleteProvider = (provider: AiProviderRow) => {
-    setDeleteTarget({ type: "provider", provider });
-  };
-
-  const confirmDeleteProvider = async () => {
-    if (deleteTarget?.type !== "provider") return;
-    await deleteProvider.mutate({ id: deleteTarget.provider.id });
-    setDeleteTarget(null);
-  };
-
-  const handleOpenAddModel = (providerId: string) => {
-    setEditingModel(undefined);
-    setModelProviderId(providerId);
-    setModelDialogOpen(true);
-  };
-
-  const handleOpenEditModel = (model: AiModelRow) => {
-    setEditingModel(model);
-    setModelProviderId(model.providerId);
-    setModelDialogOpen(true);
-  };
-
-  const handleSaveModel = async (data: AiModelFormData) => {
-    if (editingModel) {
-      await updateModel.mutate({
-        id: editingModel.id,
-        ...data,
-      });
-    } else if (modelProviderId) {
-      await createModel.mutate({
-        providerId: modelProviderId,
+      await createCustomModel.mutate({
+        connectionId: customModelConnection.id,
         ...data,
       });
     }
-    setModelDialogOpen(false);
+    setEditingCustomModel(undefined);
+    setCustomModelConnection(undefined);
+    setCustomModelDialogOpen(false);
   };
-
-  const handleDeleteModel = (model: AiModelRow) => {
-    setDeleteTarget({ type: "model", model });
-  };
-
-  const confirmDeleteModel = async () => {
-    if (deleteTarget?.type !== "model") return;
-    await deleteModel.mutate({ id: deleteTarget.model.id });
-    setDeleteTarget(null);
-  };
-
-  const handleSetDefault = async (modelId: string) => {
-    await setDefaultModel.mutate({ id: modelId });
-  };
-
-  const handleSyncModels = async (providerId: string) => {
-    await syncModels.mutate({ providerId });
-  };
-
-  const allBusy =
-    createProvider.isPending ||
-    updateProvider.isPending ||
-    deleteProvider.isPending ||
-    createModel.isPending ||
-    updateModel.isPending ||
-    deleteModel.isPending ||
-    setDefaultModel.isPending ||
-    syncModels.isPending;
 
   return (
-    <main className="min-h-dvh select-none bg-editor-background text-foreground">
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-6 py-8">
-        {/* Header */}
-        <section className="flex items-center justify-between gap-4">
+    <main className="min-h-dvh bg-editor-background text-foreground">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8">
+        <section className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => navigate("/")}
-              className="rounded p-1 text-foreground-muted hover:text-foreground hover:bg-button-hover-background transition-colors"
+              className="rounded p-1 text-foreground-muted transition hover:bg-button-hover-background hover:text-foreground"
               title="返回"
             >
               <span className="icon-[material-symbols--arrow-back] text-xl" />
             </button>
             <div>
-              <h1 className="text-lg font-semibold tracking-tight">AI 设置</h1>
-              <p className="mt-0.5 text-xs text-foreground-muted">
-                {providers.length} 个提供方 · {models.length} 个模型
+              <h1 className="text-xl font-semibold tracking-tight">AI 设置</h1>
+              <p className="mt-1 text-sm text-foreground-muted">
+                {status?.activeProviderCount ?? 0} 个活跃 provider · {status?.activeModelCount ?? 0}{" "}
+                个活跃模型 · {allConnections.length} 个连接
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={handleOpenAddProvider}
-            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-sidebar-background px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-list-hover-background"
-          >
-            <span className="icon-[material-symbols--add] text-base" />
-            新提供方
-          </button>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setEditingConnection(undefined);
+                setConnectionDialogOpen(true);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-sidebar-background px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-list-hover-background"
+            >
+              <span className="icon-[material-symbols--add] text-base" />
+              新建连接
+            </button>
+            <button
+              type="button"
+              onClick={() => void refreshCatalog.mutate({ force: true })}
+              disabled={refreshCatalog.isPending}
+              className="inline-flex items-center gap-1.5 rounded-md bg-accent-foreground px-3 py-1.5 text-sm font-medium text-foreground transition hover:brightness-110 disabled:opacity-50"
+            >
+              <span
+                className={`text-base ${refreshCatalog.isPending ? "icon-[material-symbols--sync] animate-spin" : "icon-[material-symbols--cloud-sync]"}`}
+              />
+              刷新 Catalog
+            </button>
+          </div>
         </section>
 
-        {/* Loading state */}
-        {isLoading ? (
-          <div className="flex items-center justify-center gap-2 rounded-md border border-dashed border-border px-4 py-10 text-sm text-foreground-muted">
-            <span className="icon-[material-symbols--sync] text-base animate-spin" />
-            加载中...
+        <section className="grid gap-3 rounded-2xl border border-border bg-sidebar-background p-4 text-sm text-foreground-muted sm:grid-cols-2 xl:grid-cols-4">
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-foreground-muted/70">
+              Last Success
+            </div>
+            <div className="mt-1 text-foreground">
+              {status?.lastSuccessAt ? new Date(status.lastSuccessAt).toLocaleString() : "从未同步"}
+            </div>
           </div>
-        ) : null}
-
-        {/* Empty state */}
-        {!isLoading && providers.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 rounded-md border border-dashed border-border px-4 py-12 text-sm text-foreground-muted">
-            <span className="icon-[material-symbols--api] text-3xl" />
-            <span>还没有 AI 提供方，点击「新提供方」添加。</span>
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-foreground-muted/70">
+              Last Attempt
+            </div>
+            <div className="mt-1 text-foreground">
+              {status?.lastAttemptAt ? new Date(status.lastAttemptAt).toLocaleString() : "—"}
+            </div>
           </div>
-        ) : null}
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-foreground-muted/70">
+              State
+            </div>
+            <div className="mt-1 text-foreground">
+              {status?.isStale ? "快照已过期" : "快照新鲜"}
+            </div>
+          </div>
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-foreground-muted/70">
+              Last Error
+            </div>
+            <div className="mt-1 wrap-break-word text-foreground">{status?.lastError ?? "—"}</div>
+          </div>
+        </section>
 
-        {/* Provider cards */}
-        {!isLoading
-          ? providers.map((provider) => {
-              const providerModels = models.filter((m) => m.providerId === provider.id);
-              return (
-                <AiProviderCard
-                  key={provider.id}
-                  provider={provider}
-                  models={providerModels}
-                  expanded={expandedIds.has(provider.id)}
-                  onToggle={() => toggleExpanded(provider.id)}
-                  onEditProvider={() => handleOpenEditProvider(provider)}
-                  onDeleteProvider={() => handleDeleteProvider(provider)}
-                  onSyncModels={() => handleSyncModels(provider.id)}
-                  isSyncing={syncModels.isPending}
-                  onAddModel={() => handleOpenAddModel(provider.id)}
-                  onEditModel={handleOpenEditModel}
-                  onDeleteModel={handleDeleteModel}
-                  onSetDefaultModel={handleSetDefault}
-                />
-              );
-            })
-          : null}
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold">Connections</h2>
+                <p className="text-sm text-foreground-muted">
+                  这里保存真正会被未来 AI SDK 使用的连接实例。
+                </p>
+              </div>
+            </div>
 
-        {/* Bottom add button */}
-        {!isLoading && providers.length > 0 ? (
-          <button
-            type="button"
-            onClick={handleOpenAddProvider}
-            className="inline-flex items-center gap-1.5 self-start rounded-md px-3 py-1.5 text-sm text-foreground-muted transition hover:text-foreground hover:bg-list-hover-background"
-          >
-            <span className="icon-[material-symbols--add] text-base" />
-            添加提供方
-          </button>
-        ) : null}
+            {connectionsLoading ? (
+              <div className="rounded-xl border border-dashed border-border px-4 py-10 text-sm text-foreground-muted">
+                连接加载中...
+              </div>
+            ) : allConnections.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border px-4 py-10 text-sm text-foreground-muted">
+                还没有任何连接。先创建一个 registry 或 custom connection。
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {allConnections.map((connection) => (
+                  <ConnectionCard
+                    key={connection.id}
+                    connection={connection}
+                    providerName={
+                      connection.catalogProviderId
+                        ? (providerMap.get(connection.catalogProviderId)?.name ?? null)
+                        : null
+                    }
+                    onEdit={(connection) => {
+                      setEditingConnection(connection);
+                      setConnectionDialogOpen(true);
+                    }}
+                    onDelete={(connection) => void deleteConnection.mutate({ id: connection.id })}
+                    onOpenAddCustomModel={(connection) => {
+                      setCustomModelConnection(connection);
+                      setEditingCustomModel(undefined);
+                      setCustomModelDialogOpen(true);
+                    }}
+                    onOpenEditCustomModel={(connection, model) => {
+                      if (!model.customModelId) return;
+                      setCustomModelConnection(connection);
+                      setEditingCustomModel({
+                        id: model.customModelId,
+                        connectionId: connection.id,
+                        modelId: model.modelId,
+                        displayName: model.displayName,
+                        contextWindow: model.contextWindow,
+                        maxOutputTokens: model.maxOutputTokens,
+                        supportsVision: model.supportsVision,
+                        supportsToolUse: model.supportsToolUse,
+                        supportsReasoning: model.supportsReasoning,
+                        supportsTemperature: model.supportsTemperature,
+                        inputPricePer1m: model.inputPricePer1m,
+                        outputPricePer1m: model.outputPricePer1m,
+                        isEnabled: model.isEnabled,
+                        createdAt: 0,
+                        updatedAt: 0,
+                      });
+                      setCustomModelDialogOpen(true);
+                    }}
+                    onDeleteCustomModel={(connection, model) => {
+                      if (!model.customModelId) return;
+                      void deleteCustomModel.mutate({ id: model.customModelId });
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold">Catalog</h2>
+              <p className="text-sm text-foreground-muted">
+                来自 models.dev 的目录快照。支持接入的 provider 可以直接创建 registry 连接。
+              </p>
+            </div>
+
+            {providersLoading ? (
+              <div className="rounded-xl border border-dashed border-border px-4 py-10 text-sm text-foreground-muted">
+                Catalog 加载中...
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {allProviders.map((provider) => (
+                  <CatalogProviderCard key={provider.id} provider={provider} />
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
       </div>
 
-      {/* Provider dialog */}
-      <AiProviderDialog
-        open={provDialogOpen}
-        provider={editingProvider}
-        isPending={createProvider.isPending || updateProvider.isPending}
-        onSave={handleSaveProvider}
-        onCancel={() => setProvDialogOpen(false)}
+      <ConnectionDialog
+        open={connectionDialogOpen}
+        connection={editingConnection}
+        catalogProviders={allProviders}
+        supportedPackages={packageList}
+        isPending={createConnection.isPending || updateConnection.isPending}
+        onCancel={() => {
+          setEditingConnection(undefined);
+          setConnectionDialogOpen(false);
+        }}
+        onSave={handleSaveConnection}
       />
 
-      {/* Model dialog */}
-      <AiModelDialog
-        open={modelDialogOpen}
-        model={editingModel}
-        isPending={createModel.isPending || updateModel.isPending}
-        onSave={handleSaveModel}
-        onCancel={() => setModelDialogOpen(false)}
+      <CustomModelDialog
+        open={customModelDialogOpen}
+        model={editingCustomModel}
+        isPending={createCustomModel.isPending || updateCustomModel.isPending}
+        onCancel={() => {
+          setEditingCustomModel(undefined);
+          setCustomModelConnection(undefined);
+          setCustomModelDialogOpen(false);
+        }}
+        onSave={handleSaveCustomModel}
       />
-
-      {/* Delete confirmation dialog */}
-      {deleteTarget ? (
-        <dialog
-          open
-          onCancel={(event) => {
-            event.preventDefault();
-            if (!allBusy) setDeleteTarget(null);
-          }}
-          className="w-[min(24rem,calc(100vw-2rem))] rounded-lg border border-border bg-sidebar-background p-0 text-foreground shadow-lg backdrop:bg-black/50"
-        >
-          <div className="flex items-center gap-2 border-b border-border px-4 py-2">
-            <span className="icon-[material-symbols--warning] text-base text-accent-foreground" />
-            <span className="text-sm font-medium">确认删除</span>
-            <button
-              type="button"
-              onClick={() => setDeleteTarget(null)}
-              disabled={allBusy}
-              className="ml-auto rounded p-0.5 text-foreground-muted transition hover:bg-button-hover-background hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <span className="icon-[material-symbols--close] text-base leading-none" />
-            </button>
-          </div>
-          <div className="p-4 text-sm leading-relaxed text-foreground-muted">
-            {deleteTarget.type === "provider"
-              ? `确认删除提供方「${deleteTarget.provider.name}」吗？该提供方下的所有模型也将被删除。`
-              : `确认删除模型「${deleteTarget.model.displayName}」吗？`}
-          </div>
-          <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
-            <button
-              type="button"
-              onClick={() => setDeleteTarget(null)}
-              disabled={allBusy}
-              className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-list-hover-background disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              取消
-            </button>
-            <button
-              type="button"
-              onClick={
-                deleteTarget.type === "provider" ? confirmDeleteProvider : confirmDeleteModel
-              }
-              disabled={allBusy}
-              className="rounded-md bg-accent-foreground px-3 py-1.5 text-sm font-medium text-foreground transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {allBusy ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="icon-[material-symbols--sync] text-base animate-spin" />
-                  删除中
-                </span>
-              ) : (
-                `删除${deleteTarget.type === "provider" ? "提供方" : "模型"}`
-              )}
-            </button>
-          </div>
-        </dialog>
-      ) : null}
     </main>
   );
 }

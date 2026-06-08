@@ -9,7 +9,7 @@ const tempDir = mkdtempSync(join(tmpdir(), "novel-evolver-"));
 const dbPath = join(tempDir, "workspace-test.sqlite");
 process.env.DATABASE_URL = dbPath;
 
-const { db, schema, sqlite } = await import("../db");
+const { db, schema } = await import("../db");
 const service = await import("./index");
 
 function seedProject(projectId: string) {
@@ -33,7 +33,6 @@ beforeEach(() => {
 });
 
 afterAll(() => {
-  sqlite.close();
   rmSync(tempDir, { recursive: true, force: true });
 });
 

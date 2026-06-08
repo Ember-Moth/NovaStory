@@ -8,18 +8,20 @@ import * as workspaceHandlers from "./workspaces";
 export { healthcheck } from "./health";
 
 export const ai = {
-  listProviders: aiHandlers.listProviders,
-  getProvider: aiHandlers.getProvider,
-  createProvider: aiHandlers.createProvider,
-  updateProvider: aiHandlers.updateProvider,
-  deleteProvider: aiHandlers.deleteProvider,
-  listModels: aiHandlers.listModels,
-  listModelsForProvider: aiHandlers.listModelsForProvider,
-  createModel: aiHandlers.createModel,
-  updateModel: aiHandlers.updateModel,
-  deleteModel: aiHandlers.deleteModel,
-  setDefaultModel: aiHandlers.setDefaultModel,
-  syncModels: aiHandlers.syncModels,
+  listSupportedSdkPackages: aiHandlers.listSupportedSdkPackages,
+  getCatalogStatus: aiHandlers.getCatalogStatus,
+  refreshCatalog: aiHandlers.refreshCatalog,
+  listCatalogProviders: aiHandlers.listCatalogProviders,
+  listCatalogModels: aiHandlers.listCatalogModels,
+  listConnections: aiHandlers.listConnections,
+  createConnection: aiHandlers.createConnection,
+  updateConnection: aiHandlers.updateConnection,
+  deleteConnection: aiHandlers.deleteConnection,
+  listResolvedModels: aiHandlers.listResolvedModels,
+  setCatalogModelEnabled: aiHandlers.setCatalogModelEnabled,
+  createCustomModel: aiHandlers.createCustomModel,
+  updateCustomModel: aiHandlers.updateCustomModel,
+  deleteCustomModel: aiHandlers.deleteCustomModel,
 };
 
 export const projects = {
