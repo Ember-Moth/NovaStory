@@ -72,7 +72,12 @@ type CustomModelMutationInput = Pick<
 >;
 
 function invalidateConnection(ctx: MutationCtx, connectionId: string) {
-  ctx.invalidate("ai.connections", `ai.connections.models:${connectionId}`);
+  ctx.invalidate(`ai.connections.models:${connectionId}`);
+}
+
+function invalidateConnectionsList(ctx: MutationCtx, connectionId: string) {
+  ctx.invalidate("ai.connections");
+  invalidateConnection(ctx, connectionId);
 }
 
 function sanitizeName(name: string): string {
@@ -297,13 +302,13 @@ export const updateConnection = mutation<UpdateConnectionInput, AiConnectionRow>
     .set(nextValues)
     .where(eq(schema.aiConnections.id, input.id))
     .run();
-  invalidateConnection(ctx, input.id);
+  invalidateConnectionsList(ctx, input.id);
   return db.query.aiConnections.findFirst({ where: eq(schema.aiConnections.id, input.id) }).sync()!;
 });
 
 export const deleteConnection = mutation<{ id: string }, void>(({ id }, ctx) => {
   db.delete(schema.aiConnections).where(eq(schema.aiConnections.id, id)).run();
-  invalidateConnection(ctx, id);
+  invalidateConnectionsList(ctx, id);
 });
 
 export const listResolvedModels = query<
