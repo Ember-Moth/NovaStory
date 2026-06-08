@@ -9,6 +9,7 @@ import type {
   AiResolvedModelView,
   AiSupportedSdkPackage,
 } from "@/domain/types";
+import { OverlayScrollbar } from "@/features/project/components/OverlayScrollbar";
 import { SidebarListRow } from "@/features/project/components/nodes/SidebarListRow";
 import { rpc } from "@/server/rpc/client";
 
@@ -1076,8 +1077,8 @@ export function AiSettingsPage() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4">
-          <section className="mb-4 grid gap-3 rounded-md border border-border bg-sidebar-background p-3 text-sm text-foreground-muted sm:grid-cols-2 xl:grid-cols-4">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
+          <section className="mb-4 grid shrink-0 gap-3 rounded-md border border-border bg-sidebar-background p-3 text-sm text-foreground-muted sm:grid-cols-2 xl:grid-cols-4">
             <div>
               <div className="text-[11px] uppercase tracking-wide text-foreground-muted/70">
                 Last Success
@@ -1112,95 +1113,101 @@ export function AiSettingsPage() {
             </div>
           </section>
 
-          <section className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-            <div className="space-y-3">
-              <div>
+          <section className="grid min-h-0 flex-1 gap-4 overflow-y-auto xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] xl:overflow-hidden">
+            <div className="flex min-h-0 flex-col gap-3 xl:overflow-hidden">
+              <div className="shrink-0">
                 <h2 className="text-sm font-semibold text-foreground">Connections</h2>
                 <p className="text-xs text-foreground-muted">
                   这里保存真正会被未来 AI SDK 使用的连接实例。
                 </p>
               </div>
 
-              {connectionsLoading ? (
-                <div className="rounded-md border border-dashed border-border px-4 py-10 text-sm text-foreground-muted">
-                  连接加载中...
-                </div>
-              ) : allConnections.length === 0 ? (
-                <div className="rounded-md border border-dashed border-border px-4 py-10 text-sm text-foreground-muted">
-                  还没有任何连接。先创建一个 registry 或 custom connection。
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {allConnections.map((connection) => (
-                    <ConnectionCard
-                      key={connection.id}
-                      connection={connection}
-                      providerName={
-                        connection.catalogProviderId
-                          ? (providerMap.get(connection.catalogProviderId)?.name ?? null)
-                          : null
-                      }
-                      onEdit={(connection) => {
-                        setEditingConnection(connection);
-                        setConnectionDialogOpen(true);
-                      }}
-                      onDelete={(connection) => void deleteConnection.mutate({ id: connection.id })}
-                      onOpenAddCustomModel={(connection) => {
-                        setCustomModelConnection(connection);
-                        setEditingCustomModel(undefined);
-                        setCustomModelDialogOpen(true);
-                      }}
-                      onOpenEditCustomModel={(connection, model) => {
-                        if (!model.customModelId) return;
-                        setCustomModelConnection(connection);
-                        setEditingCustomModel({
-                          id: model.customModelId,
-                          connectionId: connection.id,
-                          modelId: model.modelId,
-                          displayName: model.displayName,
-                          contextWindow: model.contextWindow,
-                          maxOutputTokens: model.maxOutputTokens,
-                          supportsVision: model.supportsVision,
-                          supportsToolUse: model.supportsToolUse,
-                          supportsReasoning: model.supportsReasoning,
-                          supportsTemperature: model.supportsTemperature,
-                          inputPricePer1m: model.inputPricePer1m,
-                          outputPricePer1m: model.outputPricePer1m,
-                          isEnabled: model.isEnabled,
-                          createdAt: 0,
-                          updatedAt: 0,
-                        });
-                        setCustomModelDialogOpen(true);
-                      }}
-                      onDeleteCustomModel={(connection, model) => {
-                        if (!model.customModelId) return;
-                        void deleteCustomModel.mutate({ id: model.customModelId });
-                      }}
-                    />
-                  ))}
-                </div>
-              )}
+              <OverlayScrollbar variant="card">
+                {connectionsLoading ? (
+                  <div className="rounded-md border border-dashed border-border px-4 py-10 text-sm text-foreground-muted">
+                    连接加载中...
+                  </div>
+                ) : allConnections.length === 0 ? (
+                  <div className="rounded-md border border-dashed border-border px-4 py-10 text-sm text-foreground-muted">
+                    还没有任何连接。先创建一个 registry 或 custom connection。
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {allConnections.map((connection) => (
+                      <ConnectionCard
+                        key={connection.id}
+                        connection={connection}
+                        providerName={
+                          connection.catalogProviderId
+                            ? (providerMap.get(connection.catalogProviderId)?.name ?? null)
+                            : null
+                        }
+                        onEdit={(connection) => {
+                          setEditingConnection(connection);
+                          setConnectionDialogOpen(true);
+                        }}
+                        onDelete={(connection) =>
+                          void deleteConnection.mutate({ id: connection.id })
+                        }
+                        onOpenAddCustomModel={(connection) => {
+                          setCustomModelConnection(connection);
+                          setEditingCustomModel(undefined);
+                          setCustomModelDialogOpen(true);
+                        }}
+                        onOpenEditCustomModel={(connection, model) => {
+                          if (!model.customModelId) return;
+                          setCustomModelConnection(connection);
+                          setEditingCustomModel({
+                            id: model.customModelId,
+                            connectionId: connection.id,
+                            modelId: model.modelId,
+                            displayName: model.displayName,
+                            contextWindow: model.contextWindow,
+                            maxOutputTokens: model.maxOutputTokens,
+                            supportsVision: model.supportsVision,
+                            supportsToolUse: model.supportsToolUse,
+                            supportsReasoning: model.supportsReasoning,
+                            supportsTemperature: model.supportsTemperature,
+                            inputPricePer1m: model.inputPricePer1m,
+                            outputPricePer1m: model.outputPricePer1m,
+                            isEnabled: model.isEnabled,
+                            createdAt: 0,
+                            updatedAt: 0,
+                          });
+                          setCustomModelDialogOpen(true);
+                        }}
+                        onDeleteCustomModel={(connection, model) => {
+                          if (!model.customModelId) return;
+                          void deleteCustomModel.mutate({ id: model.customModelId });
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </OverlayScrollbar>
             </div>
 
-            <div className="space-y-3">
-              <div>
+            <div className="flex min-h-0 flex-col gap-3 xl:overflow-hidden">
+              <div className="shrink-0">
                 <h2 className="text-sm font-semibold text-foreground">Catalog</h2>
                 <p className="text-xs text-foreground-muted">
                   来自 models.dev 的目录快照。支持接入的 provider 可以直接创建 registry 连接。
                 </p>
               </div>
 
-              {providersLoading ? (
-                <div className="rounded-md border border-dashed border-border px-4 py-10 text-sm text-foreground-muted">
-                  Catalog 加载中...
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {allProviders.map((provider) => (
-                    <CatalogProviderCard key={provider.id} provider={provider} />
-                  ))}
-                </div>
-              )}
+              <OverlayScrollbar variant="card">
+                {providersLoading ? (
+                  <div className="rounded-md border border-dashed border-border px-4 py-10 text-sm text-foreground-muted">
+                    Catalog 加载中...
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {allProviders.map((provider) => (
+                      <CatalogProviderCard key={provider.id} provider={provider} />
+                    ))}
+                  </div>
+                )}
+              </OverlayScrollbar>
             </div>
           </section>
         </div>
