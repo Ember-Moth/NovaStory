@@ -70,6 +70,14 @@
   --color-icon-mixed: #c99b4b;
 }
 
+@utility view-transition-name-* {
+  view-transition-name: --value([*]);
+
+  @variant motion-reduce {
+    view-transition-name: none;
+  }
+}
+
 @custom-variant fine-pointer {
   @media (pointer: fine) {
     @slot;

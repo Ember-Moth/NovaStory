@@ -32,7 +32,7 @@ function ActivityBarButton({
     >
       {active ? (
         <div
-          className="pointer-events-none absolute inset-y-0 left-0 w-0.5 bg-activity-bar-active-foreground [view-transition-name:activity-bar-indicator] motion-reduce:[view-transition-name:none]"
+          className="pointer-events-none absolute inset-y-0 left-0 w-0.5 bg-activity-bar-active-foreground view-transition-name-[activity-bar-indicator]"
           aria-hidden
         />
       ) : null}
