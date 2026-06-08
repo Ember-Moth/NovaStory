@@ -151,7 +151,7 @@ export const aiProviders = sqliteTable(
     check("ai_providers_name_nonempty", sql`length(${table.name}) > 0`),
     check(
       "ai_providers_type_valid",
-      sql`${table.providerType} IN ('openai', 'anthropic', 'google', 'ollama', 'custom')`,
+      sql`${table.providerType} IN ('openai', 'anthropic', 'google', 'deepseek', 'xai', 'ollama', 'custom')`,
     ),
   ],
 );

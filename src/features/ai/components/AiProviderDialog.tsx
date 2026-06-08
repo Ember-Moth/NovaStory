@@ -6,11 +6,21 @@ const PROVIDER_DEFAULTS: Record<string, string> = {
   openai: "https://api.openai.com/v1",
   anthropic: "https://api.anthropic.com/v1",
   google: "https://generativelanguage.googleapis.com/v1beta",
+  deepseek: "https://api.deepseek.com/v1",
+  xai: "https://api.x.ai/v1",
   ollama: "http://localhost:11434/v1",
   custom: "",
 };
 
-const PROVIDER_TYPES = ["openai", "anthropic", "google", "ollama", "custom"] as const;
+const PROVIDER_TYPES = [
+  "openai",
+  "anthropic",
+  "google",
+  "deepseek",
+  "xai",
+  "ollama",
+  "custom",
+] as const;
 
 export interface AiProviderFormData {
   name: string;

@@ -6,6 +6,8 @@ const PROVIDER_ICONS: Record<string, string> = {
   openai: "icon-[material-symbols--psychology]",
   anthropic: "icon-[material-symbols--smart-toy]",
   google: "icon-[material-symbols--auto-awesome]",
+  deepseek: "icon-[material-symbols--network-node]",
+  xai: "icon-[material-symbols--rocket-launch]",
   ollama: "icon-[material-symbols--dns]",
   custom: "icon-[material-symbols--api]",
 };
