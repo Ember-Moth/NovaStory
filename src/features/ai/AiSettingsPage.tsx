@@ -296,7 +296,7 @@ function ConnectionCard({
   onOpenEditCustomModel: (_connection: AiConnectionRow, _model: AiResolvedModelView) => void;
   onDeleteCustomModel: (_connection: AiConnectionRow, _model: AiResolvedModelView) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
 
   return (
     <div className="overflow-hidden rounded-md border border-border bg-sidebar-background">
