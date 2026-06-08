@@ -3,7 +3,7 @@ import { expect, test } from "bun:test";
 import { validateConnectionApiKey, validateConnectionBaseUrl } from "./ai";
 
 test("new connections require an api key", () => {
-  expect(() => validateConnectionApiKey({ apiKey: null })).toThrow("API Key is required");
+  expect(() => validateConnectionApiKey({ apiKey: null })).toThrow("请填写 API Key。");
 });
 
 test("existing connections with no stored api key must provide one on update", () => {
@@ -12,7 +12,7 @@ test("existing connections with no stored api key must provide one on update", (
       apiKey: null,
       existingApiKey: null,
     }),
-  ).toThrow("API Key is required");
+  ).toThrow("请填写 API Key。");
 });
 
 test("existing connections may keep their current api key without resubmitting it", () => {
@@ -31,7 +31,7 @@ test("azure connections require either base url or resource name", () => {
       baseUrl: null,
       config: {},
     }),
-  ).toThrow("Azure connections require either Base URL or Resource Name");
+  ).toThrow("Azure 连接需要填写 Base URL 或 Resource Name。");
 });
 
 test("azure connections accept resource name without base url", () => {

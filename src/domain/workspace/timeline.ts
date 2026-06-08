@@ -105,7 +105,7 @@ export function moveTimelinePoint(input: {
     const workspace = getWorkspaceOrThrow(tx, input.workspaceId);
     const point = getTimelinePointOrThrow(tx, workspace.id, input.pointId);
     const afterPointId = validateTimelinePointRef(tx, workspace.id, input.afterPointId);
-    invariant(point.id !== afterPointId, "Timeline point cannot move after itself");
+    invariant(point.id !== afterPointId, "无法移动：不能把时间点移动到自己后面。");
     if (point.prevPointId === afterPointId) {
       return point;
     }
@@ -145,10 +145,7 @@ export function updateTimelinePoint(input: {
   description?: string | null;
 }) {
   return db.transaction((tx) => {
-    invariant(
-      input.pointId !== ORIGIN_TIMELINE_POINT_ID,
-      "Cannot update implicit origin timeline point",
-    );
+    invariant(input.pointId !== ORIGIN_TIMELINE_POINT_ID, "无法修改原点时间点。");
 
     const workspace = getWorkspaceOrThrow(tx, input.workspaceId);
     const point = getTimelinePointOrThrow(tx, workspace.id, input.pointId);

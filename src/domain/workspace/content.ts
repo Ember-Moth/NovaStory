@@ -39,7 +39,7 @@ export function createContentNode(input: {
       const previousSibling = getContentNodeOrThrow(tx, workspace.id, input.afterSiblingId);
       invariant(
         previousSibling.parentId === input.parentId,
-        "afterSiblingId must belong to the same parent",
+        "无法创建章节：目标位置不在同一个父级下。",
       );
 
       tx.insert(schema.contentNodes)
@@ -99,17 +99,14 @@ export function moveContentNode(input: {
     const workspace = getWorkspaceOrThrow(tx, input.workspaceId);
     const contentRootId = assertContentRoot(workspace);
     const node = getContentNodeOrThrow(tx, workspace.id, input.nodeId);
-    invariant(node.id !== contentRootId, "Cannot move the hidden content root");
+    invariant(node.id !== contentRootId, "无法移动隐藏的正文根节点。");
     const newParent = getContentNodeOrThrow(tx, workspace.id, input.newParentId);
     const subtreeIds = collectContentSubtreeIds(tx, workspace.id, node.id);
-    invariant(!subtreeIds.has(newParent.id), "Cannot move a content node under its own descendant");
+    invariant(!subtreeIds.has(newParent.id), "无法移动：不能把章节移动到自己的子章节下。");
     if (input.afterSiblingId) {
       const previousSibling = getContentNodeOrThrow(tx, workspace.id, input.afterSiblingId);
-      invariant(
-        previousSibling.parentId === newParent.id,
-        "afterSiblingId must belong to the destination parent",
-      );
-      invariant(previousSibling.id !== node.id, "afterSiblingId cannot be the moved node");
+      invariant(previousSibling.parentId === newParent.id, "无法移动：目标位置不在目标父级下。");
+      invariant(previousSibling.id !== node.id, "无法移动：不能把章节移动到自己后面。");
     }
 
     const oldPrev = getContentPrevSibling(tx, workspace.id, node.id);
@@ -157,7 +154,7 @@ export function deleteContentNode(input: { workspaceId: string; nodeId: string }
     const workspace = getWorkspaceOrThrow(tx, input.workspaceId);
     const contentRootId = assertContentRoot(workspace);
     const node = getContentNodeOrThrow(tx, workspace.id, input.nodeId);
-    invariant(node.id !== contentRootId, "Cannot delete the hidden content root");
+    invariant(node.id !== contentRootId, "无法删除隐藏的正文根节点。");
 
     const oldPrev = getContentPrevSibling(tx, workspace.id, node.id);
     const timestamp = now();

@@ -1033,5 +1033,5 @@ test("implicit origin timeline point cannot be updated", () => {
       pointId: service.ORIGIN_TIMELINE_POINT_ID,
       label: "Forbidden",
     }),
-  ).toThrow("Cannot update implicit origin timeline point");
+  ).toThrow("无法修改原点时间点。");
 });

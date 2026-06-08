@@ -441,10 +441,7 @@ export function validateAuxParent(
 ) {
   const parent = readAuxByIdAtInternal(executor, workspace, timelinePointId, parentAuxNodeId);
   invariant(parent, `Aux parent not found: ${parentAuxNodeId}`);
-  invariant(
-    parent.nodeType === "dir" || parent.nodeType === "root",
-    "Aux parent must be a directory",
-  );
+  invariant(parent.nodeType === "dir" || parent.nodeType === "root", "辅助信息父级必须是文件夹。");
   return parent;
 }
 

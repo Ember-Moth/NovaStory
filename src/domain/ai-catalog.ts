@@ -96,7 +96,7 @@ function parseRegistryPayload(payload: string): Record<string, RegistryProviderP
   const parsed = JSON.parse(payload) as unknown;
   invariant(
     parsed && typeof parsed === "object" && !Array.isArray(parsed),
-    "Invalid registry payload",
+    "模型目录数据格式不正确。",
   );
   return parsed as Record<string, RegistryProviderPayload>;
 }
@@ -226,7 +226,7 @@ export function listResolvedModelsForConnection({
   const connection = db.query.aiConnections
     .findFirst({ where: eq(schema.aiConnections.id, connectionId) })
     .sync();
-  invariant(connection, "Connection not found");
+  invariant(connection, "未找到 AI 连接。");
 
   const resolved: AiResolvedModelView[] = [];
 
@@ -317,7 +317,7 @@ export function assertConnectionSupportsCustomModel(connection: AiConnectionRow,
       ),
     })
     .sync();
-  invariant(!conflicting, "Model ID conflicts with a catalog model on this connection");
+  invariant(!conflicting, "模型 ID 与当前连接中的目录模型冲突。");
 }
 
 export async function syncAiCatalogFromPayload(
@@ -475,7 +475,7 @@ export async function refreshAiCatalog({
         headers: { "user-agent": "NovelEvolver/0.1" },
       });
       if (!response.ok) {
-        throw new Error(`Registry request failed: HTTP ${response.status} ${response.statusText}`);
+        throw new Error(`模型目录请求失败：HTTP ${response.status} ${response.statusText}`);
       }
       const payload = await response.text();
       return await syncAiCatalogFromPayload(payload, db);

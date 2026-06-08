@@ -10,7 +10,7 @@ export function getWorkspaceOrThrow(executor: DatabaseExecutor, workspaceId: str
     .from(schema.workspaces)
     .where(eq(schema.workspaces.id, workspaceId))
     .get();
-  invariant(workspace, `Workspace not found: ${workspaceId}`);
+  invariant(workspace, "未找到工作区。");
   return workspace;
 }
 
@@ -20,7 +20,7 @@ export function getProjectOrThrow(executor: DatabaseExecutor, projectId: string)
     .from(schema.projects)
     .where(eq(schema.projects.id, projectId))
     .get();
-  invariant(project, `Project not found: ${projectId}`);
+  invariant(project, "未找到项目。");
   return project;
 }
 
@@ -39,7 +39,7 @@ export function getTimelinePointOrThrow(
       ),
     )
     .get();
-  invariant(point, `Timeline point not found: ${pointId}`);
+  invariant(point, "未找到时间点。");
   return point;
 }
 
@@ -55,7 +55,7 @@ export function getContentNodeOrThrow(
       and(eq(schema.contentNodes.id, nodeId), eq(schema.contentNodes.workspaceId, workspaceId)),
     )
     .get();
-  invariant(node, `Content node not found: ${nodeId}`);
+  invariant(node, "未找到正文节点。");
   return node;
 }
 
@@ -65,7 +65,7 @@ export function getAuxNodeOrThrow(executor: DatabaseExecutor, workspaceId: strin
     .from(schema.auxNodes)
     .where(and(eq(schema.auxNodes.id, nodeId), eq(schema.auxNodes.workspaceId, workspaceId)))
     .get();
-  invariant(node, `Aux node not found: ${nodeId}`);
+  invariant(node, "未找到辅助信息节点。");
   return node;
 }
 

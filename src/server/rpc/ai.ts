@@ -94,7 +94,7 @@ function invalidateConnectionsList(ctx: MutationCtx, connectionId: string) {
 
 function sanitizeName(name: string): string {
   const trimmed = name.trim();
-  invariant(trimmed.length > 0, "Name cannot be empty");
+  invariant(trimmed.length > 0, "名称不能为空。");
   return trimmed;
 }
 
@@ -124,7 +124,7 @@ function sanitizeConfigJson(
 
 function validateSdkPackageForInput(sdkPackage: string) {
   const recipe = getAiSdkPackageRecipe(sdkPackage);
-  invariant(recipe, "Unsupported AI SDK package");
+  invariant(recipe, "不支持这个 AI SDK 包。");
   return recipe;
 }
 
@@ -135,7 +135,7 @@ export function validateConnectionApiKey({
   apiKey: string | null;
   existingApiKey?: string | null;
 }) {
-  invariant(apiKey || existingApiKey, "API Key is required");
+  invariant(apiKey || existingApiKey, "请填写 API Key。");
 }
 
 export function validateConnectionBaseUrl({
@@ -149,15 +149,15 @@ export function validateConnectionBaseUrl({
 }) {
   const recipe = validateSdkPackageForInput(sdkPackage);
   if (recipe.requiresBaseUrl) {
-    invariant(baseUrl, "Base URL is required for this AI SDK package");
+    invariant(baseUrl, "这个 AI SDK 包需要填写 Base URL。");
   }
   if (!recipe.requiresBaseUrl && !recipe.allowsCustomEndpoint) {
-    invariant(baseUrl == null, "This AI SDK package does not allow custom endpoints");
+    invariant(baseUrl == null, "这个 AI SDK 包不支持自定义接口地址。");
   }
   if (recipe.configKind === "azure") {
     invariant(
       baseUrl || config?.azure?.resourceName,
-      "Azure connections require either Base URL or Resource Name",
+      "Azure 连接需要填写 Base URL 或 Resource Name。",
     );
   }
 }
@@ -171,11 +171,11 @@ function buildConnectionInsert(input: CreateConnectionInput): ConnectionInsert {
     const provider = db.query.aiCatalogProviders
       .findFirst({ where: eq(schema.aiCatalogProviders.id, input.catalogProviderId) })
       .sync();
-    invariant(provider, "Catalog provider not found");
-    invariant(provider.sdkPackage, "Catalog provider has no AI SDK package");
+    invariant(provider, "未找到模型目录服务商。");
+    invariant(provider.sdkPackage, "该模型目录服务商没有配置 AI SDK 包。");
 
     const recipe = validateSdkPackageForInput(provider.sdkPackage);
-    invariant(recipe.supportsRegistryProvider, "Catalog provider package is not supported");
+    invariant(recipe.supportsRegistryProvider, "暂不支持该模型目录服务商使用的 AI SDK 包。");
     const baseUrl = sanitizeBaseUrl(input.baseUrl);
     const config = normalizeConnectionConfigForSdkPackage(provider.sdkPackage, input.config);
     validateConnectionApiKey({ apiKey });
@@ -220,8 +220,8 @@ function buildConnectionInsert(input: CreateConnectionInput): ConnectionInsert {
 function normalizeCustomModelInput(input: CustomModelMutationInput) {
   const modelId = input.modelId.trim();
   const displayName = input.displayName.trim();
-  invariant(modelId.length > 0, "Model ID cannot be empty");
-  invariant(displayName.length > 0, "Display name cannot be empty");
+  invariant(modelId.length > 0, "模型 ID 不能为空。");
+  invariant(displayName.length > 0, "显示名称不能为空。");
 
   return {
     modelId,
@@ -305,7 +305,7 @@ export const updateConnection = mutation<UpdateConnectionInput, AiConnectionRow>
   const existing = db.query.aiConnections
     .findFirst({ where: eq(schema.aiConnections.id, input.id) })
     .sync();
-  invariant(existing, "Connection not found");
+  invariant(existing, "未找到 AI 连接。");
 
   const timestamp = now();
   const nextName = input.name != null ? sanitizeName(input.name) : existing.name;
@@ -315,14 +315,14 @@ export const updateConnection = mutation<UpdateConnectionInput, AiConnectionRow>
 
   if (nextKind === "registry") {
     const providerId = input.catalogProviderId ?? existing.catalogProviderId;
-    invariant(providerId, "Registry connection must reference a catalog provider");
+    invariant(providerId, "模型目录连接必须关联一个服务商。");
     const provider = db.query.aiCatalogProviders
       .findFirst({ where: eq(schema.aiCatalogProviders.id, providerId) })
       .sync();
-    invariant(provider, "Catalog provider not found");
-    invariant(provider.sdkPackage, "Catalog provider has no AI SDK package");
+    invariant(provider, "未找到模型目录服务商。");
+    invariant(provider.sdkPackage, "该模型目录服务商没有配置 AI SDK 包。");
     const recipe = validateSdkPackageForInput(provider.sdkPackage);
-    invariant(recipe.supportsRegistryProvider, "Catalog provider package is not supported");
+    invariant(recipe.supportsRegistryProvider, "暂不支持该模型目录服务商使用的 AI SDK 包。");
     nextSdkPackage = provider.sdkPackage;
     nextCatalogProviderId = provider.id;
   } else if (input.sdkPackage != null) {
@@ -391,17 +391,14 @@ export const setCatalogModelEnabled = mutation<
   const connection = db.query.aiConnections
     .findFirst({ where: eq(schema.aiConnections.id, connectionId) })
     .sync();
-  invariant(connection, "Connection not found");
-  invariant(connection.kind === "registry", "Only registry connections can toggle catalog models");
+  invariant(connection, "未找到 AI 连接。");
+  invariant(connection.kind === "registry", "只有模型目录连接可以启用或停用目录模型。");
 
   const catalogModel = db.query.aiCatalogModels
     .findFirst({ where: eq(schema.aiCatalogModels.id, catalogModelId) })
     .sync();
-  invariant(catalogModel, "Catalog model not found");
-  invariant(
-    catalogModel.providerId === connection.catalogProviderId,
-    "Catalog model does not belong to this connection",
-  );
+  invariant(catalogModel, "未找到目录模型。");
+  invariant(catalogModel.providerId === connection.catalogProviderId, "该目录模型不属于当前连接。");
 
   if (enabled) {
     db.delete(schema.aiConnectionCatalogOverrides)
@@ -447,7 +444,7 @@ export const createCustomModel = mutation<
   const connection = db.query.aiConnections
     .findFirst({ where: eq(schema.aiConnections.id, connectionId) })
     .sync();
-  invariant(connection, "Connection not found");
+  invariant(connection, "未找到 AI 连接。");
 
   const values = normalizeCustomModelInput(input);
   assertConnectionSupportsCustomModel(connection, values.modelId);
@@ -477,12 +474,12 @@ export const updateCustomModel = mutation<
   const existing = db.query.aiConnectionCustomModels
     .findFirst({ where: eq(schema.aiConnectionCustomModels.id, id) })
     .sync();
-  invariant(existing, "Custom model not found");
+  invariant(existing, "未找到自定义模型。");
 
   const connection = db.query.aiConnections
     .findFirst({ where: eq(schema.aiConnections.id, existing.connectionId) })
     .sync();
-  invariant(connection, "Connection not found");
+  invariant(connection, "未找到 AI 连接。");
 
   const values = normalizeCustomModelInput({
     modelId: input.modelId ?? existing.modelId,
@@ -516,7 +513,7 @@ export const deleteCustomModel = mutation<{ id: string }, void>(({ id }, ctx) =>
   const model = db.query.aiConnectionCustomModels
     .findFirst({ where: eq(schema.aiConnectionCustomModels.id, id) })
     .sync();
-  invariant(model, "Custom model not found");
+  invariant(model, "未找到自定义模型。");
   db.delete(schema.aiConnectionCustomModels)
     .where(eq(schema.aiConnectionCustomModels.id, id))
     .run();

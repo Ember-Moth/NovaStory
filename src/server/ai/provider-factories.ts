@@ -29,13 +29,13 @@ type ProviderFactory = (_input: ProviderFactoryInput) => ProviderV3;
 
 function requireApiKey(connection: AiConnectionRow): string {
   const apiKey = connection.apiKey?.trim();
-  invariant(apiKey, `Connection ${connection.id} is missing an API key`);
+  invariant(apiKey, `AI 连接 ${connection.id} 缺少 API Key。`);
   return apiKey;
 }
 
 function requireBaseUrl(connection: AiConnectionRow): string {
   const baseUrl = connection.baseUrl?.trim();
-  invariant(baseUrl, `Connection ${connection.id} is missing a Base URL`);
+  invariant(baseUrl, `AI 连接 ${connection.id} 缺少 Base URL。`);
   return baseUrl;
 }
 
@@ -96,7 +96,7 @@ export const PROVIDER_FACTORY_REGISTRY: Record<AiProviderFactoryId, ProviderFact
 
 export function createProviderForConnection(connection: AiConnectionRow): ProviderV3 {
   const recipe = getAiSdkPackageRecipe(connection.sdkPackage);
-  invariant(recipe, `Unsupported AI SDK package: ${connection.sdkPackage}`);
+  invariant(recipe, `不支持这个 AI SDK 包：${connection.sdkPackage}`);
 
   const normalizedConnection = {
     ...connection,
@@ -125,6 +125,6 @@ export function createLanguageModelForConnection({
   modelId: string;
 }): LanguageModelV3 {
   const normalizedModelId = modelId.trim();
-  invariant(normalizedModelId, "Model ID cannot be empty");
+  invariant(normalizedModelId, "模型 ID 不能为空。");
   return createProviderForConnection(connection).languageModel(normalizedModelId);
 }

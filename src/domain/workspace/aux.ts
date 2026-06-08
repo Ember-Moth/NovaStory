@@ -92,8 +92,8 @@ export function writeFileAt(input: {
 
     if (input.nodeId) {
       const existing = readAuxByIdAtInternal(tx, workspace, timelinePointId, input.nodeId);
-      invariant(existing, `Aux file not found: ${input.nodeId}`);
-      invariant(existing.nodeType === "file", "Aux node is not a file");
+      invariant(existing, "辅助文件不存在或在当前时间点不可见。");
+      invariant(existing.nodeType === "file", "当前辅助信息不是文件，无法写入内容。");
       putAuxLayer(tx, {
         workspaceId: workspace.id,
         timelinePointId,
@@ -112,8 +112,8 @@ export function writeFileAt(input: {
       return getAuxNodeOrThrow(tx, workspace.id, existing.id);
     }
 
-    invariant(input.parentDirId, "parentDirId is required when creating a file");
-    invariant(input.name, "name is required when creating a file");
+    invariant(input.parentDirId, "创建辅助文件时必须指定父文件夹。");
+    invariant(input.name, "创建辅助文件时必须填写名称。");
     validateAuxParent(tx, workspace, timelinePointId, input.parentDirId);
     const name = validateUniqueAuxName(
       tx,
@@ -172,7 +172,7 @@ export function linkAt(input: {
       "创建辅助符号链接",
     );
     const target = readAuxByIdAtInternal(tx, workspace, timelinePointId, input.targetNodeId);
-    invariant(target, `Symlink target is not visible: ${input.targetNodeId}`);
+    invariant(target, "符号链接目标不存在或在当前时间点不可见。");
 
     const nodeId = createId("aux");
     const timestamp = now();
@@ -214,8 +214,8 @@ export function moveAuxNodeAt(input: {
     const auxRootId = assertAuxRoot(workspace);
     const timelinePointId = validateTimelinePointRef(tx, workspace.id, input.timelinePointId);
     const current = readAuxByIdAtInternal(tx, workspace, timelinePointId, input.nodeId);
-    invariant(current, `Aux node not found: ${input.nodeId}`);
-    invariant(current.id !== auxRootId, "Cannot move the hidden aux root");
+    invariant(current, "辅助信息不存在或在当前时间点不可见。");
+    invariant(current.id !== auxRootId, "无法移动隐藏的辅助信息根节点。");
     validateAuxParent(tx, workspace, timelinePointId, input.newParentDirId);
 
     const snapshot = buildReachableAuxSnapshot(tx, workspace, timelinePointId);
@@ -231,10 +231,7 @@ export function moveAuxNodeAt(input: {
         queue.push(child.id);
       }
     }
-    invariant(
-      !subtree.has(input.newParentDirId),
-      "Cannot move an aux node under its own descendant",
-    );
+    invariant(!subtree.has(input.newParentDirId), "无法移动：不能把辅助信息移动到自己的子节点下。");
     const newName = validateUniqueAuxName(
       tx,
       workspace,
@@ -271,8 +268,8 @@ export function deleteAuxNodeAt(input: {
     const auxRootId = assertAuxRoot(workspace);
     const timelinePointId = validateTimelinePointRef(tx, workspace.id, input.timelinePointId);
     const current = readAuxByIdAtInternal(tx, workspace, timelinePointId, input.nodeId);
-    invariant(current, `Aux node not found: ${input.nodeId}`);
-    invariant(current.id !== auxRootId, "Cannot delete the hidden aux root");
+    invariant(current, "辅助信息不存在或在当前时间点不可见。");
+    invariant(current.id !== auxRootId, "无法删除隐藏的辅助信息根节点。");
 
     putAuxLayer(tx, {
       workspaceId: workspace.id,
@@ -298,7 +295,7 @@ export function restoreAuxNodeAt(input: {
   return db.transaction((tx) => {
     const workspace = getWorkspaceOrThrow(tx, input.workspaceId);
     const timelinePointId = validateTimelinePointRef(tx, workspace.id, input.timelinePointId);
-    invariant(timelinePointId, "Cannot restore auxiliary changes at implicit origin");
+    invariant(timelinePointId, "原点没有可恢复的辅助信息改动。");
     const point = getTimelinePointOrThrow(tx, workspace.id, timelinePointId);
 
     const layer = tx
@@ -312,7 +309,7 @@ export function restoreAuxNodeAt(input: {
         ),
       )
       .get();
-    invariant(layer, `Aux change not found: ${input.nodeId}`);
+    invariant(layer, "未找到这个时间点上的辅助信息改动。");
 
     const currentSnapshot = buildReachableAuxSnapshot(tx, workspace, timelinePointId);
     const previousSnapshot = buildReachableAuxSnapshot(tx, workspace, point.prevPointId);
@@ -368,10 +365,10 @@ export function listAuxDirAt(
   const dirId = target.path
     ? (resolveAuxNodeIdFromPath(snapshot, auxRootId, target.path) ?? undefined)
     : target.dirId;
-  invariant(dirId, "Directory target is required");
+  invariant(dirId, "必须指定要读取的辅助信息文件夹。");
   const dir = snapshot.get(dirId);
-  invariant(dir, `Directory not found: ${dirId}`);
-  invariant(dir.nodeType === "dir" || dir.nodeType === "root", "Target is not a directory");
+  invariant(dir, "辅助信息文件夹不存在或在当前时间点不可见。");
+  invariant(dir.nodeType === "dir" || dir.nodeType === "root", "目标辅助信息不是文件夹。");
 
   return listChildrenFromSnapshot(snapshot, dir.id);
 }
@@ -379,7 +376,7 @@ export function listAuxDirAt(
 export function listAuxChangesAt(workspaceId: string, pointId: TimelinePointRef) {
   const workspace = getWorkspaceOrThrow(db, workspaceId);
   const timelinePointId = validateTimelinePointRef(db, workspace.id, pointId);
-  invariant(timelinePointId, "Cannot list auxiliary changes at implicit origin");
+  invariant(timelinePointId, "原点没有辅助信息改动列表。");
   return listAuxLayerChangesAtTimelinePoint(db, workspace, timelinePointId);
 }
 
