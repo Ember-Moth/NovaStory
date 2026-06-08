@@ -54,7 +54,7 @@ export const exportSubtree = query<
 
 export const composeWritingContext = query<
   { workspaceId: string; contentNodeId: string },
-  ReturnType<typeof composeWritingContext>
+  ReturnType<typeof buildWritingContext>
 >(({ workspaceId, contentNodeId }, ctx) => {
   const context = buildWritingContext(workspaceId, contentNodeId);
   ctx.watch(`content:${workspaceId}`);
