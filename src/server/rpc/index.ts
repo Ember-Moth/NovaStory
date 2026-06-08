@@ -19,6 +19,7 @@ export const ai = {
   updateModel: aiHandlers.updateModel,
   deleteModel: aiHandlers.deleteModel,
   setDefaultModel: aiHandlers.setDefaultModel,
+  syncModels: aiHandlers.syncModels,
 };
 
 export const projects = {

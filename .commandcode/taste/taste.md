@@ -17,3 +17,11 @@
 - Use drizzle as the database ORM. Confidence: 0.70
 - Use bun for testing. Confidence: 0.70
 - Use nanoid for generating IDs. Confidence: 0.70
+
+# RPC / API
+
+- Use async/await in @codehz/rpc mutation handlers instead of Bun's fetch .sync() — the framework seamlessly supports async. Confidence: 0.70
+
+# Database
+
+- Use db.transaction() to wrap multi-step write operations (insert/update loops) to ensure atomicity and avoid partial updates. Confidence: 0.70

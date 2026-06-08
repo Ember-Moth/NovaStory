@@ -25,6 +25,8 @@ export function AiProviderCard({
   onToggle,
   onEditProvider,
   onDeleteProvider,
+  onSyncModels,
+  isSyncing,
   onAddModel,
   onEditModel,
   onDeleteModel,
@@ -36,6 +38,8 @@ export function AiProviderCard({
   onToggle: () => void;
   onEditProvider: () => void;
   onDeleteProvider: () => void;
+  onSyncModels: () => void;
+  isSyncing: boolean;
   onAddModel: () => void;
   onEditModel: (_model: AiModelRow) => void;
   onDeleteModel: (_model: AiModelRow) => void;
@@ -87,6 +91,20 @@ export function AiProviderCard({
           type="button"
           onClick={(e) => {
             e.stopPropagation();
+            onSyncModels();
+          }}
+          disabled={isSyncing}
+          className="rounded p-0.5 hover:bg-button-hover-background hover:text-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          title="同步模型"
+        >
+          <span
+            className={`text-sm leading-none ${isSyncing ? "icon-[material-symbols--sync] animate-spin" : "icon-[material-symbols--cloud-download]"}`}
+          />
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
             onDeleteProvider();
           }}
           className="rounded p-0.5 hover:bg-button-hover-background hover:text-foreground transition-colors"
@@ -103,10 +121,10 @@ export function AiProviderCard({
               <thead>
                 <tr className="h-6 border-b border-border/50 text-[10px] font-semibold uppercase text-foreground-muted/60">
                   <th className="px-3 text-left font-medium">模型</th>
-                  <th className="w-16 px-2 text-right font-medium">上下文</th>
-                  <th className="w-8 px-2 text-center font-medium">视觉</th>
-                  <th className="w-8 px-2 text-center font-medium">工具</th>
-                  <th className="w-18 px-2 text-right font-medium">价格</th>
+                  <th className="w-16 px-2 text-right font-medium whitespace-nowrap">上下文</th>
+                  <th className="w-10 px-1 text-center font-medium whitespace-nowrap">视觉</th>
+                  <th className="w-10 px-1 text-center font-medium whitespace-nowrap">工具</th>
+                  <th className="w-18 px-2 text-right font-medium whitespace-nowrap">价格</th>
                   <th className="w-15 px-2" />
                 </tr>
               </thead>

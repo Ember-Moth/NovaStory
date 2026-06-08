@@ -21,6 +21,7 @@ export function AiSettingsPage() {
   const updateModel = rpc.useMutation("ai.updateModel");
   const deleteModel = rpc.useMutation("ai.deleteModel");
   const setDefaultModel = rpc.useMutation("ai.setDefaultModel");
+  const syncModels = rpc.useMutation("ai.syncModels");
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
@@ -125,6 +126,10 @@ export function AiSettingsPage() {
     await setDefaultModel.mutate({ id: modelId });
   };
 
+  const handleSyncModels = async (providerId: string) => {
+    await syncModels.mutate({ providerId });
+  };
+
   const allBusy =
     createProvider.isPending ||
     updateProvider.isPending ||
@@ -132,7 +137,8 @@ export function AiSettingsPage() {
     createModel.isPending ||
     updateModel.isPending ||
     deleteModel.isPending ||
-    setDefaultModel.isPending;
+    setDefaultModel.isPending ||
+    syncModels.isPending;
 
   return (
     <main className="min-h-dvh select-none bg-editor-background text-foreground">
@@ -194,6 +200,8 @@ export function AiSettingsPage() {
                   onToggle={() => toggleExpanded(provider.id)}
                   onEditProvider={() => handleOpenEditProvider(provider)}
                   onDeleteProvider={() => handleDeleteProvider(provider)}
+                  onSyncModels={() => handleSyncModels(provider.id)}
+                  isSyncing={syncModels.isPending}
                   onAddModel={() => handleOpenAddModel(provider.id)}
                   onEditModel={handleOpenEditModel}
                   onDeleteModel={handleDeleteModel}

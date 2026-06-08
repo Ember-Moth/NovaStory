@@ -1,5 +1,5 @@
 import { mutation, query } from "@codehz/rpc";
-import { type InferInsertModel, type InferSelectModel, eq } from "drizzle-orm";
+import { type InferInsertModel, type InferSelectModel, and, eq } from "drizzle-orm";
 
 import { db, schema } from "@/db";
 import { createId, now } from "@/domain/internal/ids";
@@ -137,3 +137,117 @@ export const setDefaultModel = mutation<{ id: string }, ModelRow>(({ id }, ctx) 
   ctx.invalidate("ai.models", `ai.models:provider:${model.providerId}`);
   return db.query.aiModels.findFirst({ where: eq(schema.aiModels.id, id) }).sync()!;
 });
+
+// --- Model Sync ---
+
+interface FetchedModel {
+  modelId: string;
+  displayName: string;
+}
+
+async function fetchModelsFromProvider(provider: ProviderRow): Promise<FetchedModel[]> {
+  const baseUrl = provider.baseUrl!.replace(/\/+$/, "");
+  const apiKey = provider.apiKey!;
+  const type = provider.providerType;
+
+  let url: string;
+  let headers: Record<string, string>;
+
+  switch (type) {
+    case "anthropic": {
+      url = `${baseUrl}/models`;
+      headers = { "x-api-key": apiKey };
+      break;
+    }
+    case "google": {
+      url = `${baseUrl}/models?key=${encodeURIComponent(apiKey)}`;
+      headers = {};
+      break;
+    }
+    default: {
+      url = `${baseUrl}/models`;
+      headers = { Authorization: `Bearer ${apiKey}` };
+    }
+  }
+
+  const response = await fetch(url, { headers });
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch models from ${provider.name}: HTTP ${response.status} ${response.statusText}`,
+    );
+  }
+
+  const json = (await response.json()) as any;
+
+  if (type === "google") {
+    const models: any[] = json?.models ?? [];
+    return models.map((m: any) => {
+      const rawId: string = m.name ?? "";
+      return {
+        modelId: rawId.startsWith("models/") ? rawId.slice("models/".length) : rawId,
+        displayName: m.displayName ?? rawId,
+      };
+    });
+  }
+
+  const data: any[] = json?.data ?? [];
+  return data.map((m: any) => ({
+    modelId: m.id ?? "",
+    displayName: m.display_name ?? m.id ?? "",
+  }));
+}
+
+export const syncModels = mutation<{ providerId: string }, ModelRow[]>(
+  async ({ providerId }, ctx) => {
+    const provider = db.query.aiProviders
+      .findFirst({ where: eq(schema.aiProviders.id, providerId) })
+      .sync();
+    if (!provider) throw new Error("Provider not found");
+    if (!provider.apiKey) throw new Error("Provider has no API key configured");
+    if (!provider.baseUrl) throw new Error("Provider has no base URL configured");
+
+    const fetchedModels = await fetchModelsFromProvider(provider);
+    const timestamp = now();
+
+    db.transaction((tx) => {
+      for (const fm of fetchedModels) {
+        const existing = tx.query.aiModels
+          .findFirst({
+            where: and(
+              eq(schema.aiModels.providerId, providerId),
+              eq(schema.aiModels.modelId, fm.modelId),
+            ),
+          })
+          .sync();
+
+        if (existing) {
+          if (existing.displayName !== fm.displayName) {
+            tx.update(schema.aiModels)
+              .set({ displayName: fm.displayName, updatedAt: timestamp })
+              .where(eq(schema.aiModels.id, existing.id))
+              .run();
+          }
+        } else {
+          tx.insert(schema.aiModels)
+            .values({
+              id: createId("model"),
+              providerId,
+              modelId: fm.modelId,
+              displayName: fm.displayName,
+              isDefault: false,
+              isEnabled: true,
+              supportsVision: false,
+              supportsToolUse: false,
+              createdAt: timestamp,
+              updatedAt: timestamp,
+            })
+            .run();
+        }
+      }
+    });
+
+    ctx.invalidate("ai.models", `ai.models:provider:${providerId}`);
+    return db.query.aiModels.findMany({ where: eq(schema.aiModels.providerId, providerId) }).sync();
+  },
+);
