@@ -87,14 +87,25 @@ export function HomePage() {
               <p className="mt-0.5 text-xs text-foreground-muted">{projectList.length} 个项目</p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={openCreateDialog}
-            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-sidebar-background px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-list-hover-background"
-          >
-            <span className="icon-[material-symbols--add] text-base" />
-            新建
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate("/settings/ai")}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-sidebar-background px-3 py-1.5 text-sm font-medium text-foreground-muted transition hover:bg-list-hover-background hover:text-foreground"
+              title="AI 设置"
+            >
+              <span className="icon-[material-symbols--settings] text-base" />
+              AI
+            </button>
+            <button
+              type="button"
+              onClick={openCreateDialog}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-sidebar-background px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-list-hover-background"
+            >
+              <span className="icon-[material-symbols--add] text-base" />
+              新建
+            </button>
+          </div>
         </section>
 
         {/* Error banner */}
