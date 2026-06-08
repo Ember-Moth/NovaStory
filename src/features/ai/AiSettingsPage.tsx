@@ -343,8 +343,12 @@ function ConnectionCard({
 
       {expanded ? (
         <div className="border-t border-border px-4 py-3">
-          <div className="mb-3 flex flex-wrap items-center gap-2 text-[11px] text-foreground-muted">
-            {connection.baseUrl ? <span>Endpoint {connection.baseUrl}</span> : null}
+          {connection.baseUrl ? (
+            <div className="mb-2 text-[11px] text-foreground-muted">
+              Endpoint {connection.baseUrl}
+            </div>
+          ) : null}
+          <div className="mb-3">
             <button
               type="button"
               onClick={() => onOpenAddCustomModel(connection)}
