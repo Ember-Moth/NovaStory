@@ -103,7 +103,13 @@ function CatalogProviderModels({ catalogProviderId }: { catalogProviderId: strin
   );
 }
 
-function CatalogProviderCard({ provider }: { provider: AiCatalogProviderView }) {
+function CatalogProviderCard({
+  provider,
+  onQuickConnect,
+}: {
+  provider: AiCatalogProviderView;
+  onQuickConnect: (_providerId: string) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -116,15 +122,29 @@ function CatalogProviderCard({ provider }: { provider: AiCatalogProviderView }) 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="truncate text-sm font-semibold text-foreground">{provider.name}</span>
-            <span
-              className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                provider.isSupported
-                  ? "bg-emerald-500/10 text-emerald-300"
-                  : "bg-amber-500/10 text-amber-300"
-              }`}
-            >
-              {provider.isSupported ? "可接入" : "暂不支持"}
-            </span>
+            {provider.isSupported ? (
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onQuickConnect(provider.id);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.stopPropagation();
+                    onQuickConnect(provider.id);
+                  }
+                }}
+                className="rounded-full px-2 py-0.5 text-[10px] font-medium bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 transition cursor-pointer"
+              >
+                快速接入
+              </span>
+            ) : (
+              <span className="rounded-full px-2 py-0.5 text-[10px] font-medium bg-amber-500/10 text-amber-300">
+                暂不支持
+              </span>
+            )}
             {!provider.isActive ? (
               <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-foreground-muted">
                 已失活
@@ -395,6 +415,7 @@ function ConnectionModelsList({
 function ConnectionDialog({
   open,
   connection,
+  quickConnectProviderId,
   catalogProviders,
   supportedPackages,
   isPending,
@@ -403,6 +424,7 @@ function ConnectionDialog({
 }: {
   open: boolean;
   connection?: AiConnectionRow;
+  quickConnectProviderId?: string | null;
   catalogProviders: AiCatalogProviderView[];
   supportedPackages: AiSupportedSdkPackage[];
   isPending: boolean;
@@ -428,8 +450,9 @@ function ConnectionDialog({
       className="w-[min(34rem,calc(100vw-2rem))] rounded-lg border border-border bg-sidebar-background p-0 text-foreground shadow-lg backdrop:bg-black/50"
     >
       <ConnectionDialogForm
-        key={connection?.id ?? "new"}
+        key={connection?.id ?? (quickConnectProviderId ? `quick-${quickConnectProviderId}` : "new")}
         connection={connection}
+        quickConnectProviderId={quickConnectProviderId}
         catalogProviders={catalogProviders}
         supportedPackages={supportedPackages}
         isPending={isPending}
@@ -442,6 +465,7 @@ function ConnectionDialog({
 
 function ConnectionDialogForm({
   connection,
+  quickConnectProviderId,
   catalogProviders,
   supportedPackages,
   isPending,
@@ -449,6 +473,7 @@ function ConnectionDialogForm({
   onSave,
 }: {
   connection?: AiConnectionRow;
+  quickConnectProviderId?: string | null;
   catalogProviders: AiCatalogProviderView[];
   supportedPackages: AiSupportedSdkPackage[];
   isPending: boolean;
@@ -457,19 +482,22 @@ function ConnectionDialogForm({
 }) {
   const editableProviders = catalogProviders.filter((provider) => provider.isSupported);
   const defaultProvider = editableProviders[0] ?? null;
+  const quickConnectProvider = quickConnectProviderId
+    ? (editableProviders.find((p) => p.id === quickConnectProviderId) ?? null)
+    : null;
   const [kind, setKind] = useState<"registry" | "custom">(
     normalizeConnectionKind(connection?.kind),
   );
-  const [name, setName] = useState(connection?.name ?? "");
+  const [name, setName] = useState(connection?.name ?? quickConnectProvider?.name ?? "");
   const [catalogProviderId, setCatalogProviderId] = useState<string>(
-    connection?.catalogProviderId ?? defaultProvider?.id ?? "",
+    connection?.catalogProviderId ?? quickConnectProvider?.id ?? defaultProvider?.id ?? "",
   );
   const [sdkPackage, setSdkPackage] = useState<string>(
     normalizeConnectionKind(connection?.kind) === "custom"
       ? (connection?.sdkPackage ?? supportedPackages[0]?.sdkPackage ?? "@ai-sdk/openai-compatible")
       : (supportedPackages[0]?.sdkPackage ?? "@ai-sdk/openai-compatible"),
   );
-  const [baseUrl, setBaseUrl] = useState(connection?.baseUrl ?? "");
+  const [baseUrl, setBaseUrl] = useState(connection?.baseUrl ?? quickConnectProvider?.apiUrl ?? "");
   const [apiKey, setApiKey] = useState(connection ? "••••••••" : "");
   const [apiKeyChanged, setApiKeyChanged] = useState(false);
   const [isEnabled, setIsEnabled] = useState(connection?.isEnabled ?? true);
@@ -979,12 +1007,19 @@ export function AiSettingsPage() {
     AiConnectionCustomModelRow | undefined
   >();
   const [customModelConnection, setCustomModelConnection] = useState<AiConnectionRow | undefined>();
+  const [quickConnectProviderId, setQuickConnectProviderId] = useState<string | null>(null);
   const [providerFilter, setProviderFilter] = useState("");
 
   const allProviders = catalogProviders ?? [];
   const allConnections = connections ?? [];
   const packageList = supportedPackages ?? [];
   const providerMap = new Map(allProviders.map((provider) => [provider.id, provider]));
+
+  const handleQuickConnect = (providerId: string) => {
+    setQuickConnectProviderId(providerId);
+    setEditingConnection(undefined);
+    setConnectionDialogOpen(true);
+  };
 
   const handleSaveConnection = async (data: ConnectionFormData) => {
     if (editingConnection) {
@@ -1217,7 +1252,11 @@ export function AiSettingsPage() {
                           : true,
                       )
                       .map((provider) => (
-                        <CatalogProviderCard key={provider.id} provider={provider} />
+                        <CatalogProviderCard
+                          key={provider.id}
+                          provider={provider}
+                          onQuickConnect={handleQuickConnect}
+                        />
                       ))}
                   </div>
                 )}
@@ -1230,11 +1269,13 @@ export function AiSettingsPage() {
       <ConnectionDialog
         open={connectionDialogOpen}
         connection={editingConnection}
+        quickConnectProviderId={quickConnectProviderId}
         catalogProviders={allProviders}
         supportedPackages={packageList}
         isPending={createConnection.isPending || updateConnection.isPending}
         onCancel={() => {
           setEditingConnection(undefined);
+          setQuickConnectProviderId(null);
           setConnectionDialogOpen(false);
         }}
         onSave={handleSaveConnection}
