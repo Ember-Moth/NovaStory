@@ -1,5 +1,6 @@
-import { Route, Switch } from "wouter";
+import { Activity } from "react";
 
+import { useCachedProjectRoute } from "@/client/hooks/useCachedProjectRoute";
 import { AiSettingsPage } from "@/features/ai/AiSettingsPage";
 import { HomePage } from "@/features/home/HomePage";
 import { ProjectPage } from "@/features/project";
@@ -7,17 +8,32 @@ import { ProjectPage } from "@/features/project";
 import "./styles.css";
 
 export function App() {
+  const { isHome, isSettings, isProjectRoute, isKnownRoute, cachedProjectId } =
+    useCachedProjectRoute();
+
+  if (!isKnownRoute) {
+    return (
+      <div className="flex h-dvh items-center justify-center bg-editor-background text-foreground-muted">
+        404: No such page!
+      </div>
+    );
+  }
+
   return (
-    <Switch>
-      <Route path="/">
+    <>
+      <Activity mode={isHome ? "visible" : "hidden"}>
         <HomePage />
-      </Route>
-      <Route path="/project/:id">{({ id }) => <ProjectPage id={id} />}</Route>
-      <Route path="/projects/:id">{({ id }) => <ProjectPage id={id} />}</Route>
-      <Route path="/settings/ai">
+      </Activity>
+
+      <Activity mode={isSettings ? "visible" : "hidden"}>
         <AiSettingsPage />
-      </Route>
-      <Route>404: No such page!</Route>
-    </Switch>
+      </Activity>
+
+      {cachedProjectId ? (
+        <Activity mode={isProjectRoute ? "visible" : "hidden"}>
+          <ProjectPage key={cachedProjectId} id={cachedProjectId} />
+        </Activity>
+      ) : null}
+    </>
   );
 }

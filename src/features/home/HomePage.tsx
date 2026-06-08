@@ -1,6 +1,9 @@
+import { useAtomValue, useSetAtom } from "jotai";
 import { type FormEvent, useRef, useState } from "react";
 import { useLocation } from "wouter";
 
+import { AppShell } from "@/client/components/AppShell";
+import { lastProjectIdAtom } from "@/client/state/lastProject";
 import { rpc } from "@/server/rpc/client";
 
 const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
@@ -10,6 +13,8 @@ const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
 
 export function HomePage() {
   const [, navigate] = useLocation();
+  const lastProjectId = useAtomValue(lastProjectIdAtom);
+  const setLastProjectId = useSetAtom(lastProjectIdAtom);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -70,118 +75,104 @@ export function HomePage() {
     try {
       setDeletingId(id);
       await deleteProject.mutate({ id });
+      setLastProjectId((current) => (current === id ? null : current));
     } finally {
       setDeletingId(null);
     }
   };
 
   return (
-    <main className="min-h-dvh select-none bg-editor-background text-foreground">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-8">
-        {/* Header */}
-        <section className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <span className="icon-[material-symbols--description] text-2xl text-foreground-muted" />
-            <div>
-              <h1 className="text-lg font-semibold tracking-tight">项目</h1>
-              <p className="mt-0.5 text-xs text-foreground-muted">{projectList.length} 个项目</p>
+    <AppShell active="home">
+      <div className="flex h-full flex-col overflow-hidden">
+        <div className="flex shrink-0 items-center gap-3 border-b border-border bg-title-bar-background px-4 py-2">
+          <span className="icon-[material-symbols--folder] text-xl text-icon-folder" />
+          <div className="min-w-0">
+            <h1 className="text-[14px] font-semibold text-foreground">项目</h1>
+            <p className="text-[11px] text-foreground-muted">{projectList.length} 个项目</p>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6">
+          {error ? (
+            <div className="mb-4 flex items-center gap-2 rounded-md border border-border bg-sidebar-background px-3 py-2 text-sm text-accent-foreground">
+              <span className="icon-[material-symbols--info] shrink-0 text-base" />
+              {error.message}
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => navigate("/settings/ai")}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-sidebar-background px-3 py-1.5 text-sm font-medium text-foreground-muted transition hover:bg-list-hover-background hover:text-foreground"
-              title="AI 设置"
-            >
-              <span className="icon-[material-symbols--settings] text-base" />
-              AI
-            </button>
-            <button
-              type="button"
-              onClick={openCreateDialog}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-sidebar-background px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-list-hover-background"
-            >
-              <span className="icon-[material-symbols--add] text-base" />
-              新建
-            </button>
-          </div>
-        </section>
+          ) : null}
 
-        {/* Error banner */}
-        {error ? (
-          <div className="flex items-center gap-2 rounded-md border border-border bg-sidebar-background px-3 py-2 text-sm text-accent-foreground">
-            <span className="icon-[material-symbols--info] text-base shrink-0" />
-            {error.message}
-          </div>
-        ) : null}
-
-        {/* Loading state */}
-        {isLoading ? (
-          <div className="flex items-center justify-center gap-2 rounded-md border border-dashed border-border px-4 py-10 text-sm text-foreground-muted">
-            <span className="icon-[material-symbols--sync] text-base animate-spin" />
-            加载中...
-          </div>
-        ) : null}
-
-        {/* Empty state */}
-        {!isLoading && projectList.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 rounded-md border border-dashed border-border px-4 py-12 text-sm text-foreground-muted">
-            <span className="icon-[material-symbols--edit-note] text-3xl" />
-            <span>还没有项目，点击「新建」创建一个。</span>
-          </div>
-        ) : null}
-
-        {/* Project list */}
-        {!isLoading ? (
-          <div className="flex flex-col">
-            {projectList.map((project) => (
-              <div
-                key={project.id}
-                className="group flex items-start gap-2 rounded-md px-3 py-2 transition hover:bg-list-hover-background"
+          {isLoading ? (
+            <div className="flex items-center justify-center gap-2 rounded-md border border-dashed border-border px-4 py-10 text-sm text-foreground-muted">
+              <span className="icon-[material-symbols--sync] animate-spin text-base" />
+              加载中...
+            </div>
+          ) : (
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4">
+              <button
+                type="button"
+                onClick={openCreateDialog}
+                className="group flex min-h-36 flex-col items-center justify-center gap-2 rounded-md border border-dashed border-border bg-sidebar-background p-4 text-foreground-muted transition hover:border-accent-foreground hover:bg-list-hover-background hover:text-foreground"
               >
-                <button
-                  type="button"
-                  onClick={() => navigate(`/project/${project.id}`)}
-                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
-                >
-                  <span className="icon-[material-symbols--folder] mt-0.5 shrink-0 text-lg text-icon-folder" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="truncate text-sm font-medium text-foreground">
+                <span className="icon-[material-symbols--add-circle-outline] text-3xl text-accent-foreground transition group-hover:scale-105" />
+                <span className="text-sm font-medium">新建项目</span>
+              </button>
+
+              {projectList.map((project) => {
+                const isLastOpened = project.id === lastProjectId;
+
+                return (
+                  <div
+                    key={project.id}
+                    className={`group relative flex min-h-36 flex-col rounded-md border p-4 transition ${
+                      isLastOpened
+                        ? "border-accent-foreground/40 bg-list-active-background"
+                        : "border-border bg-sidebar-background hover:bg-list-hover-background"
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/project/${project.id}`)}
+                      className="flex min-h-0 flex-1 flex-col items-start gap-2 text-left"
+                    >
+                      <div className="flex w-full items-center gap-2">
+                        <span className="icon-[material-symbols--folder] text-2xl text-icon-folder" />
+                        {isLastOpened ? (
+                          <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-accent-foreground">
+                            上次打开
+                          </span>
+                        ) : null}
+                      </div>
+                      <span className="line-clamp-2 text-sm font-medium text-foreground">
                         {project.name}
                       </span>
-                      <span className="shrink-0 text-[11px] text-foreground-muted">
+                      <p className="line-clamp-2 flex-1 text-xs leading-relaxed text-foreground-muted">
+                        {project.description?.trim() || "暂无描述"}
+                      </p>
+                      <span className="text-[11px] text-foreground-muted">
                         {dateFormatter.format(project.updatedAt)}
                       </span>
-                    </div>
-                    <p className="mt-0.5 truncate text-xs text-foreground-muted">
-                      {project.description?.trim() || "暂无描述"}
-                    </p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteProject(project.id, project.name)}
+                      disabled={deleteProject.isPending && deletingId === project.id}
+                      className="absolute right-2 top-2 rounded p-1 text-foreground-muted opacity-0 transition hover:bg-button-hover-background hover:text-foreground group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-30"
+                      title="删除项目"
+                    >
+                      <span className="icon-[material-symbols--delete] text-base leading-none" />
+                    </button>
                   </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteProject(project.id, project.name)}
-                  disabled={deleteProject.isPending && deletingId === project.id}
-                  className="shrink-0 rounded p-1 text-foreground-muted opacity-0 transition hover:bg-button-hover-background hover:text-foreground group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-30"
-                  title="删除项目"
-                >
-                  <span className="icon-[material-symbols--delete] text-base leading-none" />
-                </button>
-              </div>
-            ))}
-          </div>
-        ) : null}
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* New project dialog */}
       <dialog
         ref={dialogRef}
         className="w-[min(28rem,calc(100vw-2rem))] rounded-lg border border-border bg-sidebar-background p-0 text-foreground shadow-lg backdrop:bg-black/50"
       >
         <form onSubmit={handleCreateProject}>
-          {/* Dialog title bar */}
           <div className="flex items-center gap-2 border-b border-border px-4 py-2">
             <span className="icon-[material-symbols--add-circle-outline] text-base text-accent-foreground" />
             <span className="text-sm font-medium">新建项目</span>
@@ -213,13 +204,13 @@ export function HomePage() {
                 onChange={(event) => setDescription(event.target.value)}
                 rows={3}
                 placeholder="可选"
-                className="w-full resize-none rounded-md border border-border bg-editor-background px-3 py-1.5 text-sm text-foreground leading-relaxed outline-none transition placeholder:text-foreground-muted/50 focus:border-accent-foreground"
+                className="w-full resize-none rounded-md border border-border bg-editor-background px-3 py-1.5 text-sm leading-relaxed text-foreground outline-none transition placeholder:text-foreground-muted/50 focus:border-accent-foreground"
               />
             </label>
 
             {formError || createProject.error ? (
               <div className="flex items-center gap-2 rounded-md border border-border bg-editor-background px-3 py-2 text-sm text-accent-foreground">
-                <span className="icon-[material-symbols--warning] text-base shrink-0" />
+                <span className="icon-[material-symbols--warning] shrink-0 text-base" />
                 {formError ?? createProject.error?.message}
               </div>
             ) : null}
@@ -240,7 +231,7 @@ export function HomePage() {
             >
               {createProject.isPending ? (
                 <span className="inline-flex items-center gap-1.5">
-                  <span className="icon-[material-symbols--sync] text-base animate-spin" />
+                  <span className="icon-[material-symbols--sync] animate-spin text-base" />
                   创建中
                 </span>
               ) : (
@@ -250,6 +241,6 @@ export function HomePage() {
           </div>
         </form>
       </dialog>
-    </main>
+    </AppShell>
   );
 }
