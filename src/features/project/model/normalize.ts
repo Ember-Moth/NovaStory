@@ -123,6 +123,8 @@ function buildAuxNode(
     content: node.content ?? "",
     path: node.path,
     symlinkTargetPath: node.symlinkTargetPath,
+    hasTimelineChange: node.hasTimelineChange,
+    isDeleted: node.isDeleted,
     children: [],
   };
 

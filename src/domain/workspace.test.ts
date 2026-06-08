@@ -12,6 +12,8 @@ process.env.DATABASE_URL = dbPath;
 const { db, schema } = await import("../db");
 const service = await import("./index");
 
+type ExportedAuxNode = ReturnType<typeof service.exportAuxSnapshotTree>["nodes"][number];
+
 function seedProject(projectId: string) {
   db.insert(schema.projects)
     .values({
@@ -21,6 +23,10 @@ function seedProject(projectId: string) {
     })
     .run();
   return service.createDefaultWorkspace(projectId);
+}
+
+function flattenAuxNodes(nodes: ExportedAuxNode[]): ExportedAuxNode[] {
+  return nodes.flatMap((node) => [node, ...flattenAuxNodes(node.children)]);
 }
 
 beforeEach(() => {
@@ -185,6 +191,190 @@ test("symlink keeps following the same aux node after rename and move", () => {
   expect(exported.nodes.map((node) => node.name)).toEqual(["current_location", "places"]);
   expect(exported.nodes[0]?.symlinkTargetPath).toBe("/places/villa/main_bathroom");
   expect(exported.nodes[1]?.children.map((node) => node.name)).toEqual(["home", "villa"]);
+});
+
+test("aux snapshot marks visible nodes with layers at the active timeline point", () => {
+  const workspace = seedProject("project_aux_snapshot_changes");
+  const rootId = workspace.auxRootId!;
+
+  const stateDir = service.mkdirAt({
+    workspaceId: workspace.id,
+    timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: rootId,
+    name: "state",
+  });
+  const locationFile = service.writeFileAt({
+    workspaceId: workspace.id,
+    timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: stateDir.id,
+    name: "location.md",
+    content: "home",
+  });
+  const characterFile = service.writeFileAt({
+    workspaceId: workspace.id,
+    timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: stateDir.id,
+    name: "character.md",
+    content: "calm",
+  });
+
+  const originSnapshot = service.exportAuxSnapshotTree(
+    workspace.id,
+    service.ORIGIN_TIMELINE_POINT_ID,
+  );
+  expect(flattenAuxNodes(originSnapshot.nodes).every((node) => !node.hasTimelineChange)).toBe(true);
+
+  const point = service.createTimelinePoint({
+    workspaceId: workspace.id,
+    afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
+    key: "after_departure",
+    label: "After departure",
+  });
+  service.writeFileAt({
+    workspaceId: workspace.id,
+    timelinePointId: point.id,
+    nodeId: locationFile.id,
+    content: "home",
+  });
+  service.mkdirAt({
+    workspaceId: workspace.id,
+    timelinePointId: point.id,
+    parentDirId: rootId,
+    name: "delta-only",
+  });
+  service.moveAuxNodeAt({
+    workspaceId: workspace.id,
+    timelinePointId: point.id,
+    nodeId: characterFile.id,
+    newParentDirId: rootId,
+    newName: "cast.md",
+  });
+
+  const pointSnapshot = service.exportAuxSnapshotTree(workspace.id, point.id);
+  const changesByPath = new Map(
+    flattenAuxNodes(pointSnapshot.nodes).map((node) => [node.path, node.hasTimelineChange]),
+  );
+
+  expect(changesByPath.get("/state")).toBe(false);
+  expect(changesByPath.get("/state/location.md")).toBe(true);
+  expect(changesByPath.get("/delta-only")).toBe(true);
+  expect(changesByPath.get("/cast.md")).toBe(true);
+});
+
+test("aux snapshot exports deleted folders as deleted ghost subtrees", () => {
+  const workspace = seedProject("project_aux_deleted_ghosts");
+  const rootId = workspace.auxRootId!;
+
+  const stateDir = service.mkdirAt({
+    workspaceId: workspace.id,
+    timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: rootId,
+    name: "state",
+  });
+  service.writeFileAt({
+    workspaceId: workspace.id,
+    timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: stateDir.id,
+    name: "location.md",
+    content: "home",
+  });
+
+  const point = service.createTimelinePoint({
+    workspaceId: workspace.id,
+    afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
+    key: "after_delete_state",
+    label: "After delete state",
+  });
+  service.deleteAuxNodeAt({
+    workspaceId: workspace.id,
+    timelinePointId: point.id,
+    nodeId: stateDir.id,
+  });
+
+  const snapshot = service.exportAuxSnapshotTree(workspace.id, point.id);
+  const deletedDir = snapshot.nodes.find((node) => node.path === "/state");
+  const deletedFile = flattenAuxNodes(snapshot.nodes).find(
+    (node) => node.path === "/state/location.md",
+  );
+
+  expect(deletedDir?.isDeleted).toBe(true);
+  expect(deletedDir?.hasTimelineChange).toBe(true);
+  expect(deletedFile?.isDeleted).toBe(true);
+  expect(deletedFile?.hasTimelineChange).toBe(false);
+});
+
+test("restoreAuxNodeAt removes the active timeline point aux layer", () => {
+  const workspace = seedProject("project_aux_restore_layer");
+  const rootId = workspace.auxRootId!;
+
+  const notesFile = service.writeFileAt({
+    workspaceId: workspace.id,
+    timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: rootId,
+    name: "notes.md",
+    content: "origin",
+  });
+  const point = service.createTimelinePoint({
+    workspaceId: workspace.id,
+    afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
+    key: "after_notes",
+    label: "After notes",
+  });
+  service.writeFileAt({
+    workspaceId: workspace.id,
+    timelinePointId: point.id,
+    nodeId: notesFile.id,
+    content: "changed",
+  });
+
+  expect(service.readAuxByIdAt(workspace.id, point.id, notesFile.id)?.content).toBe("changed");
+
+  service.restoreAuxNodeAt({
+    workspaceId: workspace.id,
+    timelinePointId: point.id,
+    nodeId: notesFile.id,
+  });
+
+  const restored = service.exportAuxSnapshotTree(workspace.id, point.id).nodes[0];
+  expect(restored?.content).toBe("origin");
+  expect(restored?.hasTimelineChange).toBe(false);
+});
+
+test("restoreAuxNodeAt restores deleted aux nodes by removing the tombstone layer", () => {
+  const workspace = seedProject("project_aux_restore_delete");
+  const rootId = workspace.auxRootId!;
+
+  const notesFile = service.writeFileAt({
+    workspaceId: workspace.id,
+    timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: rootId,
+    name: "notes.md",
+    content: "origin",
+  });
+  const point = service.createTimelinePoint({
+    workspaceId: workspace.id,
+    afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
+    key: "after_delete_notes",
+    label: "After delete notes",
+  });
+  service.deleteAuxNodeAt({
+    workspaceId: workspace.id,
+    timelinePointId: point.id,
+    nodeId: notesFile.id,
+  });
+
+  expect(service.exportAuxSnapshotTree(workspace.id, point.id).nodes[0]?.isDeleted).toBe(true);
+
+  service.restoreAuxNodeAt({
+    workspaceId: workspace.id,
+    timelinePointId: point.id,
+    nodeId: notesFile.id,
+  });
+
+  const restored = service.exportAuxSnapshotTree(workspace.id, point.id).nodes[0];
+  expect(restored?.path).toBe("/notes.md");
+  expect(restored?.isDeleted).toBe(false);
+  expect(restored?.hasTimelineChange).toBe(false);
 });
 
 test("content node deletion removes subtree and preserves sibling order", () => {

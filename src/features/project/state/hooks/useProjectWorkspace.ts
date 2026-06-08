@@ -57,6 +57,7 @@ export function useProjectWorkspaceData(projectId: string) {
   const writeFileAux = rpc.useMutation("aux.writeFile");
   const moveAux = rpc.useMutation("aux.move");
   const deleteAux = rpc.useMutation("aux.delete");
+  const restoreAux = rpc.useMutation("aux.restore");
 
   const contentState = useMemo(
     () => buildContentTreeState(contentQuery.data?.nodes ?? []),
@@ -79,7 +80,11 @@ export function useProjectWorkspaceData(projectId: string) {
     deleteTimeline.isPending ||
     updateTimeline.isPending;
   const auxBusy =
-    mkdirAux.isPending || writeFileAux.isPending || moveAux.isPending || deleteAux.isPending;
+    mkdirAux.isPending ||
+    writeFileAux.isPending ||
+    moveAux.isPending ||
+    deleteAux.isPending ||
+    restoreAux.isPending;
   const auxInitialLoading =
     !auxQuery.isSkipped && !visibleAuxSnapshot && auxQuery.isLoading && !auxQuery.error;
   const auxRefreshing =
@@ -113,6 +118,7 @@ export function useProjectWorkspaceData(projectId: string) {
     writeFileAux,
     moveAux,
     deleteAux,
+    restoreAux,
     contentTree: contentState.tree,
     flatContentNodes: contentState.flatNodes,
     contentNodeMap: contentState.nodeMap,

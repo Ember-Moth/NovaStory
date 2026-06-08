@@ -11,6 +11,7 @@ import {
   moveAuxNodeAt,
   readAuxByIdAt,
   readAuxByPathAt,
+  restoreAuxNodeAt,
   writeFileAt,
 } from "@/domain";
 import { auxSnapshotWatchKey, normalizeTimelinePointId } from "@/domain/internal/timeline-point";
@@ -54,6 +55,11 @@ export const deleteMutation = mutation<Parameters<typeof deleteAuxNodeAt>[0], vo
     ctx.invalidate(`aux:${input.workspaceId}`);
   },
 );
+
+export const restore = mutation<Parameters<typeof restoreAuxNodeAt>[0], void>((input, ctx) => {
+  restoreAuxNodeAt(input);
+  ctx.invalidate(`aux:${input.workspaceId}`);
+});
 
 export const readById = query<
   { workspaceId: string; pointId?: string | typeof ORIGIN_TIMELINE_POINT_ID; nodeId: string },

@@ -19,6 +19,8 @@ test("deriveProjectSelectionState resolves active nodes and timeline labels", ()
     content: "Notes",
     path: "/notes.md",
     symlinkTargetPath: null,
+    hasTimelineChange: false,
+    isDeleted: false,
     children: [],
   };
 
@@ -55,6 +57,8 @@ test("deriveProjectEditorState computes content and aux save state independently
     content: "Committed aux",
     path: "/notes.md",
     symlinkTargetPath: null,
+    hasTimelineChange: true,
+    isDeleted: false,
     children: [],
   };
 

@@ -1,16 +1,19 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { db, schema } from "@/db";
 
 import {
   assertAuxRoot,
   getAuxNodeOrThrow,
+  getTimelinePointOrThrow,
   getWorkspaceOrThrow,
   touchWorkspace,
 } from "../internal/access";
 import {
   buildReachableAuxSnapshot,
-  exportAuxNode,
+  collectChangedAuxNodeIds,
+  collectDeletedAuxNodeIds,
+  exportAuxChildren,
   gcOrphanAuxNodes,
   listAuxLayerChangesAtTimelinePoint,
   listChildrenFromSnapshot,
@@ -260,6 +263,35 @@ export function deleteAuxNodeAt(input: {
   });
 }
 
+export function restoreAuxNodeAt(input: {
+  workspaceId: string;
+  timelinePointId?: TimelinePointRef;
+  nodeId: string;
+}) {
+  return db.transaction((tx) => {
+    const workspace = getWorkspaceOrThrow(tx, input.workspaceId);
+    const timelinePointId = validateTimelinePointRef(tx, workspace.id, input.timelinePointId);
+    invariant(timelinePointId, "Cannot restore auxiliary changes at implicit origin");
+
+    const layer = tx
+      .select({ id: schema.auxNodeLayers.id })
+      .from(schema.auxNodeLayers)
+      .where(
+        and(
+          eq(schema.auxNodeLayers.workspaceId, workspace.id),
+          eq(schema.auxNodeLayers.timelinePointId, timelinePointId),
+          eq(schema.auxNodeLayers.auxNodeId, input.nodeId),
+        ),
+      )
+      .get();
+    invariant(layer, `Aux change not found: ${input.nodeId}`);
+
+    tx.delete(schema.auxNodeLayers).where(eq(schema.auxNodeLayers.id, layer.id)).run();
+    gcOrphanAuxNodes(tx, workspace.id);
+    touchWorkspace(tx, workspace.id);
+  });
+}
+
 export function readAuxByIdAt(workspaceId: string, pointId: TimelinePointRef, nodeId: string) {
   const workspace = getWorkspaceOrThrow(db, workspaceId);
   const timelinePointId = validateTimelinePointRef(db, workspace.id, pointId);
@@ -308,12 +340,22 @@ export function exportAuxSnapshotTree(workspaceId: string, pointId?: TimelinePoi
   const auxRootId = assertAuxRoot(workspace);
   const timelinePointId = validateTimelinePointRef(db, workspace.id, pointId);
   const snapshot = buildReachableAuxSnapshot(db, workspace, timelinePointId);
+  const changedNodeIds = collectChangedAuxNodeIds(db, workspace.id, snapshot, timelinePointId);
+  const deletedNodeIds = collectDeletedAuxNodeIds(db, workspace.id, timelinePointId);
+  const previousSnapshot = timelinePointId
+    ? buildReachableAuxSnapshot(
+        db,
+        workspace,
+        getTimelinePointOrThrow(db, workspace.id, timelinePointId).prevPointId,
+      )
+    : null;
 
   return {
     rootNodeId: auxRootId,
     timelinePointId: pointIdOrOrigin(timelinePointId),
-    nodes: listChildrenFromSnapshot(snapshot, auxRootId).map((node) =>
-      exportAuxNode(snapshot, node),
-    ),
+    nodes: exportAuxChildren(snapshot, auxRootId, changedNodeIds, {
+      previousSnapshot,
+      deletedNodeIds,
+    }),
   } satisfies ExportedAuxSnapshotTree;
 }

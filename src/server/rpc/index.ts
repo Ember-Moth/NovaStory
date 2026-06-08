@@ -59,6 +59,7 @@ export const aux = {
   link: auxHandlers.link,
   move: auxHandlers.move,
   delete: auxHandlers.deleteMutation,
+  restore: auxHandlers.restore,
   readById: auxHandlers.readById,
   readByPath: auxHandlers.readByPath,
   listDir: auxHandlers.listDir,

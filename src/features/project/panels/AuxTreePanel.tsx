@@ -25,7 +25,9 @@ function AuxTreeNodeRow({
   onCreateChildDir,
   onCreateChildFile,
   onDelete,
+  onRestore,
   isBusy,
+  showTimelineChanges,
 }: {
   node: AuxTreeNodeVM;
   depth: number;
@@ -37,24 +39,46 @@ function AuxTreeNodeRow({
   onCreateChildDir: (_node: AuxTreeNodeVM, _anchorId: string) => void;
   onCreateChildFile: (_node: AuxTreeNodeVM, _anchorId: string) => void;
   onDelete: (_id: string, _anchorId: string) => void;
+  onRestore: (_id: string, _anchorId: string) => void;
   isBusy: boolean;
+  showTimelineChanges: boolean;
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const isDir = node.nodeType === "dir";
+  const isDeleted = node.isDeleted;
+  const contentStateClass = isDeleted
+    ? "text-red-300 opacity-55"
+    : showTimelineChanges && !node.hasTimelineChange
+      ? "opacity-55"
+      : "opacity-100";
   const rowAnchorId = actionAnchorId("aux", "row", node.id);
   const addDirAnchorId = actionAnchorId("aux", "add-dir", node.id);
   const addFileAnchorId = actionAnchorId("aux", "add-file", node.id);
   const deleteAnchorId = actionAnchorId("aux", "delete", node.id);
+  const restoreAnchorId = actionAnchorId("aux", "restore", node.id);
+  const canRestore = showTimelineChanges && node.hasTimelineChange;
+
+  const icon = (
+    <span className={`inline-flex shrink-0 items-center ${contentStateClass}`}>
+      <AuxNodeIcon nodeType={isDir ? (isExpanded ? "dir-open" : "dir") : node.nodeType} />
+    </span>
+  );
 
   const label = (
-    <InlineEditableText
-      value={node.name}
-      disabled={isBusy}
-      onEditStart={() => onSelect(node)}
-      onEditingChange={setIsEditing}
-      onCommit={async (next) => onRename(node.id, next)}
-      className="truncate"
-    />
+    <span className={`min-w-0 flex-1 ${contentStateClass}`}>
+      <InlineEditableText
+        value={node.name}
+        disabled={isBusy || isDeleted}
+        onEditStart={() => {
+          if (!isDeleted) {
+            onSelect(node);
+          }
+        }}
+        onEditingChange={setIsEditing}
+        onCommit={async (next) => onRename(node.id, next)}
+        className="truncate"
+      />
+    </span>
   );
 
   if (isDir) {
@@ -71,31 +95,44 @@ function AuxTreeNodeRow({
         leading={
           <ExpandToggle hasChildren expanded={isExpanded} onToggle={() => onToggle(node.id)} />
         }
-        icon={<AuxNodeIcon nodeType={isExpanded ? "dir-open" : "dir"} />}
+        icon={icon}
         label={label}
         actions={
           <>
-            <RowActionButton
-              anchorId={addDirAnchorId}
-              onClick={() => onCreateChildDir(node, addDirAnchorId)}
-              disabled={isBusy || isEditing}
-              title="添加子文件夹"
-              icon="icon-[material-symbols--create-new-folder]"
-            />
-            <RowActionButton
-              anchorId={addFileAnchorId}
-              onClick={() => onCreateChildFile(node, addFileAnchorId)}
-              disabled={isBusy || isEditing}
-              title="添加子文件"
-              icon="icon-[material-symbols--note-add]"
-            />
-            <RowActionButton
-              anchorId={deleteAnchorId}
-              onClick={() => onDelete(node.id, deleteAnchorId)}
-              disabled={isBusy || isEditing}
-              title="删除节点"
-              icon="icon-[material-symbols--close]"
-            />
+            {canRestore ? (
+              <RowActionButton
+                anchorId={restoreAnchorId}
+                onClick={() => onRestore(node.id, restoreAnchorId)}
+                disabled={isBusy || isEditing}
+                title="恢复到上一时间点状态"
+                icon="icon-[material-symbols--undo]"
+              />
+            ) : null}
+            {isDeleted ? null : (
+              <>
+                <RowActionButton
+                  anchorId={addDirAnchorId}
+                  onClick={() => onCreateChildDir(node, addDirAnchorId)}
+                  disabled={isBusy || isEditing}
+                  title="添加子文件夹"
+                  icon="icon-[material-symbols--create-new-folder]"
+                />
+                <RowActionButton
+                  anchorId={addFileAnchorId}
+                  onClick={() => onCreateChildFile(node, addFileAnchorId)}
+                  disabled={isBusy || isEditing}
+                  title="添加子文件"
+                  icon="icon-[material-symbols--note-add]"
+                />
+                <RowActionButton
+                  anchorId={deleteAnchorId}
+                  onClick={() => onDelete(node.id, deleteAnchorId)}
+                  disabled={isBusy || isEditing}
+                  title="删除节点"
+                  icon="icon-[material-symbols--close]"
+                />
+              </>
+            )}
           </>
         }
       />
@@ -110,7 +147,7 @@ function AuxTreeNodeRow({
       anchorId={rowAnchorId}
       onClick={() => onSelect(node)}
       leading={<ExpandToggle hasChildren={false} expanded={false} />}
-      icon={<AuxNodeIcon nodeType={node.nodeType} />}
+      icon={icon}
       label={label}
       trailing={
         node.nodeType === "symlink" && node.symlinkTargetPath
@@ -118,13 +155,26 @@ function AuxTreeNodeRow({
           : undefined
       }
       actions={
-        <RowActionButton
-          anchorId={deleteAnchorId}
-          onClick={() => onDelete(node.id, deleteAnchorId)}
-          disabled={isBusy || isEditing}
-          title="删除节点"
-          icon="icon-[material-symbols--close]"
-        />
+        <>
+          {canRestore ? (
+            <RowActionButton
+              anchorId={restoreAnchorId}
+              onClick={() => onRestore(node.id, restoreAnchorId)}
+              disabled={isBusy || isEditing}
+              title="恢复到上一时间点状态"
+              icon="icon-[material-symbols--undo]"
+            />
+          ) : null}
+          {isDeleted ? null : (
+            <RowActionButton
+              anchorId={deleteAnchorId}
+              onClick={() => onDelete(node.id, deleteAnchorId)}
+              disabled={isBusy || isEditing}
+              title="删除节点"
+              icon="icon-[material-symbols--close]"
+            />
+          )}
+        </>
       }
     />
   );
@@ -140,8 +190,10 @@ export function AuxTreePanel({
   onCreateChildDir,
   onCreateChildFile,
   onDelete,
+  onRestore,
   isBusy,
   isRefreshing,
+  showTimelineChanges,
 }: {
   tree: AuxTreeNodeVM[];
   expandedIds: Set<string>;
@@ -152,8 +204,10 @@ export function AuxTreePanel({
   onCreateChildDir: (_node: AuxTreeNodeVM, _anchorId: string) => void;
   onCreateChildFile: (_node: AuxTreeNodeVM, _anchorId: string) => void;
   onDelete: (_id: string, _anchorId: string) => void;
+  onRestore: (_id: string, _anchorId: string) => void;
   isBusy: boolean;
   isRefreshing: boolean;
+  showTimelineChanges: boolean;
 }) {
   if (tree.length === 0) {
     return (
@@ -176,7 +230,9 @@ export function AuxTreePanel({
       onCreateChildDir={onCreateChildDir}
       onCreateChildFile={onCreateChildFile}
       onDelete={onDelete}
+      onRestore={onRestore}
       isBusy={isBusy}
+      showTimelineChanges={showTimelineChanges}
     />
   );
 

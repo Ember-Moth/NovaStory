@@ -116,6 +116,8 @@ export interface ExportedAuxNode {
   symlinkTargetPath: string | null;
   timelinePointId: string | typeof ORIGIN_TIMELINE_POINT_ID;
   path: string;
+  hasTimelineChange: boolean;
+  isDeleted: boolean;
   children: ExportedAuxNode[];
 }
 

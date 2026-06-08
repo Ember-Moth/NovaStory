@@ -23,6 +23,7 @@ import {
 import { useProjectWorkspaceEffects } from "@/features/project/state/hooks/useProjectWorkspaceEffects";
 import { ErrorsMolecule } from "@/features/project/state/molecules/errors";
 import { ProjectScope } from "@/features/project/state/scopes";
+import { ORIGIN_TIMELINE_POINT_ID } from "@/shared/constants";
 
 const CONTENT_CREATE_SIBLING_ANCHOR = actionAnchorId("content", "create-sibling");
 const AUX_CREATE_DIR_ANCHOR = actionAnchorId("aux", "create-dir");
@@ -241,8 +242,10 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
                       onCreateChildFile={actions.handleAuxCreateChildFile}
                       onRename={actions.handleAuxRename}
                       onDelete={actions.handleAuxDelete}
+                      onRestore={actions.handleAuxRestore}
                       isBusy={auxBusy}
                       isRefreshing={auxRefreshing}
+                      showTimelineChanges={activeTimelinePointId !== ORIGIN_TIMELINE_POINT_ID}
                     />
                   ),
                 },

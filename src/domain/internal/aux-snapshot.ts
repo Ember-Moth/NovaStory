@@ -219,12 +219,129 @@ export function listChildrenFromSnapshot(
     .sort((left, right) => (left.name ?? "").localeCompare(right.name ?? ""));
 }
 
+export function collectChangedAuxNodeIds(
+  executor: DatabaseExecutor,
+  workspaceId: string,
+  snapshot: Map<string, ResolvedAuxSnapshotNode>,
+  timelinePointId: string | null,
+) {
+  const changedIds = new Set<string>();
+  if (!timelinePointId) {
+    return changedIds;
+  }
+
+  const layers = executor
+    .select({ auxNodeId: schema.auxNodeLayers.auxNodeId })
+    .from(schema.auxNodeLayers)
+    .where(
+      and(
+        eq(schema.auxNodeLayers.workspaceId, workspaceId),
+        eq(schema.auxNodeLayers.timelinePointId, timelinePointId),
+      ),
+    )
+    .all();
+
+  for (const layer of layers) {
+    if (snapshot.has(layer.auxNodeId)) {
+      changedIds.add(layer.auxNodeId);
+    }
+  }
+
+  return changedIds;
+}
+
+export function collectDeletedAuxNodeIds(
+  executor: DatabaseExecutor,
+  workspaceId: string,
+  timelinePointId: string | null,
+) {
+  const deletedIds = new Set<string>();
+  if (!timelinePointId) {
+    return deletedIds;
+  }
+
+  const layers = executor
+    .select({ auxNodeId: schema.auxNodeLayers.auxNodeId })
+    .from(schema.auxNodeLayers)
+    .where(
+      and(
+        eq(schema.auxNodeLayers.workspaceId, workspaceId),
+        eq(schema.auxNodeLayers.timelinePointId, timelinePointId),
+        eq(schema.auxNodeLayers.isDeleted, true),
+      ),
+    )
+    .all();
+
+  for (const layer of layers) {
+    deletedIds.add(layer.auxNodeId);
+  }
+
+  return deletedIds;
+}
+
+interface AuxNodeExportOptions {
+  previousSnapshot?: Map<string, ResolvedAuxSnapshotNode> | null;
+  deletedNodeIds?: ReadonlySet<string>;
+  forceDeleted?: boolean;
+}
+
+function listAuxExportChildren(
+  snapshot: Map<string, ResolvedAuxSnapshotNode>,
+  parentId: string,
+  options: AuxNodeExportOptions,
+  parentDeleted: boolean,
+) {
+  const previousSnapshot = options.previousSnapshot ?? null;
+  const deletedNodeIds = options.deletedNodeIds ?? new Set<string>();
+  const children: { node: ResolvedAuxSnapshotNode; isDeleted: boolean }[] = [];
+
+  if (parentDeleted) {
+    if (previousSnapshot) {
+      children.push(
+        ...listChildrenFromSnapshot(previousSnapshot, parentId).map((node) => ({
+          node,
+          isDeleted: true,
+        })),
+      );
+    }
+    return children;
+  }
+
+  children.push(
+    ...listChildrenFromSnapshot(snapshot, parentId).map((node) => ({
+      node,
+      isDeleted: false,
+    })),
+  );
+
+  if (previousSnapshot) {
+    children.push(
+      ...listChildrenFromSnapshot(previousSnapshot, parentId)
+        .filter((node) => deletedNodeIds.has(node.id) && !snapshot.has(node.id))
+        .map((node) => ({
+          node,
+          isDeleted: true,
+        })),
+    );
+  }
+
+  return children.sort((left, right) =>
+    (left.node.name ?? "").localeCompare(right.node.name ?? ""),
+  );
+}
+
 export function exportAuxNode(
   snapshot: Map<string, ResolvedAuxSnapshotNode>,
   node: ResolvedAuxSnapshotNode,
+  changedNodeIds: ReadonlySet<string> = new Set(),
+  options: AuxNodeExportOptions = {},
 ): ExportedAuxNode {
+  const isDeleted = options.forceDeleted === true;
+  const sourceSnapshot =
+    isDeleted && options.previousSnapshot ? options.previousSnapshot : snapshot;
+  const deletedNodeIds = options.deletedNodeIds ?? new Set<string>();
   const symlinkTargetPath = node.symlinkTargetAuxNodeId
-    ? (snapshot.get(node.symlinkTargetAuxNodeId)?.path ?? null)
+    ? (sourceSnapshot.get(node.symlinkTargetAuxNodeId)?.path ?? null)
     : null;
 
   return {
@@ -237,10 +354,29 @@ export function exportAuxNode(
     symlinkTargetPath,
     timelinePointId: node.timelinePointId,
     path: node.path,
-    children: listChildrenFromSnapshot(snapshot, node.id).map((child) =>
-      exportAuxNode(snapshot, child),
+    hasTimelineChange: changedNodeIds.has(node.id) || deletedNodeIds.has(node.id),
+    isDeleted,
+    children: listAuxExportChildren(snapshot, node.id, options, isDeleted).map((child) =>
+      exportAuxNode(snapshot, child.node, changedNodeIds, {
+        ...options,
+        forceDeleted: child.isDeleted,
+      }),
     ),
   };
+}
+
+export function exportAuxChildren(
+  snapshot: Map<string, ResolvedAuxSnapshotNode>,
+  parentId: string,
+  changedNodeIds: ReadonlySet<string> = new Set(),
+  options: AuxNodeExportOptions = {},
+) {
+  return listAuxExportChildren(snapshot, parentId, options, false).map((child) =>
+    exportAuxNode(snapshot, child.node, changedNodeIds, {
+      ...options,
+      forceDeleted: child.isDeleted,
+    }),
+  );
 }
 
 export function resolveAuxNodeIdFromPath(

@@ -80,6 +80,31 @@ export function EditorArea({
   }
 
   if (target === "aux" && auxNode) {
+    if (auxNode.isDeleted) {
+      const title =
+        auxNode.nodeType === "symlink" && auxNode.symlinkTargetPath
+          ? `${auxNode.path} → ${auxNode.symlinkTargetPath}`
+          : auxNode.path;
+
+      return (
+        <div className="flex h-full flex-col">
+          <div className="flex shrink-0 items-center gap-2 border-b border-border bg-title-bar-background px-4 py-2">
+            <AuxNodeIcon nodeType={auxNode.nodeType} />
+            <span className="truncate text-[14px] text-red-300">{title}</span>
+            <span className="ml-auto shrink-0 text-[11px] text-accent-foreground">
+              时间点: {timelineLabel}
+            </span>
+            {auxRefreshing ? (
+              <span className="shrink-0 text-[11px] text-foreground-muted">刷新中...</span>
+            ) : null}
+          </div>
+          <div className="flex flex-1 items-center justify-center px-4 text-sm text-foreground-muted">
+            该辅助信息已在当前时间点删除，需要恢复后才可以编辑
+          </div>
+        </div>
+      );
+    }
+
     if (auxNode.nodeType === "file") {
       return (
         <div className="flex h-full flex-col">

@@ -63,6 +63,8 @@ test("buildAuxTreeState filters unsupported nodes and builds aux indexes", () =>
       content: null,
       path: "/dir",
       symlinkTargetPath: null,
+      hasTimelineChange: false,
+      isDeleted: false,
       children: [
         {
           id: "file",
@@ -71,6 +73,8 @@ test("buildAuxTreeState filters unsupported nodes and builds aux indexes", () =>
           content: null,
           path: "/dir/notes.md",
           symlinkTargetPath: null,
+          hasTimelineChange: true,
+          isDeleted: true,
           children: [],
         },
       ],
@@ -82,6 +86,8 @@ test("buildAuxTreeState filters unsupported nodes and builds aux indexes", () =>
       content: null,
       path: "/ignored",
       symlinkTargetPath: null,
+      hasTimelineChange: true,
+      isDeleted: false,
       children: [
         {
           id: "ignored-child",
@@ -90,6 +96,8 @@ test("buildAuxTreeState filters unsupported nodes and builds aux indexes", () =>
           content: "ignored",
           path: "/ignored/still-ignored.md",
           symlinkTargetPath: null,
+          hasTimelineChange: true,
+          isDeleted: false,
           children: [],
         },
       ],
@@ -100,6 +108,9 @@ test("buildAuxTreeState filters unsupported nodes and builds aux indexes", () =>
   expect(state.tree[0]?.name).toBe("(未命名)");
   expect(state.tree[0]?.children.map((node) => node.id)).toEqual(["file"]);
   expect(state.nodeMap.get("file")?.content).toBe("");
+  expect(state.tree[0]?.hasTimelineChange).toBe(false);
+  expect(state.nodeMap.get("file")?.hasTimelineChange).toBe(true);
+  expect(state.nodeMap.get("file")?.isDeleted).toBe(true);
   expect(state.parentMap.get("dir")).toBeNull();
   expect(state.parentMap.get("file")).toBe("dir");
   expect([...state.idSet]).toEqual(["dir", "file"]);

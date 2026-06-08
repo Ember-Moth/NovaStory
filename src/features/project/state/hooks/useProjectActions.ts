@@ -96,6 +96,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
       writeFileAux,
       moveAux,
       deleteAux,
+      restoreAux,
     },
     selection: { activeContentNode },
   } = workspace;
@@ -1023,6 +1024,32 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
     ],
   );
 
+  const handleAuxRestore = useCallback(
+    async (nodeId: string, anchorId: string) => {
+      if (!workspaceId || !activeTimelinePointId) {
+        return;
+      }
+
+      clearActionError(setAuxError);
+
+      try {
+        await restoreAux.mutate({
+          workspaceId,
+          timelinePointId: activeTimelinePointId,
+          nodeId,
+        });
+        clearAuxNodeLocalState(new Set([nodeId]));
+      } catch (error) {
+        setActionError(
+          setAuxError,
+          error instanceof Error ? error.message : "恢复辅助节点失败，请稍后重试。",
+          anchorId,
+        );
+      }
+    },
+    [activeTimelinePointId, clearAuxNodeLocalState, restoreAux, setAuxError, workspaceId],
+  );
+
   const handleTimelineDelete = useCallback(
     async (pointId: string, anchorId: string) => {
       if (!workspaceId || pointId === ORIGIN_TIMELINE_POINT_ID) {
@@ -1154,6 +1181,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
     handleAuxCreateChildFile,
     handleAuxRename,
     handleAuxDelete,
+    handleAuxRestore,
     setActiveAuxNodeId,
     setActiveTimelinePointId,
   };
