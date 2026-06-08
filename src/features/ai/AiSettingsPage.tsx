@@ -979,6 +979,7 @@ export function AiSettingsPage() {
     AiConnectionCustomModelRow | undefined
   >();
   const [customModelConnection, setCustomModelConnection] = useState<AiConnectionRow | undefined>();
+  const [providerFilter, setProviderFilter] = useState("");
 
   const allProviders = catalogProviders ?? [];
   const allConnections = connections ?? [];
@@ -1193,6 +1194,13 @@ export function AiSettingsPage() {
                 <p className="text-xs text-foreground-muted">
                   来自 models.dev 的目录快照。支持接入的 provider 可以直接创建 registry 连接。
                 </p>
+                <input
+                  type="text"
+                  value={providerFilter}
+                  onChange={(e) => setProviderFilter(e.target.value)}
+                  placeholder="筛选 Provider..."
+                  className="mt-2 w-full rounded-md border border-border bg-editor-background px-3 py-1.5 text-sm outline-none placeholder:text-foreground-muted/50 focus:border-accent-foreground"
+                />
               </div>
 
               <OverlayScrollbar variant="card">
@@ -1202,9 +1210,15 @@ export function AiSettingsPage() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {allProviders.map((provider) => (
-                      <CatalogProviderCard key={provider.id} provider={provider} />
-                    ))}
+                    {allProviders
+                      .filter((p) =>
+                        providerFilter
+                          ? p.name.toLowerCase().includes(providerFilter.toLowerCase())
+                          : true,
+                      )
+                      .map((provider) => (
+                        <CatalogProviderCard key={provider.id} provider={provider} />
+                      ))}
                   </div>
                 )}
               </OverlayScrollbar>
