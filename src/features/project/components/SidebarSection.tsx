@@ -1,6 +1,6 @@
 import { type ReactNode } from "react";
 
-import { PanelScrollArea } from "@/features/project/components/PanelScrollArea";
+import { OverlayScrollbar } from "@/features/project/components/OverlayScrollbar";
 
 export function SidebarSection({
   title,
@@ -41,7 +41,7 @@ export function SidebarSection({
           </span>
         ) : null}
       </div>
-      {!collapsed ? <PanelScrollArea>{children}</PanelScrollArea> : null}
+      {!collapsed ? <OverlayScrollbar>{children}</OverlayScrollbar> : null}
     </div>
   );
 }

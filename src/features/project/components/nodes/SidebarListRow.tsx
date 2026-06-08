@@ -2,7 +2,7 @@ import { type DragEvent, type ReactNode } from "react";
 
 import type { DragRowProps } from "./useDragReorder";
 
-export const ROW_BASE = "flex w-full items-center gap-1 h-7 pr-3 text-[13px]";
+export const ROW_BASE = "flex w-full items-center gap-1 h-7 pr-4 text-[13px]";
 export const ROW_ACTIVE = "bg-list-active-background text-foreground";
 export const ROW_INACTIVE = "text-foreground hover:bg-list-hover-background";
 
