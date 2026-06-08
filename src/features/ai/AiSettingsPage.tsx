@@ -300,39 +300,42 @@ function ConnectionCard({
 
   return (
     <div className="overflow-hidden rounded-md border border-border bg-sidebar-background">
-      <button
-        type="button"
-        onClick={() => setExpanded((value) => !value)}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-list-hover-background"
-      >
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="truncate text-sm font-semibold text-foreground">
-              {connection.name}
-            </span>
-            <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-foreground-muted">
-              {connection.kind === "registry" ? "Registry" : "Custom"}
-            </span>
-            {!connection.isEnabled ? (
-              <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-foreground-muted">
-                已禁用
+      <div className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-list-hover-background">
+        <button
+          type="button"
+          onClick={() => setExpanded((value) => !value)}
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+          aria-expanded={expanded}
+        >
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="truncate text-sm font-semibold text-foreground">
+                {connection.name}
               </span>
-            ) : null}
+              <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-foreground-muted">
+                {connection.kind === "registry" ? "Registry" : "Custom"}
+              </span>
+              {!connection.isEnabled ? (
+                <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-foreground-muted">
+                  已禁用
+                </span>
+              ) : null}
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-foreground-muted">
+              <span className="font-mono">{connection.sdkPackage}</span>
+              {providerName ? <span>来源 {providerName}</span> : null}
+              <span>{maskApiKey(connection.apiKey)}</span>
+            </div>
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-foreground-muted">
-            <span className="font-mono">{connection.sdkPackage}</span>
-            {providerName ? <span>来源 {providerName}</span> : null}
-            <span>{maskApiKey(connection.apiKey)}</span>
-          </div>
-        </div>
+          <span
+            className={`text-xl text-foreground-muted ${expanded ? "icon-[material-symbols--keyboard-arrow-up]" : "icon-[material-symbols--keyboard-arrow-down]"}`}
+          />
+        </button>
 
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onEdit(connection);
-            }}
+            onClick={() => onEdit(connection)}
             className="rounded p-1 text-foreground-muted transition hover:bg-button-hover-background hover:text-foreground"
             title="编辑连接"
           >
@@ -340,20 +343,14 @@ function ConnectionCard({
           </button>
           <button
             type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onDelete(connection);
-            }}
+            onClick={() => onDelete(connection)}
             className="rounded p-1 text-foreground-muted transition hover:bg-button-hover-background hover:text-foreground"
             title="删除连接"
           >
             <span className="icon-[material-symbols--delete-outline] text-sm" />
           </button>
-          <span
-            className={`text-xl text-foreground-muted ${expanded ? "icon-[material-symbols--keyboard-arrow-up]" : "icon-[material-symbols--keyboard-arrow-down]"}`}
-          />
         </div>
-      </button>
+      </div>
 
       {expanded ? (
         <div className="border-t border-border px-4 py-3">
