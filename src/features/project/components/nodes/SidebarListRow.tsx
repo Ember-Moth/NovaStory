@@ -1,5 +1,7 @@
 import { type DragEvent, type ReactNode } from "react";
 
+import { cn } from "@/shared/cn";
+
 import type { DragRowProps } from "./useDragReorder";
 
 export const ROW_BASE = "flex w-full items-center gap-1 h-7 pr-4 text-[13px]";
@@ -73,7 +75,7 @@ export function SidebarListRow({
   return (
     <div
       data-action-anchor={anchorId}
-      className={`${ROW_BASE} ${stateClass} ${groupClass} ${interactiveClass} ${dragClass} ${className}`.trim()}
+      className={cn(ROW_BASE, stateClass, groupClass, interactiveClass, dragClass, className)}
       style={{ paddingLeft: `${rowPaddingLeft(depth)}px` }}
       onClick={onClick}
       draggable={draggable}
@@ -105,7 +107,10 @@ function RowHoverSlot({ actions, badge }: { actions?: ReactNode; badge?: ReactNo
       ) : null}
       {badge ? (
         <span
-          className={`col-start-1 row-start-1 max-w-20 self-center justify-self-end truncate text-[10px] leading-none text-accent-foreground opacity-70 transition${actions ? "group-hover:pointer-events-none group-hover:opacity-0" : ""}`}
+          className={cn(
+            "col-start-1 row-start-1 max-w-20 self-center justify-self-end truncate text-[10px] leading-none text-accent-foreground opacity-70 transition",
+            actions ? "group-hover:pointer-events-none group-hover:opacity-0" : "",
+          )}
         >
           {badge}
         </span>

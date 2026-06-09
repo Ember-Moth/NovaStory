@@ -1,6 +1,7 @@
 import { type ComponentPropsWithoutRef, type ReactNode } from "react";
 
 import { ActivityBar, type ActivityBarItem } from "@/client/components/ActivityBar";
+import { cn } from "@/shared/cn";
 
 export function AppShell({
   active,
@@ -19,11 +20,14 @@ export function AppShell({
   return (
     <div
       {...rest}
-      className={`flex h-dvh w-full overflow-hidden bg-editor-background text-foreground select-none ${className ?? ""}`.trim()}
+      className={cn(
+        "flex h-dvh w-full overflow-hidden bg-editor-background text-foreground select-none",
+        className,
+      )}
     >
       <ActivityBar active={active} />
       {sidebar}
-      <div className={`flex min-w-0 flex-1 flex-col overflow-hidden ${mainClassName ?? ""}`.trim()}>
+      <div className={cn("flex min-w-0 flex-1 flex-col overflow-hidden", mainClassName)}>
         {children}
       </div>
     </div>

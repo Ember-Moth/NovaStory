@@ -2,6 +2,7 @@ import { useAtomValue } from "jotai";
 import { useLocation } from "wouter";
 
 import { lastProjectIdAtom } from "@/client/state/lastProject";
+import { cn } from "@/shared/cn";
 
 export type ActivityBarItem = "home" | "project" | "settings";
 
@@ -26,9 +27,10 @@ function ActivityBarButton({
       title={label}
       aria-label={label}
       aria-current={active ? "page" : undefined}
-      className={`relative flex w-full items-center justify-center border-l-2 border-l-transparent py-1 transition ${
-        interactive ? "cursor-pointer hover:text-activity-bar-active-foreground" : "cursor-default"
-      }`}
+      className={cn(
+        "relative flex w-full items-center justify-center border-l-2 border-l-transparent py-1 transition",
+        interactive ? "cursor-pointer hover:text-activity-bar-active-foreground" : "cursor-default",
+      )}
     >
       {active ? (
         <div
@@ -37,9 +39,11 @@ function ActivityBarButton({
         />
       ) : null}
       <span
-        className={`${icon} text-2xl ${
-          active ? "text-activity-bar-active-foreground" : "text-activity-bar-foreground"
-        }`}
+        className={cn(
+          icon,
+          "text-2xl",
+          active ? "text-activity-bar-active-foreground" : "text-activity-bar-foreground",
+        )}
       />
     </button>
   );

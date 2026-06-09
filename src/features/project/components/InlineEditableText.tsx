@@ -8,6 +8,8 @@ import {
   useState,
 } from "react";
 
+import { cn } from "@/shared/cn";
+
 const INPUT_CLASS_NAME =
   "box-border h-5.5 min-w-0 flex-1 rounded border border-border bg-editor-background px-1.5 text-[13px] leading-5.5 text-foreground outline-none select-text focus:border-accent-foreground";
 
@@ -182,14 +184,14 @@ export function InlineEditableText({
         inputRef={inputRef}
         inputProps={inputProps}
         placeholder={placeholder}
-        className={className ? `${INPUT_CLASS_NAME} ${className}` : INPUT_CLASS_NAME}
+        className={cn(INPUT_CLASS_NAME, className)}
       />
     );
   }
 
   return (
     <span
-      className={className ? `${DISPLAY_CLASS_NAME} ${className}` : DISPLAY_CLASS_NAME}
+      className={cn(DISPLAY_CLASS_NAME, className)}
       onDoubleClick={(event) => {
         if (!editable || disabled) {
           return;
