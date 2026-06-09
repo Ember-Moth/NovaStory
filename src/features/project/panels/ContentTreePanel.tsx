@@ -381,20 +381,29 @@ export function ContentTreePanel({
       const targetElement = panelElement?.querySelector(
         `[data-content-tree-row-id="${CSS.escape(dropIntent.targetId)}"]`,
       );
+      const tailId = visibleSubtreeTailMap.get(dropIntent.targetId) ?? dropIntent.targetId;
+      const tailElement = panelElement?.querySelector(
+        `[data-content-tree-row-id="${CSS.escape(tailId)}"]`,
+      );
 
-      if (!panelElement || !(targetElement instanceof HTMLElement)) {
+      if (
+        !panelElement ||
+        !(targetElement instanceof HTMLElement) ||
+        !(tailElement instanceof HTMLElement)
+      ) {
         setDropIndicatorRect(null);
         return;
       }
 
       const panelRect = panelElement.getBoundingClientRect();
       const targetRect = targetElement.getBoundingClientRect();
+      const tailRect = tailElement.getBoundingClientRect();
       setDropIndicatorRect({
         mode: "inside",
         top: targetRect.top - panelRect.top,
         left: Math.max(targetRect.left - panelRect.left, 0),
         width: Math.max(targetRect.width, 24),
-        height: targetRect.height,
+        height: Math.max(tailRect.bottom - targetRect.top, targetRect.height),
       });
       return;
     }
@@ -431,7 +440,7 @@ export function ContentTreePanel({
       left,
       width,
     });
-  }, [boundaryDrop, dropIntent]);
+  }, [boundaryDrop, dropIntent, visibleSubtreeTailMap]);
 
   if (tree.length === 0) {
     return (
