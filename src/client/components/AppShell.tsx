@@ -19,7 +19,7 @@ export function AppShell({
   return (
     <div
       {...rest}
-      className={`bg-editor-background text-foreground flex h-dvh w-full overflow-hidden select-none ${className ?? ""}`.trim()}
+      className={`flex h-dvh w-full overflow-hidden bg-editor-background text-foreground select-none ${className ?? ""}`.trim()}
     >
       <ActivityBar active={active} />
       {sidebar}
