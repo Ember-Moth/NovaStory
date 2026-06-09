@@ -256,7 +256,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
                       icon="icon-[material-symbols--add]"
                       title="添加时间点"
                       onClick={() => actions.handleTimelineAdd(TIMELINE_ADD_ANCHOR)}
-                      disabled={timelinePending || contentBusy || !activeTimelinePointId}
+                      disabled={timelinePending || !activeTimelinePointId}
                       anchorId={TIMELINE_ADD_ANCHOR}
                     />
                   ),
@@ -273,8 +273,8 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
                             : null
                         }
                         canSetAnchor={editorTarget === "content" && !!activeContentNode}
-                        isBusy={timelineBusy || contentBusy}
-                        isPending={timelinePending || contentBusy}
+                        isBusy={timelineBusy}
+                        isPending={timelinePending}
                         onSelect={actions.handleTimelineSelect}
                         onSetAnchor={actions.handleContentAnchorSet}
                         onReorder={actions.handleTimelineReorder}
