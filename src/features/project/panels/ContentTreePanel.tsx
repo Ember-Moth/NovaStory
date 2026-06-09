@@ -32,6 +32,9 @@ const CONTENT_ROW_SELECTOR = "[data-content-tree-row-id]";
 const DRAG_START_DISTANCE = 4;
 
 type ContentDropIntent = ContentMoveIntent;
+type ContentBoundaryIntent = ContentMoveIntent & {
+  position: Exclude<ContentDropPosition, "inside">;
+};
 type ContentBoundaryDrop = {
   type: "boundary";
   parentId: string | null;
@@ -58,6 +61,10 @@ function dropPositionFromPointer(clientY: number, row: HTMLElement): ContentDrop
     return "after";
   }
   return "inside";
+}
+
+function isBoundaryDropIntent(intent: ContentDropIntent | null): intent is ContentBoundaryIntent {
+  return intent !== null && intent.position !== "inside";
 }
 
 function ContentTreeNodeRow({
@@ -298,12 +305,22 @@ export function ContentTreePanel({
     () => buildVisiblePreviousRowMap(tree, expandedIds),
     [expandedIds, tree],
   );
+  const visibleSubtreeTailMap = useMemo(
+    () => buildVisibleSubtreeTailMap(tree, expandedIds),
+    [expandedIds, tree],
+  );
   const boundaryDrop = useMemo(
     () =>
-      dropIntent && dropIntent.position !== "inside"
-        ? resolveBoundaryDrop(dropIntent, panelParentMap, panelDepthMap, visiblePreviousRowMap)
+      isBoundaryDropIntent(dropIntent)
+        ? resolveBoundaryDrop(
+            dropIntent,
+            panelParentMap,
+            panelDepthMap,
+            visiblePreviousRowMap,
+            visibleSubtreeTailMap,
+          )
         : null,
-    [dropIntent, panelDepthMap, panelParentMap, visiblePreviousRowMap],
+    [dropIntent, panelDepthMap, panelParentMap, visiblePreviousRowMap, visibleSubtreeTailMap],
   );
 
   useLayoutEffect(() => {
@@ -354,7 +371,7 @@ export function ContentTreePanel({
     const row = source?.closest(CONTENT_ROW_SELECTOR);
 
     if (!(row instanceof HTMLElement)) {
-      return null;
+      return findBlankAreaDropIntent(nodeId, point);
     }
 
     const targetId = row.dataset.contentTreeRowId;
@@ -364,6 +381,49 @@ export function ContentTreePanel({
 
     const position = dropPositionFromPointer(point.y, row);
     const nextIntent = { nodeId, targetId, position };
+    const resolved = resolveContentMove({
+      tree,
+      parentMap: panelParentMap,
+      nodeMap: panelNodeMap,
+      contentRootId: "__content_root__",
+      ...nextIntent,
+    });
+
+    return resolved ? nextIntent : null;
+  };
+
+  const findBlankAreaDropIntent = (nodeId: string, point: { x: number; y: number }) => {
+    const panelElement = panelRef.current;
+    const lastTopLevelNode = tree.at(-1);
+    if (!panelElement || !lastTopLevelNode) {
+      return null;
+    }
+
+    const panelRect = panelElement.getBoundingClientRect();
+    if (
+      point.x < panelRect.left ||
+      point.x > panelRect.right ||
+      point.y < panelRect.top ||
+      point.y > panelRect.bottom
+    ) {
+      return null;
+    }
+
+    const visibleRows = panelElement.querySelectorAll(CONTENT_ROW_SELECTOR);
+    const lastVisibleRow = visibleRows.item(visibleRows.length - 1);
+    if (!(lastVisibleRow instanceof HTMLElement)) {
+      return null;
+    }
+
+    if (point.y < lastVisibleRow.getBoundingClientRect().bottom) {
+      return null;
+    }
+
+    const nextIntent = {
+      nodeId,
+      targetId: lastTopLevelNode.id,
+      position: "after" as const,
+    };
     const resolved = resolveContentMove({
       tree,
       parentMap: panelParentMap,
@@ -427,7 +487,7 @@ export function ContentTreePanel({
   );
 
   return (
-    <div ref={panelRef} className="relative pb-2">
+    <div ref={panelRef} className="relative min-h-full pb-2">
       <TreeNodePanel
         nodes={tree}
         expandedIds={expandedIds}
@@ -442,20 +502,22 @@ export function ContentTreePanel({
 }
 
 function resolveBoundaryDrop(
-  intent: ContentMoveIntent & { position: Exclude<ContentDropPosition, "inside"> },
+  intent: ContentBoundaryIntent,
   parentMap: ReadonlyMap<string, string | null>,
   depthMap: ReadonlyMap<string, number>,
   previousRowMap: ReadonlyMap<string, string | null>,
+  subtreeTailMap: ReadonlyMap<string, string>,
 ): ContentBoundaryDrop {
   const parentId = parentMap.get(intent.targetId) ?? null;
   const previousRowId = previousRowMap.get(intent.targetId) ?? null;
   const afterSiblingId = intent.position === "before" ? previousRowId : intent.targetId;
   const targetDepth = depthMap.get(intent.targetId) ?? 0;
+  const afterAnchorId = subtreeTailMap.get(intent.targetId) ?? intent.targetId;
   return {
     type: "boundary",
     parentId,
     afterSiblingId,
-    anchorId: intent.position === "before" ? (previousRowId ?? intent.targetId) : intent.targetId,
+    anchorId: intent.position === "before" ? (previousRowId ?? intent.targetId) : afterAnchorId,
     depth: targetDepth,
     position: intent.position,
   };
@@ -515,4 +577,28 @@ function buildVisiblePreviousRowMap(nodes: ContentTreeNodeVM[], expandedIds: Rea
 
   walk(nodes);
   return map;
+}
+
+function buildVisibleSubtreeTailMap(nodes: ContentTreeNodeVM[], expandedIds: ReadonlySet<string>) {
+  const map = new Map<string, string>();
+
+  const walk = (visibleNodes: ContentTreeNodeVM[]) => {
+    for (const node of visibleNodes) {
+      map.set(node.id, findVisibleSubtreeTailId(node, expandedIds));
+      if (expandedIds.has(node.id)) {
+        walk(node.children);
+      }
+    }
+  };
+
+  walk(nodes);
+  return map;
+}
+
+function findVisibleSubtreeTailId(node: ContentTreeNodeVM, expandedIds: ReadonlySet<string>) {
+  if (!expandedIds.has(node.id) || node.children.length === 0) {
+    return node.id;
+  }
+
+  return findVisibleSubtreeTailId(node.children[node.children.length - 1]!, expandedIds);
 }
