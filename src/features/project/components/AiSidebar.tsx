@@ -17,6 +17,7 @@ import {
 } from "@floating-ui/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { OverlayScrollbar } from "@/features/project/components/OverlayScrollbar";
 import { rpc } from "@/server/rpc/client";
 
 type ConnectionModelGroup = NonNullable<
@@ -181,7 +182,7 @@ function ModelPicker({
             : triggerLabel
         }
         aria-label="选择连接和模型"
-        className="grid h-12 min-w-0 max-w-full flex-1 grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-2 items-center gap-x-2 rounded border border-transparent px-1.5 py-1 text-left outline-none transition hover:border-border hover:bg-list-hover-background focus:border-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+        className="grid h-11 min-w-0 max-w-full flex-1 grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-2 items-center gap-x-2 rounded border border-transparent px-1.5 py-1 text-left outline-none transition hover:border-border hover:bg-list-hover-background focus:border-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
         {...getReferenceProps()}
       >
         <span className="icon-[material-symbols--token] col-start-1 row-span-2 row-start-1 shrink-0 text-base text-accent-foreground" />
@@ -202,40 +203,42 @@ function ModelPicker({
             <div
               ref={setFloating}
               style={floatingStyles}
-              className="z-50 overflow-y-auto border border-border bg-sidebar-background py-1 text-[12px] text-foreground shadow-[0_6px_18px_rgb(0_0_0_/_0.35)] outline-none"
+              className="z-50 flex min-h-0 flex-col overflow-hidden border border-border bg-sidebar-background text-[12px] text-foreground shadow-[0_6px_18px_rgb(0_0_0/0.35)] outline-none"
               {...getFloatingProps()}
             >
-              <FloatingList elementsRef={listRef} labelsRef={labelsRef}>
-                {loadingEmpty ? (
-                  <div className="px-2 py-2 text-foreground-muted">加载连接和模型中...</div>
-                ) : selectableOptions.length === 0 ? (
-                  <div className="px-2 py-2 text-foreground-muted">没有可用连接模型</div>
-                ) : (
-                  groupedOptions.map((group) =>
-                    group.models.length > 0 ? (
-                      <div key={group.connection.id}>
-                        <div className="sticky top-0 z-10 border-y border-border bg-sidebar-background px-2 py-1 text-[11px] font-medium text-foreground-muted first:border-t-0">
-                          {group.connection.name}
+              <OverlayScrollbar variant="panel">
+                <FloatingList elementsRef={listRef} labelsRef={labelsRef}>
+                  {loadingEmpty ? (
+                    <div className="px-2 py-2 text-foreground-muted">加载连接和模型中...</div>
+                  ) : selectableOptions.length === 0 ? (
+                    <div className="px-2 py-2 text-foreground-muted">没有可用连接模型</div>
+                  ) : (
+                    groupedOptions.map((group) =>
+                      group.models.length > 0 ? (
+                        <div key={group.connection.id}>
+                          <div className="sticky top-0 z-10 border-y border-border bg-sidebar-background px-2 py-1 text-[11px] font-medium text-foreground-muted first:border-t-0">
+                            {group.connection.name}
+                          </div>
+                          {group.models.map(({ model, optionIndex }) => (
+                            <ModelOption
+                              key={`${group.connection.id}:${model.id}`}
+                              connection={group.connection}
+                              model={model}
+                              selected={
+                                group.connection.id === selectedConnectionId &&
+                                model.id === selectedModelId
+                              }
+                              active={activeIndex === optionIndex}
+                              getItemProps={getItemProps}
+                              onSelect={selectModel}
+                            />
+                          ))}
                         </div>
-                        {group.models.map(({ model, optionIndex }) => (
-                          <ModelOption
-                            key={`${group.connection.id}:${model.id}`}
-                            connection={group.connection}
-                            model={model}
-                            selected={
-                              group.connection.id === selectedConnectionId &&
-                              model.id === selectedModelId
-                            }
-                            active={activeIndex === optionIndex}
-                            getItemProps={getItemProps}
-                            onSelect={selectModel}
-                          />
-                        ))}
-                      </div>
-                    ) : null,
-                  )
-                )}
-              </FloatingList>
+                      ) : null,
+                    )
+                  )}
+                </FloatingList>
+              </OverlayScrollbar>
             </div>
           </FloatingFocusManager>
         </FloatingPortal>
@@ -271,7 +274,7 @@ function ModelOption({
       role="option"
       aria-selected={selected}
       tabIndex={active ? 0 : -1}
-      className={`flex w-full items-start gap-2 border-l-2 px-2 py-1.5 text-left outline-none ${
+      className={`flex w-full items-start gap-2 border-l-2 py-1.5 pl-2 pr-6 text-left outline-none ${
         active ? "bg-list-hover-background" : "bg-transparent"
       } ${
         selected
