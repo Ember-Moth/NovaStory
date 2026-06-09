@@ -1,4 +1,5 @@
 import { type ReactNode } from "react";
+import { AnimatePresence, motion } from "motion/react";
 
 export interface TreeRowContext<T> {
   node: T;
@@ -25,32 +26,45 @@ export function TreeNodePanel<T>({
   getChildren: (_node: T) => T[];
   renderRow: (_ctx: TreeRowContext<T>) => ReactNode;
 }) {
-  return (
-    <>
-      {nodes.map((node) => {
-        const id = getId(node);
-        const children = getChildren(node);
-        const hasChildren = children.length > 0;
-        const isExpanded = expandedIds.has(id);
-        const isActive = activeId === id;
+  const rows = nodes.map((node) => {
+    const id = getId(node);
+    const children = getChildren(node);
+    const hasChildren = children.length > 0;
+    const isExpanded = expandedIds.has(id);
+    const isActive = activeId === id;
+    const content = (
+      <>
+        {renderRow({ node, depth, hasChildren, isExpanded, isActive })}
+        {hasChildren && isExpanded ? (
+          <TreeNodePanel
+            nodes={children}
+            depth={depth + 1}
+            expandedIds={expandedIds}
+            activeId={activeId}
+            getId={getId}
+            getChildren={getChildren}
+            renderRow={renderRow}
+          />
+        ) : null}
+      </>
+    );
 
-        return (
-          <div key={id}>
-            {renderRow({ node, depth, hasChildren, isExpanded, isActive })}
-            {hasChildren && isExpanded ? (
-              <TreeNodePanel
-                nodes={children}
-                depth={depth + 1}
-                expandedIds={expandedIds}
-                activeId={activeId}
-                getId={getId}
-                getChildren={getChildren}
-                renderRow={renderRow}
-              />
-            ) : null}
-          </div>
-        );
-      })}
-    </>
+    return (
+      <motion.div
+        key={id}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.14, ease: "easeOut" }}
+      >
+        {content}
+      </motion.div>
+    );
+  });
+
+  return (
+    <AnimatePresence initial={false} mode="popLayout">
+      {rows}
+    </AnimatePresence>
   );
 }
