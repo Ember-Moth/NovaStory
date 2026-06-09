@@ -1,4 +1,4 @@
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import {
   type PointerEvent as ReactPointerEvent,
   useLayoutEffect,
@@ -45,10 +45,21 @@ type ContentBoundaryDrop = {
 };
 
 type BoundaryIndicatorRect = {
+  mode: "boundary";
   top: number;
   left: number;
   width: number;
 };
+
+type InsideIndicatorRect = {
+  mode: "inside";
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+};
+
+type DropIndicatorRect = BoundaryIndicatorRect | InsideIndicatorRect;
 
 function dropPositionFromPointer(clientY: number, row: HTMLElement): ContentDropPosition {
   const rect = row.getBoundingClientRect();
@@ -81,7 +92,6 @@ function ContentTreeNodeRow({
   onDragStart,
   onDragMove,
   onDragEnd,
-  isInsideDropTarget,
   isDragging,
   isDragDisabled,
   timelineLabelMap,
@@ -101,7 +111,6 @@ function ContentTreeNodeRow({
   onDragStart: (_nodeId: string) => void;
   onDragMove: (_nodeId: string, _point: { x: number; y: number }) => void;
   onDragEnd: (_nodeId: string, _point: { x: number; y: number }) => void;
-  isInsideDropTarget: boolean;
   isDragging: boolean;
   isDragDisabled: boolean;
   timelineLabelMap: ReadonlyMap<string, string>;
@@ -184,7 +193,6 @@ function ContentTreeNodeRow({
       data-content-tree-row-id={node.id}
       className={cn(
         "relative list-none",
-        isInsideDropTarget ? "bg-list-hover-background" : "",
         isDragging ? "pointer-events-none z-10 opacity-75 shadow-sm" : "",
       )}
       layout="position"
@@ -195,7 +203,6 @@ function ContentTreeNodeRow({
         isActive={isActive}
         group
         anchorId={rowAnchorId}
-        className={isInsideDropTarget ? "outline-1 -outline-offset-1 outline-drag-border" : ""}
         onClick={() => {
           onSelect(node);
           if (hasChildren && !isExpanded) {
@@ -252,15 +259,62 @@ function ContentTreeNodeRow({
   );
 }
 
-function BoundaryDropIndicator({ rect }: { rect: BoundaryIndicatorRect }) {
+function DropIndicatorOverlay({ rect }: { rect: DropIndicatorRect }) {
+  const isInside = rect.mode === "inside";
+  const top = isInside ? rect.top : rect.top - 6;
+  const height = isInside ? rect.height : 12;
+
   return (
-    <span
-      className="pointer-events-none absolute z-30 flex h-3 -translate-y-1/2 items-center"
-      style={{ top: rect.top, left: rect.left, width: rect.width }}
+    <motion.span
+      className="pointer-events-none absolute z-30 block"
+      initial={{ opacity: 0, scale: 0.96 }}
+      animate={{
+        opacity: 1,
+        scale: 1,
+        top,
+        left: rect.left,
+        width: rect.width,
+        height,
+      }}
+      exit={{
+        opacity: 0,
+        scale: 0.96,
+        top,
+        left: rect.left,
+        width: rect.width,
+        height,
+      }}
+      transition={{ duration: 0.14, ease: "easeOut" }}
+      style={{
+        top,
+        left: rect.left,
+        width: rect.width,
+        height,
+        originX: 0,
+        originY: 0.5,
+      }}
     >
-      <span className="size-1.5 shrink-0 rounded-full bg-drag-border" />
-      <span className="h-0.5 min-w-0 flex-1 rounded-full bg-drag-border" />
-    </span>
+      <motion.span
+        className="absolute rounded border border-drag-border bg-list-hover-background/40"
+        animate={{
+          inset: isInside ? 0 : "5px 0 5px 0",
+          borderRadius: isInside ? 0 : 999,
+          opacity: isInside ? 1 : 0,
+        }}
+        transition={{ duration: 0.14, ease: "easeOut" }}
+      />
+      <motion.span
+        className="absolute top-1/2 left-0 size-1.5 -translate-y-1/2 rounded-full bg-drag-border"
+        animate={{ opacity: isInside ? 0 : 1, scale: isInside ? 0.7 : 1 }}
+        transition={{ duration: 0.12, ease: "easeOut" }}
+      />
+      <motion.span
+        className="absolute top-1/2 right-0 left-1.5 h-0.5 -translate-y-1/2 rounded-full bg-drag-border"
+        animate={{ opacity: isInside ? 0 : 1, scaleX: isInside ? 0.96 : 1 }}
+        transition={{ duration: 0.12, ease: "easeOut" }}
+        style={{ originX: 0 }}
+      />
+    </motion.span>
   );
 }
 
@@ -293,9 +347,7 @@ export function ContentTreePanel({
 }) {
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropIntent, setDropIntent] = useState<ContentDropIntent | null>(null);
-  const [boundaryIndicatorRect, setBoundaryIndicatorRect] = useState<BoundaryIndicatorRect | null>(
-    null,
-  );
+  const [dropIndicatorRect, setDropIndicatorRect] = useState<DropIndicatorRect | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const subtreeIdsRef = useRef<Set<string>>(new Set());
   const panelNodeMap = useMemo(() => buildPanelNodeMap(tree), [tree]);
@@ -324,8 +376,31 @@ export function ContentTreePanel({
   );
 
   useLayoutEffect(() => {
+    if (dropIntent?.position === "inside") {
+      const panelElement = panelRef.current;
+      const targetElement = panelElement?.querySelector(
+        `[data-content-tree-row-id="${CSS.escape(dropIntent.targetId)}"]`,
+      );
+
+      if (!panelElement || !(targetElement instanceof HTMLElement)) {
+        setDropIndicatorRect(null);
+        return;
+      }
+
+      const panelRect = panelElement.getBoundingClientRect();
+      const targetRect = targetElement.getBoundingClientRect();
+      setDropIndicatorRect({
+        mode: "inside",
+        top: targetRect.top - panelRect.top,
+        left: Math.max(targetRect.left - panelRect.left, 0),
+        width: Math.max(targetRect.width, 24),
+        height: targetRect.height,
+      });
+      return;
+    }
+
     if (!boundaryDrop) {
-      setBoundaryIndicatorRect(null);
+      setDropIndicatorRect(null);
       return;
     }
 
@@ -335,7 +410,7 @@ export function ContentTreePanel({
     );
 
     if (!panelElement || !(anchorElement instanceof HTMLElement)) {
-      setBoundaryIndicatorRect(null);
+      setDropIndicatorRect(null);
       return;
     }
 
@@ -350,12 +425,13 @@ export function ContentTreePanel({
     const rightInset = 12;
     const width = Math.max(panelRect.width - left - rightInset, 24);
 
-    setBoundaryIndicatorRect({
+    setDropIndicatorRect({
+      mode: "boundary",
       top: clampedTop,
       left,
       width,
     });
-  }, [boundaryDrop]);
+  }, [boundaryDrop, dropIntent]);
 
   if (tree.length === 0) {
     return (
@@ -450,7 +526,7 @@ export function ContentTreePanel({
     const finalIntent = findDropIntent(nodeId, point) ?? dropIntent;
     setDraggedId(null);
     setDropIntent(null);
-    setBoundaryIndicatorRect(null);
+    setDropIndicatorRect(null);
     subtreeIdsRef.current = new Set();
 
     if (finalIntent) {
@@ -473,11 +549,6 @@ export function ContentTreePanel({
       onDragStart={handleDragStart}
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
-      isInsideDropTarget={
-        dropIntent?.targetId === ctx.node.id &&
-        dropIntent.nodeId !== ctx.node.id &&
-        dropIntent.position === "inside"
-      }
       isDragging={draggedId === ctx.node.id}
       isDragDisabled={isBusy}
       timelineLabelMap={timelineLabelMap}
@@ -496,7 +567,11 @@ export function ContentTreePanel({
         getChildren={(node) => node.children}
         renderRow={renderRow}
       />
-      {boundaryIndicatorRect ? <BoundaryDropIndicator rect={boundaryIndicatorRect} /> : null}
+      <AnimatePresence>
+        {dropIndicatorRect ? (
+          <DropIndicatorOverlay key="content-drop-indicator" rect={dropIndicatorRect} />
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }
