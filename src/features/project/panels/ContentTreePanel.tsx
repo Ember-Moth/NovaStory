@@ -1,5 +1,11 @@
 import { motion } from "motion/react";
-import { type PointerEvent as ReactPointerEvent, useMemo, useRef, useState } from "react";
+import {
+  type PointerEvent as ReactPointerEvent,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { ContentNodeIcon } from "@/features/project/components/icons";
 import { InlineEditableText } from "@/features/project/components/InlineEditableText";
@@ -8,6 +14,7 @@ import {
   RowActionButton,
   SidebarListRow,
   TreeNodePanel,
+  rowPaddingLeft,
   type TreeRowContext,
 } from "@/features/project/components/nodes";
 import { PanelPlaceholder } from "@/features/project/components/PanelPlaceholder";
@@ -25,6 +32,20 @@ const CONTENT_ROW_SELECTOR = "[data-content-tree-row-id]";
 const DRAG_START_DISTANCE = 4;
 
 type ContentDropIntent = ContentMoveIntent;
+type ContentBoundaryDrop = {
+  type: "boundary";
+  parentId: string | null;
+  afterSiblingId: string | null;
+  anchorId: string;
+  depth: number;
+  position: Exclude<ContentDropPosition, "inside">;
+};
+
+type BoundaryIndicatorRect = {
+  top: number;
+  left: number;
+  width: number;
+};
 
 function dropPositionFromPointer(clientY: number, row: HTMLElement): ContentDropPosition {
   const rect = row.getBoundingClientRect();
@@ -53,7 +74,7 @@ function ContentTreeNodeRow({
   onDragStart,
   onDragMove,
   onDragEnd,
-  dropPosition,
+  isInsideDropTarget,
   isDragging,
   isDragDisabled,
   timelineLabelMap,
@@ -73,7 +94,7 @@ function ContentTreeNodeRow({
   onDragStart: (_nodeId: string) => void;
   onDragMove: (_nodeId: string, _point: { x: number; y: number }) => void;
   onDragEnd: (_nodeId: string, _point: { x: number; y: number }) => void;
-  dropPosition: ContentDropPosition | null;
+  isInsideDropTarget: boolean;
   isDragging: boolean;
   isDragDisabled: boolean;
   timelineLabelMap: ReadonlyMap<string, string>;
@@ -156,21 +177,18 @@ function ContentTreeNodeRow({
       data-content-tree-row-id={node.id}
       className={cn(
         "relative list-none",
-        dropPosition === "inside" ? "bg-list-hover-background" : "",
+        isInsideDropTarget ? "bg-list-hover-background" : "",
         isDragging ? "pointer-events-none z-10 opacity-75 shadow-sm" : "",
       )}
       layout="position"
     >
-      {dropPosition === "before" ? <DropLine placement="top" /> : null}
       <SidebarListRow
         dataNodeId={node.id}
         depth={depth}
         isActive={isActive}
         group
         anchorId={rowAnchorId}
-        className={
-          dropPosition === "inside" ? "outline-1 -outline-offset-1 outline-drag-border" : ""
-        }
+        className={isInsideDropTarget ? "outline-1 -outline-offset-1 outline-drag-border" : ""}
         onClick={() => {
           onSelect(node);
           if (hasChildren && !isExpanded) {
@@ -223,19 +241,19 @@ function ContentTreeNodeRow({
           </>
         }
       />
-      {dropPosition === "after" ? <DropLine placement="bottom" /> : null}
     </motion.div>
   );
 }
 
-function DropLine({ placement }: { placement: "top" | "bottom" }) {
+function BoundaryDropIndicator({ rect }: { rect: BoundaryIndicatorRect }) {
   return (
     <span
-      className={cn(
-        "pointer-events-none absolute right-3 left-3 z-20 h-0.5 rounded-full bg-drag-border",
-        placement === "top" ? "top-0" : "bottom-0",
-      )}
-    />
+      className="pointer-events-none absolute z-30 flex h-3 -translate-y-1/2 items-center"
+      style={{ top: rect.top, left: rect.left, width: rect.width }}
+    >
+      <span className="size-1.5 shrink-0 rounded-full bg-drag-border" />
+      <span className="h-0.5 min-w-0 flex-1 rounded-full bg-drag-border" />
+    </span>
   );
 }
 
@@ -268,9 +286,59 @@ export function ContentTreePanel({
 }) {
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropIntent, setDropIntent] = useState<ContentDropIntent | null>(null);
+  const [boundaryIndicatorRect, setBoundaryIndicatorRect] = useState<BoundaryIndicatorRect | null>(
+    null,
+  );
+  const panelRef = useRef<HTMLDivElement>(null);
   const subtreeIdsRef = useRef<Set<string>>(new Set());
   const panelNodeMap = useMemo(() => buildPanelNodeMap(tree), [tree]);
   const panelParentMap = useMemo(() => buildPanelParentMap(tree), [tree]);
+  const panelDepthMap = useMemo(() => buildPanelDepthMap(tree), [tree]);
+  const visiblePreviousRowMap = useMemo(
+    () => buildVisiblePreviousRowMap(tree, expandedIds),
+    [expandedIds, tree],
+  );
+  const boundaryDrop = useMemo(
+    () =>
+      dropIntent && dropIntent.position !== "inside"
+        ? resolveBoundaryDrop(dropIntent, panelParentMap, panelDepthMap, visiblePreviousRowMap)
+        : null,
+    [dropIntent, panelDepthMap, panelParentMap, visiblePreviousRowMap],
+  );
+
+  useLayoutEffect(() => {
+    if (!boundaryDrop) {
+      setBoundaryIndicatorRect(null);
+      return;
+    }
+
+    const panelElement = panelRef.current;
+    const anchorElement = panelElement?.querySelector(
+      `[data-content-tree-row-id="${CSS.escape(boundaryDrop.anchorId)}"]`,
+    );
+
+    if (!panelElement || !(anchorElement instanceof HTMLElement)) {
+      setBoundaryIndicatorRect(null);
+      return;
+    }
+
+    const panelRect = panelElement.getBoundingClientRect();
+    const anchorRect = anchorElement.getBoundingClientRect();
+    const top =
+      boundaryDrop.afterSiblingId === null
+        ? anchorRect.top - panelRect.top
+        : anchorRect.bottom - panelRect.top;
+    const clampedTop = Math.min(Math.max(top, 1), Math.max(panelRect.height - 1, 1));
+    const left = Math.max(rowPaddingLeft(boundaryDrop.depth) + 8, 8);
+    const rightInset = 12;
+    const width = Math.max(panelRect.width - left - rightInset, 24);
+
+    setBoundaryIndicatorRect({
+      top: clampedTop,
+      left,
+      width,
+    });
+  }, [boundaryDrop]);
 
   if (tree.length === 0) {
     return (
@@ -322,6 +390,7 @@ export function ContentTreePanel({
     const finalIntent = findDropIntent(nodeId, point) ?? dropIntent;
     setDraggedId(null);
     setDropIntent(null);
+    setBoundaryIndicatorRect(null);
     subtreeIdsRef.current = new Set();
 
     if (finalIntent) {
@@ -344,10 +413,10 @@ export function ContentTreePanel({
       onDragStart={handleDragStart}
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
-      dropPosition={
-        dropIntent?.targetId === ctx.node.id && dropIntent.nodeId !== ctx.node.id
-          ? dropIntent.position
-          : null
+      isInsideDropTarget={
+        dropIntent?.targetId === ctx.node.id &&
+        dropIntent.nodeId !== ctx.node.id &&
+        dropIntent.position === "inside"
       }
       isDragging={draggedId === ctx.node.id}
       isDragDisabled={isBusy}
@@ -358,7 +427,7 @@ export function ContentTreePanel({
   );
 
   return (
-    <div className="pb-2">
+    <div ref={panelRef} className="relative pb-2">
       <TreeNodePanel
         nodes={tree}
         expandedIds={expandedIds}
@@ -367,8 +436,29 @@ export function ContentTreePanel({
         getChildren={(node) => node.children}
         renderRow={renderRow}
       />
+      {boundaryIndicatorRect ? <BoundaryDropIndicator rect={boundaryIndicatorRect} /> : null}
     </div>
   );
+}
+
+function resolveBoundaryDrop(
+  intent: ContentMoveIntent & { position: Exclude<ContentDropPosition, "inside"> },
+  parentMap: ReadonlyMap<string, string | null>,
+  depthMap: ReadonlyMap<string, number>,
+  previousRowMap: ReadonlyMap<string, string | null>,
+): ContentBoundaryDrop {
+  const parentId = parentMap.get(intent.targetId) ?? null;
+  const previousRowId = previousRowMap.get(intent.targetId) ?? null;
+  const afterSiblingId = intent.position === "before" ? previousRowId : intent.targetId;
+  const targetDepth = depthMap.get(intent.targetId) ?? 0;
+  return {
+    type: "boundary",
+    parentId,
+    afterSiblingId,
+    anchorId: intent.position === "before" ? (previousRowId ?? intent.targetId) : intent.targetId,
+    depth: targetDepth,
+    position: intent.position,
+  };
 }
 
 function buildPanelNodeMap(nodes: ContentTreeNodeVM[]) {
@@ -394,5 +484,35 @@ function buildPanelParentMap(nodes: ContentTreeNodeVM[], parentId: string | null
       map.set(childId, childParentId);
     }
   }
+  return map;
+}
+
+function buildPanelDepthMap(nodes: ContentTreeNodeVM[], depth = 0) {
+  const map = new Map<string, number>();
+  for (const node of nodes) {
+    map.set(node.id, depth);
+    for (const [childId, childDepth] of buildPanelDepthMap(node.children, depth + 1)) {
+      map.set(childId, childDepth);
+    }
+  }
+  return map;
+}
+
+function buildVisiblePreviousRowMap(nodes: ContentTreeNodeVM[], expandedIds: ReadonlySet<string>) {
+  const map = new Map<string, string | null>();
+  let previousId: string | null = null;
+
+  const walk = (visibleNodes: ContentTreeNodeVM[]) => {
+    for (const node of visibleNodes) {
+      map.set(node.id, previousId);
+      previousId = node.id;
+
+      if (expandedIds.has(node.id)) {
+        walk(node.children);
+      }
+    }
+  };
+
+  walk(nodes);
   return map;
 }
