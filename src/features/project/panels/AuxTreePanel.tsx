@@ -17,6 +17,7 @@ import type { AuxTreeNodeVM } from "@/features/project/model/types";
 function AuxTreeNodeRow({
   node,
   depth,
+  hasChildren,
   isExpanded,
   isActive,
   onToggle,
@@ -31,6 +32,7 @@ function AuxTreeNodeRow({
 }: {
   node: AuxTreeNodeVM;
   depth: number;
+  hasChildren: boolean;
   isExpanded: boolean;
   isActive: boolean;
   onToggle: (_id: string) => void;
@@ -90,10 +92,16 @@ function AuxTreeNodeRow({
         anchorId={rowAnchorId}
         onClick={() => {
           onSelect(node);
-          onToggle(node.id);
+          if (hasChildren && !isExpanded) {
+            onToggle(node.id);
+          }
         }}
         leading={
-          <ExpandToggle hasChildren expanded={isExpanded} onToggle={() => onToggle(node.id)} />
+          <ExpandToggle
+            hasChildren={hasChildren}
+            expanded={isExpanded}
+            onToggle={() => onToggle(node.id)}
+          />
         }
         icon={icon}
         label={label}
@@ -222,6 +230,7 @@ export function AuxTreePanel({
     <AuxTreeNodeRow
       node={ctx.node}
       depth={ctx.depth}
+      hasChildren={ctx.hasChildren}
       isExpanded={ctx.isExpanded}
       isActive={ctx.isActive}
       onToggle={onToggle}
