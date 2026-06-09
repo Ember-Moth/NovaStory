@@ -86,6 +86,7 @@ function AuxTreeNodeRow({
   if (isDir) {
     return (
       <SidebarListRow
+        layout="position"
         depth={depth}
         isActive={isActive}
         group
@@ -149,6 +150,7 @@ function AuxTreeNodeRow({
 
   return (
     <SidebarListRow
+      layout="position"
       depth={depth}
       isActive={isActive}
       group
