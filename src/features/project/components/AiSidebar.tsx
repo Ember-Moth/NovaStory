@@ -80,7 +80,7 @@ function ModelPicker({
   const triggerLabel = loadingEmpty
     ? "加载连接和模型中..."
     : selectedOption
-      ? `${selectedConnection?.name ?? "连接"} / ${selectedModel?.displayName ?? "模型"}`
+      ? (selectedModel?.displayName ?? "模型")
       : selectableOptions.length === 0
         ? "无可用连接模型"
         : "选择连接和模型";
@@ -181,14 +181,18 @@ function ModelPicker({
             : triggerLabel
         }
         aria-label="选择连接和模型"
-        className="flex h-7 min-w-0 max-w-full items-center gap-1.5 rounded border border-transparent px-1.5 text-left text-[11px] text-foreground-muted outline-none transition hover:border-border hover:bg-list-hover-background hover:text-foreground focus:border-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+        className="grid h-12 min-w-0 max-w-full flex-1 grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-2 items-center gap-x-2 rounded border border-transparent px-1.5 py-1 text-left outline-none transition hover:border-border hover:bg-list-hover-background focus:border-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
         {...getReferenceProps()}
       >
-        <span className="icon-[material-symbols--token] shrink-0 text-sm text-accent-foreground" />
-        <span className="min-w-0 truncate text-[12px] text-foreground">{triggerLabel}</span>
-        <CompactModelMeta model={selectedModel} />
+        <span className="icon-[material-symbols--token] col-start-1 row-span-2 row-start-1 shrink-0 text-base text-accent-foreground" />
+        <span className="col-start-2 row-start-1 min-w-0 self-end truncate text-[11px] leading-4 text-foreground-muted">
+          {selectedConnection?.name ?? "连接"}
+        </span>
+        <span className="col-start-2 row-start-2 min-w-0 self-start truncate text-[12px] font-medium leading-4 text-foreground">
+          {triggerLabel}
+        </span>
         <span
-          className={`shrink-0 text-base ${effectiveOpen ? "icon-[material-symbols--keyboard-arrow-up]" : "icon-[material-symbols--keyboard-arrow-down]"}`}
+          className={`col-start-3 row-span-2 row-start-1 shrink-0 text-base text-foreground-muted ${effectiveOpen ? "icon-[material-symbols--keyboard-arrow-up]" : "icon-[material-symbols--keyboard-arrow-down]"}`}
         />
       </button>
 
@@ -237,23 +241,6 @@ function ModelPicker({
         </FloatingPortal>
       ) : null}
     </>
-  );
-}
-
-function CompactModelMeta({ model }: { model: ResolvedModel | null }) {
-  if (!model) {
-    return null;
-  }
-
-  const capabilities = getModelCapabilities(model);
-
-  return (
-    <span className="hidden min-w-0 items-center gap-1.5 text-[11px] text-foreground-muted min-[340px]:flex">
-      <span className="min-w-0 truncate font-mono">{model.modelId}</span>
-      {capabilities.map((capability) => (
-        <span key={capability}>{capability}</span>
-      ))}
-    </span>
   );
 }
 
@@ -394,7 +381,7 @@ export function AiSidebar() {
                 className="min-h-16 w-full resize-none border-none bg-transparent px-2.5 py-2 text-[13px] leading-5 text-editor-foreground outline-none placeholder:text-foreground-muted/70 disabled:cursor-not-allowed disabled:opacity-70"
                 placeholder={canType ? "输入消息..." : "选择可用模型后输入..."}
               />
-              <div className="flex min-w-0 items-center justify-between gap-2 border-t border-border px-1.5 py-1">
+              <div className="flex min-w-0 items-center gap-2 border-t border-border px-1.5 py-1.5">
                 <ModelPicker
                   selectedConnectionId={selectedConnectionId}
                   selectedModelId={selectedModelId}
@@ -408,9 +395,9 @@ export function AiSidebar() {
                   disabled
                   title="发送功能尚未接入"
                   aria-label="发送"
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-foreground-muted transition disabled:cursor-not-allowed disabled:opacity-40"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded text-foreground-muted transition disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  <span className="icon-[material-symbols--send] text-lg" />
+                  <span className="icon-[material-symbols--send] text-xl" />
                 </button>
               </div>
             </div>
