@@ -16,13 +16,17 @@ import { EditorArea } from "@/features/project/panels/EditorArea";
 import { TimelinePanel } from "@/features/project/panels/TimelinePanel";
 import { useProjectActions } from "@/features/project/state/hooks/useProjectActions";
 import {
+  useProjectAuxData,
+  useProjectContentData,
   useProjectEditorView,
   useProjectPageErrorState,
   useProjectSelectionView,
-  useProjectWorkspaceData,
+  useProjectTimelineData,
+  useProjectWorkspaceIdentity,
 } from "@/features/project/state/hooks/useProjectWorkspace";
 import { useProjectWorkspaceEffects } from "@/features/project/state/hooks/useProjectWorkspaceEffects";
 import { ErrorsMolecule } from "@/features/project/state/molecules/errors";
+import { SelectionMolecule } from "@/features/project/state/molecules/selection";
 import { ProjectScope } from "@/features/project/state/scopes";
 import { ORIGIN_TIMELINE_POINT_ID } from "@/shared/constants";
 
@@ -41,11 +45,25 @@ export function ProjectPage({ id: projectId }: { id: string }) {
 }
 
 function ProjectWorkspace({ projectId }: { projectId: string }) {
-  const data = useProjectWorkspaceData(projectId);
-  const selection = useProjectSelectionView(data);
+  const identity = useProjectWorkspaceIdentity(projectId);
+  const content = useProjectContentData(identity.workspaceId);
+  const timeline = useProjectTimelineData(identity.workspaceId);
+  const selectionMolecule = useMolecule(SelectionMolecule);
+  const rawActiveTimelinePointId = useAtomValue(selectionMolecule.activeTimelinePointIdAtom);
+  const aux = useProjectAuxData(
+    identity.workspaceId,
+    identity.workspaceAuxRootId,
+    rawActiveTimelinePointId,
+  );
+  const selection = useProjectSelectionView({
+    contentNodeMap: content.nodeMap,
+    auxNodeMap: aux.nodeMap,
+    timelineLabelMap: timeline.labelMap,
+  });
   const editorView = useProjectEditorView(selection);
-  const pageErrorState = useProjectPageErrorState(data.pageError);
-  const workspace = { data, selection, editor: editorView };
+  const pageError = identity.error ?? content.error ?? timeline.error ?? aux.error;
+  const pageErrorState = useProjectPageErrorState(pageError);
+  const workspace = { identity, content, timeline, aux, selection, editor: editorView };
   const actions = useProjectActions(workspace);
   const errors = useMolecule(ErrorsMolecule);
   const setContentError = useSetAtom(errors.contentErrorAtom);
@@ -53,27 +71,27 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
   const setAuxError = useSetAtom(errors.auxErrorAtom);
   useProjectWorkspaceEffects(workspace, actions.flushBodySave, actions.flushAuxSave);
 
+  const { workspaceId, contentRootId, workspaceQuery, workspaceInitialLoading } = identity;
   const {
-    workspaceQuery,
-    workspaceInitialLoading,
-    workspaceId,
-    contentRootId,
-    contentQuery,
-    contentPending,
-    timelineQuery,
-    timelinePending,
-    contentTree,
-    timelinePoints,
-    auxTree,
-    timelineLabelMap,
-    auxRootId,
-    contentBusy,
-    timelineBusy,
-    auxBusy,
-    auxPending,
-    auxInitialLoading,
-    pageError,
-  } = data;
+    query: contentQuery,
+    pending: contentPending,
+    tree: contentTree,
+    busy: contentBusy,
+  } = content;
+  const {
+    query: timelineQuery,
+    pending: timelinePending,
+    points: timelinePoints,
+    labelMap: timelineLabelMap,
+    busy: timelineBusy,
+  } = timeline;
+  const {
+    tree: auxTree,
+    rootId: auxRootId,
+    busy: auxBusy,
+    pending: auxPending,
+    initialLoading: auxInitialLoading,
+  } = aux;
   const {
     activeContentNodeId,
     activeAuxNodeId,

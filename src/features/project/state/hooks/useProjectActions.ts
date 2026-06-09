@@ -80,28 +80,31 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
   const setAuxError = useSetAtom(errors.auxErrorAtom);
 
   const {
-    data: {
-      workspaceId,
-      contentRootId,
-      contentTree,
-      auxTree,
-      auxRootId,
-      auxNodeMap,
-      auxParentMap,
-      flatContentNodes,
-      contentNodeMap,
-      contentParentMap,
-      timelinePoints,
+    identity: { workspaceId, contentRootId },
+    content: {
+      tree: contentTree,
+      flatNodes: flatContentNodes,
+      nodeMap: contentNodeMap,
+      parentMap: contentParentMap,
       createContent,
       deleteContent,
       moveContent,
       updateContent,
+    },
+    timeline: {
+      points: timelinePoints,
       createTimeline,
       moveTimeline,
       deleteTimeline,
       updateTimeline,
       reorderTimelineOptimistically,
       clearOptimisticTimelineReorder,
+    },
+    aux: {
+      tree: auxTree,
+      rootId: auxRootId,
+      nodeMap: auxNodeMap,
+      parentMap: auxParentMap,
       mkdirAux,
       writeFileAux,
       moveAux,

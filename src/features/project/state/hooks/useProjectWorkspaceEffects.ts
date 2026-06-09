@@ -32,18 +32,15 @@ export function useProjectWorkspaceEffects(
   const setCommittedBodies = useSetAtom(editor.committedBodiesAtom);
 
   const {
-    data: {
-      workspaceId,
-      flatContentNodes,
-      contentNodeMap,
-      contentTree,
-      contentParentMap,
-      timelinePoints,
-      timelinePointIdSet,
-      auxTree,
-      auxNodeMap,
-      auxNodeIdSet,
+    identity: { workspaceId },
+    content: {
+      flatNodes: flatContentNodes,
+      nodeMap: contentNodeMap,
+      tree: contentTree,
+      parentMap: contentParentMap,
     },
+    timeline: { points: timelinePoints, idSet: timelinePointIdSet },
+    aux: { tree: auxTree, nodeMap: auxNodeMap, idSet: auxNodeIdSet },
     selection: {
       activeContentNodeId,
       activeAuxNodeId,
