@@ -19,6 +19,16 @@ const timestampColumns = {
     .default(sql`(unixepoch() * 1000)`),
 };
 
+export const globalConfigOptions = sqliteTable(
+  "global_config_options",
+  {
+    key: text("key").primaryKey(),
+    valueJson: text("value_json").notNull(),
+    ...timestampColumns,
+  },
+  (table) => [check("global_config_options_key_nonempty", sql`length(${table.key}) > 0`)],
+);
+
 export const projects = sqliteTable(
   "projects",
   {
