@@ -1,14 +1,13 @@
-import { skipToken } from "@codehz/rpc";
+import { skipToken } from "@codehz/rpc/react";
 import { useMolecule } from "bunshi/react";
 import { useAtomValue, useSetAtom } from "jotai";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 
 import {
   buildAuxTreeState,
   buildContentTreeState,
   buildTimelineState,
 } from "@/features/project/model/normalize";
-import type { TimelinePointVM } from "@/features/project/model/types";
 import { rpc } from "@/server/rpc/client";
 
 import { deriveProjectEditorState, deriveProjectSelectionState } from "../helpers/projectView";
@@ -19,7 +18,7 @@ import { SelectionMolecule } from "../molecules/selection";
 type AuxSnapshotData = NonNullable<ReturnType<typeof rpc.useQuery<"aux.snapshotTree">>["data"]>;
 type RefreshableQueryState = {
   isSkipped: boolean;
-  isLoading: boolean;
+  isRefetching: boolean;
   isStale: boolean;
   error: unknown;
 };
@@ -32,23 +31,9 @@ export function selectVisibleAuxSnapshot(
 }
 
 export function isQueryRefreshing(query: RefreshableQueryState, hasVisibleData: boolean) {
-  return !query.isSkipped && hasVisibleData && (query.isLoading || query.isStale) && !query.error;
-}
-
-function moveTimelinePointLocally(points: TimelinePointVM[], fromIndex: number, toIndex: number) {
-  if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) {
-    return points;
-  }
-
-  const nextPoints = [...points];
-  const [movedPoint] = nextPoints.splice(fromIndex, 1);
-
-  if (!movedPoint) {
-    return points;
-  }
-
-  nextPoints.splice(Math.min(toIndex, nextPoints.length), 0, movedPoint);
-  return nextPoints;
+  return (
+    !query.isSkipped && hasVisibleData && (query.isRefetching || query.isStale) && !query.error
+  );
 }
 
 export function useProjectWorkspaceIdentity(projectId: string) {
@@ -57,7 +42,7 @@ export function useProjectWorkspaceIdentity(projectId: string) {
   const workspaceId = workspace?.id;
   const contentRootId = workspace?.contentRootId ?? null;
   const workspaceAuxRootId = workspace?.auxRootId ?? null;
-  const workspaceInitialLoading = workspaceQuery.isLoading && !workspaceId;
+  const workspaceInitialLoading = workspaceQuery.isInitialLoading && !workspaceId;
   const error = workspaceQuery.error?.message ?? null;
 
   return useMemo(
@@ -149,39 +134,10 @@ export function useProjectTimelineData(workspaceId: string | undefined) {
   const deleteTimeline = rpc.useMutation("timeline.delete");
   const updateTimeline = rpc.useMutation("timeline.update");
 
-  const serverTimelineState = useMemo(
+  const timelineState = useMemo(
     () => buildTimelineState(timelineQuery.data ?? []),
     [timelineQuery.data],
   );
-  const [optimisticTimelinePoints, setOptimisticTimelinePoints] = useState<
-    TimelinePointVM[] | null
-  >(null);
-  const visibleTimelinePoints = optimisticTimelinePoints ?? serverTimelineState.points;
-  const timelineState = useMemo(
-    () => ({
-      points: visibleTimelinePoints,
-      labelMap: new Map(visibleTimelinePoints.map((point) => [point.id, point.label])),
-      idSet: new Set(visibleTimelinePoints.map((point) => point.id)),
-    }),
-    [visibleTimelinePoints],
-  );
-
-  useEffect(() => {
-    setOptimisticTimelinePoints(null);
-  }, [timelineQuery.data]);
-
-  const reorderTimelineOptimistically = useCallback(
-    (fromIndex: number, toIndex: number) => {
-      setOptimisticTimelinePoints((currentPoints) =>
-        moveTimelinePointLocally(currentPoints ?? serverTimelineState.points, fromIndex, toIndex),
-      );
-    },
-    [serverTimelineState.points],
-  );
-
-  const clearOptimisticTimelineReorder = useCallback(() => {
-    setOptimisticTimelinePoints(null);
-  }, []);
 
   const busy =
     createTimeline.isPending ||
@@ -202,8 +158,6 @@ export function useProjectTimelineData(workspaceId: string | undefined) {
       points: timelineState.points,
       labelMap: timelineState.labelMap,
       idSet: timelineState.idSet,
-      reorderTimelineOptimistically,
-      clearOptimisticTimelineReorder,
       busy,
       refreshing,
       pending,
@@ -211,14 +165,12 @@ export function useProjectTimelineData(workspaceId: string | undefined) {
     }),
     [
       busy,
-      clearOptimisticTimelineReorder,
       createTimeline,
       deleteTimeline,
       error,
       moveTimeline,
       pending,
       refreshing,
-      reorderTimelineOptimistically,
       timelineQuery,
       timelineState.idSet,
       timelineState.labelMap,
@@ -260,7 +212,7 @@ export function useProjectAuxData(
     deleteAux.isPending ||
     restoreAux.isPending;
   const initialLoading =
-    !auxQuery.isSkipped && !visibleAuxSnapshot && auxQuery.isLoading && !auxQuery.error;
+    !auxQuery.isSkipped && !visibleAuxSnapshot && auxQuery.isInitialLoading && !auxQuery.error;
   const refreshing = isQueryRefreshing(auxQuery, !!visibleAuxSnapshot);
   const pending = busy || refreshing;
   const error = auxQuery.error?.message ?? null;

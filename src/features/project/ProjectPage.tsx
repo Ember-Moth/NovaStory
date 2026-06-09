@@ -207,7 +207,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
                     />
                   ),
                   content:
-                    contentQuery.isLoading && contentTree.length === 0 ? (
+                    contentQuery.isInitialLoading && contentTree.length === 0 ? (
                       <PanelPlaceholder variant="refresh" label="正在加载正文..." />
                     ) : (
                       <ContentTreePanel
@@ -279,7 +279,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
                     />
                   ),
                   content:
-                    timelineQuery.isLoading && timelinePoints.length === 0 ? (
+                    timelineQuery.isInitialLoading && timelinePoints.length === 0 ? (
                       <PanelPlaceholder variant="refresh" label="正在加载时间轴..." />
                     ) : (
                       <TimelinePanel

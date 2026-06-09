@@ -2,6 +2,7 @@ import { useMolecule } from "bunshi/react";
 import { useAtomValue, useSetAtom } from "jotai";
 import { useCallback, useState } from "react";
 
+import { moveArrayItem } from "@/client/state/rpcCache";
 import {
   actionAnchorId,
   clearActionError,
@@ -97,8 +98,6 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
       moveTimeline,
       deleteTimeline,
       updateTimeline,
-      reorderTimelineOptimistically,
-      clearOptimisticTimelineReorder,
     },
     aux: {
       tree: auxTree,
@@ -986,7 +985,11 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
           : (orderedMovablePoints[newIndex - 1]?.id ?? ORIGIN_TIMELINE_POINT_ID);
 
       clearActionError(setTimelineError);
-      reorderTimelineOptimistically(fromIndex, toIndex);
+      rpc.cancelQueries("timeline.list", { workspaceId });
+      const previousTimeline = rpc.getQueryData("timeline.list", { workspaceId });
+      rpc.updateQueryData("timeline.list", { workspaceId }, (points) =>
+        moveArrayItem(points, fromIndex, toIndex),
+      );
 
       try {
         await moveTimeline.mutate({
@@ -995,7 +998,9 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
           afterPointId,
         });
       } catch (error) {
-        clearOptimisticTimelineReorder();
+        if (previousTimeline) {
+          rpc.setQueryData("timeline.list", { workspaceId }, previousTimeline);
+        }
         setActionError(
           setTimelineError,
           error instanceof Error ? error.message : "调整时间轴顺序失败，请稍后重试。",
@@ -1003,14 +1008,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         );
       }
     },
-    [
-      clearOptimisticTimelineReorder,
-      moveTimeline,
-      reorderTimelineOptimistically,
-      setTimelineError,
-      timelinePoints,
-      workspaceId,
-    ],
+    [moveTimeline, setTimelineError, timelinePoints, workspaceId],
   );
 
   const handleAuxCreateSiblingDir = useCallback(

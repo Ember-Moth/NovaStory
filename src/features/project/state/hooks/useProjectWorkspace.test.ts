@@ -7,7 +7,7 @@ test("isQueryRefreshing only reports visible background refreshes", () => {
     isQueryRefreshing(
       {
         isSkipped: false,
-        isLoading: true,
+        isRefetching: true,
         isStale: false,
         error: null,
       },
@@ -19,7 +19,7 @@ test("isQueryRefreshing only reports visible background refreshes", () => {
     isQueryRefreshing(
       {
         isSkipped: false,
-        isLoading: false,
+        isRefetching: false,
         isStale: true,
         error: null,
       },
@@ -31,7 +31,7 @@ test("isQueryRefreshing only reports visible background refreshes", () => {
     isQueryRefreshing(
       {
         isSkipped: true,
-        isLoading: true,
+        isRefetching: true,
         isStale: true,
         error: null,
       },
@@ -43,7 +43,7 @@ test("isQueryRefreshing only reports visible background refreshes", () => {
     isQueryRefreshing(
       {
         isSkipped: false,
-        isLoading: true,
+        isRefetching: true,
         isStale: false,
         error: new Error("failed"),
       },
@@ -55,7 +55,7 @@ test("isQueryRefreshing only reports visible background refreshes", () => {
     isQueryRefreshing(
       {
         isSkipped: false,
-        isLoading: true,
+        isRefetching: true,
         isStale: false,
         error: null,
       },

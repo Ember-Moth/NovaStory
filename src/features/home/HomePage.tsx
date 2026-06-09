@@ -2,10 +2,16 @@ import { useAtomValue, useSetAtom } from "jotai";
 import { type FormEvent, useRef, useState } from "react";
 import { useLocation } from "wouter";
 
+import { insertProjectOptimistically, removeProjectOptimistically } from "@/client/state/rpcCache";
 import { AppShell } from "@/client/components/AppShell";
 import { lastProjectIdAtom } from "@/client/state/lastProject";
 import { rpc } from "@/server/rpc/client";
 import { LoadingBlock } from "@/shared/components/Loading";
+
+type ProjectList = NonNullable<ReturnType<typeof rpc.useQuery<"projects.list">>["data"]>;
+type ProjectMutationContext = {
+  previousProjects?: ProjectList;
+};
 
 const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
   dateStyle: "medium",
@@ -22,9 +28,60 @@ export function HomePage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const { data: projects, error, isLoading } = rpc.useQuery("projects.list");
-  const createProject = rpc.useMutation("projects.create");
-  const deleteProject = rpc.useMutation("projects.delete");
+  const {
+    data: projects,
+    error,
+    isInitialLoading,
+  } = rpc.useQuery("projects.list", undefined, {
+    refetchOnWindowFocus: true,
+  });
+  const createProject = rpc.useMutation<"projects.create", ProjectMutationContext>(
+    "projects.create",
+    {
+      onMutate: (input) => {
+        const previousProjects = rpc.getQueryData("projects.list");
+        if (previousProjects) {
+          const timestamp = Date.now();
+          rpc.setQueryData(
+            "projects.list",
+            insertProjectOptimistically(previousProjects, {
+              id: input.id,
+              name: input.name,
+              description: input.description ?? null,
+              createdAt: timestamp,
+              updatedAt: timestamp,
+            }),
+          );
+        }
+        return { previousProjects };
+      },
+      onError: (_, __, context) => {
+        if (context?.previousProjects) {
+          rpc.setQueryData("projects.list", context.previousProjects);
+        }
+      },
+    },
+  );
+  const deleteProject = rpc.useMutation<"projects.delete", ProjectMutationContext>(
+    "projects.delete",
+    {
+      onMutate: (input) => {
+        const previousProjects = rpc.getQueryData("projects.list");
+        if (previousProjects) {
+          rpc.setQueryData(
+            "projects.list",
+            removeProjectOptimistically(previousProjects, input.id),
+          );
+        }
+        return { previousProjects };
+      },
+      onError: (_, __, context) => {
+        if (context?.previousProjects) {
+          rpc.setQueryData("projects.list", context.previousProjects);
+        }
+      },
+    },
+  );
 
   const projectList = [...(projects ?? [])].sort((a, b) => b.updatedAt - a.updatedAt);
 
@@ -101,7 +158,7 @@ export function HomePage() {
             </div>
           ) : null}
 
-          {isLoading ? (
+          {isInitialLoading ? (
             <LoadingBlock />
           ) : (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4">

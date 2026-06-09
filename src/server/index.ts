@@ -1,4 +1,4 @@
-import { createRpcHandler } from "@codehz/rpc";
+import { createRpcHandler } from "@codehz/rpc/server";
 import { serve } from "bun";
 
 import index from "@/client/index.html";
@@ -9,7 +9,7 @@ import "@/db";
 
 const server = serve({
   routes: {
-    "/api/rpc": createRpcHandler(api),
+    "/api/rpc": createRpcHandler(api, { batchConcurrency: 4 }),
     "/*": index,
   },
 

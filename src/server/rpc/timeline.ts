@@ -1,4 +1,4 @@
-import { mutation, query } from "@codehz/rpc";
+import { mutation, query } from "@codehz/rpc/core";
 
 import { db } from "@/db";
 import {
@@ -14,15 +14,21 @@ import {
   listAffectedTimelinePointIdsForInsert,
   listAffectedTimelinePointIdsForMove,
 } from "@/domain/internal/timeline-chain";
-import { auxSnapshotWatchKey, normalizeTimelinePointId } from "@/domain/internal/timeline-point";
+import { normalizeTimelinePointId } from "@/domain/internal/timeline-point";
+import { rpcTags, type RpcTagList } from "@/server/rpc/tags";
 
-export const list = query<{ workspaceId: string }, ReturnType<typeof listTimelinePoints>>(
-  ({ workspaceId }, ctx) => {
-    const result = listTimelinePoints(workspaceId);
-    ctx.watch(`timeline:${workspaceId}`);
-    return result;
-  },
-);
+export const list = query<
+  { workspaceId: string },
+  ReturnType<typeof listTimelinePoints>,
+  RpcTagList
+>({
+  watch: ({ workspaceId }) => [rpcTags.timelineList(workspaceId)],
+  handler: ({ workspaceId }) => listTimelinePoints(workspaceId),
+});
+
+function auxSnapshotTags(workspaceId: string, pointIds: string[]) {
+  return pointIds.map((pointId) => rpcTags.auxSnapshot(workspaceId, pointId));
+}
 
 export const create = mutation<
   {
@@ -32,7 +38,8 @@ export const create = mutation<
     label: string;
     description?: string | null;
   },
-  ReturnType<typeof createTimelinePoint>
+  ReturnType<typeof createTimelinePoint>,
+  RpcTagList
 >((input, ctx) => {
   const point = createTimelinePoint(input);
   const afterPointId = normalizeTimelinePointId(input.afterPointId);
@@ -43,8 +50,8 @@ export const create = mutation<
     point.id,
   );
   ctx.invalidate(
-    `timeline:${input.workspaceId}`,
-    ...affectedPointIds.map((pointId) => auxSnapshotWatchKey(input.workspaceId, pointId)),
+    rpcTags.timelineList(input.workspaceId),
+    ...auxSnapshotTags(input.workspaceId, affectedPointIds),
   );
   return point;
 });
@@ -55,7 +62,8 @@ export const move = mutation<
     pointId: string;
     afterPointId?: string | typeof ORIGIN_TIMELINE_POINT_ID;
   },
-  ReturnType<typeof moveTimelinePoint>
+  ReturnType<typeof moveTimelinePoint>,
+  RpcTagList
 >((input, ctx) => {
   const afterPointId = normalizeTimelinePointId(input.afterPointId);
   const affectedPointIds = listAffectedTimelinePointIdsForMove(
@@ -66,24 +74,23 @@ export const move = mutation<
   );
   const point = moveTimelinePoint(input);
   ctx.invalidate(
-    `timeline:${input.workspaceId}`,
-    ...affectedPointIds.map((pointId) => auxSnapshotWatchKey(input.workspaceId, pointId)),
+    rpcTags.timelineList(input.workspaceId),
+    ...auxSnapshotTags(input.workspaceId, affectedPointIds),
   );
   return point;
 });
 
 export const deleteMutation = mutation<
   { workspaceId: string; pointId: string; purgeAuxLayers?: boolean },
-  void
+  void,
+  RpcTagList
 >(({ workspaceId, pointId, purgeAuxLayers }, ctx) => {
   const affectedPointIds = listAffectedTimelinePointIdsForDelete(db, workspaceId, pointId);
   deleteTimelinePoint(workspaceId, pointId, { purgeAuxLayers });
-  ctx.invalidate(`timeline:${workspaceId}`);
-  ctx.invalidate(
-    ...affectedPointIds.map((affectedPointId) => auxSnapshotWatchKey(workspaceId, affectedPointId)),
-  );
+  ctx.invalidate(rpcTags.timelineList(workspaceId));
+  ctx.invalidate(...auxSnapshotTags(workspaceId, affectedPointIds));
   if (purgeAuxLayers) {
-    ctx.invalidate(`aux:${workspaceId}`);
+    ctx.invalidate(rpcTags.auxWorkspace(workspaceId));
   }
 });
 
@@ -94,9 +101,9 @@ export const update = mutation<
     label?: string;
     description?: string | null;
   },
-  ReturnType<typeof updateTimelinePoint>
->((input, ctx) => {
-  const point = updateTimelinePoint(input);
-  ctx.invalidate(`timeline:${input.workspaceId}`);
-  return point;
+  ReturnType<typeof updateTimelinePoint>,
+  RpcTagList
+>({
+  invalidate: (input) => [rpcTags.timelineList(input.workspaceId)],
+  handler: (input) => updateTimelinePoint(input),
 });

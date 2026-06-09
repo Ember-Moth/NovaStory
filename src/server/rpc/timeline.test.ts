@@ -11,6 +11,7 @@ process.env.DATABASE_URL = dbPath;
 const { db, schema } = await import("../../db");
 const service = await import("../../domain");
 const auxHandlers = await import("./aux");
+const { rpcTags } = await import("./tags");
 const timelineHandlers = await import("./timeline");
 
 function seedProject(projectId: string) {
@@ -51,7 +52,10 @@ test("aux snapshot tree watches the active point snapshot key instead of workspa
     pointId: point.id,
   });
 
-  expect(result.watch).toEqual([`aux:${workspace.id}`, `aux-snapshot:${workspace.id}:${point.id}`]);
+  expect(result.watch).toEqual([
+    rpcTags.auxWorkspace(workspace.id),
+    rpcTags.auxSnapshot(workspace.id, point.id),
+  ]);
 });
 
 test("timeline label updates do not invalidate aux snapshots", async () => {
@@ -69,7 +73,7 @@ test("timeline label updates do not invalidate aux snapshots", async () => {
     label: "Point A+",
   });
 
-  expect(result.invalidate).toEqual([`timeline:${workspace.id}`]);
+  expect(result.invalidate).toEqual([rpcTags.timelineList(workspace.id)]);
 });
 
 test("deleting an unrelated later point only invalidates that point snapshot", async () => {
@@ -93,8 +97,8 @@ test("deleting an unrelated later point only invalidates that point snapshot", a
   });
 
   expect(result.invalidate).toEqual([
-    `timeline:${workspace.id}`,
-    `aux-snapshot:${workspace.id}:${pointB.id}`,
+    rpcTags.timelineList(workspace.id),
+    rpcTags.auxSnapshot(workspace.id, pointB.id),
   ]);
 });
 
@@ -121,7 +125,7 @@ test("creating a later point only invalidates the new snapshot chain", async () 
   });
 
   expect(result.invalidate).toEqual([
-    `timeline:${workspace.id}`,
-    `aux-snapshot:${workspace.id}:${result.data.id}`,
+    rpcTags.timelineList(workspace.id),
+    rpcTags.auxSnapshot(workspace.id, result.data.id),
   ]);
 });

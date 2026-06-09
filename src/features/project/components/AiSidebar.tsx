@@ -76,8 +76,8 @@ function ModelPicker({
   const selectedModel = selectedOption?.model ?? null;
   const selectedConnection = selectedOption?.connection ?? null;
   const selectedIndex = selectedOption ? selectableOptions.indexOf(selectedOption) : null;
-  const disabled = groupsQuery.isLoading || selectableOptions.length === 0;
-  const loadingEmpty = groupsQuery.isLoading && groups.length === 0;
+  const disabled = groupsQuery.isInitialLoading || selectableOptions.length === 0;
+  const loadingEmpty = groupsQuery.isInitialLoading && groups.length === 0;
   const triggerLabel = loadingEmpty
     ? "加载连接和模型中..."
     : selectedOption
@@ -140,7 +140,7 @@ function ModelPicker({
   ]);
 
   useEffect(() => {
-    if (groupsQuery.isLoading && selectableOptions.length === 0) {
+    if (groupsQuery.isInitialLoading && selectableOptions.length === 0) {
       return;
     }
 
@@ -156,7 +156,7 @@ function ModelPicker({
     const firstOption = selectableOptions[0];
     onSelectionChange(firstOption?.connection.id ?? "", firstOption?.model.id ?? "");
   }, [
-    groupsQuery.isLoading,
+    groupsQuery.isInitialLoading,
     onSelectionChange,
     selectableOptions,
     selectedConnectionId,

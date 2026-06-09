@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { AppShell, AppSidebar } from "@/client/components/AppShell";
 import {
@@ -391,15 +391,32 @@ function ConnectionModelsList({
   onOpenEditCustomModel: (_connection: AiConnectionRow, _model: AiResolvedModelView) => void;
   onDeleteCustomModel: (_connection: AiConnectionRow, _model: AiResolvedModelView) => void;
 }) {
-  const { data: models, isLoading } = rpc.useQuery("ai.listResolvedModels", {
-    connectionId: connection.id,
-    includeDisabled: true,
+  const resolvedModelsInput = useMemo(
+    () => ({
+      connectionId: connection.id,
+      includeDisabled: true,
+    }),
+    [connection.id],
+  );
+  const {
+    data: models,
+    isInitialLoading,
+    isRefetching,
+    isStale,
+  } = rpc.useQuery("ai.listResolvedModels", resolvedModelsInput);
+  const toggleCatalogModel = rpc.useMutation("ai.setCatalogModelEnabled", {
+    onSuccess: (data, input) => {
+      rpc.setQueryData(
+        "ai.listResolvedModels",
+        { connectionId: input.connectionId, includeDisabled: true },
+        data,
+      );
+    },
   });
-  const toggleCatalogModel = rpc.useMutation("ai.setCatalogModelEnabled");
   const hasLoadedModels = models !== undefined;
-  const isRefreshing = hasLoadedModels && isLoading;
+  const isRefreshing = hasLoadedModels && (isRefetching || isStale);
 
-  if (!hasLoadedModels && isLoading) {
+  if (!hasLoadedModels && isInitialLoading) {
     return <LoadingInline label="加载模型中..." />;
   }
 
