@@ -202,6 +202,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
                         timelineLabelMap={timelineLabelMap}
                         onCreateChild={actions.handleContentCreateChild}
                         onDelete={actions.handleContentDelete}
+                        onMove={actions.handleContentMove}
                         isBusy={contentBusy}
                         canCreate={!!activeTimelinePointId}
                       />

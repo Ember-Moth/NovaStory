@@ -137,7 +137,9 @@ export function moveContentNode(input: {
         .where(eq(schema.contentNodes.id, node.id))
         .run();
     } else {
-      const head = orderContentChildren(listContentChildren(tx, workspace.id, newParent.id))[0];
+      const head = orderContentChildren(
+        listContentChildren(tx, workspace.id, newParent.id).filter((child) => child.id !== node.id),
+      )[0];
       tx.update(schema.contentNodes)
         .set({ parentId: newParent.id, nextSiblingId: head?.id ?? null, updatedAt: timestamp })
         .where(eq(schema.contentNodes.id, node.id))

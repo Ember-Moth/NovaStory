@@ -22,6 +22,7 @@ export function SidebarListRow({
   trailing,
   actions,
   anchorId,
+  dataNodeId,
 }: {
   depth?: number;
   isActive: boolean;
@@ -34,6 +35,7 @@ export function SidebarListRow({
   trailing?: ReactNode;
   actions?: ReactNode;
   anchorId?: string;
+  dataNodeId?: string;
 }) {
   const stateClass = isActive ? ROW_ACTIVE : ROW_INACTIVE;
   const hasHoverSlot = trailing != null || actions != null;
@@ -43,6 +45,7 @@ export function SidebarListRow({
   return (
     <div
       data-action-anchor={anchorId}
+      data-tree-node-id={dataNodeId}
       className={cn(ROW_BASE, stateClass, groupClass, interactiveClass, className)}
       style={{ paddingLeft: `${rowPaddingLeft(depth)}px` }}
       onClick={onClick}

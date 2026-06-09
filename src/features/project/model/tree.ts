@@ -1,5 +1,20 @@
 import type { AuxTreeNodeVM, ContentTreeNodeVM } from "./types";
 
+export type ContentDropPosition = "before" | "inside" | "after";
+
+export interface ContentMoveIntent {
+  nodeId: string;
+  targetId: string;
+  position: ContentDropPosition;
+}
+
+export interface ResolvedContentMove {
+  nodeId: string;
+  newParentId: string;
+  afterSiblingId: string | null;
+  position: ContentDropPosition;
+}
+
 export function buildContentNodePath(
   nodeId: string,
   contentParentMap: Map<string, string | null>,
@@ -104,6 +119,97 @@ export function collectContentSubtreeIds(root: ContentTreeNodeVM): Set<string> {
 
   walk(root);
   return ids;
+}
+
+export function resolveContentMove({
+  tree,
+  parentMap,
+  nodeMap,
+  contentRootId,
+  nodeId,
+  targetId,
+  position,
+}: {
+  tree: ContentTreeNodeVM[];
+  parentMap: ReadonlyMap<string, string | null>;
+  nodeMap: ReadonlyMap<string, ContentTreeNodeVM>;
+  contentRootId: string | null;
+  nodeId: string;
+  targetId: string;
+  position: ContentDropPosition;
+}): ResolvedContentMove | null {
+  if (!contentRootId || nodeId === targetId) {
+    return null;
+  }
+
+  const node = nodeMap.get(nodeId);
+  const target = nodeMap.get(targetId);
+  if (!node || !target) {
+    return null;
+  }
+
+  const subtreeIds = collectContentSubtreeIds(node);
+  if (subtreeIds.has(targetId)) {
+    return null;
+  }
+
+  const currentParentId = parentMap.get(nodeId) ?? contentRootId;
+
+  if (position === "inside") {
+    const siblingsWithoutMoved = target.children.filter((child) => child.id !== nodeId);
+    const afterSiblingId = siblingsWithoutMoved.at(-1)?.id ?? null;
+
+    if (currentParentId === targetId && target.children.at(-1)?.id === nodeId) {
+      return null;
+    }
+
+    return {
+      nodeId,
+      newParentId: targetId,
+      afterSiblingId,
+      position,
+    };
+  }
+
+  const targetParentId = parentMap.get(targetId) ?? contentRootId;
+  const siblings = listContentSiblings(tree, targetParentId, contentRootId);
+  const fromIndex = siblings.findIndex((sibling) => sibling.id === nodeId);
+  const targetIndex = siblings.findIndex((sibling) => sibling.id === targetId);
+
+  if (targetIndex < 0) {
+    return null;
+  }
+
+  if (currentParentId === targetParentId) {
+    if (position === "before" && fromIndex === targetIndex - 1) {
+      return null;
+    }
+    if (position === "after" && fromIndex === targetIndex + 1) {
+      return null;
+    }
+  }
+
+  if (position === "after") {
+    return {
+      nodeId,
+      newParentId: targetParentId,
+      afterSiblingId: targetId,
+      position,
+    };
+  }
+
+  const siblingsWithoutMoved = siblings.filter((sibling) => sibling.id !== nodeId);
+  const insertIndex = siblingsWithoutMoved.findIndex((sibling) => sibling.id === targetId);
+  if (insertIndex < 0) {
+    return null;
+  }
+
+  return {
+    nodeId,
+    newParentId: targetParentId,
+    afterSiblingId: siblingsWithoutMoved[insertIndex - 1]?.id ?? null,
+    position,
+  };
 }
 
 export function findPreferredContentNode(nodes: ContentTreeNodeVM[]): ContentTreeNodeVM | null {

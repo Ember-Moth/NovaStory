@@ -643,6 +643,80 @@ test("deleting a middle content sibling rewires next sibling without violating u
   expect(exported.nodes.map((node) => node.title)).toEqual(["Chapter 1", "Chapter 3"]);
 });
 
+test("content node move can reorder across parents and preserve child order", () => {
+  const workspace = seedProject("project_content_move_cross_parent");
+  const rootId = workspace.contentRootId!;
+
+  const chapter1 = service.createContentNode({
+    workspaceId: workspace.id,
+    parentId: rootId,
+    title: "Chapter 1",
+  });
+  const chapter2 = service.createContentNode({
+    workspaceId: workspace.id,
+    parentId: rootId,
+    afterSiblingId: chapter1.id,
+    title: "Chapter 2",
+  });
+  const scene1 = service.createContentNode({
+    workspaceId: workspace.id,
+    parentId: chapter1.id,
+    title: "Scene 1",
+  });
+  service.createContentNode({
+    workspaceId: workspace.id,
+    parentId: chapter1.id,
+    afterSiblingId: scene1.id,
+    title: "Scene 2",
+  });
+
+  service.moveContentNode({
+    workspaceId: workspace.id,
+    nodeId: scene1.id,
+    newParentId: chapter2.id,
+  });
+
+  const exported = service.exportContentSubtree(workspace.id);
+  expect(exported.nodes.map((node) => node.title)).toEqual(["Chapter 1", "Chapter 2"]);
+  expect(exported.nodes[0]?.children.map((node) => node.title)).toEqual(["Scene 2"]);
+  expect(exported.nodes[1]?.children.map((node) => node.title)).toEqual(["Scene 1"]);
+
+  service.moveContentNode({
+    workspaceId: workspace.id,
+    nodeId: chapter2.id,
+    newParentId: rootId,
+  });
+
+  expect(service.exportContentSubtree(workspace.id).nodes.map((node) => node.title)).toEqual([
+    "Chapter 2",
+    "Chapter 1",
+  ]);
+});
+
+test("content node move rejects moving a node below its own descendant", () => {
+  const workspace = seedProject("project_content_move_into_descendant");
+  const rootId = workspace.contentRootId!;
+
+  const chapter = service.createContentNode({
+    workspaceId: workspace.id,
+    parentId: rootId,
+    title: "Chapter",
+  });
+  const scene = service.createContentNode({
+    workspaceId: workspace.id,
+    parentId: chapter.id,
+    title: "Scene",
+  });
+
+  expect(() =>
+    service.moveContentNode({
+      workspaceId: workspace.id,
+      nodeId: chapter.id,
+      newParentId: scene.id,
+    }),
+  ).toThrow("无法移动：不能把章节移动到自己的子章节下。");
+});
+
 test("content node anchor point can be updated", () => {
   const workspace = seedProject("project_anchor_update");
   const contentRootId = workspace.contentRootId!;

@@ -65,6 +65,7 @@ export function useProjectWorkspaceData(projectId: string) {
 
   const createContent = rpc.useMutation("content.create");
   const deleteContent = rpc.useMutation("content.delete");
+  const moveContent = rpc.useMutation("content.move");
   const updateContent = rpc.useMutation("content.update");
   const createTimeline = rpc.useMutation("timeline.create");
   const moveTimeline = rpc.useMutation("timeline.move");
@@ -119,7 +120,11 @@ export function useProjectWorkspaceData(projectId: string) {
     setOptimisticTimelinePoints(null);
   }, []);
 
-  const contentBusy = createContent.isPending || deleteContent.isPending || updateContent.isPending;
+  const contentBusy =
+    createContent.isPending ||
+    deleteContent.isPending ||
+    moveContent.isPending ||
+    updateContent.isPending;
   const timelineBusy =
     createTimeline.isPending ||
     moveTimeline.isPending ||
@@ -155,6 +160,7 @@ export function useProjectWorkspaceData(projectId: string) {
     auxQuery,
     createContent,
     deleteContent,
+    moveContent,
     updateContent,
     createTimeline,
     moveTimeline,

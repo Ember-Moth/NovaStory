@@ -16,6 +16,8 @@ import {
   nextAuxDirName,
   nextAuxFileName,
   omitRecordKey,
+  resolveContentMove,
+  type ContentMoveIntent,
 } from "@/features/project/model/tree";
 import type { AuxTreeNodeVM, ContentTreeNodeVM } from "@/features/project/model/types";
 import { rpc } from "@/server/rpc/client";
@@ -89,6 +91,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
       timelinePoints,
       createContent,
       deleteContent,
+      moveContent,
       updateContent,
       createTimeline,
       moveTimeline,
@@ -811,6 +814,57 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
     [setContentError, updateContent, workspaceId],
   );
 
+  const handleContentMove = useCallback(
+    async (intent: ContentMoveIntent) => {
+      if (!workspaceId || !contentRootId) {
+        return;
+      }
+
+      const move = resolveContentMove({
+        tree: contentTree,
+        parentMap: contentParentMap,
+        nodeMap: contentNodeMap,
+        contentRootId,
+        ...intent,
+      });
+
+      if (!move) {
+        return;
+      }
+
+      clearActionError(setContentError);
+
+      if (move.position === "inside") {
+        expandContentParent(move.newParentId);
+      }
+
+      try {
+        await moveContent.mutate({
+          workspaceId,
+          nodeId: move.nodeId,
+          newParentId: move.newParentId,
+          afterSiblingId: move.afterSiblingId,
+        });
+      } catch (error) {
+        setActionError(
+          setContentError,
+          error instanceof Error ? error.message : "调整正文顺序失败，请稍后重试。",
+          actionAnchorId("content", "row", move.nodeId),
+        );
+      }
+    },
+    [
+      contentNodeMap,
+      contentParentMap,
+      contentRootId,
+      contentTree,
+      expandContentParent,
+      moveContent,
+      setContentError,
+      workspaceId,
+    ],
+  );
+
   const handleTimelineRename = useCallback(
     async (pointId: string, label: string) => {
       if (!workspaceId || pointId === ORIGIN_TIMELINE_POINT_ID) {
@@ -1220,6 +1274,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
     handleContentCreateSibling,
     handleContentCreateChild,
     handleContentDelete,
+    handleContentMove,
     handleTimelineAdd,
     handleTimelineRename,
     handleTimelineReorder,
