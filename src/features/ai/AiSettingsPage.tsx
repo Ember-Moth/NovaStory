@@ -91,18 +91,18 @@ function CatalogProviderModels({ catalogProviderId }: { catalogProviderId: strin
       {(models ?? []).map((model) => (
         <div
           key={model.id}
-          className="rounded-md border border-border bg-editor-background px-3 py-2 text-xs"
+          className="border-border bg-editor-background rounded-md border px-3 py-2 text-xs"
         >
           <div className="flex items-center gap-2">
-            <span className="font-medium text-foreground">{model.displayName}</span>
-            <span className="font-mono text-foreground-muted">{model.modelId}</span>
+            <span className="text-foreground font-medium">{model.displayName}</span>
+            <span className="text-foreground-muted font-mono">{model.modelId}</span>
             {!model.isActive ? (
-              <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-foreground-muted">
+              <span className="text-foreground-muted rounded-full bg-white/5 px-2 py-0.5 text-[10px]">
                 已失活
               </span>
             ) : null}
           </div>
-          <div className="mt-1 flex flex-wrap gap-3 text-[11px] text-foreground-muted">
+          <div className="text-foreground-muted mt-1 flex flex-wrap gap-3 text-[11px]">
             <span>上下文 {fmtContextWindow(model.contextWindow)}</span>
             <span>输出 {fmtContextWindow(model.maxOutputTokens)}</span>
             <span>
@@ -128,15 +128,15 @@ function CatalogProviderCard({
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="rounded-md border border-border bg-sidebar-background">
+    <div className="border-border bg-sidebar-background rounded-md border">
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
-        className="sticky top-0 z-10 flex w-full items-center gap-3 rounded-md px-4 py-3 text-left transition hover:bg-list-hover-background bg-sidebar-background"
+        className="hover:bg-list-hover-background bg-sidebar-background sticky top-0 z-10 flex w-full items-center gap-3 rounded-md px-4 py-3 text-left transition"
       >
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="truncate text-sm font-semibold text-foreground">{provider.name}</span>
+            <span className="text-foreground truncate text-sm font-semibold">{provider.name}</span>
             {provider.isSupported ? (
               <span
                 role="button"
@@ -151,34 +151,34 @@ function CatalogProviderCard({
                     onQuickConnect(provider.id);
                   }
                 }}
-                className="rounded-full px-2 py-0.5 text-[10px] font-medium bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 transition cursor-pointer"
+                className="cursor-pointer rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-300 transition hover:bg-emerald-500/20"
               >
                 快速接入
               </span>
             ) : (
-              <span className="rounded-full px-2 py-0.5 text-[10px] font-medium bg-amber-500/10 text-amber-300">
+              <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-300">
                 暂不支持
               </span>
             )}
             {!provider.isActive ? (
-              <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-foreground-muted">
+              <span className="text-foreground-muted rounded-full bg-white/5 px-2 py-0.5 text-[10px]">
                 已失活
               </span>
             ) : null}
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-foreground-muted">
+          <div className="text-foreground-muted mt-1 flex flex-wrap items-center gap-2 text-[11px]">
             <span className="font-mono">{provider.sdkPackage ?? "无 npm package"}</span>
             <span>{provider.modelCount} 个模型</span>
           </div>
         </div>
         <span
-          className={`text-xl text-foreground-muted ${expanded ? "icon-[material-symbols--keyboard-arrow-up]" : "icon-[material-symbols--keyboard-arrow-down]"}`}
+          className={`text-foreground-muted text-xl ${expanded ? "icon-[material-symbols--keyboard-arrow-up]" : "icon-[material-symbols--keyboard-arrow-down]"}`}
         />
       </button>
 
       {expanded ? (
-        <div className="border-t border-border px-4 py-3">
-          <div className="mb-3 space-y-1 text-[11px] text-foreground-muted">
+        <div className="border-border border-t px-4 py-3">
+          <div className="text-foreground-muted mb-3 space-y-1 text-[11px]">
             <div>API: {provider.apiUrl ?? "—"}</div>
             <div>ENV: {provider.envKeys.length > 0 ? provider.envKeys.join(", ") : "—"}</div>
             {provider.docsUrl ? (
@@ -186,7 +186,7 @@ function CatalogProviderCard({
                 href={provider.docsUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 text-accent-foreground hover:underline"
+                className="text-accent-foreground inline-flex items-center gap-1 hover:underline"
               >
                 文档
                 <span className="icon-[material-symbols--open-in-new] text-xs" />
@@ -215,7 +215,7 @@ function ConnectionModelRow({
   onDeleteCustomModel: (_model: AiResolvedModelView) => void;
 }) {
   return (
-    <div className="flex items-start gap-3 rounded-md border border-border bg-editor-background px-3 py-2">
+    <div className="border-border bg-editor-background flex items-start gap-3 rounded-md border px-3 py-2">
       <button
         type="button"
         disabled={isBusy}
@@ -227,25 +227,25 @@ function ConnectionModelRow({
           model.origin === "catalog"
             ? model.isEnabled
               ? "bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
-              : "bg-white/5 text-foreground-muted hover:bg-white/10"
+              : "text-foreground-muted bg-white/5 hover:bg-white/10"
             : model.isEnabled
               ? "bg-sky-500/10 text-sky-300"
-              : "bg-white/5 text-foreground-muted"
+              : "text-foreground-muted bg-white/5"
         } disabled:cursor-not-allowed disabled:opacity-50`}
       >
         {model.origin === "catalog" ? (model.isEnabled ? "已启用" : "已隐藏") : "自定义"}
       </button>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="truncate text-sm font-medium text-foreground">{model.displayName}</span>
-          <span className="font-mono text-[11px] text-foreground-muted">{model.modelId}</span>
+          <span className="text-foreground truncate text-sm font-medium">{model.displayName}</span>
+          <span className="text-foreground-muted font-mono text-[11px]">{model.modelId}</span>
           {model.origin === "catalog" ? (
-            <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-foreground-muted">
+            <span className="text-foreground-muted rounded-full bg-white/5 px-2 py-0.5 text-[10px]">
               Catalog
             </span>
           ) : null}
         </div>
-        <div className="mt-1 flex flex-wrap gap-3 text-[11px] text-foreground-muted">
+        <div className="text-foreground-muted mt-1 flex flex-wrap gap-3 text-[11px]">
           <span>上下文 {fmtContextWindow(model.contextWindow)}</span>
           <span>输出 {fmtContextWindow(model.maxOutputTokens)}</span>
           <span>
@@ -261,7 +261,7 @@ function ConnectionModelRow({
           <button
             type="button"
             onClick={() => onEditCustomModel(model)}
-            className="rounded p-1 text-foreground-muted transition hover:bg-button-hover-background hover:text-foreground"
+            className="text-foreground-muted hover:bg-button-hover-background hover:text-foreground rounded p-1 transition"
             title="编辑自定义模型"
           >
             <span className="icon-[material-symbols--edit] text-sm" />
@@ -269,7 +269,7 @@ function ConnectionModelRow({
           <button
             type="button"
             onClick={() => onDeleteCustomModel(model)}
-            className="rounded p-1 text-foreground-muted transition hover:bg-button-hover-background hover:text-foreground"
+            className="text-foreground-muted hover:bg-button-hover-background hover:text-foreground rounded p-1 transition"
             title="删除自定义模型"
           >
             <span className="icon-[material-symbols--delete-outline] text-sm" />
@@ -300,8 +300,8 @@ function ConnectionCard({
   const [expanded, setExpanded] = useState(true);
 
   return (
-    <div className="overflow-hidden rounded-md border border-border bg-sidebar-background">
-      <div className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-list-hover-background">
+    <div className="border-border bg-sidebar-background overflow-hidden rounded-md border">
+      <div className="hover:bg-list-hover-background flex w-full items-center gap-3 px-4 py-3 text-left transition">
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
@@ -310,26 +310,26 @@ function ConnectionCard({
         >
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="truncate text-sm font-semibold text-foreground">
+              <span className="text-foreground truncate text-sm font-semibold">
                 {connection.name}
               </span>
-              <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-foreground-muted">
+              <span className="text-foreground-muted rounded-full bg-white/5 px-2 py-0.5 text-[10px]">
                 {connection.kind === "registry" ? "Registry" : "Custom"}
               </span>
               {!connection.isEnabled ? (
-                <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-foreground-muted">
+                <span className="text-foreground-muted rounded-full bg-white/5 px-2 py-0.5 text-[10px]">
                   已禁用
                 </span>
               ) : null}
             </div>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-foreground-muted">
+            <div className="text-foreground-muted mt-1 flex flex-wrap items-center gap-2 text-[11px]">
               <span className="font-mono">{connection.sdkPackage}</span>
               {providerName ? <span>来源 {providerName}</span> : null}
               <span>{maskApiKey(connection.apiKey)}</span>
             </div>
           </div>
           <span
-            className={`text-xl text-foreground-muted ${expanded ? "icon-[material-symbols--keyboard-arrow-up]" : "icon-[material-symbols--keyboard-arrow-down]"}`}
+            className={`text-foreground-muted text-xl ${expanded ? "icon-[material-symbols--keyboard-arrow-up]" : "icon-[material-symbols--keyboard-arrow-down]"}`}
           />
         </button>
 
@@ -337,7 +337,7 @@ function ConnectionCard({
           <button
             type="button"
             onClick={() => onEdit(connection)}
-            className="rounded p-1 text-foreground-muted transition hover:bg-button-hover-background hover:text-foreground"
+            className="text-foreground-muted hover:bg-button-hover-background hover:text-foreground rounded p-1 transition"
             title="编辑连接"
           >
             <span className="icon-[material-symbols--edit] text-sm" />
@@ -345,7 +345,7 @@ function ConnectionCard({
           <button
             type="button"
             onClick={() => onDelete(connection)}
-            className="rounded p-1 text-foreground-muted transition hover:bg-button-hover-background hover:text-foreground"
+            className="text-foreground-muted hover:bg-button-hover-background hover:text-foreground rounded p-1 transition"
             title="删除连接"
           >
             <span className="icon-[material-symbols--delete-outline] text-sm" />
@@ -354,9 +354,9 @@ function ConnectionCard({
       </div>
 
       {expanded ? (
-        <div className="border-t border-border px-4 py-3">
+        <div className="border-border border-t px-4 py-3">
           {connection.baseUrl ? (
-            <div className="mb-2 text-[11px] text-foreground-muted">
+            <div className="text-foreground-muted mb-2 text-[11px]">
               Endpoint {connection.baseUrl}
             </div>
           ) : null}
@@ -364,7 +364,7 @@ function ConnectionCard({
             <button
               type="button"
               onClick={() => onOpenAddCustomModel(connection)}
-              className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-foreground transition hover:bg-list-hover-background"
+              className="border-border text-foreground hover:bg-list-hover-background inline-flex items-center gap-1 rounded-md border px-2 py-1 transition"
             >
               <span className="icon-[material-symbols--add] text-sm" />
               添加自定义模型
@@ -404,12 +404,12 @@ function ConnectionModelsList({
   }
 
   if ((models ?? []).length === 0) {
-    return <div className="py-4 text-sm text-foreground-muted">这个连接当前没有可见模型。</div>;
+    return <div className="text-foreground-muted py-4 text-sm">这个连接当前没有可见模型。</div>;
   }
 
   return (
     <div className="relative" aria-busy={isRefreshing}>
-      <RefreshOverlay active={isRefreshing} className="right-0 top-0" />
+      <RefreshOverlay active={isRefreshing} className="top-0 right-0" />
       <div
         inert={isRefreshing}
         className={`space-y-2 transition-opacity ${
@@ -473,7 +473,7 @@ function ConnectionDialog({
         event.preventDefault();
         if (!isPending) onCancel();
       }}
-      className="w-[min(34rem,calc(100vw-2rem))] rounded-lg border border-border bg-sidebar-background p-0 text-foreground shadow-lg backdrop:bg-black/50"
+      className="border-border bg-sidebar-background text-foreground w-[min(34rem,calc(100vw-2rem))] rounded-lg border p-0 shadow-lg backdrop:bg-black/50"
     >
       <ConnectionDialogForm
         key={connection?.id ?? (quickConnectProviderId ? `quick-${quickConnectProviderId}` : "new")}
@@ -589,14 +589,14 @@ function ConnectionDialogForm({
 
   return (
     <form onSubmit={handleSubmit}>
-      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-        <span className="icon-[material-symbols--cable] text-base text-accent-foreground" />
+      <div className="border-border flex items-center gap-2 border-b px-4 py-3">
+        <span className="icon-[material-symbols--cable] text-accent-foreground text-base" />
         <span className="text-sm font-medium">{connection ? "编辑连接" : "新建连接"}</span>
         <button
           type="button"
           onClick={onCancel}
           disabled={isPending}
-          className="ml-auto rounded p-1 text-foreground-muted transition hover:bg-button-hover-background hover:text-foreground disabled:opacity-40"
+          className="text-foreground-muted hover:bg-button-hover-background hover:text-foreground ml-auto rounded p-1 transition disabled:opacity-40"
         >
           <span className="icon-[material-symbols--close] text-base" />
         </button>
@@ -632,23 +632,23 @@ function ConnectionDialogForm({
         ) : null}
 
         <label className="block space-y-1">
-          <span className="text-[11px] font-medium text-foreground-muted">名称</span>
+          <span className="text-foreground-muted text-[11px] font-medium">名称</span>
           <input
             autoFocus
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="例如：OpenRouter 主账号"
-            className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-sm outline-none focus:border-accent-foreground"
+            className="border-border bg-editor-background focus:border-accent-foreground w-full rounded-md border px-3 py-2 text-sm outline-none"
           />
         </label>
 
         {kind === "registry" ? (
           <label className="block space-y-1">
-            <span className="text-[11px] font-medium text-foreground-muted">Catalog Provider</span>
+            <span className="text-foreground-muted text-[11px] font-medium">Catalog Provider</span>
             <select
               value={catalogProviderId}
               onChange={(event) => setCatalogProviderId(event.target.value)}
-              className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-sm outline-none focus:border-accent-foreground"
+              className="border-border bg-editor-background focus:border-accent-foreground w-full rounded-md border px-3 py-2 text-sm outline-none"
             >
               {editableProviders.map((provider) => (
                 <option key={provider.id} value={provider.id}>
@@ -659,11 +659,11 @@ function ConnectionDialogForm({
           </label>
         ) : (
           <label className="block space-y-1">
-            <span className="text-[11px] font-medium text-foreground-muted">AI SDK Package</span>
+            <span className="text-foreground-muted text-[11px] font-medium">AI SDK Package</span>
             <select
               value={sdkPackage}
               onChange={(event) => setSdkPackage(event.target.value)}
-              className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-sm outline-none focus:border-accent-foreground"
+              className="border-border bg-editor-background focus:border-accent-foreground w-full rounded-md border px-3 py-2 text-sm outline-none"
             >
               {supportedPackages.map((item) => (
                 <option key={item.sdkPackage} value={item.sdkPackage}>
@@ -674,8 +674,8 @@ function ConnectionDialogForm({
           </label>
         )}
 
-        <div className="rounded-md border border-border bg-editor-background px-3 py-2 text-xs text-foreground-muted">
-          <div className="font-mono text-foreground">{effectiveSdkPackage ?? "未选择 package"}</div>
+        <div className="border-border bg-editor-background text-foreground-muted rounded-md border px-3 py-2 text-xs">
+          <div className="text-foreground font-mono">{effectiveSdkPackage ?? "未选择 package"}</div>
           {recipe ? (
             <div className="mt-1">
               factory: {recipe.providerFactoryId}
@@ -690,12 +690,12 @@ function ConnectionDialogForm({
 
         {showBaseUrl ? (
           <label className="block space-y-1">
-            <span className="text-[11px] font-medium text-foreground-muted">Base URL</span>
+            <span className="text-foreground-muted text-[11px] font-medium">Base URL</span>
             <input
               value={baseUrl}
               onChange={(event) => setBaseUrl(event.target.value)}
               placeholder="https://api.example.com/v1"
-              className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-xs font-mono outline-none focus:border-accent-foreground"
+              className="border-border bg-editor-background focus:border-accent-foreground w-full rounded-md border px-3 py-2 font-mono text-xs outline-none"
             />
           </label>
         ) : null}
@@ -703,7 +703,7 @@ function ConnectionDialogForm({
         {isAzureConfig ? (
           <>
             <label className="block space-y-1">
-              <span className="text-[11px] font-medium text-foreground-muted">Resource Name</span>
+              <span className="text-foreground-muted text-[11px] font-medium">Resource Name</span>
               <input
                 value={config.azure?.resourceName ?? ""}
                 onChange={(event) =>
@@ -716,12 +716,12 @@ function ConnectionDialogForm({
                   }))
                 }
                 placeholder="your-azure-resource"
-                className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-sm outline-none focus:border-accent-foreground"
+                className="border-border bg-editor-background focus:border-accent-foreground w-full rounded-md border px-3 py-2 text-sm outline-none"
               />
             </label>
 
             <label className="block space-y-1">
-              <span className="text-[11px] font-medium text-foreground-muted">API Version</span>
+              <span className="text-foreground-muted text-[11px] font-medium">API Version</span>
               <input
                 value={config.azure?.apiVersion ?? ""}
                 onChange={(event) =>
@@ -734,11 +734,11 @@ function ConnectionDialogForm({
                   }))
                 }
                 placeholder="preview"
-                className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-sm outline-none focus:border-accent-foreground"
+                className="border-border bg-editor-background focus:border-accent-foreground w-full rounded-md border px-3 py-2 text-sm outline-none"
               />
             </label>
 
-            <label className="flex items-center gap-2 text-sm text-foreground-muted">
+            <label className="text-foreground-muted flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
                 checked={config.azure?.useDeploymentBasedUrls ?? false}
@@ -751,7 +751,7 @@ function ConnectionDialogForm({
                     },
                   }))
                 }
-                className="rounded border-border bg-editor-background accent-accent-foreground"
+                className="border-border bg-editor-background accent-accent-foreground rounded"
               />
               使用 deployment-based URLs
             </label>
@@ -759,7 +759,7 @@ function ConnectionDialogForm({
         ) : null}
 
         <label className="block space-y-1">
-          <span className="text-[11px] font-medium text-foreground-muted">API Key</span>
+          <span className="text-foreground-muted text-[11px] font-medium">API Key</span>
           <input
             type="password"
             value={apiKey}
@@ -774,40 +774,40 @@ function ConnectionDialogForm({
               }
             }}
             placeholder={connection?.apiKey ? "留空则不修改" : "sk-..."}
-            className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-sm outline-none focus:border-accent-foreground"
+            className="border-border bg-editor-background focus:border-accent-foreground w-full rounded-md border px-3 py-2 text-sm outline-none"
           />
         </label>
 
-        <label className="flex items-center gap-2 text-sm text-foreground-muted">
+        <label className="text-foreground-muted flex items-center gap-2 text-sm">
           <input
             type="checkbox"
             checked={isEnabled}
             onChange={(event) => setIsEnabled(event.target.checked)}
-            className="rounded border-border bg-editor-background accent-accent-foreground"
+            className="border-border bg-editor-background accent-accent-foreground rounded"
           />
           启用这个连接
         </label>
 
         {formError ? (
-          <div className="rounded-md border border-border bg-editor-background px-3 py-2 text-sm text-accent-foreground">
+          <div className="border-border bg-editor-background text-accent-foreground rounded-md border px-3 py-2 text-sm">
             {formError}
           </div>
         ) : null}
       </div>
 
-      <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
+      <div className="border-border flex items-center justify-end gap-2 border-t px-4 py-3">
         <button
           type="button"
           onClick={onCancel}
           disabled={isPending}
-          className="rounded-md border border-border px-3 py-1.5 text-sm text-foreground transition hover:bg-list-hover-background disabled:opacity-40"
+          className="border-border text-foreground hover:bg-list-hover-background rounded-md border px-3 py-1.5 text-sm transition disabled:opacity-40"
         >
           取消
         </button>
         <button
           type="submit"
           disabled={isPending}
-          className="rounded-md bg-accent-background px-3 py-1.5 text-sm font-medium text-foreground transition hover:brightness-110 disabled:opacity-50"
+          className="bg-accent-background text-foreground rounded-md px-3 py-1.5 text-sm font-medium transition hover:brightness-110 disabled:opacity-50"
         >
           {isPending ? "保存中..." : "保存连接"}
         </button>
@@ -845,7 +845,7 @@ function CustomModelDialog({
         event.preventDefault();
         if (!isPending) onCancel();
       }}
-      className="w-[min(34rem,calc(100vw-2rem))] rounded-lg border border-border bg-sidebar-background p-0 text-foreground shadow-lg backdrop:bg-black/50"
+      className="border-border bg-sidebar-background text-foreground w-[min(34rem,calc(100vw-2rem))] rounded-lg border p-0 shadow-lg backdrop:bg-black/50"
     >
       <CustomModelDialogForm
         key={model?.id ?? "new"}
@@ -912,14 +912,14 @@ function CustomModelDialogForm({
 
   return (
     <form onSubmit={handleSubmit}>
-      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-        <span className="icon-[material-symbols--token] text-base text-accent-foreground" />
+      <div className="border-border flex items-center gap-2 border-b px-4 py-3">
+        <span className="icon-[material-symbols--token] text-accent-foreground text-base" />
         <span className="text-sm font-medium">{model ? "编辑自定义模型" : "添加自定义模型"}</span>
         <button
           type="button"
           onClick={onCancel}
           disabled={isPending}
-          className="ml-auto rounded p-1 text-foreground-muted transition hover:bg-button-hover-background hover:text-foreground disabled:opacity-40"
+          className="text-foreground-muted hover:bg-button-hover-background hover:text-foreground ml-auto rounded p-1 transition disabled:opacity-40"
         >
           <span className="icon-[material-symbols--close] text-base" />
         </button>
@@ -928,54 +928,54 @@ function CustomModelDialogForm({
       <div className="space-y-4 p-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="block space-y-1">
-            <span className="text-[11px] font-medium text-foreground-muted">模型 ID</span>
+            <span className="text-foreground-muted text-[11px] font-medium">模型 ID</span>
             <input
               autoFocus
               value={modelId}
               onChange={(event) => setModelId(event.target.value)}
               placeholder="gpt-4o-mini"
-              className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-xs font-mono outline-none focus:border-accent-foreground"
+              className="border-border bg-editor-background focus:border-accent-foreground w-full rounded-md border px-3 py-2 font-mono text-xs outline-none"
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-[11px] font-medium text-foreground-muted">显示名称</span>
+            <span className="text-foreground-muted text-[11px] font-medium">显示名称</span>
             <input
               value={displayName}
               onChange={(event) => setDisplayName(event.target.value)}
               placeholder="My Fine-Tuned Model"
-              className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-sm outline-none focus:border-accent-foreground"
+              className="border-border bg-editor-background focus:border-accent-foreground w-full rounded-md border px-3 py-2 text-sm outline-none"
             />
           </label>
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="block space-y-1">
-            <span className="text-[11px] font-medium text-foreground-muted">上下文窗口</span>
+            <span className="text-foreground-muted text-[11px] font-medium">上下文窗口</span>
             <input
               type="number"
               value={contextWindow}
               onChange={(event) => setContextWindow(event.target.value)}
-              className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-xs font-mono outline-none focus:border-accent-foreground"
+              className="border-border bg-editor-background focus:border-accent-foreground w-full rounded-md border px-3 py-2 font-mono text-xs outline-none"
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-[11px] font-medium text-foreground-muted">最大输出</span>
+            <span className="text-foreground-muted text-[11px] font-medium">最大输出</span>
             <input
               type="number"
               value={maxOutputTokens}
               onChange={(event) => setMaxOutputTokens(event.target.value)}
-              className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-xs font-mono outline-none focus:border-accent-foreground"
+              className="border-border bg-editor-background focus:border-accent-foreground w-full rounded-md border px-3 py-2 font-mono text-xs outline-none"
             />
           </label>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 text-sm text-foreground-muted sm:grid-cols-4">
+        <div className="text-foreground-muted grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
           <label className="flex items-center gap-2">
             <input
               type="checkbox"
               checked={supportsVision}
               onChange={(event) => setSupportsVision(event.target.checked)}
-              className="rounded border-border bg-editor-background accent-accent-foreground"
+              className="border-border bg-editor-background accent-accent-foreground rounded"
             />
             视觉
           </label>
@@ -984,7 +984,7 @@ function CustomModelDialogForm({
               type="checkbox"
               checked={supportsToolUse}
               onChange={(event) => setSupportsToolUse(event.target.checked)}
-              className="rounded border-border bg-editor-background accent-accent-foreground"
+              className="border-border bg-editor-background accent-accent-foreground rounded"
             />
             工具
           </label>
@@ -993,7 +993,7 @@ function CustomModelDialogForm({
               type="checkbox"
               checked={supportsReasoning}
               onChange={(event) => setSupportsReasoning(event.target.checked)}
-              className="rounded border-border bg-editor-background accent-accent-foreground"
+              className="border-border bg-editor-background accent-accent-foreground rounded"
             />
             推理
           </label>
@@ -1002,7 +1002,7 @@ function CustomModelDialogForm({
               type="checkbox"
               checked={supportsTemperature}
               onChange={(event) => setSupportsTemperature(event.target.checked)}
-              className="rounded border-border bg-editor-background accent-accent-foreground"
+              className="border-border bg-editor-background accent-accent-foreground rounded"
             />
             温度
           </label>
@@ -1010,59 +1010,59 @@ function CustomModelDialogForm({
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="block space-y-1">
-            <span className="text-[11px] font-medium text-foreground-muted">输入价格 / 1M</span>
+            <span className="text-foreground-muted text-[11px] font-medium">输入价格 / 1M</span>
             <input
               type="number"
               step="0.001"
               min="0"
               value={inputPrice}
               onChange={(event) => setInputPrice(event.target.value)}
-              className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-xs font-mono outline-none focus:border-accent-foreground"
+              className="border-border bg-editor-background focus:border-accent-foreground w-full rounded-md border px-3 py-2 font-mono text-xs outline-none"
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-[11px] font-medium text-foreground-muted">输出价格 / 1M</span>
+            <span className="text-foreground-muted text-[11px] font-medium">输出价格 / 1M</span>
             <input
               type="number"
               step="0.001"
               min="0"
               value={outputPrice}
               onChange={(event) => setOutputPrice(event.target.value)}
-              className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-xs font-mono outline-none focus:border-accent-foreground"
+              className="border-border bg-editor-background focus:border-accent-foreground w-full rounded-md border px-3 py-2 font-mono text-xs outline-none"
             />
           </label>
         </div>
 
-        <label className="flex items-center gap-2 text-sm text-foreground-muted">
+        <label className="text-foreground-muted flex items-center gap-2 text-sm">
           <input
             type="checkbox"
             checked={isEnabled}
             onChange={(event) => setIsEnabled(event.target.checked)}
-            className="rounded border-border bg-editor-background accent-accent-foreground"
+            className="border-border bg-editor-background accent-accent-foreground rounded"
           />
           启用这个自定义模型
         </label>
 
         {formError ? (
-          <div className="rounded-md border border-border bg-editor-background px-3 py-2 text-sm text-accent-foreground">
+          <div className="border-border bg-editor-background text-accent-foreground rounded-md border px-3 py-2 text-sm">
             {formError}
           </div>
         ) : null}
       </div>
 
-      <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
+      <div className="border-border flex items-center justify-end gap-2 border-t px-4 py-3">
         <button
           type="button"
           onClick={onCancel}
           disabled={isPending}
-          className="rounded-md border border-border px-3 py-1.5 text-sm text-foreground transition hover:bg-list-hover-background disabled:opacity-40"
+          className="border-border text-foreground hover:bg-list-hover-background rounded-md border px-3 py-1.5 text-sm transition disabled:opacity-40"
         >
           取消
         </button>
         <button
           type="submit"
           disabled={isPending}
-          className="rounded-md bg-accent-background px-3 py-1.5 text-sm font-medium text-foreground transition hover:brightness-110 disabled:opacity-50"
+          className="bg-accent-background text-foreground rounded-md px-3 py-1.5 text-sm font-medium transition hover:brightness-110 disabled:opacity-50"
         >
           {isPending ? "保存中..." : "保存模型"}
         </button>
@@ -1074,13 +1074,13 @@ function CustomModelDialogForm({
 function SettingsSidebar() {
   return (
     <AppSidebar>
-      <div className="flex h-7 shrink-0 items-center px-3 text-[11px] font-semibold uppercase tracking-wider text-foreground-muted">
+      <div className="text-foreground-muted flex h-7 shrink-0 items-center px-3 text-[11px] font-semibold tracking-wider uppercase">
         设置
       </div>
       <SidebarListRow
         isActive
         icon={
-          <span className="icon-[material-symbols--smart-toy] text-base text-foreground-muted" />
+          <span className="icon-[material-symbols--smart-toy] text-foreground-muted text-base" />
         }
         label="AI"
       />
@@ -1186,10 +1186,10 @@ export function AiSettingsPage() {
   return (
     <AppShell active="settings" sidebar={<SettingsSidebar />}>
       <div className="flex h-full flex-col overflow-hidden">
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-title-bar-background px-4 py-2">
+        <div className="border-border bg-title-bar-background flex shrink-0 flex-wrap items-center justify-between gap-3 border-b px-4 py-2">
           <div className="min-w-0">
-            <h1 className="text-[14px] font-semibold text-foreground">AI 设置</h1>
-            <p className="text-[11px] text-foreground-muted">
+            <h1 className="text-foreground text-[14px] font-semibold">AI 设置</h1>
+            <p className="text-foreground-muted text-[11px]">
               {status?.activeProviderCount ?? 0} 个活跃 provider · {status?.activeModelCount ?? 0}{" "}
               个活跃模型 · {allConnections.length} 个连接
             </p>
@@ -1202,7 +1202,7 @@ export function AiSettingsPage() {
                 setEditingConnection(undefined);
                 setConnectionDialogOpen(true);
               }}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-sidebar-background px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-list-hover-background"
+              className="border-border bg-sidebar-background text-foreground hover:bg-list-hover-background inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition"
             >
               <span className="icon-[material-symbols--add] text-base" />
               新建连接
@@ -1211,7 +1211,7 @@ export function AiSettingsPage() {
               type="button"
               onClick={() => void refreshCatalog.mutate({ force: true })}
               disabled={refreshCatalog.isPending}
-              className="inline-flex items-center gap-1.5 rounded-md bg-accent-background px-3 py-1.5 text-sm font-medium text-foreground transition hover:brightness-110 disabled:opacity-50"
+              className="bg-accent-background text-foreground inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition hover:brightness-110 disabled:opacity-50"
             >
               <span
                 className={`text-base ${refreshCatalog.isPending ? "icon-[material-symbols--sync] animate-spin" : "icon-[material-symbols--cloud-sync]"}`}
@@ -1222,46 +1222,46 @@ export function AiSettingsPage() {
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
-          <section className="mb-4 grid shrink-0 gap-3 rounded-md border border-border bg-sidebar-background p-3 text-sm text-foreground-muted sm:grid-cols-2 xl:grid-cols-4">
+          <section className="border-border bg-sidebar-background text-foreground-muted mb-4 grid shrink-0 gap-3 rounded-md border p-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
             <div>
-              <div className="text-[11px] uppercase tracking-wide text-foreground-muted/70">
+              <div className="text-foreground-muted/70 text-[11px] tracking-wide uppercase">
                 Last Success
               </div>
-              <div className="mt-1 text-foreground">
+              <div className="text-foreground mt-1">
                 {status?.lastSuccessAt
                   ? new Date(status.lastSuccessAt).toLocaleString()
                   : "从未同步"}
               </div>
             </div>
             <div>
-              <div className="text-[11px] uppercase tracking-wide text-foreground-muted/70">
+              <div className="text-foreground-muted/70 text-[11px] tracking-wide uppercase">
                 Last Attempt
               </div>
-              <div className="mt-1 text-foreground">
+              <div className="text-foreground mt-1">
                 {status?.lastAttemptAt ? new Date(status.lastAttemptAt).toLocaleString() : "—"}
               </div>
             </div>
             <div>
-              <div className="text-[11px] uppercase tracking-wide text-foreground-muted/70">
+              <div className="text-foreground-muted/70 text-[11px] tracking-wide uppercase">
                 State
               </div>
-              <div className="mt-1 text-foreground">
+              <div className="text-foreground mt-1">
                 {status?.isStale ? "快照已过期" : "快照新鲜"}
               </div>
             </div>
             <div>
-              <div className="text-[11px] uppercase tracking-wide text-foreground-muted/70">
+              <div className="text-foreground-muted/70 text-[11px] tracking-wide uppercase">
                 Last Error
               </div>
-              <div className="mt-1 wrap-break-word text-foreground">{status?.lastError ?? "—"}</div>
+              <div className="text-foreground mt-1 wrap-break-word">{status?.lastError ?? "—"}</div>
             </div>
           </section>
 
           <section className="grid min-h-0 flex-1 gap-4 overflow-y-auto xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] xl:overflow-hidden">
             <div className="flex min-h-0 flex-col gap-3 xl:overflow-hidden">
               <div className="shrink-0">
-                <h2 className="text-sm font-semibold text-foreground">Connections</h2>
-                <p className="text-xs text-foreground-muted">
+                <h2 className="text-foreground text-sm font-semibold">Connections</h2>
+                <p className="text-foreground-muted text-xs">
                   这里保存真正会被未来 AI SDK 使用的连接实例。
                 </p>
               </div>
@@ -1270,7 +1270,7 @@ export function AiSettingsPage() {
                 {connectionsLoading ? (
                   <LoadingBlock label="连接加载中..." />
                 ) : allConnections.length === 0 ? (
-                  <div className="rounded-md border border-dashed border-border px-4 py-10 text-sm text-foreground-muted">
+                  <div className="border-border text-foreground-muted rounded-md border border-dashed px-4 py-10 text-sm">
                     还没有任何连接。先创建一个 registry 或 custom connection。
                   </div>
                 ) : (
@@ -1331,8 +1331,8 @@ export function AiSettingsPage() {
 
             <div className="flex min-h-0 flex-col gap-3 xl:overflow-hidden">
               <div className="shrink-0">
-                <h2 className="text-sm font-semibold text-foreground">Catalog</h2>
-                <p className="text-xs text-foreground-muted">
+                <h2 className="text-foreground text-sm font-semibold">Catalog</h2>
+                <p className="text-foreground-muted text-xs">
                   来自 models.dev 的目录快照。支持接入的 provider 可以直接创建 registry 连接。
                 </p>
                 <input
@@ -1340,7 +1340,7 @@ export function AiSettingsPage() {
                   value={providerFilter}
                   onChange={(e) => setProviderFilter(e.target.value)}
                   placeholder="筛选 Provider..."
-                  className="mt-2 w-full rounded-md border border-border bg-editor-background px-3 py-1.5 text-sm outline-none placeholder:text-foreground-muted/50 focus:border-accent-foreground"
+                  className="border-border bg-editor-background placeholder:text-foreground-muted/50 focus:border-accent-foreground mt-2 w-full rounded-md border px-3 py-1.5 text-sm outline-none"
                 />
               </div>
 

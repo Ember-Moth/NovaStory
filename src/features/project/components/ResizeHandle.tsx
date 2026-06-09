@@ -17,7 +17,7 @@ export function ResizeHandle({
   if (!interactive) {
     return (
       <div className="relative z-10 -my-0.75 h-1.75 shrink-0">
-        <div className="absolute inset-x-0 top-0.75 h-px bg-border" />
+        <div className="bg-border absolute inset-x-0 top-0.75 h-px" />
       </div>
     );
   }
@@ -58,9 +58,9 @@ export function ResizeHandle({
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
     >
-      <div className="absolute inset-x-0 top-0.75 h-px bg-border" />
+      <div className="bg-border absolute inset-x-0 top-0.75 h-px" />
       <div
-        className={`absolute inset-x-0 top-[2.5px] h-0.5 bg-drag-border transition-opacity ${
+        className={`bg-drag-border absolute inset-x-0 top-[2.5px] h-0.5 transition-opacity ${
           dragging ? "opacity-100" : "opacity-0 group-hover:opacity-100"
         }`}
       />

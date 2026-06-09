@@ -27,12 +27,12 @@ function ActivityBarButton({
       aria-label={label}
       aria-current={active ? "page" : undefined}
       className={`relative flex w-full items-center justify-center border-l-2 border-l-transparent py-1 transition ${
-        interactive ? "cursor-pointer hover:text-activity-bar-active-foreground" : "cursor-default"
+        interactive ? "hover:text-activity-bar-active-foreground cursor-pointer" : "cursor-default"
       }`}
     >
       {active ? (
         <div
-          className="pointer-events-none absolute inset-y-0 left-0 w-0.5 bg-activity-bar-active-foreground view-transition-name-[activity-bar-indicator]"
+          className="bg-activity-bar-active-foreground view-transition-name-[activity-bar-indicator] pointer-events-none absolute inset-y-0 left-0 w-0.5"
           aria-hidden
         />
       ) : null}
@@ -50,7 +50,7 @@ export function ActivityBar({ active }: { active: ActivityBarItem }) {
   const lastProjectId = useAtomValue(lastProjectIdAtom);
 
   return (
-    <div className="flex w-12 shrink-0 flex-col items-center gap-1 bg-activity-bar-background pt-2">
+    <div className="bg-activity-bar-background flex w-12 shrink-0 flex-col items-center gap-1 pt-2">
       <ActivityBarButton
         icon="icon-[material-symbols--folder]"
         label="项目"

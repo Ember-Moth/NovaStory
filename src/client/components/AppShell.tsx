@@ -19,7 +19,7 @@ export function AppShell({
   return (
     <div
       {...rest}
-      className={`flex h-dvh w-full select-none overflow-hidden bg-editor-background text-foreground ${className ?? ""}`.trim()}
+      className={`bg-editor-background text-foreground flex h-dvh w-full overflow-hidden select-none ${className ?? ""}`.trim()}
     >
       <ActivityBar active={active} />
       {sidebar}
@@ -32,7 +32,7 @@ export function AppShell({
 
 export function AppSidebar({ children }: { children: ReactNode }) {
   return (
-    <div className="relative flex w-72 shrink-0 flex-col overflow-hidden border-r border-border bg-sidebar-background">
+    <div className="border-border bg-sidebar-background relative flex w-72 shrink-0 flex-col overflow-hidden border-r">
       {children}
     </div>
   );

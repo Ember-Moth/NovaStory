@@ -85,17 +85,17 @@ export function HomePage() {
   return (
     <AppShell active="home">
       <div className="flex h-full flex-col overflow-hidden">
-        <div className="flex shrink-0 items-center gap-3 border-b border-border bg-title-bar-background px-4 py-2">
-          <span className="icon-[material-symbols--folder] text-xl text-icon-folder" />
+        <div className="border-border bg-title-bar-background flex shrink-0 items-center gap-3 border-b px-4 py-2">
+          <span className="icon-[material-symbols--folder] text-icon-folder text-xl" />
           <div className="min-w-0">
-            <h1 className="text-[14px] font-semibold text-foreground">项目</h1>
-            <p className="text-[11px] text-foreground-muted">{projectList.length} 个项目</p>
+            <h1 className="text-foreground text-[14px] font-semibold">项目</h1>
+            <p className="text-foreground-muted text-[11px]">{projectList.length} 个项目</p>
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
           {error ? (
-            <div className="mb-4 flex items-center gap-2 rounded-md border border-border bg-sidebar-background px-3 py-2 text-sm text-accent-foreground">
+            <div className="border-border bg-sidebar-background text-accent-foreground mb-4 flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
               <span className="icon-[material-symbols--info] shrink-0 text-base" />
               {error.message}
             </div>
@@ -108,9 +108,9 @@ export function HomePage() {
               <button
                 type="button"
                 onClick={openCreateDialog}
-                className="group flex min-h-36 flex-col items-center justify-center gap-2 rounded-md border border-dashed border-border bg-sidebar-background p-4 text-foreground-muted transition hover:border-accent-foreground hover:bg-list-hover-background hover:text-foreground"
+                className="group border-border bg-sidebar-background text-foreground-muted hover:border-accent-foreground hover:bg-list-hover-background hover:text-foreground flex min-h-36 flex-col items-center justify-center gap-2 rounded-md border border-dashed p-4 transition"
               >
-                <span className="icon-[material-symbols--add-circle-outline] text-3xl text-accent-foreground transition group-hover:scale-105" />
+                <span className="icon-[material-symbols--add-circle-outline] text-accent-foreground text-3xl transition group-hover:scale-105" />
                 <span className="text-sm font-medium">新建项目</span>
               </button>
 
@@ -132,20 +132,20 @@ export function HomePage() {
                       className="flex min-h-0 flex-1 flex-col items-start gap-2 text-left"
                     >
                       <div className="flex w-full items-center gap-2">
-                        <span className="icon-[material-symbols--folder] text-2xl text-icon-folder" />
+                        <span className="icon-[material-symbols--folder] text-icon-folder text-2xl" />
                         {isLastOpened ? (
-                          <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-accent-foreground">
+                          <span className="text-accent-foreground rounded px-1.5 py-0.5 text-[10px] font-medium">
                             上次打开
                           </span>
                         ) : null}
                       </div>
-                      <span className="line-clamp-2 text-sm font-medium text-foreground">
+                      <span className="text-foreground line-clamp-2 text-sm font-medium">
                         {project.name}
                       </span>
-                      <p className="line-clamp-2 flex-1 text-xs leading-relaxed text-foreground-muted">
+                      <p className="text-foreground-muted line-clamp-2 flex-1 text-xs leading-relaxed">
                         {project.description?.trim() || "暂无描述"}
                       </p>
-                      <span className="text-[11px] text-foreground-muted">
+                      <span className="text-foreground-muted text-[11px]">
                         {dateFormatter.format(project.updatedAt)}
                       </span>
                     </button>
@@ -153,7 +153,7 @@ export function HomePage() {
                       type="button"
                       onClick={() => handleDeleteProject(project.id, project.name)}
                       disabled={deleteProject.isPending && deletingId === project.id}
-                      className="absolute right-2 top-2 rounded p-1 text-foreground-muted opacity-0 transition hover:bg-button-hover-background hover:text-foreground group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-30"
+                      className="text-foreground-muted hover:bg-button-hover-background hover:text-foreground absolute top-2 right-2 rounded p-1 opacity-0 transition group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-30"
                       title="删除项目"
                     >
                       <span className="icon-[material-symbols--delete] text-base leading-none" />
@@ -168,16 +168,16 @@ export function HomePage() {
 
       <dialog
         ref={dialogRef}
-        className="w-[min(28rem,calc(100vw-2rem))] rounded-lg border border-border bg-sidebar-background p-0 text-foreground shadow-lg backdrop:bg-black/50"
+        className="border-border bg-sidebar-background text-foreground w-[min(28rem,calc(100vw-2rem))] rounded-lg border p-0 shadow-lg backdrop:bg-black/50"
       >
         <form onSubmit={handleCreateProject}>
-          <div className="flex items-center gap-2 border-b border-border px-4 py-2">
-            <span className="icon-[material-symbols--add-circle-outline] text-base text-accent-foreground" />
+          <div className="border-border flex items-center gap-2 border-b px-4 py-2">
+            <span className="icon-[material-symbols--add-circle-outline] text-accent-foreground text-base" />
             <span className="text-sm font-medium">新建项目</span>
             <button
               type="button"
               onClick={closeCreateDialog}
-              className="ml-auto rounded p-0.5 text-foreground-muted transition hover:bg-button-hover-background hover:text-foreground"
+              className="text-foreground-muted hover:bg-button-hover-background hover:text-foreground ml-auto rounded p-0.5 transition"
             >
               <span className="icon-[material-symbols--close] text-base leading-none" />
             </button>
@@ -185,47 +185,47 @@ export function HomePage() {
 
           <div className="space-y-4 p-4">
             <label className="block space-y-1.5">
-              <span className="text-xs font-medium text-foreground-muted">项目名</span>
+              <span className="text-foreground-muted text-xs font-medium">项目名</span>
               <input
                 autoFocus
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="例如：雾港编年史"
-                className="w-full rounded-md border border-border bg-editor-background px-3 py-1.5 text-sm text-foreground outline-none transition placeholder:text-foreground-muted/50 focus:border-accent-foreground"
+                className="border-border bg-editor-background text-foreground placeholder:text-foreground-muted/50 focus:border-accent-foreground w-full rounded-md border px-3 py-1.5 text-sm transition outline-none"
               />
             </label>
 
             <label className="block space-y-1.5">
-              <span className="text-xs font-medium text-foreground-muted">描述</span>
+              <span className="text-foreground-muted text-xs font-medium">描述</span>
               <textarea
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
                 rows={3}
                 placeholder="可选"
-                className="w-full resize-none rounded-md border border-border bg-editor-background px-3 py-1.5 text-sm leading-relaxed text-foreground outline-none transition placeholder:text-foreground-muted/50 focus:border-accent-foreground"
+                className="border-border bg-editor-background text-foreground placeholder:text-foreground-muted/50 focus:border-accent-foreground w-full resize-none rounded-md border px-3 py-1.5 text-sm leading-relaxed transition outline-none"
               />
             </label>
 
             {formError || createProject.error ? (
-              <div className="flex items-center gap-2 rounded-md border border-border bg-editor-background px-3 py-2 text-sm text-accent-foreground">
+              <div className="border-border bg-editor-background text-accent-foreground flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
                 <span className="icon-[material-symbols--warning] shrink-0 text-base" />
                 {formError ?? createProject.error?.message}
               </div>
             ) : null}
           </div>
 
-          <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
+          <div className="border-border flex items-center justify-end gap-2 border-t px-4 py-3">
             <button
               type="button"
               onClick={closeCreateDialog}
-              className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-list-hover-background"
+              className="border-border text-foreground hover:bg-list-hover-background rounded-md border px-3 py-1.5 text-sm font-medium transition"
             >
               取消
             </button>
             <button
               type="submit"
               disabled={createProject.isPending}
-              className="rounded-md bg-accent-background px-3 py-1.5 text-sm font-medium text-foreground transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+              className="bg-accent-background text-foreground rounded-md px-3 py-1.5 text-sm font-medium transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {createProject.isPending ? (
                 <span className="inline-flex items-center gap-1.5">

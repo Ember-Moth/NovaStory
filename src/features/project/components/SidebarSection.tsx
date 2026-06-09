@@ -23,7 +23,7 @@ export function SidebarSection({
       style={collapsed || height == null ? undefined : { height }}
     >
       <div
-        className="flex h-7 shrink-0 cursor-pointer items-center gap-1 px-2 text-[11px] font-semibold uppercase tracking-wider text-foreground-muted hover:text-foreground"
+        className="text-foreground-muted hover:text-foreground flex h-7 shrink-0 cursor-pointer items-center gap-1 px-2 text-[11px] font-semibold tracking-wider uppercase"
         onClick={onToggleCollapse}
         role="button"
         tabIndex={0}

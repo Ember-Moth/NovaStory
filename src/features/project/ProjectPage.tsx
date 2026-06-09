@@ -166,7 +166,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
           <AppSidebar>
             <div
               data-action-anchor={PAGE_ERROR_ANCHOR}
-              className="pointer-events-none absolute left-2 top-2 h-px w-px"
+              className="pointer-events-none absolute top-2 left-2 h-px w-px"
               aria-hidden
             />
 

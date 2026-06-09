@@ -48,27 +48,27 @@ export function ConfirmDialog({
           onCancel();
         }
       }}
-      className="w-[min(28rem,calc(100vw-2rem))] rounded-lg border border-border bg-sidebar-background p-0 text-foreground shadow-lg backdrop:bg-black/50"
+      className="border-border bg-sidebar-background text-foreground w-[min(28rem,calc(100vw-2rem))] rounded-lg border p-0 shadow-lg backdrop:bg-black/50"
     >
-      <div className="flex items-center gap-2 border-b border-border px-4 py-2">
-        <span className="icon-[material-symbols--warning] text-base text-accent-foreground" />
+      <div className="border-border flex items-center gap-2 border-b px-4 py-2">
+        <span className="icon-[material-symbols--warning] text-accent-foreground text-base" />
         <span className="text-sm font-medium">{title}</span>
         <button
           type="button"
           onClick={onCancel}
           disabled={isPending}
-          className="ml-auto rounded p-0.5 text-foreground-muted transition hover:bg-button-hover-background hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+          className="text-foreground-muted hover:bg-button-hover-background hover:text-foreground ml-auto rounded p-0.5 transition disabled:cursor-not-allowed disabled:opacity-40"
         >
           <span className="icon-[material-symbols--close] text-base leading-none" />
         </button>
       </div>
 
       <div className="space-y-3 p-4">
-        <p className="text-sm leading-relaxed text-foreground-muted">{description}</p>
+        <p className="text-foreground-muted text-sm leading-relaxed">{description}</p>
         {items.length > 0 ? (
-          <ul className="max-h-48 space-y-1 overflow-y-auto rounded-md border border-border bg-editor-background px-3 py-2 text-sm">
+          <ul className="border-border bg-editor-background max-h-48 space-y-1 overflow-y-auto rounded-md border px-3 py-2 text-sm">
             {items.map((item) => (
-              <li key={item} className="truncate font-mono text-xs text-foreground">
+              <li key={item} className="text-foreground truncate font-mono text-xs">
                 {item}
               </li>
             ))}
@@ -76,12 +76,12 @@ export function ConfirmDialog({
         ) : null}
       </div>
 
-      <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
+      <div className="border-border flex items-center justify-end gap-2 border-t px-4 py-3">
         <button
           type="button"
           onClick={onCancel}
           disabled={isPending}
-          className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-list-hover-background disabled:cursor-not-allowed disabled:opacity-40"
+          className="border-border text-foreground hover:bg-list-hover-background rounded-md border px-3 py-1.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40"
         >
           {cancelLabel}
         </button>
@@ -89,11 +89,11 @@ export function ConfirmDialog({
           type="button"
           onClick={onConfirm}
           disabled={isPending}
-          className="rounded-md bg-accent-background px-3 py-1.5 text-sm font-medium text-foreground transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+          className="bg-accent-background text-foreground rounded-md px-3 py-1.5 text-sm font-medium transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isPending ? (
             <span className="inline-flex items-center gap-1.5">
-              <span className="icon-[material-symbols--sync] text-base animate-spin" />
+              <span className="icon-[material-symbols--sync] animate-spin text-base" />
               处理中
             </span>
           ) : (
