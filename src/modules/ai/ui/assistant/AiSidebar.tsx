@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { AnimatePresence } from "./AiSidebarView";
 import type {
@@ -31,6 +31,7 @@ export function AiSidebar({
   projectId: string;
   contextSnapshot: ProjectAssistantContextSnapshot;
 }) {
+  const messagesViewportRef = useRef<HTMLElement | null>(null);
   const controller = useAiAssistantController(projectId, contextSnapshot);
   const layout = useAssistantSheetLayout({
     defaultState: "peek",
@@ -38,6 +39,7 @@ export function AiSidebar({
   const [expandedToolTraceKeys, setExpandedToolTraceKeys] = useState<Set<string>>(new Set());
   const [expandedReasoningKeys, setExpandedReasoningKeys] = useState<Set<string>>(new Set());
   const [expandedRunSummaryKeys, setExpandedRunSummaryKeys] = useState<Set<string>>(new Set());
+  const [shouldStickToBottom, setShouldStickToBottom] = useState(true);
   const contextDetails = listAssistantContextDetails(controller.contextSnapshot);
   const pendingSendSummary =
     controller.activeStream?.kind === "send"
@@ -46,6 +48,26 @@ export function AiSidebar({
   const visibleMessages = controller.messages.flatMap((message, index) =>
     message.role === "tool" ? [] : [{ message, index }],
   );
+
+  useEffect(() => {
+    setShouldStickToBottom(true);
+  }, [controller.activeThreadId]);
+
+  useEffect(() => {
+    if (!shouldStickToBottom) {
+      return;
+    }
+
+    const viewport = messagesViewportRef.current;
+    if (viewport == null) {
+      return;
+    }
+
+    const frameId = requestAnimationFrame(() => {
+      viewport.scrollTop = viewport.scrollHeight;
+    });
+    return () => cancelAnimationFrame(frameId);
+  }, [controller.activeStream, controller.messages, controller.pendingAction, shouldStickToBottom]);
 
   function toggleToolTrace(key: string) {
     setExpandedToolTraceKeys((current) => {
@@ -83,6 +105,18 @@ export function AiSidebar({
     });
   }
 
+  function handleMessagesScroll() {
+    const viewport = messagesViewportRef.current;
+    if (viewport == null) {
+      return;
+    }
+
+    setShouldStickToBottom((current) => {
+      const next = isViewportNearBottom(viewport);
+      return current === next ? current : next;
+    });
+  }
+
   return (
     <aside className="flex h-full w-96 max-w-[42vw] min-w-72 shrink-0 flex-col overflow-hidden border-l border-border bg-sidebar-background">
       <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border bg-title-bar-background px-3">
@@ -103,6 +137,8 @@ export function AiSidebar({
 
       <AiAssistantSheetLayout
         layout={layout}
+        messagesViewportRef={messagesViewportRef}
+        onMessagesScroll={handleMessagesScroll}
         sessionPane={
           <>
             <div className="flex min-h-full flex-col">
@@ -546,6 +582,10 @@ export function AiSidebar({
       />
     </aside>
   );
+}
+
+function isViewportNearBottom(viewport: HTMLElement) {
+  return viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop <= 24;
 }
 
 function buildStreamRunSummary(overlay: AssistantStreamOverlay) {

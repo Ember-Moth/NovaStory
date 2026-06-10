@@ -1,6 +1,6 @@
 import type { PartialOptions } from "overlayscrollbars";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 
 export type OverlayScrollbarVariant = "panel" | "card";
 
@@ -30,17 +30,42 @@ export function OverlayScrollbar({
   children,
   variant = "panel",
   className,
+  viewportRef,
+  onViewportScroll,
 }: {
   children: ReactNode;
   variant?: OverlayScrollbarVariant;
   className?: string;
+  viewportRef?: { current: HTMLElement | null };
+  onViewportScroll?: (_event: Event) => void;
 }) {
   const rootClassName = ["h-full w-full min-h-0 flex-1", className].filter(Boolean).join(" ");
+
+  useEffect(() => {
+    return () => {
+      if (viewportRef) {
+        viewportRef.current = null;
+      }
+    };
+  }, [viewportRef]);
 
   return (
     <OverlayScrollbarsComponent
       defer
       options={getScrollbarOptions(variant)}
+      events={{
+        initialized(instance) {
+          if (viewportRef) {
+            viewportRef.current = instance.elements().viewport;
+          }
+        },
+        scroll(instance, event) {
+          if (viewportRef) {
+            viewportRef.current = instance.elements().viewport;
+          }
+          onViewportScroll?.(event);
+        },
+      }}
       className={rootClassName}
       data-overlayscrollbars-initialize
     >

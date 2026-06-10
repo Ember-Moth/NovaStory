@@ -9,6 +9,8 @@ export type AiAssistantSheetLayoutProps = {
   sessionPane: ReactNode;
   messagesPane: ReactNode;
   composerPane: ReactNode;
+  messagesViewportRef?: { current: HTMLElement | null };
+  onMessagesScroll?: (_event: Event) => void;
 };
 
 export function AiAssistantSheetLayout({
@@ -16,6 +18,8 @@ export function AiAssistantSheetLayout({
   sessionPane,
   messagesPane,
   composerPane,
+  messagesViewportRef,
+  onMessagesScroll,
 }: AiAssistantSheetLayoutProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -55,7 +59,13 @@ export function AiAssistantSheetLayout({
           </div>
 
           <div className="min-h-0 flex-1 overflow-hidden">
-            <OverlayScrollbar variant="panel">{messagesPane}</OverlayScrollbar>
+            <OverlayScrollbar
+              variant="panel"
+              viewportRef={messagesViewportRef}
+              onViewportScroll={onMessagesScroll}
+            >
+              {messagesPane}
+            </OverlayScrollbar>
           </div>
 
           <div className="shrink-0 border-t border-border">{composerPane}</div>
