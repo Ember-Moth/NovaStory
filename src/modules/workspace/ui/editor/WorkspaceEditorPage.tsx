@@ -38,16 +38,28 @@ const AUX_CREATE_FILE_ANCHOR = actionAnchorId("aux", "create-file");
 const TIMELINE_ADD_ANCHOR = actionAnchorId("timeline", "add");
 const PAGE_ERROR_ANCHOR = actionAnchorId("sidebar", "page-error");
 
-export function WorkspaceEditorPage({ id: projectId }: { id: string }) {
+export function WorkspaceEditorPage({
+  projectId,
+  workspaceId,
+}: {
+  projectId: string;
+  workspaceId: string;
+}) {
   return (
     <ScopeProvider scope={ProjectScope} value={projectId}>
-      <ProjectWorkspace projectId={projectId} />
+      <ProjectWorkspace projectId={projectId} workspaceId={workspaceId} />
     </ScopeProvider>
   );
 }
 
-function ProjectWorkspace({ projectId }: { projectId: string }) {
-  const identity = useProjectWorkspaceIdentity(projectId);
+function ProjectWorkspace({
+  projectId,
+  workspaceId: requestedWorkspaceId,
+}: {
+  projectId: string;
+  workspaceId: string;
+}) {
+  const identity = useProjectWorkspaceIdentity(projectId, requestedWorkspaceId);
   const content = useProjectContentData(identity.workspaceId);
   const timeline = useProjectTimelineData(identity.workspaceId);
   const selectionMolecule = useMolecule(SelectionMolecule);
@@ -73,7 +85,8 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
   const setAuxError = useSetAtom(errors.auxErrorAtom);
   useProjectWorkspaceEffects(workspace, actions.flushBodySave, actions.flushAuxSave);
 
-  const { workspaceId, contentRootId, workspaceQuery, workspaceInitialLoading } = identity;
+  const { workspaceId, contentRootId, workspaceQuery, workspaceInitialLoading, routeMismatch } =
+    identity;
   const {
     query: contentQuery,
     pending: contentPending,
@@ -140,21 +153,21 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
       <AppShell active="project">
         <FullPageMessage
           icon="icon-[material-symbols--sync] animate-spin"
-          title="正在加载项目"
-          description="正在解析默认工作区并准备编辑数据。"
+          title="正在加载工作区"
+          description="正在读取工作区数据并准备编辑内容。"
           embedded
         />
       </AppShell>
     );
   }
 
-  if (workspaceQuery.error) {
+  if (workspaceQuery.error || routeMismatch) {
     return (
       <AppShell active="project">
         <FullPageMessage
           icon="icon-[material-symbols--warning]"
-          title="项目加载失败"
-          description={workspaceQuery.error.message}
+          title={routeMismatch ? "工作区与项目不匹配" : "工作区加载失败"}
+          description={routeMismatch ?? workspaceQuery.error?.message ?? "未找到工作区。"}
           embedded
         />
       </AppShell>
@@ -166,8 +179,8 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
       <AppShell active="project">
         <FullPageMessage
           icon="icon-[material-symbols--folder-off]"
-          title="未找到默认工作区"
-          description="这个项目暂时没有可用的默认工作区，因此无法进入编辑页。"
+          title="未找到工作区"
+          description={`未能定位工作区「${requestedWorkspaceId}」，因此无法进入编辑页。`}
           embedded
         />
       </AppShell>

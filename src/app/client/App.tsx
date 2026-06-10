@@ -8,8 +8,14 @@ import { WorkspaceEditorPage } from "@/modules/workspace/ui/editor/WorkspaceEdit
 import "./styles.css";
 
 export function App() {
-  const { isHome, isSettings, isProjectRoute, isKnownRoute, cachedProjectId } =
-    useCachedProjectRoute();
+  const {
+    isProjectsPage,
+    isSettings,
+    isWorkspaceRoute,
+    isKnownRoute,
+    projectRouteId,
+    cachedWorkspaceRoute,
+  } = useCachedProjectRoute();
 
   if (!isKnownRoute) {
     return (
@@ -21,17 +27,21 @@ export function App() {
 
   return (
     <>
-      <Activity mode={isHome ? "visible" : "hidden"}>
-        <ProjectsPage />
+      <Activity mode={isProjectsPage ? "visible" : "hidden"}>
+        <ProjectsPage projectId={projectRouteId} />
       </Activity>
 
       <Activity mode={isSettings ? "visible" : "hidden"}>
         <AiSettingsPage />
       </Activity>
 
-      {cachedProjectId ? (
-        <Activity mode={isProjectRoute ? "visible" : "hidden"}>
-          <WorkspaceEditorPage key={cachedProjectId} id={cachedProjectId} />
+      {cachedWorkspaceRoute ? (
+        <Activity mode={isWorkspaceRoute ? "visible" : "hidden"}>
+          <WorkspaceEditorPage
+            key={cachedWorkspaceRoute.workspaceId}
+            projectId={cachedWorkspaceRoute.projectId}
+            workspaceId={cachedWorkspaceRoute.workspaceId}
+          />
         </Activity>
       ) : null}
     </>

@@ -1,7 +1,8 @@
 import { useAtomValue } from "jotai";
 import { useLocation } from "wouter";
 
-import { lastProjectIdAtom } from "@/app/state/lastProject";
+import { parseAppRoute } from "@/app/routing/useCachedProjectRoute";
+import { lastWorkspaceRouteAtom } from "@/app/state/lastProject";
 import { cn } from "@/shared/lib/cn";
 
 export type ActivityBarItem = "home" | "project" | "settings";
@@ -50,8 +51,10 @@ function ActivityBarButton({
 }
 
 export function ActivityBar({ active }: { active: ActivityBarItem }) {
-  const [, navigate] = useLocation();
-  const lastProjectId = useAtomValue(lastProjectIdAtom);
+  const [location, navigate] = useLocation();
+  const lastWorkspaceRoute = useAtomValue(lastWorkspaceRouteAtom);
+  const route = parseAppRoute(location);
+  const projectTarget = route.kind === "workspace" ? `/project/${route.projectId}` : "/";
 
   return (
     <div className="flex w-12 shrink-0 flex-col items-center gap-1 bg-activity-bar-background pt-2">
@@ -59,15 +62,22 @@ export function ActivityBar({ active }: { active: ActivityBarItem }) {
         icon="icon-[material-symbols--folder]"
         label="项目"
         active={active === "home"}
-        onClick={() => navigate("/")}
+        onClick={() => navigate(projectTarget)}
       />
 
-      {lastProjectId ? (
+      {lastWorkspaceRoute ? (
         <ActivityBarButton
           icon="icon-[material-symbols--description]"
           label="编辑器"
           active={active === "project"}
-          onClick={active === "project" ? undefined : () => navigate(`/project/${lastProjectId}`)}
+          onClick={
+            active === "project"
+              ? undefined
+              : () =>
+                  navigate(
+                    `/project/${lastWorkspaceRoute.projectId}/workspace/${lastWorkspaceRoute.workspaceId}`,
+                  )
+          }
         />
       ) : null}
 

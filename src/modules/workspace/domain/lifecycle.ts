@@ -73,6 +73,10 @@ export function getDefaultWorkspace(projectId: string) {
     .get();
 }
 
+export function getWorkspace(workspaceId: string) {
+  return getWorkspaceOrThrow(db, workspaceId);
+}
+
 export function listWorkspaces(projectId: string) {
   getProjectOrThrow(db, projectId);
   return db

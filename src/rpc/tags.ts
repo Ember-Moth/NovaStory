@@ -7,6 +7,7 @@ export const rpcTags = defineTags({
   project: (projectId: string) => ["projects", "detail", projectId] as const,
 
   workspacesByProject: (projectId: string) => ["workspaces", "project", projectId] as const,
+  workspace: (workspaceId: string) => ["workspaces", "detail", workspaceId] as const,
 
   contentTree: (workspaceId: string) => ["content", "tree", workspaceId] as const,
 

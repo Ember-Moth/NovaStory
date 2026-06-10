@@ -58,6 +58,7 @@ export const projects = {
 export const workspaces = {
   list: workspaceHandlers.list,
   default: workspaceHandlers.defaultWorkspace,
+  get: workspaceHandlers.get,
 };
 
 export const timeline = {

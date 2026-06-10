@@ -1,6 +1,10 @@
 import { expect, test } from "bun:test";
 
-import { insertProjectOptimistically, removeProjectOptimistically } from "./projectCache";
+import {
+  insertProjectOptimistically,
+  removeProjectOptimistically,
+  updateProjectOptimistically,
+} from "./projectCache";
 
 test("project list optimistic helpers insert, replace, and remove by id", () => {
   const projects = [
@@ -20,4 +24,18 @@ test("project list optimistic helpers insert, replace, and remove by id", () => 
   ]);
 
   expect(removeProjectOptimistically(projects, "old")).toEqual([{ id: "replace", name: "Before" }]);
+});
+
+test("project list optimistic helpers update project metadata in place", () => {
+  const projects = [
+    { id: "one", name: "One", description: null, updatedAt: 1 },
+    { id: "two", name: "Two", description: "Before", updatedAt: 2 },
+  ];
+
+  expect(
+    updateProjectOptimistically(projects, { id: "two", name: "Two+", description: "After" }, 99),
+  ).toEqual([
+    { id: "one", name: "One", description: null, updatedAt: 1 },
+    { id: "two", name: "Two+", description: "After", updatedAt: 99 },
+  ]);
 });

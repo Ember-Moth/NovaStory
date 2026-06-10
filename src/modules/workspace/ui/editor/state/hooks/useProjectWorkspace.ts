@@ -22,6 +22,7 @@ type RefreshableQueryState = {
   isStale: boolean;
   error: unknown;
 };
+type WorkspaceIdentityRow = NonNullable<ReturnType<typeof rpc.useQuery<"workspaces.get">>["data"]>;
 
 export function selectVisibleAuxSnapshot(
   workspaceAuxRootId: string | null,
@@ -36,34 +37,52 @@ export function isQueryRefreshing(query: RefreshableQueryState, hasVisibleData: 
   );
 }
 
-export function useProjectWorkspaceIdentity(projectId: string) {
-  const workspaceQuery = rpc.useQuery("workspaces.default", { projectId });
-  const workspace = workspaceQuery.data?.projectId === projectId ? workspaceQuery.data : undefined;
-  const workspaceId = workspace?.id;
-  const contentRootId = workspace?.contentRootId ?? null;
-  const workspaceAuxRootId = workspace?.auxRootId ?? null;
-  const workspaceInitialLoading = workspaceQuery.isInitialLoading && !workspaceId;
-  const error = workspaceQuery.error?.message ?? null;
+export function resolveProjectWorkspaceIdentity({
+  projectId,
+  requestedWorkspaceId,
+  workspace,
+  isInitialLoading,
+  queryErrorMessage,
+}: {
+  projectId: string;
+  requestedWorkspaceId: string;
+  workspace: WorkspaceIdentityRow | undefined;
+  isInitialLoading: boolean;
+  queryErrorMessage: string | null;
+}) {
+  const routeMismatch =
+    workspace && workspace.projectId !== projectId ? "当前工作区不属于这个项目。" : null;
+  const matchedWorkspace = routeMismatch ? undefined : workspace;
+  const workspaceId = matchedWorkspace?.id;
+
+  return {
+    projectId,
+    requestedWorkspaceId,
+    workspaceId,
+    contentRootId: matchedWorkspace?.contentRootId ?? null,
+    workspaceAuxRootId: matchedWorkspace?.auxRootId ?? null,
+    workspaceInitialLoading: isInitialLoading && !workspace && !queryErrorMessage,
+    routeMismatch,
+    error: routeMismatch ?? queryErrorMessage,
+  };
+}
+
+export function useProjectWorkspaceIdentity(projectId: string, requestedWorkspaceId: string) {
+  const workspaceQuery = rpc.useQuery("workspaces.get", { workspaceId: requestedWorkspaceId });
+  const resolved = resolveProjectWorkspaceIdentity({
+    projectId,
+    requestedWorkspaceId,
+    workspace: workspaceQuery.data,
+    isInitialLoading: workspaceQuery.isInitialLoading,
+    queryErrorMessage: workspaceQuery.error?.message ?? null,
+  });
 
   return useMemo(
     () => ({
-      projectId,
       workspaceQuery,
-      workspaceId,
-      contentRootId,
-      workspaceAuxRootId,
-      workspaceInitialLoading,
-      error,
+      ...resolved,
     }),
-    [
-      contentRootId,
-      error,
-      projectId,
-      workspaceAuxRootId,
-      workspaceId,
-      workspaceInitialLoading,
-      workspaceQuery,
-    ],
+    [resolved, workspaceQuery],
   );
 }
 
