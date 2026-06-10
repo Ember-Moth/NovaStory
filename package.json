@@ -35,7 +35,7 @@
     "@ai-sdk/openai": "^3.0.68",
     "@ai-sdk/openai-compatible": "^2.0.48",
     "@ai-sdk/xai": "^3.0.93",
-    "@codehz/rpc": "^0.1.6",
+    "@codehz/rpc": "^0.1.8",
     "@floating-ui/react": "^0.27.19",
     "@iconify/json": "^2.2.483",
     "@iconify/tailwind4": "^1.2.3",

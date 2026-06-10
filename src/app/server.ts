@@ -13,6 +13,8 @@ const server = serve({
     "/*": index,
   },
 
+  idleTimeout: -1,
+
   development: process.env.NODE_ENV !== "production" && {
     hmr: true,
     console: true,
