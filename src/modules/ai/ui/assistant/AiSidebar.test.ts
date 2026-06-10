@@ -6,7 +6,6 @@ import {
   resolveNearestSheetState,
   resolveReleasedSheetState,
   resolvePeekSessionHeight,
-  resolvePreviewSessionBodyHeight,
   selectPendingAttempt,
   selectRetryableAttempt,
 } from "./AiSidebar";
@@ -266,47 +265,15 @@ test("resolveReleasedSheetState also caps the expanded-to-peek threshold on tall
   ).toBe("expanded");
 });
 
-test("resolvePreviewSessionBodyHeight picks the first three visible session rows", () => {
-  expect(
-    resolvePreviewSessionBodyHeight({
-      visibleRowBottoms: [],
-      emptyStateHeight: 68,
-    }),
-  ).toBe(68);
-
-  expect(
-    resolvePreviewSessionBodyHeight({
-      visibleRowBottoms: [44],
-      emptyStateHeight: 68,
-    }),
-  ).toBe(44);
-
-  expect(
-    resolvePreviewSessionBodyHeight({
-      visibleRowBottoms: [44, 88],
-      emptyStateHeight: 68,
-    }),
-  ).toBe(88);
-
-  expect(
-    resolvePreviewSessionBodyHeight({
-      visibleRowBottoms: [44, 88, 132, 176, 220],
-      emptyStateHeight: 68,
-    }),
-  ).toBe(132);
-});
-
-test("resolvePeekSessionHeight uses only preview body height and respects the available height", () => {
+test("resolvePeekSessionHeight uses a fixed three-row height and respects the available height", () => {
   expect(
     resolvePeekSessionHeight({
-      previewBodyHeight: 132,
       maxHeight: 320,
     }),
   ).toBe(132);
 
   expect(
     resolvePeekSessionHeight({
-      previewBodyHeight: 132,
       maxHeight: 120,
     }),
   ).toBe(120);

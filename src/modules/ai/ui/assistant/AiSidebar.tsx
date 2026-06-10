@@ -365,8 +365,9 @@ const EMPTY_ASSISTANT_STATE: AssistantState = {
 };
 
 const EMPTY_HEADS: AiProjectHeadView[] = [];
-const SESSION_PREVIEW_COUNT = 3;
+const HEAD_ROW_HEIGHT = 44;
 const SHEET_HANDLE_HEIGHT = 16;
+const SESSION_PEEK_HEIGHT = HEAD_ROW_HEIGHT * 3;
 const PEEK_TO_EXPANDED_SNAP_RATIO = 0.3;
 const PEEK_TO_EXPANDED_SNAP_MAX_PX = 72;
 
@@ -426,29 +427,8 @@ export function resolveReleasedSheetState({
   return resolveNearestSheetState(height, anchors);
 }
 
-export function resolvePreviewSessionBodyHeight({
-  visibleRowBottoms,
-  emptyStateHeight,
-}: {
-  visibleRowBottoms: number[];
-  emptyStateHeight: number;
-}) {
-  if (visibleRowBottoms.length === 0) {
-    return Math.max(0, emptyStateHeight);
-  }
-
-  const previewIndex = Math.min(SESSION_PREVIEW_COUNT, visibleRowBottoms.length) - 1;
-  return Math.max(0, visibleRowBottoms[previewIndex] ?? 0);
-}
-
-export function resolvePeekSessionHeight({
-  previewBodyHeight,
-  maxHeight,
-}: {
-  previewBodyHeight: number;
-  maxHeight: number;
-}) {
-  return clampSessionSectionHeight(Math.max(0, previewBodyHeight), maxHeight);
+export function resolvePeekSessionHeight({ maxHeight }: { maxHeight: number }) {
+  return clampSessionSectionHeight(SESSION_PEEK_HEIGHT, maxHeight);
 }
 
 function getMessageText(content: unknown) {
@@ -733,39 +713,40 @@ function HeadRow({
 }) {
   if (isEditing) {
     return (
-      <div className="border border-border bg-editor-background p-2">
-        <div className="flex items-center gap-2">
-          <input
-            value={editingName}
-            onChange={(event) => onEditingNameChange(event.target.value)}
-            disabled={isBusy}
-            autoFocus
-            className="min-w-0 flex-1 border border-border bg-sidebar-background px-2 py-1 text-[12px] text-foreground outline-none focus:border-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
-            placeholder="会话名称"
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                onRenameSubmit();
-              }
-              if (event.key === "Escape") {
-                event.preventDefault();
-                onRenameCancel();
-              }
-            }}
-          />
-          <SessionActionButton
-            icon="icon-[material-symbols--check]"
-            label="保存会话名称"
-            disabled={isBusy}
-            onClick={onRenameSubmit}
-          />
-          <SessionActionButton
-            icon="icon-[material-symbols--close]"
-            label="取消重命名"
-            disabled={isBusy}
-            onClick={onRenameCancel}
-          />
-        </div>
+      <div
+        className="flex items-center gap-2 overflow-hidden border border-border bg-editor-background px-2"
+        style={{ height: `${HEAD_ROW_HEIGHT}px` }}
+      >
+        <input
+          value={editingName}
+          onChange={(event) => onEditingNameChange(event.target.value)}
+          disabled={isBusy}
+          autoFocus
+          className="min-w-0 flex-1 border border-border bg-sidebar-background px-2 py-1 text-[12px] text-foreground outline-none focus:border-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          placeholder="会话名称"
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              onRenameSubmit();
+            }
+            if (event.key === "Escape") {
+              event.preventDefault();
+              onRenameCancel();
+            }
+          }}
+        />
+        <SessionActionButton
+          icon="icon-[material-symbols--check]"
+          label="保存会话名称"
+          disabled={isBusy}
+          onClick={onRenameSubmit}
+        />
+        <SessionActionButton
+          icon="icon-[material-symbols--close]"
+          label="取消重命名"
+          disabled={isBusy}
+          onClick={onRenameCancel}
+        />
       </div>
     );
   }
@@ -775,11 +756,12 @@ function HeadRow({
       type="button"
       onClick={onActivate}
       disabled={isBusy || head.isArchived}
+      style={{ height: `${HEAD_ROW_HEIGHT}px` }}
       className={`group flex w-full items-center gap-2 px-3 py-2 text-left transition ${
         isActive
           ? "bg-list-active-background text-foreground"
           : "text-foreground-muted hover:bg-list-hover-background hover:text-foreground"
-      } disabled:cursor-not-allowed disabled:opacity-50`}
+      } overflow-hidden disabled:cursor-not-allowed disabled:opacity-50`}
     >
       <span
         className={`shrink-0 text-[16px] ${
@@ -893,12 +875,8 @@ export function AiSidebar({ projectId }: { projectId: string }) {
   const [sheetState, setSheetState] = useState<SheetState>("peek");
   const [sessionSectionHeight, setSessionSectionHeight] = useState(0);
   const [availableBodyHeight, setAvailableBodyHeight] = useState(0);
-  const [previewBodyHeight, setPreviewBodyHeight] = useState(0);
   const [isDraggingSheet, setIsDraggingSheet] = useState(false);
   const bodyFrameRef = useRef<HTMLDivElement>(null);
-  const sessionBodyContentRef = useRef<HTMLDivElement>(null);
-  const emptyStateRef = useRef<HTMLDivElement>(null);
-  const headRowRefs = useRef(new Map<string, HTMLDivElement>());
   const sessionSectionHeightRef = useRef(0);
   const sheetDragRef = useRef<{
     pointerId: number;
@@ -966,17 +944,6 @@ export function AiSidebar({ projectId }: { projectId: string }) {
   const heads = projectHeadsQuery.data ?? EMPTY_HEADS;
   const unarchivedHeads = useMemo(() => heads.filter((head) => !head.isArchived), [heads]);
   const archivedHeads = useMemo(() => heads.filter((head) => head.isArchived), [heads]);
-  const visibleHeadIds = useMemo(
-    () => [
-      ...unarchivedHeads.map((head) => head.id),
-      ...(showArchivedHeads ? archivedHeads.map((head) => head.id) : []),
-    ],
-    [archivedHeads, showArchivedHeads, unarchivedHeads],
-  );
-  const previewHeadIds = useMemo(
-    () => visibleHeadIds.slice(0, SESSION_PREVIEW_COUNT),
-    [visibleHeadIds],
-  );
   const retryableAttempt = selectRetryableAttempt(assistantStateQuery.data);
   const pendingAttempt = selectPendingAttempt(assistantStateQuery.data);
   const isGenerating = sendMessage.isPending || retryMessage.isPending;
@@ -1001,16 +968,13 @@ export function AiSidebar({ projectId }: { projectId: string }) {
   const sheetAnchors = useMemo<SheetAnchors>(
     () => ({
       closed: 0,
-      peek: resolvePeekSessionHeight({
-        previewBodyHeight,
-        maxHeight: availableBodyHeight,
-      }),
+      peek: resolvePeekSessionHeight({ maxHeight: availableBodyHeight }),
       expanded: clampSessionSectionHeight(
         availableBodyHeight - SHEET_HANDLE_HEIGHT,
         availableBodyHeight,
       ),
     }),
-    [availableBodyHeight, previewBodyHeight],
+    [availableBodyHeight],
   );
   const clampedSessionSectionHeight = clampSessionSectionHeight(
     sessionSectionHeight,
@@ -1059,31 +1023,12 @@ export function AiSidebar({ projectId }: { projectId: string }) {
 
   useEffect(() => {
     const frame = bodyFrameRef.current;
-    const bodyContent = sessionBodyContentRef.current;
-    if (!frame || !bodyContent) {
+    if (!frame) {
       return;
     }
 
     const measureLayout = () => {
       setAvailableBodyHeight(Math.round(frame.getBoundingClientRect().height));
-
-      const visibleRowBottoms = previewHeadIds
-        .map((headId) => {
-          const row = headRowRefs.current.get(headId);
-          return row ? Math.round(row.offsetTop + row.offsetHeight) : 0;
-        })
-        .filter((height) => height > 0);
-
-      const emptyStateHeight = emptyStateRef.current
-        ? Math.round(emptyStateRef.current.offsetHeight)
-        : 0;
-
-      setPreviewBodyHeight(
-        resolvePreviewSessionBodyHeight({
-          visibleRowBottoms,
-          emptyStateHeight,
-        }),
-      );
     };
 
     measureLayout();
@@ -1092,25 +1037,9 @@ export function AiSidebar({ projectId }: { projectId: string }) {
       measureLayout();
     });
     observer.observe(frame);
-    observer.observe(bodyContent);
-    previewHeadIds.forEach((headId) => {
-      const row = headRowRefs.current.get(headId);
-      if (row) {
-        observer.observe(row);
-      }
-    });
-    if (emptyStateRef.current) {
-      observer.observe(emptyStateRef.current);
-    }
 
     return () => observer.disconnect();
-  }, [
-    editingHead?.headId,
-    previewHeadIds,
-    projectHeadsQuery.isInitialLoading,
-    showArchivedHeads,
-    unarchivedHeads.length,
-  ]);
+  }, []);
 
   useEffect(() => {
     if (isDraggingSheet) {
@@ -1370,7 +1299,7 @@ export function AiSidebar({ projectId }: { projectId: string }) {
           >
             <div className="flex h-full min-h-0 flex-col bg-editor-background">
               <OverlayScrollbar variant="panel">
-                <div ref={sessionBodyContentRef} className="flex min-h-full flex-col gap-1 py-1">
+                <div className="flex min-h-full flex-col">
                   {projectHeadsQuery.isInitialLoading && heads.length === 0 ? (
                     <div className="px-3 py-1.5 text-[12px] text-foreground-muted">
                       正在加载会话...
@@ -1378,24 +1307,12 @@ export function AiSidebar({ projectId }: { projectId: string }) {
                   ) : null}
 
                   {unarchivedHeads.length === 0 ? (
-                    <div
-                      ref={emptyStateRef}
-                      className="mx-3 border border-dashed border-border px-3 py-2 text-[12px] text-foreground-muted"
-                    >
+                    <div className="mx-3 border border-dashed border-border px-3 py-2 text-[12px] text-foreground-muted">
                       还没有可用会话。点击右上角新建会话开始。
                     </div>
                   ) : (
                     unarchivedHeads.map((head) => (
-                      <div
-                        key={head.id}
-                        ref={(node) => {
-                          if (node) {
-                            headRowRefs.current.set(head.id, node);
-                          } else {
-                            headRowRefs.current.delete(head.id);
-                          }
-                        }}
-                      >
+                      <div key={head.id}>
                         <HeadRow
                           head={head}
                           isActive={head.id === activeHeadId}
@@ -1438,16 +1355,7 @@ export function AiSidebar({ projectId }: { projectId: string }) {
                       {showArchivedHeads ? (
                         <div className="mt-1 flex flex-col gap-1 pb-1">
                           {archivedHeads.map((head) => (
-                            <div
-                              key={head.id}
-                              ref={(node) => {
-                                if (node) {
-                                  headRowRefs.current.set(head.id, node);
-                                } else {
-                                  headRowRefs.current.delete(head.id);
-                                }
-                              }}
-                            >
+                            <div key={head.id}>
                               <HeadRow
                                 head={head}
                                 isActive={head.id === activeHeadId}
