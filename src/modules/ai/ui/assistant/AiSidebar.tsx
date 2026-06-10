@@ -13,6 +13,7 @@ import {
 } from "./AiSidebarView";
 import { AiAssistantSheetLayout } from "./AiAssistantSheetLayout";
 import {
+  getAssistantContentBlocks,
   getAssistantToolTrace,
   getMessageText,
   getRunErrorMessage,
@@ -33,6 +34,7 @@ export function AiSidebar({
     defaultState: "peek",
   });
   const [expandedToolTraceKeys, setExpandedToolTraceKeys] = useState<Set<string>>(new Set());
+  const [expandedReasoningKeys, setExpandedReasoningKeys] = useState<Set<string>>(new Set());
   const contextDetails = listAssistantContextDetails(controller.contextSnapshot);
   const visibleMessages = controller.messages.flatMap((message, index) =>
     message.role === "tool" ? [] : [{ message, index }],
@@ -40,6 +42,18 @@ export function AiSidebar({
 
   function toggleToolTrace(key: string) {
     setExpandedToolTraceKeys((current) => {
+      const next = new Set(current);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }
+
+  function toggleReasoning(key: string) {
+    setExpandedReasoningKeys((current) => {
       const next = new Set(current);
       if (next.has(key)) {
         next.delete(key);
@@ -152,6 +166,7 @@ export function AiSidebar({
 
             {visibleMessages.map(({ message, index }) => {
               const text = getMessageText(message);
+              const assistantContentBlocks = getAssistantContentBlocks(message);
               const toolTrace = getAssistantToolTrace(controller.messages, index);
               const isUser = message.role === "user";
               const showMessageBubble = isUser || text.trim().length > 0;
@@ -172,19 +187,36 @@ export function AiSidebar({
 
               return (
                 <div key={message.id}>
-                  {showMessageBubble ? (
-                    isUser ? (
+                  {isUser ? (
+                    showMessageBubble ? (
                       <div className="flex justify-end">
                         <div className="max-w-[88%] rounded-lg bg-accent-foreground px-3 py-2 text-[13px] leading-5 whitespace-pre-wrap text-sidebar-background">
                           {text}
                         </div>
                       </div>
-                    ) : (
-                      <div className="py-1 text-[13px] leading-5 whitespace-pre-wrap text-foreground">
-                        {text}
-                      </div>
-                    )
+                    ) : null
                   ) : null}
+
+                  {!isUser
+                    ? assistantContentBlocks.map((block) =>
+                        block.kind === "text" ? (
+                          <div
+                            key={block.blockId}
+                            className="py-1 text-[13px] leading-5 whitespace-pre-wrap text-foreground"
+                          >
+                            {block.text}
+                          </div>
+                        ) : (
+                          <div key={block.blockId} className="mt-1.5 px-1">
+                            <ReasoningTraceCard
+                              reasoningText={block.text}
+                              expanded={expandedReasoningKeys.has(`${message.id}:${block.blockId}`)}
+                              onToggle={() => toggleReasoning(`${message.id}:${block.blockId}`)}
+                            />
+                          </div>
+                        ),
+                      )
+                    : null}
 
                   {showRetryError ? (
                     <AttemptErrorCard
@@ -207,11 +239,38 @@ export function AiSidebar({
                         <div
                           key={`${message.id}:stream-block:${block.assistantNodeId}:${blockIndex}`}
                         >
-                          {block.assistantText.trim().length > 0 ? (
-                            <div className="py-1 text-[13px] leading-5 whitespace-pre-wrap text-foreground">
-                              {block.assistantText}
-                            </div>
-                          ) : null}
+                          {block.contentOrder.map((entry) =>
+                            entry.kind === "text" ? (
+                              block.assistantText.trim().length > 0 ? (
+                                <div
+                                  key={`${message.id}:stream:${block.assistantNodeId}:text`}
+                                  className="py-1 text-[13px] leading-5 whitespace-pre-wrap text-foreground"
+                                >
+                                  {block.assistantText}
+                                </div>
+                              ) : null
+                            ) : (
+                              <div
+                                key={`${message.id}:stream:${block.assistantNodeId}:${entry.id}`}
+                                className="mt-1.5 px-1"
+                              >
+                                <ReasoningTraceCard
+                                  reasoningText={getReasoningTraceText(
+                                    block.reasoningTrace,
+                                    entry.id,
+                                  )}
+                                  expanded={expandedReasoningKeys.has(
+                                    `${message.id}:stream:${block.assistantNodeId}:${entry.id}`,
+                                  )}
+                                  onToggle={() =>
+                                    toggleReasoning(
+                                      `${message.id}:stream:${block.assistantNodeId}:${entry.id}`,
+                                    )
+                                  }
+                                />
+                              </div>
+                            ),
+                          )}
                           {block.toolTrace.length > 0 ? (
                             <div className="mt-1.5 flex flex-col gap-1 px-1">
                               {block.toolTrace.map((entry, entryIndex) => (
@@ -293,11 +352,38 @@ export function AiSidebar({
                 {controller.activeStream?.kind === "send"
                   ? controller.activeStream.blocks.map((block, blockIndex) => (
                       <div key={`send-stream-block:${block.assistantNodeId}:${blockIndex}`}>
-                        {block.assistantText.trim().length > 0 ? (
-                          <div className="py-1 text-[13px] leading-5 whitespace-pre-wrap text-foreground">
-                            {block.assistantText}
-                          </div>
-                        ) : null}
+                        {block.contentOrder.map((entry) =>
+                          entry.kind === "text" ? (
+                            block.assistantText.trim().length > 0 ? (
+                              <div
+                                key={`send-stream:${block.assistantNodeId}:text`}
+                                className="py-1 text-[13px] leading-5 whitespace-pre-wrap text-foreground"
+                              >
+                                {block.assistantText}
+                              </div>
+                            ) : null
+                          ) : (
+                            <div
+                              key={`send-stream:${block.assistantNodeId}:${entry.id}`}
+                              className="mt-1.5 px-1"
+                            >
+                              <ReasoningTraceCard
+                                reasoningText={getReasoningTraceText(
+                                  block.reasoningTrace,
+                                  entry.id,
+                                )}
+                                expanded={expandedReasoningKeys.has(
+                                  `send-stream:${block.assistantNodeId}:${entry.id}`,
+                                )}
+                                onToggle={() =>
+                                  toggleReasoning(
+                                    `send-stream:${block.assistantNodeId}:${entry.id}`,
+                                  )
+                                }
+                              />
+                            </div>
+                          ),
+                        )}
                         {block.toolTrace.length > 0 ? (
                           <div className="mt-1.5 flex flex-col gap-1 px-1">
                             {block.toolTrace.map((entry, index) => (
@@ -416,6 +502,52 @@ export function AiSidebar({
         }
       />
     </aside>
+  );
+}
+
+function getReasoningTraceText(
+  entries: Array<{ reasoningId: string; text: string }>,
+  reasoningId: string,
+) {
+  const matchedEntry = entries.find((entry) => entry.reasoningId === reasoningId);
+  return matchedEntry?.text.trim() ?? "";
+}
+
+function ReasoningTraceCard({
+  reasoningText,
+  expanded,
+  onToggle,
+}: {
+  reasoningText: string;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="overflow-hidden rounded-md border border-border bg-editor-background text-foreground-muted">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center gap-1.5 px-2 py-1 text-left text-[11px] leading-4"
+      >
+        <span className="icon-[material-symbols--psychology-alt-outline] shrink-0 text-[13px]" />
+        <span className="min-w-0 flex-1 truncate">思考过程</span>
+        <span
+          className={`shrink-0 text-[14px] ${
+            expanded
+              ? "icon-[material-symbols--keyboard-arrow-up]"
+              : "icon-[material-symbols--keyboard-arrow-down]"
+          }`}
+        />
+      </button>
+
+      {expanded ? (
+        <div className="border-t border-current/10 px-2 py-1.5">
+          <pre className="overflow-x-auto rounded bg-sidebar-background/70 px-2 py-1 text-[10px] leading-4 break-all whitespace-pre-wrap text-foreground">
+            {reasoningText}
+          </pre>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

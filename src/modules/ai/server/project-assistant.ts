@@ -4,12 +4,13 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import {
   appendAssistantTextDelta,
+  appendAssistantReasoningDelta,
+  appendAssistantReasoningPart,
   appendAssistantToolCallPart,
   appendRunEvent,
   appendUserNode,
   archiveThread,
   assignThreadNodeSourceStepIds,
-  buildThreadModelMessages,
   createArtifact,
   createReplacementNode,
   createRun,
@@ -28,6 +29,7 @@ import {
   markThreadNodePartsDone,
   PROJECT_ASSISTANT_AGENT_PROFILE,
   renameThread,
+  resolveThreadPath,
   resolveActiveThread,
   selectActiveTip,
   setActiveThread,
@@ -104,14 +106,17 @@ interface AssistantModelSelection {
   snapshot: AiSelectionSnapshotInput;
 }
 
+type StreamProviderOptions = Parameters<typeof streamText>[0]["providerOptions"];
+
 interface StreamAssistantTextInput {
   projectId: string;
   connection: AiConnectionRow;
   modelId: string;
-  system: string;
+  system: string | null;
   toolMode: "none" | "auto-read-only";
   context: ProjectAssistantContextSnapshot | null;
   messages: ModelMessage[];
+  providerOptions?: StreamProviderOptions;
 }
 
 interface GeneratedAssistantStep {
@@ -140,6 +145,25 @@ type GeneratedAssistantChunk =
   | {
       type: "start-step";
       stepNumber: number;
+    }
+  | {
+      type: "reasoning-start";
+      stepNumber: number;
+      id: string;
+      providerMetadata: unknown;
+    }
+  | {
+      type: "reasoning-delta";
+      stepNumber: number;
+      id: string;
+      delta: string;
+      providerMetadata: unknown;
+    }
+  | {
+      type: "reasoning-end";
+      stepNumber: number;
+      id: string;
+      providerMetadata: unknown;
     }
   | {
       type: "text-delta";
@@ -188,7 +212,9 @@ interface PreparedProjectAssistantRun<TResult> {
   run: AgentRunView;
   triggerNodeId: string;
   messages: ModelMessage[];
+  providerOptions?: StreamProviderOptions;
   system: string;
+  transportSystem: string | null;
   selection: AssistantModelSelection;
   context: ProjectAssistantContextSnapshot | null;
   toolMode: "none" | "auto-read-only";
@@ -214,6 +240,7 @@ function defaultStreamAssistantText({
   toolMode,
   context,
   messages,
+  providerOptions,
 }: StreamAssistantTextInput): StreamAssistantTextResult {
   const model = createLanguageModelForConnection({ connection, modelId });
   const preparedMessagesByStep: ModelMessage[][] = [];
@@ -226,8 +253,9 @@ function defaultStreamAssistantText({
       : undefined;
   const result = streamText({
     model,
-    system,
     messages,
+    ...(system == null ? {} : { system }),
+    ...(providerOptions == null ? {} : { providerOptions }),
     tools,
     stopWhen: stepCountIs(5),
     prepareStep: ({ messages: stepMessages, stepNumber }) => {
@@ -255,6 +283,37 @@ function defaultStreamAssistantText({
           type: "text-delta",
           stepNumber: currentStepNumber,
           delta: String(Reflect.get(rawPart, "text") ?? ""),
+        };
+        continue;
+      }
+
+      if (type === "reasoning-start") {
+        yield {
+          type: "reasoning-start",
+          stepNumber: currentStepNumber,
+          id: String(Reflect.get(rawPart, "id") ?? ""),
+          providerMetadata: Reflect.get(rawPart, "providerMetadata") ?? null,
+        };
+        continue;
+      }
+
+      if (type === "reasoning-delta") {
+        yield {
+          type: "reasoning-delta",
+          stepNumber: currentStepNumber,
+          id: String(Reflect.get(rawPart, "id") ?? ""),
+          delta: String(Reflect.get(rawPart, "text") ?? Reflect.get(rawPart, "delta") ?? ""),
+          providerMetadata: Reflect.get(rawPart, "providerMetadata") ?? null,
+        };
+        continue;
+      }
+
+      if (type === "reasoning-end") {
+        yield {
+          type: "reasoning-end",
+          stepNumber: currentStepNumber,
+          id: String(Reflect.get(rawPart, "id") ?? ""),
+          providerMetadata: Reflect.get(rawPart, "providerMetadata") ?? null,
         };
         continue;
       }
@@ -388,6 +447,102 @@ function normalizeError(error: unknown) {
   return {
     message: "AI 回复生成失败。",
     detail: error,
+  };
+}
+
+function isOpenAIResponsesConnection(connection: AiConnectionRow) {
+  return connection.sdkPackage === "@ai-sdk/openai";
+}
+
+function extractResponseId(value: unknown) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const id = Reflect.get(value as Record<string, unknown>, "id");
+  return typeof id === "string" && id.trim().length > 0 ? id : null;
+}
+
+function getStepResponseId(stepId: string | null | undefined) {
+  const normalizedStepId = normalizeOptionalString(stepId);
+  if (!normalizedStepId) {
+    return null;
+  }
+
+  const step = db.query.agentRunSteps
+    .findFirst({
+      where: eq(schema.agentRunSteps.id, normalizedStepId),
+    })
+    .sync();
+  if (!step?.responseBodyArtifactId) {
+    return null;
+  }
+
+  const artifact = db.query.agentArtifacts
+    .findFirst({
+      where: eq(schema.agentArtifacts.id, step.responseBodyArtifactId),
+    })
+    .sync();
+  if (!artifact) {
+    return null;
+  }
+
+  let body: unknown;
+  try {
+    body = JSON.parse(artifact.contentJson);
+  } catch {
+    return null;
+  }
+
+  return extractResponseId(body);
+}
+
+function resolveAssistantRequest({
+  threadId,
+  triggerNodeId,
+  system,
+  selection,
+}: {
+  threadId: string;
+  triggerNodeId: string;
+  system: string;
+  selection: AssistantModelSelection;
+}): {
+  messages: ModelMessage[];
+  transportSystem: string | null;
+  providerOptions?: StreamProviderOptions;
+} {
+  const path = resolveThreadPath(threadId, triggerNodeId);
+
+  if (!isOpenAIResponsesConnection(selection.connection)) {
+    return {
+      messages: path.map((node) => node.message),
+      transportSystem: system,
+      providerOptions: undefined,
+    };
+  }
+
+  const lastAssistantIndex = [...path].map((node) => node.role).lastIndexOf("assistant");
+  const previousAssistant = lastAssistantIndex >= 0 ? path[lastAssistantIndex] : null;
+  const previousResponseId = getStepResponseId(previousAssistant?.sourceStepId);
+  const messages =
+    previousAssistant && previousResponseId
+      ? path.slice(lastAssistantIndex + 1).map((node) => node.message)
+      : path.map((node) => node.message);
+  const openaiOptions = {
+    ...(selection.resolvedModel.supportsReasoning ? { reasoningSummary: "auto" } : {}),
+    ...(previousResponseId ? { previousResponseId, instructions: system } : {}),
+  };
+
+  return {
+    messages,
+    transportSystem: previousResponseId ? null : system,
+    providerOptions:
+      Object.keys(openaiOptions).length > 0
+        ? ({
+            openai: openaiOptions,
+          } satisfies NonNullable<StreamProviderOptions>)
+        : undefined,
   };
 }
 
@@ -567,6 +722,43 @@ function createAbortPromise(signal: AbortSignal) {
   });
 }
 
+function ensureCurrentAssistantNode({
+  prepared,
+  stepRuntime,
+  currentParentId,
+  relay,
+  stepNumber,
+  assistantTextByNodeId,
+}: {
+  prepared: PreparedProjectAssistantRun<unknown>;
+  stepRuntime: StepRuntimeState;
+  currentParentId: string | null;
+  relay: BufferedEventRelay<unknown>;
+  stepNumber: number;
+  assistantTextByNodeId: Map<string, string>;
+}) {
+  const assistantNode = createStreamingAssistantNode({
+    threadId: prepared.thread.id,
+    parentNodeId: currentParentId,
+    runId: prepared.run.id,
+  });
+  stepRuntime.nodeIds.push(assistantNode.id);
+  assistantTextByNodeId.set(assistantNode.id, "");
+  appendRunEvent({
+    runId: prepared.run.id,
+    eventKind: "node-materialized",
+    nodeId: assistantNode.id,
+    summaryText: assistantNode.summaryText ?? "assistant node",
+  });
+  relay.emit({
+    type: "assistant-message-started",
+    nodeId: assistantNode.id,
+    parentNodeId: assistantNode.parentNodeId,
+    stepIndex: stepNumber,
+  });
+  return assistantNode;
+}
+
 function persistStepArtifactsAndEvents({
   run,
   system,
@@ -716,15 +908,17 @@ async function executeProjectAssistantRun<TResult>({
   let lastAssistantNode: AgentThreadNodeView | null = null;
   const stepRuntime = new Map<number, StepRuntimeState>();
   const assistantTextByNodeId = new Map<string, string>();
+  const reasoningPartsByStreamId = new Map<string, { nodeId: string; partIndex: number }>();
 
   const runtime = streamAssistantText({
     projectId: prepared.projectId,
     connection: prepared.selection.connection,
     modelId: prepared.selection.resolvedModel.modelId,
-    system: prepared.system,
+    system: prepared.transportSystem,
     toolMode: prepared.toolMode,
     context: prepared.context,
     messages: prepared.messages,
+    providerOptions: prepared.providerOptions,
   });
 
   try {
@@ -743,29 +937,103 @@ async function executeProjectAssistantRun<TResult>({
         continue;
       }
 
-      if (chunk.type === "text-delta") {
+      if (chunk.type === "reasoning-start") {
         if (!currentAssistantNode) {
-          currentAssistantNode = createStreamingAssistantNode({
-            threadId: prepared.thread.id,
-            parentNodeId: currentParentId,
-            runId: prepared.run.id,
+          currentAssistantNode = ensureCurrentAssistantNode({
+            prepared,
+            stepRuntime: currentStepRuntime,
+            currentParentId,
+            relay: relay as BufferedEventRelay<unknown>,
+            stepNumber: chunk.stepNumber,
+            assistantTextByNodeId,
           });
           currentParentId = currentAssistantNode.id;
-          currentStepRuntime.nodeIds.push(currentAssistantNode.id);
           lastAssistantNode = currentAssistantNode;
-          assistantTextByNodeId.set(currentAssistantNode.id, "");
-          appendRunEvent({
-            runId: prepared.run.id,
-            eventKind: "node-materialized",
-            nodeId: currentAssistantNode.id,
-            summaryText: currentAssistantNode.summaryText ?? "assistant node",
+        }
+
+        const appended = appendAssistantReasoningPart({
+          nodeId: currentAssistantNode.id,
+          providerMetadata: chunk.providerMetadata,
+        });
+        currentAssistantNode = appended.node;
+        lastAssistantNode = appended.node;
+        reasoningPartsByStreamId.set(chunk.id, {
+          nodeId: appended.node.id,
+          partIndex: appended.partIndex,
+        });
+        continue;
+      }
+
+      if (chunk.type === "reasoning-delta") {
+        if (!currentAssistantNode) {
+          currentAssistantNode = ensureCurrentAssistantNode({
+            prepared,
+            stepRuntime: currentStepRuntime,
+            currentParentId,
+            relay: relay as BufferedEventRelay<unknown>,
+            stepNumber: chunk.stepNumber,
+            assistantTextByNodeId,
           });
-          relay.emit({
-            type: "assistant-message-started",
+          currentParentId = currentAssistantNode.id;
+          lastAssistantNode = currentAssistantNode;
+        }
+
+        let activeReasoning = reasoningPartsByStreamId.get(chunk.id);
+        if (!activeReasoning) {
+          const appended = appendAssistantReasoningPart({
             nodeId: currentAssistantNode.id,
-            parentNodeId: currentAssistantNode.parentNodeId,
-            stepIndex: chunk.stepNumber,
+            providerMetadata: chunk.providerMetadata,
           });
+          currentAssistantNode = appended.node;
+          lastAssistantNode = appended.node;
+          activeReasoning = {
+            nodeId: appended.node.id,
+            partIndex: appended.partIndex,
+          };
+          reasoningPartsByStreamId.set(chunk.id, activeReasoning);
+        }
+
+        const nextAssistantNode = appendAssistantReasoningDelta({
+          nodeId: activeReasoning.nodeId,
+          partIndex: activeReasoning.partIndex,
+          delta: chunk.delta,
+          providerMetadata: chunk.providerMetadata,
+        });
+        currentAssistantNode = nextAssistantNode;
+        lastAssistantNode = nextAssistantNode;
+        const reasoningText = nextAssistantNode.parts.find(
+          (part) => part.partIndex === activeReasoning.partIndex,
+        )?.payload;
+        const accumulatedText =
+          reasoningText && typeof reasoningText === "object"
+            ? String(Reflect.get(reasoningText as Record<string, unknown>, "text") ?? "")
+            : chunk.delta;
+        relay.emit({
+          type: "assistant-reasoning-delta",
+          nodeId: nextAssistantNode.id,
+          reasoningId: chunk.id,
+          delta: chunk.delta,
+          accumulatedText,
+        });
+        continue;
+      }
+
+      if (chunk.type === "reasoning-end") {
+        continue;
+      }
+
+      if (chunk.type === "text-delta") {
+        if (!currentAssistantNode) {
+          currentAssistantNode = ensureCurrentAssistantNode({
+            prepared,
+            stepRuntime: currentStepRuntime,
+            currentParentId,
+            relay: relay as BufferedEventRelay<unknown>,
+            stepNumber: chunk.stepNumber,
+            assistantTextByNodeId,
+          });
+          currentParentId = currentAssistantNode.id;
+          lastAssistantNode = currentAssistantNode;
         }
 
         const nextAssistantNode = appendAssistantTextDelta({
@@ -787,27 +1055,16 @@ async function executeProjectAssistantRun<TResult>({
 
       if (chunk.type === "tool-call") {
         if (!currentAssistantNode) {
-          currentAssistantNode = createStreamingAssistantNode({
-            threadId: prepared.thread.id,
-            parentNodeId: currentParentId,
-            runId: prepared.run.id,
+          currentAssistantNode = ensureCurrentAssistantNode({
+            prepared,
+            stepRuntime: currentStepRuntime,
+            currentParentId,
+            relay: relay as BufferedEventRelay<unknown>,
+            stepNumber: chunk.stepNumber,
+            assistantTextByNodeId,
           });
           currentParentId = currentAssistantNode.id;
-          currentStepRuntime.nodeIds.push(currentAssistantNode.id);
           lastAssistantNode = currentAssistantNode;
-          assistantTextByNodeId.set(currentAssistantNode.id, "");
-          appendRunEvent({
-            runId: prepared.run.id,
-            eventKind: "node-materialized",
-            nodeId: currentAssistantNode.id,
-            summaryText: currentAssistantNode.summaryText ?? "assistant node",
-          });
-          relay.emit({
-            type: "assistant-message-started",
-            nodeId: currentAssistantNode.id,
-            parentNodeId: currentAssistantNode.parentNodeId,
-            stepIndex: chunk.stepNumber,
-          });
         }
 
         appendAssistantToolCallPart({
@@ -976,14 +1233,22 @@ function buildSendRun({
     toolMode,
     context: normalizedContext,
   });
+  const request = resolveAssistantRequest({
+    threadId: thread.id,
+    triggerNodeId: userNode.id,
+    system,
+    selection,
+  });
 
   return {
     projectId,
     thread,
     run,
     triggerNodeId: userNode.id,
-    messages: buildThreadModelMessages(thread.id, userNode.id),
+    messages: request.messages,
+    providerOptions: request.providerOptions,
     system,
+    transportSystem: request.transportSystem,
     selection,
     context: normalizedContext,
     toolMode,
@@ -1058,14 +1323,22 @@ function buildRetryRun({
     toolMode,
     context: normalizedContext,
   });
+  const request = resolveAssistantRequest({
+    threadId: thread.id,
+    triggerNodeId,
+    system,
+    selection,
+  });
 
   return {
     projectId,
     thread,
     run,
     triggerNodeId,
-    messages: buildThreadModelMessages(thread.id, triggerNodeId),
+    messages: request.messages,
+    providerOptions: request.providerOptions,
     system,
+    transportSystem: request.transportSystem,
     selection,
     context: normalizedContext,
     toolMode,
@@ -1140,14 +1413,22 @@ function buildEditRun({
     toolMode,
     context: normalizedContext,
   });
+  const request = resolveAssistantRequest({
+    threadId: thread.id,
+    triggerNodeId: replacementNode.id,
+    system,
+    selection,
+  });
 
   return {
     projectId,
     thread,
     run,
     triggerNodeId: replacementNode.id,
-    messages: buildThreadModelMessages(thread.id, replacementNode.id),
+    messages: request.messages,
+    providerOptions: request.providerOptions,
     system,
+    transportSystem: request.transportSystem,
     selection,
     context: normalizedContext,
     toolMode,

@@ -1,6 +1,11 @@
 import { expect, test } from "bun:test";
 
-import { getAssistantToolTrace, listAssistantContextDetails } from "./assistantState";
+import {
+  getAssistantContentBlocks,
+  getAssistantReasoning,
+  getAssistantToolTrace,
+  listAssistantContextDetails,
+} from "./assistantState";
 
 test("getAssistantToolTrace merges tool call and tool result into one trace entry", () => {
   expect(
@@ -217,6 +222,132 @@ test("listAssistantContextDetails formats current context chips", () => {
     {
       label: "时间",
       value: "现在",
+    },
+  ]);
+});
+
+test("getAssistantReasoning returns persisted reasoning parts", () => {
+  expect(
+    getAssistantReasoning({
+      id: "node_reasoning",
+      threadId: "thread_1",
+      parentNodeId: "node_user",
+      role: "assistant",
+      createdByRunId: "run_1",
+      sourceStepId: "step_1",
+      sourceKind: "model_response",
+      summaryText: "assistant reply",
+      message: {
+        role: "assistant",
+        content: [
+          { type: "reasoning", text: "先确认上下文。" },
+          { type: "text", text: "这是最终回答。" },
+        ],
+      },
+      parts: [
+        {
+          id: "part_reasoning",
+          nodeId: "node_reasoning",
+          partIndex: 0,
+          partKind: "reasoning",
+          visibility: "hidden",
+          state: "done",
+          providerOptions: null,
+          providerMetadata: null,
+          payload: {
+            type: "reasoning",
+            text: "先确认上下文。",
+          },
+          createdAt: 1,
+        },
+        {
+          id: "part_text",
+          nodeId: "node_reasoning",
+          partIndex: 1,
+          partKind: "text",
+          visibility: "public",
+          state: "done",
+          providerOptions: null,
+          providerMetadata: null,
+          payload: {
+            type: "text",
+            text: "这是最终回答。",
+          },
+          createdAt: 1,
+        },
+      ],
+      createdAt: 1,
+    }),
+  ).toEqual([
+    {
+      partId: "part_reasoning",
+      text: "先确认上下文。",
+    },
+  ]);
+});
+
+test("getAssistantContentBlocks preserves reasoning and text order", () => {
+  expect(
+    getAssistantContentBlocks({
+      id: "node_blocks",
+      threadId: "thread_1",
+      parentNodeId: "node_user",
+      role: "assistant",
+      createdByRunId: "run_1",
+      sourceStepId: "step_1",
+      sourceKind: "model_response",
+      summaryText: "assistant reply",
+      message: {
+        role: "assistant",
+        content: [
+          { type: "reasoning", text: "先看上下文。" },
+          { type: "text", text: "这是回复正文。" },
+        ],
+      },
+      parts: [
+        {
+          id: "part_reasoning",
+          nodeId: "node_blocks",
+          partIndex: 0,
+          partKind: "reasoning",
+          visibility: "hidden",
+          state: "done",
+          providerOptions: null,
+          providerMetadata: null,
+          payload: {
+            type: "reasoning",
+            text: "先看上下文。",
+          },
+          createdAt: 1,
+        },
+        {
+          id: "part_text",
+          nodeId: "node_blocks",
+          partIndex: 1,
+          partKind: "text",
+          visibility: "public",
+          state: "done",
+          providerOptions: null,
+          providerMetadata: null,
+          payload: {
+            type: "text",
+            text: "这是回复正文。",
+          },
+          createdAt: 2,
+        },
+      ],
+      createdAt: 1,
+    }),
+  ).toEqual([
+    {
+      kind: "reasoning",
+      blockId: "part_reasoning",
+      text: "先看上下文。",
+    },
+    {
+      kind: "text",
+      blockId: "part_text",
+      text: "这是回复正文。",
     },
   ]);
 });

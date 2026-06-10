@@ -357,7 +357,8 @@ function withProviderOptions<T extends Record<string, unknown>>(
   target: T,
   source: Record<string, unknown>,
 ) {
-  const providerOptions = Reflect.get(source, "providerOptions");
+  const providerOptions =
+    Reflect.get(source, "providerOptions") ?? Reflect.get(source, "providerMetadata");
   return providerOptions == null
     ? target
     : ({
@@ -1772,7 +1773,7 @@ export function createStreamingAssistantNode(input: {
       parentNodeId: input.parentNodeId,
       message: {
         role: "assistant",
-        content: [{ type: "text", text: "", state: "streaming" }],
+        content: [],
       } as unknown as ModelMessage,
       sourceKind: "model_response",
       createdByRunId: input.runId,
@@ -1809,10 +1810,11 @@ export function appendAssistantTextDelta(input: { nodeId: string; delta: string 
         typeof part === "object" &&
         Reflect.get(part as Record<string, unknown>, "type") === "text",
     );
+    const hadExistingTextPart = textPartIndex >= 0;
 
-    if (textPartIndex < 0) {
-      content.unshift({ type: "text", text: "", state: "streaming" });
-      textPartIndex = 0;
+    if (!hadExistingTextPart) {
+      content.push({ type: "text", text: "", state: "streaming" });
+      textPartIndex = content.length - 1;
     }
 
     const existingPart = content[textPartIndex];
@@ -1829,11 +1831,113 @@ export function appendAssistantTextDelta(input: { nodeId: string; delta: string 
       content,
     } as ModelMessage;
     updateNodeMessage(tx, node.id, nextMessage);
-    updateNodePart(tx, node.id, textPartIndex, {
+    if (hadExistingTextPart) {
+      updateNodePart(tx, node.id, textPartIndex, {
+        payload: nextPart,
+        state: "streaming",
+        providerOptions: Reflect.get(nextPart, "providerOptions"),
+        providerMetadata: Reflect.get(nextPart, "providerMetadata"),
+      });
+    } else {
+      appendNodePart(tx, node.id, {
+        partKind: "text",
+        visibility: "public",
+        state: "streaming",
+        payload: nextPart,
+        providerOptions: Reflect.get(nextPart, "providerOptions"),
+        providerMetadata: Reflect.get(nextPart, "providerMetadata"),
+      });
+    }
+    return mapNodeRow(tx, getNodeOrThrow(tx, node.id));
+  });
+}
+
+export function appendAssistantReasoningPart(input: {
+  nodeId: string;
+  providerMetadata?: unknown;
+}) {
+  return db.transaction((tx) => {
+    const node = getNodeOrThrow(tx, input.nodeId);
+    invariant(node.role === "assistant", "只能向 assistant 节点追加 reasoning。");
+    const message = JSON.parse(node.messageJson) as ModelMessage;
+    const rawContent = (message as { content?: unknown }).content;
+    const content =
+      typeof rawContent === "string"
+        ? [{ type: "text", text: rawContent }]
+        : Array.isArray(rawContent)
+          ? [...rawContent]
+          : [];
+    const nextPart = {
+      type: "reasoning",
+      text: "",
+      state: "streaming",
+      ...(input.providerMetadata == null ? {} : { providerMetadata: input.providerMetadata }),
+    };
+    const partIndex = content.length;
+    content.push(nextPart);
+    const nextMessage = {
+      ...message,
+      content,
+    } as ModelMessage;
+    const nextNode = updateNodeMessage(tx, node.id, nextMessage);
+    appendNodePart(tx, node.id, {
+      partKind: "reasoning",
+      visibility: "hidden",
+      state: "streaming",
+      payload: nextPart,
+      providerOptions: Reflect.get(nextPart, "providerOptions"),
+      providerMetadata: input.providerMetadata,
+    });
+    return {
+      node: nextNode,
+      partIndex,
+    };
+  });
+}
+
+export function appendAssistantReasoningDelta(input: {
+  nodeId: string;
+  partIndex: number;
+  delta: string;
+  providerMetadata?: unknown;
+}) {
+  return db.transaction((tx) => {
+    const node = getNodeOrThrow(tx, input.nodeId);
+    invariant(node.role === "assistant", "只能向 assistant 节点追加 reasoning。");
+    const message = JSON.parse(node.messageJson) as ModelMessage;
+    const rawContent = (message as { content?: unknown }).content;
+    const content =
+      typeof rawContent === "string"
+        ? [{ type: "text", text: rawContent }]
+        : Array.isArray(rawContent)
+          ? [...rawContent]
+          : [];
+    const existingPart = content[input.partIndex];
+    invariant(existingPart && typeof existingPart === "object", "未找到 reasoning part。");
+    invariant(
+      Reflect.get(existingPart as Record<string, unknown>, "type") === "reasoning",
+      "目标 part 不是 reasoning。",
+    );
+
+    const nextPart = {
+      ...(existingPart as Record<string, unknown>),
+      type: "reasoning",
+      text: `${String(Reflect.get(existingPart as Record<string, unknown>, "text") ?? "")}${input.delta}`,
+      state: "streaming",
+      ...(input.providerMetadata == null ? {} : { providerMetadata: input.providerMetadata }),
+    };
+    content[input.partIndex] = nextPart;
+
+    const nextMessage = {
+      ...message,
+      content,
+    } as ModelMessage;
+    updateNodeMessage(tx, node.id, nextMessage);
+    updateNodePart(tx, node.id, input.partIndex, {
       payload: nextPart,
       state: "streaming",
       providerOptions: Reflect.get(nextPart, "providerOptions"),
-      providerMetadata: Reflect.get(nextPart, "providerMetadata"),
+      providerMetadata: input.providerMetadata ?? Reflect.get(nextPart, "providerMetadata"),
     });
     return mapNodeRow(tx, getNodeOrThrow(tx, node.id));
   });

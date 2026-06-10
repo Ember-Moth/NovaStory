@@ -42,6 +42,20 @@ export interface AssistantStreamOverlay {
   blocks: Array<{
     assistantNodeId: string;
     assistantText: string;
+    reasoningTrace: Array<{
+      reasoningId: string;
+      text: string;
+    }>;
+    contentOrder: Array<
+      | {
+          kind: "text";
+          id: "text";
+        }
+      | {
+          kind: "reasoning";
+          id: string;
+        }
+    >;
     toolTrace: AssistantToolTraceEntry[];
   }>;
 }
@@ -207,6 +221,8 @@ function ensureStreamBlock(
       {
         assistantNodeId,
         assistantText: "",
+        reasoningTrace: [],
+        contentOrder: [],
         toolTrace: [],
       },
     ],
@@ -242,10 +258,50 @@ function applyStreamEvent(
         block.assistantNodeId === event.nodeId
           ? {
               ...block,
+              contentOrder: block.contentOrder.some((entry) => entry.kind === "text")
+                ? block.contentOrder
+                : [...block.contentOrder, { kind: "text", id: "text" }],
               assistantText: `${block.assistantText}${event.delta}`,
             }
           : block,
       ),
+    };
+  }
+
+  if (event.type === "assistant-reasoning-delta") {
+    const nextOverlay = ensureStreamBlock(overlay, event.nodeId);
+    return {
+      ...nextOverlay,
+      activeAssistantNodeId: event.nodeId,
+      blocks: nextOverlay.blocks.map((block) => {
+        if (block.assistantNodeId !== event.nodeId) {
+          return block;
+        }
+
+        const reasoningIndex = block.reasoningTrace.findIndex(
+          (entry) => entry.reasoningId === event.reasoningId,
+        );
+        if (reasoningIndex < 0) {
+          return {
+            ...block,
+            contentOrder: [...block.contentOrder, { kind: "reasoning", id: event.reasoningId }],
+            reasoningTrace: [
+              ...block.reasoningTrace,
+              {
+                reasoningId: event.reasoningId,
+                text: event.accumulatedText,
+              },
+            ],
+          };
+        }
+
+        return {
+          ...block,
+          reasoningTrace: block.reasoningTrace.map((entry, index) =>
+            index === reasoningIndex ? { ...entry, text: event.accumulatedText } : entry,
+          ),
+        };
+      }),
     };
   }
 

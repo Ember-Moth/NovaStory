@@ -247,6 +247,13 @@ export type ProjectAssistantStreamEvent =
       accumulatedText: string;
     }
   | {
+      type: "assistant-reasoning-delta";
+      nodeId: string;
+      reasoningId: string;
+      delta: string;
+      accumulatedText: string;
+    }
+  | {
       type: "tool-call";
       assistantNodeId: string;
       toolCallId: string | null;
