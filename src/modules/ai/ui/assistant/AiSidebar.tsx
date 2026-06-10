@@ -157,8 +157,16 @@ export function AiSidebar({
               const showMessageBubble = isUser || text.trim().length > 0;
               const candidateGroup = controller.getCandidateGroupForNode(message);
               const showRetryError = controller.retryableRun?.triggerNodeId === message.id;
-              const showServerPending = controller.pendingRun?.triggerNodeId === message.id;
+              const streamOverlayForMessage =
+                controller.activeStream?.kind === "retry" &&
+                controller.activeStream.triggerNodeId === message.id
+                  ? controller.activeStream
+                  : null;
+              const showServerPending =
+                streamOverlayForMessage == null &&
+                controller.pendingRun?.triggerNodeId === message.id;
               const showLocalRetryPending =
+                streamOverlayForMessage == null &&
                 controller.pendingAction?.kind === "retry" &&
                 controller.pendingAction.triggerNodeId === message.id;
 
@@ -189,6 +197,41 @@ export function AiSidebar({
 
                   {showServerPending || showLocalRetryPending ? (
                     <div className="mt-2">
+                      <PendingAssistantBubble label="正在生成回复..." />
+                    </div>
+                  ) : null}
+
+                  {streamOverlayForMessage ? (
+                    <div className="mt-2">
+                      {streamOverlayForMessage.blocks.map((block, blockIndex) => (
+                        <div
+                          key={`${message.id}:stream-block:${block.assistantNodeId}:${blockIndex}`}
+                        >
+                          {block.assistantText.trim().length > 0 ? (
+                            <div className="py-1 text-[13px] leading-5 whitespace-pre-wrap text-foreground">
+                              {block.assistantText}
+                            </div>
+                          ) : null}
+                          {block.toolTrace.length > 0 ? (
+                            <div className="mt-1.5 flex flex-col gap-1 px-1">
+                              {block.toolTrace.map((entry, entryIndex) => (
+                                <ToolTraceCard
+                                  key={`${message.id}:stream:${block.assistantNodeId}:${entry.toolCallId ?? entry.toolName}:${entryIndex}`}
+                                  entry={entry}
+                                  expanded={expandedToolTraceKeys.has(
+                                    `${message.id}:stream:${block.assistantNodeId}:${entry.toolCallId ?? entry.toolName}:${entryIndex}`,
+                                  )}
+                                  onToggle={() =>
+                                    toggleToolTrace(
+                                      `${message.id}:stream:${block.assistantNodeId}:${entry.toolCallId ?? entry.toolName}:${entryIndex}`,
+                                    )
+                                  }
+                                />
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      ))}
                       <PendingAssistantBubble label="正在生成回复..." />
                     </div>
                   ) : null}
@@ -247,6 +290,35 @@ export function AiSidebar({
                     {controller.pendingAction.text}
                   </div>
                 </div>
+                {controller.activeStream?.kind === "send"
+                  ? controller.activeStream.blocks.map((block, blockIndex) => (
+                      <div key={`send-stream-block:${block.assistantNodeId}:${blockIndex}`}>
+                        {block.assistantText.trim().length > 0 ? (
+                          <div className="py-1 text-[13px] leading-5 whitespace-pre-wrap text-foreground">
+                            {block.assistantText}
+                          </div>
+                        ) : null}
+                        {block.toolTrace.length > 0 ? (
+                          <div className="mt-1.5 flex flex-col gap-1 px-1">
+                            {block.toolTrace.map((entry, index) => (
+                              <ToolTraceCard
+                                key={`send-stream:${block.assistantNodeId}:${entry.toolCallId ?? entry.toolName}:${index}`}
+                                entry={entry}
+                                expanded={expandedToolTraceKeys.has(
+                                  `send-stream:${block.assistantNodeId}:${entry.toolCallId ?? entry.toolName}:${index}`,
+                                )}
+                                onToggle={() =>
+                                  toggleToolTrace(
+                                    `send-stream:${block.assistantNodeId}:${entry.toolCallId ?? entry.toolName}:${index}`,
+                                  )
+                                }
+                              />
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    ))
+                  : null}
                 <PendingAssistantBubble label="正在生成回复..." />
               </>
             ) : null}

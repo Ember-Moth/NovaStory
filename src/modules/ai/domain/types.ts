@@ -69,6 +69,7 @@ export type AgentArtifactKind =
   | "error";
 export type AiSelectionSnapshotOrigin = "catalog" | "custom";
 export type AgentToolTraceStatus = "success" | "error";
+export type ProjectAssistantStreamToolStatus = AgentToolTraceStatus;
 
 export interface ProjectAssistantContextSnapshot {
   workspaceId: string | null;
@@ -223,6 +224,49 @@ export interface AgentRunView {
   createdAt: number;
   updatedAt: number;
 }
+
+export type ProjectAssistantStreamEvent =
+  | {
+      type: "run-started";
+      run: AgentRunView;
+      threadId: string;
+      triggerNodeId: string;
+      userNode?: AgentThreadNodeView;
+      replacementNode?: AgentThreadNodeView;
+    }
+  | {
+      type: "assistant-message-started";
+      nodeId: string;
+      parentNodeId: string | null;
+      stepIndex: number;
+    }
+  | {
+      type: "assistant-text-delta";
+      nodeId: string;
+      delta: string;
+      accumulatedText: string;
+    }
+  | {
+      type: "tool-call";
+      assistantNodeId: string;
+      toolCallId: string | null;
+      toolName: string;
+      input: unknown;
+    }
+  | {
+      type: "tool-result";
+      toolNodeId: string;
+      toolCallId: string | null;
+      toolName: string;
+      output: unknown;
+      status: ProjectAssistantStreamToolStatus;
+    }
+  | {
+      type: "step-finished";
+      stepIndex: number;
+      finishReason: string | undefined;
+      usage: unknown;
+    };
 
 export interface AgentRunStepView {
   id: string;

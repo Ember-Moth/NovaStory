@@ -1,4 +1,4 @@
-import { mutation, type MutationCtx, query } from "@codehz/rpc/core";
+import { mutation, type MutationCtx, query, stream } from "@codehz/rpc/core";
 import { and, eq, type InferInsertModel } from "drizzle-orm";
 
 import { db, schema } from "@/db";
@@ -41,6 +41,7 @@ import type {
   AiCatalogStatusView,
   AiConnectionRow,
   AiResolvedModelView,
+  ProjectAssistantStreamEvent,
   ProjectAssistantContextSnapshot,
 } from "@/modules/ai/domain/types";
 import { assertRpcFound } from "@/rpc/errors";
@@ -770,6 +771,50 @@ export const sendProjectAssistantMessage = mutation<
   }
 });
 
+export const sendProjectAssistantMessageStream = stream<
+  SendProjectAssistantMessageInput,
+  ProjectAssistantStreamEvent,
+  ProjectAssistantSendResult,
+  RpcTagList
+>({
+  handler: async ({ projectId, threadId, text, context }, ctx) => {
+    const execution = getProjectAssistantService().sendProjectAssistantMessageStream({
+      projectId,
+      threadId,
+      text,
+      context,
+    });
+    const unsubscribe = execution.subscribe((event) => {
+      ctx.emit(event);
+    });
+    try {
+      const result = await Promise.race([
+        execution.finalResult,
+        (async () => {
+          await new Promise<void>((resolve) => {
+            if (ctx.signal.aborted) {
+              resolve();
+              return;
+            }
+            ctx.signal.addEventListener("abort", () => resolve(), { once: true });
+          });
+          return execution.initialResult;
+        })(),
+      ]);
+      if (!ctx.signal.aborted) {
+        invalidateProjectAiState(ctx, projectId, {
+          threadId: result.thread.id,
+          runId: result.run.id,
+          candidateParentNodeId: result.userNode.id,
+        });
+      }
+      return result;
+    } finally {
+      unsubscribe();
+    }
+  },
+});
+
 export const retryProjectAssistantMessage = mutation<
   RetryProjectAssistantMessageInput,
   ProjectAssistantRetryResult,
@@ -792,6 +837,50 @@ export const retryProjectAssistantMessage = mutation<
     invalidateProjectAiState(ctx, projectId, { threadId });
     throw error;
   }
+});
+
+export const retryProjectAssistantMessageStream = stream<
+  RetryProjectAssistantMessageInput,
+  ProjectAssistantStreamEvent,
+  ProjectAssistantRetryResult,
+  RpcTagList
+>({
+  handler: async ({ projectId, threadId, triggerNodeId, context }, ctx) => {
+    const execution = getProjectAssistantService().retryProjectAssistantMessageStream({
+      projectId,
+      threadId,
+      triggerNodeId,
+      context,
+    });
+    const unsubscribe = execution.subscribe((event) => {
+      ctx.emit(event);
+    });
+    try {
+      const result = await Promise.race([
+        execution.finalResult,
+        (async () => {
+          await new Promise<void>((resolve) => {
+            if (ctx.signal.aborted) {
+              resolve();
+              return;
+            }
+            ctx.signal.addEventListener("abort", () => resolve(), { once: true });
+          });
+          return execution.initialResult;
+        })(),
+      ]);
+      if (!ctx.signal.aborted) {
+        invalidateProjectAiState(ctx, projectId, {
+          threadId: result.thread.id,
+          runId: result.run.id,
+          candidateParentNodeId: triggerNodeId,
+        });
+      }
+      return result;
+    } finally {
+      unsubscribe();
+    }
+  },
 });
 
 export const editProjectAssistantMessage = mutation<
@@ -817,6 +906,51 @@ export const editProjectAssistantMessage = mutation<
     invalidateProjectAiState(ctx, projectId, { threadId });
     throw error;
   }
+});
+
+export const editProjectAssistantMessageStream = stream<
+  EditProjectAssistantMessageInput,
+  ProjectAssistantStreamEvent,
+  ProjectAssistantEditResult,
+  RpcTagList
+>({
+  handler: async ({ projectId, threadId, nodeId, text, context }, ctx) => {
+    const execution = getProjectAssistantService().editProjectAssistantMessageStream({
+      projectId,
+      threadId,
+      nodeId,
+      text,
+      context,
+    });
+    const unsubscribe = execution.subscribe((event) => {
+      ctx.emit(event);
+    });
+    try {
+      const result = await Promise.race([
+        execution.finalResult,
+        (async () => {
+          await new Promise<void>((resolve) => {
+            if (ctx.signal.aborted) {
+              resolve();
+              return;
+            }
+            ctx.signal.addEventListener("abort", () => resolve(), { once: true });
+          });
+          return execution.initialResult;
+        })(),
+      ]);
+      if (!ctx.signal.aborted) {
+        invalidateProjectAiState(ctx, projectId, {
+          threadId: result.thread.id,
+          runId: result.run.id,
+          candidateParentNodeId: result.replacementNode.parentNodeId,
+        });
+      }
+      return result;
+    } finally {
+      unsubscribe();
+    }
+  },
 });
 
 // Warm the local catalog snapshot whenever the AI surface is touched.

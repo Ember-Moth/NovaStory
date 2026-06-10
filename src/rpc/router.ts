@@ -36,8 +36,11 @@ export const ai = {
   archiveProjectAssistantThread: aiHandlers.archiveProjectAssistantThread,
   selectThreadTip: aiHandlers.selectThreadTip,
   sendProjectAssistantMessage: aiHandlers.sendProjectAssistantMessage,
+  sendProjectAssistantMessageStream: aiHandlers.sendProjectAssistantMessageStream,
   retryProjectAssistantMessage: aiHandlers.retryProjectAssistantMessage,
+  retryProjectAssistantMessageStream: aiHandlers.retryProjectAssistantMessageStream,
   editProjectAssistantMessage: aiHandlers.editProjectAssistantMessage,
+  editProjectAssistantMessageStream: aiHandlers.editProjectAssistantMessageStream,
 };
 
 export const config = {

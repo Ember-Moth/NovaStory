@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterAll, beforeEach, expect, test } from "bun:test";
+import type { ModelMessage } from "ai";
 
 const tempDir = mkdtempSync(join(tmpdir(), "novel-evolver-project-assistant-"));
 const dbPath = join(tempDir, "assistant.sqlite");
@@ -11,6 +12,32 @@ process.env.DATABASE_URL = dbPath;
 const { db, schema } = await import("@/db");
 const logs = await import("@/modules/ai/domain/logs");
 const { createProjectAssistantService } = await import("./project-assistant");
+
+function createMockStream({
+  chunks,
+  text,
+  finishReason,
+  usage,
+  steps,
+}: {
+  chunks: Array<Record<string, unknown>>;
+  text: string;
+  finishReason: string;
+  usage: unknown;
+  steps: Array<Record<string, unknown>>;
+}) {
+  return () => ({
+    chunks: (async function* () {
+      for (const chunk of chunks) {
+        yield chunk;
+      }
+    })(),
+    text: Promise.resolve(text),
+    finishReason: Promise.resolve(finishReason),
+    usage: Promise.resolve(usage),
+    steps: Promise.resolve(steps),
+  });
+}
 
 function seedProject(projectId: string) {
   db.insert(schema.projects)
@@ -105,14 +132,31 @@ test("sendProjectAssistantMessage materializes user and assistant nodes and reco
   });
   const service = createProjectAssistantService({
     readStoredSelection: () => seeded.selection,
-    generateAssistantText: async ({ messages }) => ({
+    streamAssistantText: createMockStream({
+      chunks: [
+        {
+          type: "start-step",
+          stepNumber: 0,
+        },
+        {
+          type: "text-delta",
+          stepNumber: 0,
+          delta: "Assistant reply",
+        },
+        {
+          type: "finish-step",
+          stepNumber: 0,
+          finishReason: "stop",
+          usage: { totalTokens: 42 },
+        },
+      ],
       text: "Assistant reply",
       usage: { totalTokens: 42 },
       finishReason: "stop",
-      preparedMessagesByStep: [messages],
       steps: [
         {
           stepNumber: 0,
+          preparedMessages: [{ role: "user", content: [{ type: "text", text: "Hello world" }] }],
           model: { provider: "openai", modelId: "story-model" },
           finishReason: "stop",
           rawFinishReason: "stop",
@@ -132,7 +176,7 @@ test("sendProjectAssistantMessage materializes user and assistant nodes and reco
           toolResults: [],
         },
       ],
-    }),
+    }) as any,
   });
   const thread = service.createProjectAssistantThread("assistant_send");
 
@@ -158,14 +202,31 @@ test("retryProjectAssistantMessage creates sibling assistant candidates", async 
   });
   const service = createProjectAssistantService({
     readStoredSelection: () => seeded.selection,
-    generateAssistantText: async ({ messages }) => ({
+    streamAssistantText: createMockStream({
+      chunks: [
+        {
+          type: "start-step",
+          stepNumber: 0,
+        },
+        {
+          type: "text-delta",
+          stepNumber: 0,
+          delta: "Retried reply",
+        },
+        {
+          type: "finish-step",
+          stepNumber: 0,
+          finishReason: "stop",
+          usage: { totalTokens: 9 },
+        },
+      ],
       text: "Retried reply",
       usage: { totalTokens: 9 },
       finishReason: "stop",
-      preparedMessagesByStep: [messages],
       steps: [
         {
           stepNumber: 0,
+          preparedMessages: [{ role: "user", content: [{ type: "text", text: "Need help" }] }],
           model: { provider: "openai", modelId: "story-model" },
           finishReason: "stop",
           rawFinishReason: "stop",
@@ -185,7 +246,7 @@ test("retryProjectAssistantMessage creates sibling assistant candidates", async 
           toolResults: [],
         },
       ],
-    }),
+    }) as any,
   });
   const thread = service.createProjectAssistantThread("assistant_retry");
   const userNode = logs.appendUserNode({
@@ -217,7 +278,7 @@ test("sendProjectAssistantMessage only materializes per-step response deltas int
   });
   const service = createProjectAssistantService({
     readStoredSelection: () => seeded.selection,
-    generateAssistantText: async ({ messages }) => {
+    streamAssistantText: ((_input: { messages: ModelMessage[] }) => {
       const stepZeroAssistant = {
         role: "assistant" as const,
         content: [
@@ -286,13 +347,79 @@ test("sendProjectAssistantMessage only materializes per-step response deltas int
       };
 
       return {
-        text: "现在可以开始分析设定了。",
-        usage: { totalTokens: 123 },
-        finishReason: "stop",
-        preparedMessagesByStep: [messages, messages, messages],
-        steps: [
+        chunks: (async function* () {
+          yield { type: "start-step", stepNumber: 0 };
+          yield { type: "text-delta", stepNumber: 0, delta: "先读取当前上下文。" };
+          yield {
+            type: "tool-call",
+            stepNumber: 0,
+            toolCall: {
+              toolCallId: "tool_call_context",
+              toolName: "read_current_writing_context",
+              input: {},
+            },
+          };
+          yield {
+            type: "tool-result",
+            stepNumber: 0,
+            toolResult: {
+              toolCallId: "tool_call_context",
+              toolName: "read_current_writing_context",
+              output: {
+                ok: true,
+              },
+            },
+          };
+          yield {
+            type: "finish-step",
+            stepNumber: 0,
+            finishReason: "tool-calls",
+            usage: { totalTokens: 40 },
+          };
+          yield { type: "start-step", stepNumber: 1 };
+          yield { type: "text-delta", stepNumber: 1, delta: "`/设定` 是文件，我再看一下根目录。" };
+          yield {
+            type: "tool-call",
+            stepNumber: 1,
+            toolCall: {
+              toolCallId: "tool_call_root",
+              toolName: "list_aux_dir",
+              input: {},
+            },
+          };
+          yield {
+            type: "tool-result",
+            stepNumber: 1,
+            toolResult: {
+              toolCallId: "tool_call_root",
+              toolName: "list_aux_dir",
+              output: {
+                ok: true,
+              },
+            },
+          };
+          yield {
+            type: "finish-step",
+            stepNumber: 1,
+            finishReason: "tool-calls",
+            usage: { totalTokens: 41 },
+          };
+          yield { type: "start-step", stepNumber: 2 };
+          yield { type: "text-delta", stepNumber: 2, delta: "现在可以开始分析设定了。" };
+          yield {
+            type: "finish-step",
+            stepNumber: 2,
+            finishReason: "stop",
+            usage: { totalTokens: 42 },
+          };
+        })(),
+        text: Promise.resolve("现在可以开始分析设定了。"),
+        usage: Promise.resolve({ totalTokens: 123 }),
+        finishReason: Promise.resolve("stop"),
+        steps: Promise.resolve([
           {
             stepNumber: 0,
+            preparedMessages: _input.messages,
             model: { provider: "openai", modelId: "story-model" },
             finishReason: "tool-calls",
             rawFinishReason: "tool_calls",
@@ -322,6 +449,7 @@ test("sendProjectAssistantMessage only materializes per-step response deltas int
           },
           {
             stepNumber: 1,
+            preparedMessages: _input.messages,
             model: { provider: "openai", modelId: "story-model" },
             finishReason: "tool-calls",
             rawFinishReason: "tool_calls",
@@ -351,6 +479,7 @@ test("sendProjectAssistantMessage only materializes per-step response deltas int
           },
           {
             stepNumber: 2,
+            preparedMessages: _input.messages,
             model: { provider: "openai", modelId: "story-model" },
             finishReason: "stop",
             rawFinishReason: "stop",
@@ -370,9 +499,9 @@ test("sendProjectAssistantMessage only materializes per-step response deltas int
             toolCalls: [],
             toolResults: [],
           },
-        ],
+        ]),
       };
-    },
+    }) as any,
   });
   const thread = service.createProjectAssistantThread("assistant_multistep");
 
@@ -413,4 +542,70 @@ test("sendProjectAssistantMessage only materializes per-step response deltas int
 
   expect(responseMessageLengths).toEqual([2, 4, 5]);
   expect(trace.events.filter((event) => event.eventKind === "node-materialized")).toHaveLength(5);
+});
+
+test("sendProjectAssistantMessageStream keeps running after subscribers detach", async () => {
+  seedProject("assistant_background");
+  const seeded = seedCustomConnection({
+    connectionId: "conn_background",
+    modelId: "story-model",
+    modelRowId: "cmodel_background",
+  });
+  const service = createProjectAssistantService({
+    readStoredSelection: () => seeded.selection,
+    streamAssistantText: createMockStream({
+      chunks: [
+        { type: "start-step", stepNumber: 0 },
+        { type: "text-delta", stepNumber: 0, delta: "Detached reply" },
+        {
+          type: "finish-step",
+          stepNumber: 0,
+          finishReason: "stop",
+          usage: { totalTokens: 7 },
+        },
+      ],
+      text: "Detached reply",
+      usage: { totalTokens: 7 },
+      finishReason: "stop",
+      steps: [
+        {
+          stepNumber: 0,
+          preparedMessages: [{ role: "user", content: [{ type: "text", text: "Keep going" }] }],
+          model: { provider: "openai", modelId: "story-model" },
+          finishReason: "stop",
+          rawFinishReason: "stop",
+          usage: { totalTokens: 7 },
+          request: { body: { prompt: "Keep going" } },
+          response: {
+            body: { id: "resp_background" },
+            messages: [
+              {
+                role: "assistant",
+                content: [{ type: "text", text: "Detached reply" }],
+              },
+            ],
+          },
+          providerMetadata: {},
+          toolCalls: [],
+          toolResults: [],
+        },
+      ],
+    }) as any,
+  });
+  const thread = service.createProjectAssistantThread("assistant_background");
+
+  const handle = service.sendProjectAssistantMessageStream({
+    projectId: "assistant_background",
+    threadId: thread.id,
+    text: "Keep going",
+  });
+  const unsubscribe = handle.subscribe(() => {
+    return;
+  });
+  unsubscribe();
+
+  const result = await handle.finalResult;
+
+  expect(result.run.status).toBe("succeeded");
+  expect(result.state.activePath.map((node) => node.role)).toEqual(["user", "assistant"]);
 });

@@ -728,6 +728,101 @@ function insertNode(executor: DatabaseExecutor, input: CreateNodeInput) {
   return mapNodeRow(executor, getNodeOrThrow(executor, id));
 }
 
+function updateNodeMessage(
+  executor: DatabaseExecutor,
+  nodeId: string,
+  message: ModelMessage,
+  summaryText?: string | null,
+) {
+  const node = getNodeOrThrow(executor, nodeId);
+  executor
+    .update(schema.agentThreadNodes)
+    .set({
+      messageJson: serializeRequiredJson(message, "线程消息"),
+      summaryText:
+        normalizeSummaryText(summaryText) ?? normalizeSummaryText(buildMessageSummary(message)),
+    })
+    .where(eq(schema.agentThreadNodes.id, node.id))
+    .run();
+  touchThread(executor, node.threadId);
+  return mapNodeRow(executor, getNodeOrThrow(executor, node.id));
+}
+
+function updateNodePart(
+  executor: DatabaseExecutor,
+  nodeId: string,
+  partIndex: number,
+  {
+    payload,
+    state,
+    providerOptions,
+    providerMetadata,
+  }: {
+    payload: unknown;
+    state: AgentPartState;
+    providerOptions?: unknown;
+    providerMetadata?: unknown;
+  },
+) {
+  const row = executor
+    .select()
+    .from(schema.agentThreadNodeParts)
+    .where(
+      and(
+        eq(schema.agentThreadNodeParts.nodeId, nodeId),
+        eq(schema.agentThreadNodeParts.partIndex, partIndex),
+      ),
+    )
+    .get();
+  invariant(row, "未找到节点 part。");
+  executor
+    .update(schema.agentThreadNodeParts)
+    .set({
+      state,
+      providerOptionsJson: serializeOptionalJson(providerOptions),
+      providerMetadataJson: serializeOptionalJson(providerMetadata),
+      payloadJson: serializeRequiredJson(payload, "节点 part"),
+    })
+    .where(eq(schema.agentThreadNodeParts.id, row.id))
+    .run();
+}
+
+function appendNodePart(
+  executor: DatabaseExecutor,
+  nodeId: string,
+  part: {
+    partKind: AgentThreadNodePartKind;
+    visibility: AgentVisibility;
+    state: AgentPartState;
+    payload: unknown;
+    providerOptions?: unknown;
+    providerMetadata?: unknown;
+  },
+) {
+  const latest = executor
+    .select({ partIndex: schema.agentThreadNodeParts.partIndex })
+    .from(schema.agentThreadNodeParts)
+    .where(eq(schema.agentThreadNodeParts.nodeId, nodeId))
+    .orderBy(desc(schema.agentThreadNodeParts.partIndex))
+    .get();
+  const partIndex = (latest?.partIndex ?? -1) + 1;
+  executor
+    .insert(schema.agentThreadNodeParts)
+    .values({
+      id: createId("agent_part"),
+      nodeId,
+      partIndex,
+      partKind: part.partKind,
+      visibility: part.visibility,
+      state: part.state,
+      providerOptionsJson: serializeOptionalJson(part.providerOptions),
+      providerMetadataJson: serializeOptionalJson(part.providerMetadata),
+      payloadJson: serializeRequiredJson(part.payload, "节点 part"),
+      createdAt: now(),
+    })
+    .run();
+}
+
 function getLatestUnarchivedThreadRow(
   executor: DatabaseExecutor,
   projectId: string,
@@ -1260,6 +1355,237 @@ export function materializeResponseMessages(input: MaterializeResponseMessagesIn
       nodes,
       tipNodeId: parentNodeId,
     };
+  });
+}
+
+export function createStreamingAssistantNode(input: {
+  threadId: string;
+  parentNodeId: string | null;
+  runId: string;
+  stepId?: string | null;
+}) {
+  return db.transaction((tx) => {
+    const node = insertNode(tx, {
+      threadId: input.threadId,
+      parentNodeId: input.parentNodeId,
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "", state: "streaming" }],
+      } as unknown as ModelMessage,
+      sourceKind: "model_response",
+      createdByRunId: input.runId,
+      sourceStepId: trimOptionalString(input.stepId),
+      summaryText: "助手回复",
+    });
+    tx.update(schema.agentThreads)
+      .set({
+        activeTipNodeId: node.id,
+        updatedAt: now(),
+      })
+      .where(eq(schema.agentThreads.id, input.threadId))
+      .run();
+    return node;
+  });
+}
+
+export function appendAssistantTextDelta(input: { nodeId: string; delta: string }) {
+  return db.transaction((tx) => {
+    const node = getNodeOrThrow(tx, input.nodeId);
+    invariant(node.role === "assistant", "只能向 assistant 节点追加文本。");
+    const message = JSON.parse(node.messageJson) as ModelMessage;
+    const rawContent = (message as { content?: unknown }).content;
+    const content =
+      typeof rawContent === "string"
+        ? [{ type: "text", text: rawContent }]
+        : Array.isArray(rawContent)
+          ? [...rawContent]
+          : [];
+
+    let textPartIndex = content.findIndex(
+      (part) =>
+        part &&
+        typeof part === "object" &&
+        Reflect.get(part as Record<string, unknown>, "type") === "text",
+    );
+
+    if (textPartIndex < 0) {
+      content.unshift({ type: "text", text: "", state: "streaming" });
+      textPartIndex = 0;
+    }
+
+    const existingPart = content[textPartIndex];
+    const nextPart = {
+      ...(existingPart as Record<string, unknown>),
+      type: "text",
+      text: `${String(Reflect.get(existingPart as Record<string, unknown>, "text") ?? "")}${input.delta}`,
+      state: "streaming",
+    };
+    content[textPartIndex] = nextPart;
+
+    const nextMessage = {
+      ...message,
+      content,
+    } as ModelMessage;
+    updateNodeMessage(tx, node.id, nextMessage);
+    updateNodePart(tx, node.id, textPartIndex, {
+      payload: nextPart,
+      state: "streaming",
+      providerOptions: Reflect.get(nextPart, "providerOptions"),
+      providerMetadata: Reflect.get(nextPart, "providerMetadata"),
+    });
+    return mapNodeRow(tx, getNodeOrThrow(tx, node.id));
+  });
+}
+
+export function appendAssistantToolCallPart(input: {
+  nodeId: string;
+  toolCall: Record<string, unknown>;
+}) {
+  return db.transaction((tx) => {
+    const node = getNodeOrThrow(tx, input.nodeId);
+    invariant(node.role === "assistant", "只能向 assistant 节点追加工具调用。");
+    const message = JSON.parse(node.messageJson) as ModelMessage;
+    const rawContent = (message as { content?: unknown }).content;
+    const content =
+      typeof rawContent === "string"
+        ? [{ type: "text", text: rawContent }]
+        : Array.isArray(rawContent)
+          ? [...rawContent]
+          : [];
+    const nextPart = {
+      type: "tool-call",
+      ...input.toolCall,
+    };
+    content.push(nextPart);
+    const nextMessage = {
+      ...message,
+      content,
+    } as ModelMessage;
+    const nextNode = updateNodeMessage(tx, node.id, nextMessage);
+    appendNodePart(tx, node.id, {
+      partKind: "tool-call",
+      visibility: "internal",
+      state: "done",
+      payload: nextPart,
+      providerOptions: Reflect.get(nextPart, "providerOptions"),
+      providerMetadata: Reflect.get(nextPart, "providerMetadata"),
+    });
+    return nextNode;
+  });
+}
+
+export function createStreamingToolResultNode(input: {
+  threadId: string;
+  parentNodeId: string | null;
+  runId: string;
+  stepId?: string | null;
+  toolResult: Record<string, unknown>;
+}) {
+  return db.transaction((tx) => {
+    const node = insertNode(tx, {
+      threadId: input.threadId,
+      parentNodeId: input.parentNodeId,
+      message: {
+        role: "tool",
+        content: [{ type: "tool-result", ...input.toolResult }],
+      } as unknown as ModelMessage,
+      sourceKind: "tool_result",
+      createdByRunId: input.runId,
+      sourceStepId: trimOptionalString(input.stepId),
+    });
+    tx.update(schema.agentThreads)
+      .set({
+        activeTipNodeId: node.id,
+        updatedAt: now(),
+      })
+      .where(eq(schema.agentThreads.id, input.threadId))
+      .run();
+    return node;
+  });
+}
+
+export function markThreadNodePartsDone(nodeId: string) {
+  return db.transaction((tx) => {
+    const node = getNodeOrThrow(tx, nodeId);
+    const message = JSON.parse(node.messageJson) as ModelMessage;
+    const rawContent = (message as { content?: unknown }).content;
+    const content =
+      typeof rawContent === "string"
+        ? [{ type: "text", text: rawContent }]
+        : Array.isArray(rawContent)
+          ? rawContent.map((part) => {
+              if (!part || typeof part !== "object") {
+                return part;
+              }
+              if (
+                Reflect.get(part as Record<string, unknown>, "state") === "streaming" ||
+                Reflect.get(part as Record<string, unknown>, "state") === "done"
+              ) {
+                return {
+                  ...(part as Record<string, unknown>),
+                  state: "done",
+                };
+              }
+              return part;
+            })
+          : [];
+    const nextMessage = {
+      ...message,
+      content,
+    } as ModelMessage;
+    tx.update(schema.agentThreadNodeParts)
+      .set({ state: "done" })
+      .where(eq(schema.agentThreadNodeParts.nodeId, node.id))
+      .run();
+    return updateNodeMessage(tx, node.id, nextMessage);
+  });
+}
+
+export function assignThreadNodeSourceStepIds(nodeIds: string[], stepId: string) {
+  if (nodeIds.length === 0) {
+    return;
+  }
+
+  db.transaction((tx) => {
+    getStepOrThrow(tx, stepId);
+    nodeIds.forEach((nodeId) => {
+      getNodeOrThrow(tx, nodeId);
+      tx.update(schema.agentThreadNodes)
+        .set({ sourceStepId: stepId })
+        .where(eq(schema.agentThreadNodes.id, nodeId))
+        .run();
+    });
+  });
+}
+
+export function updateRunStep(input: {
+  stepId: string;
+  finishReason?: string | null;
+  rawFinishReason?: string | null;
+  preparedMessagesArtifactId?: string | null;
+  responseMessagesArtifactId?: string | null;
+  requestBodyArtifactId?: string | null;
+  responseBodyArtifactId?: string | null;
+  providerMetadataArtifactId?: string | null;
+  usage?: unknown;
+}) {
+  return db.transaction((tx) => {
+    const step = getStepOrThrow(tx, input.stepId);
+    tx.update(schema.agentRunSteps)
+      .set({
+        finishReason: trimOptionalString(input.finishReason),
+        rawFinishReason: trimOptionalString(input.rawFinishReason),
+        preparedMessagesArtifactId: trimOptionalString(input.preparedMessagesArtifactId),
+        responseMessagesArtifactId: trimOptionalString(input.responseMessagesArtifactId),
+        requestBodyArtifactId: trimOptionalString(input.requestBodyArtifactId),
+        responseBodyArtifactId: trimOptionalString(input.responseBodyArtifactId),
+        providerMetadataArtifactId: trimOptionalString(input.providerMetadataArtifactId),
+        usageJson: serializeOptionalJson(input.usage),
+        completedAt: now(),
+      })
+      .where(eq(schema.agentRunSteps.id, step.id))
+      .run();
+    return mapRunStepRow(getStepOrThrow(tx, step.id));
   });
 }
 

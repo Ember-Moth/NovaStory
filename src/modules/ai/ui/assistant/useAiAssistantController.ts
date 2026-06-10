@@ -1,13 +1,18 @@
 import type { FormEvent } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type { AgentThreadView, ProjectAssistantContextSnapshot } from "@/modules/ai/domain/types";
+import type {
+  AgentThreadView,
+  ProjectAssistantContextSnapshot,
+  ProjectAssistantStreamEvent,
+} from "@/modules/ai/domain/types";
 import { rpc } from "@/rpc/client";
 
 import {
   canSendAssistantMessage,
   EMPTY_ASSISTANT_STATE,
   EMPTY_THREADS,
+  type AssistantToolTraceEntry,
   type EditingThreadState,
   getCandidateGroupForNode,
   selectPendingRun,
@@ -27,6 +32,19 @@ export type SessionListRow =
       type: "archived-toggle";
       count: number;
     };
+
+export interface AssistantStreamOverlay {
+  kind: "send" | "retry";
+  threadId: string;
+  triggerNodeId: string | null;
+  runId: string | null;
+  activeAssistantNodeId: string | null;
+  blocks: Array<{
+    assistantNodeId: string;
+    assistantText: string;
+    toolTrace: AssistantToolTraceEntry[];
+  }>;
+}
 
 export function buildSessionRows({
   unarchivedThreads,
@@ -103,6 +121,165 @@ export function resolveExpectedActiveThreadAfterArchiveToggle({
   return null;
 }
 
+function createStreamOverlay({
+  kind,
+  threadId,
+  triggerNodeId,
+}: {
+  kind: "send" | "retry";
+  threadId: string;
+  triggerNodeId: string | null;
+}): AssistantStreamOverlay {
+  return {
+    kind,
+    threadId,
+    triggerNodeId,
+    runId: null,
+    activeAssistantNodeId: null,
+    blocks: [],
+  };
+}
+
+function updateStreamToolTrace(
+  current: AssistantToolTraceEntry[],
+  event: Extract<ProjectAssistantStreamEvent, { type: "tool-call" | "tool-result" }>,
+) {
+  if (event.type === "tool-call") {
+    return [
+      ...current,
+      {
+        toolCallId: event.toolCallId,
+        toolName: event.toolName,
+        status: "pending" as const,
+        summary: `调用 ${event.toolName}`,
+        nodeId: event.assistantNodeId,
+        runId: null,
+        requestPayload: event.input,
+        responsePayload: null,
+      },
+    ];
+  }
+
+  const index = current.findIndex(
+    (entry) =>
+      entry.toolCallId != null && event.toolCallId != null && entry.toolCallId === event.toolCallId,
+  );
+  if (index < 0) {
+    return [
+      ...current,
+      {
+        toolCallId: event.toolCallId,
+        toolName: event.toolName,
+        status: event.status,
+        summary: event.status === "error" ? `${event.toolName} 执行失败` : `调用 ${event.toolName}`,
+        nodeId: event.toolNodeId,
+        runId: null,
+        requestPayload: null,
+        responsePayload: event.output,
+      },
+    ];
+  }
+
+  return current.map((entry, entryIndex) =>
+    entryIndex === index
+      ? {
+          ...entry,
+          status: event.status,
+          summary: event.status === "error" ? `${event.toolName} 执行失败` : entry.summary,
+          responsePayload: event.output,
+        }
+      : entry,
+  );
+}
+
+function ensureStreamBlock(
+  overlay: AssistantStreamOverlay,
+  assistantNodeId: string,
+): AssistantStreamOverlay {
+  if (overlay.blocks.some((block) => block.assistantNodeId === assistantNodeId)) {
+    return overlay;
+  }
+
+  return {
+    ...overlay,
+    blocks: [
+      ...overlay.blocks,
+      {
+        assistantNodeId,
+        assistantText: "",
+        toolTrace: [],
+      },
+    ],
+  };
+}
+
+function applyStreamEvent(
+  overlay: AssistantStreamOverlay,
+  event: ProjectAssistantStreamEvent,
+): AssistantStreamOverlay {
+  if (event.type === "run-started") {
+    return {
+      ...overlay,
+      runId: event.run.id,
+      triggerNodeId: event.triggerNodeId,
+    };
+  }
+
+  if (event.type === "assistant-message-started") {
+    const nextOverlay = ensureStreamBlock(overlay, event.nodeId);
+    return {
+      ...nextOverlay,
+      activeAssistantNodeId: event.nodeId,
+    };
+  }
+
+  if (event.type === "assistant-text-delta") {
+    const nextOverlay = ensureStreamBlock(overlay, event.nodeId);
+    return {
+      ...nextOverlay,
+      activeAssistantNodeId: event.nodeId,
+      blocks: nextOverlay.blocks.map((block) =>
+        block.assistantNodeId === event.nodeId
+          ? {
+              ...block,
+              assistantText: `${block.assistantText}${event.delta}`,
+            }
+          : block,
+      ),
+    };
+  }
+
+  if (event.type === "tool-call" || event.type === "tool-result") {
+    const blockIndex =
+      event.type === "tool-call"
+        ? overlay.blocks.findIndex((block) => block.assistantNodeId === event.assistantNodeId)
+        : overlay.blocks.findIndex((block) =>
+            block.toolTrace.some(
+              (entry) => entry.toolCallId != null && entry.toolCallId === event.toolCallId,
+            ),
+          );
+    const fallbackIndex = overlay.blocks.length - 1;
+    const targetIndex = blockIndex >= 0 ? blockIndex : fallbackIndex;
+    if (targetIndex < 0) {
+      return overlay;
+    }
+
+    return {
+      ...overlay,
+      blocks: overlay.blocks.map((block, index) =>
+        index === targetIndex
+          ? {
+              ...block,
+              toolTrace: updateStreamToolTrace(block.toolTrace, event),
+            }
+          : block,
+      ),
+    };
+  }
+
+  return overlay;
+}
+
 export function useAiAssistantController(
   projectId: string,
   contextSnapshot: ProjectAssistantContextSnapshot,
@@ -116,6 +293,7 @@ export function useAiAssistantController(
   const [showArchivedThreads, setShowArchivedThreads] = useState(false);
   const [expectedActiveThreadId, setExpectedActiveThreadId] = useState<string | null>(null);
   const [composerError, setComposerError] = useState<string | null>(null);
+  const [activeStream, setActiveStream] = useState<AssistantStreamOverlay | null>(null);
 
   const storedSelectionQuery = rpc.useQuery("config.getAiAssistantModelSelection");
   const assistantOverviewQuery = rpc.useQuery("ai.getProjectAssistantState", { projectId });
@@ -130,8 +308,8 @@ export function useAiAssistantController(
   const renameThread = rpc.useMutation("ai.renameProjectAssistantThread");
   const archiveThread = rpc.useMutation("ai.archiveProjectAssistantThread");
   const selectThreadTip = rpc.useMutation("ai.selectThreadTip");
-  const sendMessage = rpc.useMutation("ai.sendProjectAssistantMessage");
-  const retryMessage = rpc.useMutation("ai.retryProjectAssistantMessage");
+  const sendMessageStream = rpc.useStreamMutation("ai.sendProjectAssistantMessageStream");
+  const retryMessageStream = rpc.useStreamMutation("ai.retryProjectAssistantMessageStream");
 
   const isLoadingSelection = !selectionHydrated;
   const overview = assistantOverviewQuery.data ?? {
@@ -167,7 +345,7 @@ export function useAiAssistantController(
   );
   const retryableRun = selectRetryableRun(assistantState);
   const pendingRun = selectPendingRun(assistantState);
-  const isGenerating = sendMessage.isPending || retryMessage.isPending;
+  const isGenerating = sendMessageStream.isStreaming || retryMessageStream.isStreaming;
   const isThreadMutating =
     createThread.isPending ||
     setActiveThread.isPending ||
@@ -186,7 +364,8 @@ export function useAiAssistantController(
     hasPendingRun: pendingRun != null,
   });
   const messages = assistantState.activePath;
-  const showEmptyState = messages.length === 0 && pendingAction?.kind !== "send";
+  const showEmptyState =
+    messages.length === 0 && pendingAction?.kind !== "send" && activeStream?.kind !== "send";
 
   useEffect(() => {
     if (expectedActiveThreadId === null) {
@@ -216,6 +395,20 @@ export function useAiAssistantController(
     setSelectedModelId(storedSelectionQuery.data?.modelId ?? "");
     setSelectionHydrated(true);
   }, [selectionHydrated, storedSelectionQuery.data, storedSelectionQuery.error]);
+
+  useEffect(() => {
+    if (!pendingRun || activeStream != null) {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      void assistantOverviewQuery.refetch();
+    }, 1500);
+
+    return () => {
+      clearInterval(timer);
+    };
+  }, [activeStream, assistantOverviewQuery, pendingRun]);
 
   const handleSelectionChange = useCallback((connectionId: string, modelId: string) => {
     setSelectedConnectionId(connectionId);
@@ -247,23 +440,43 @@ export function useAiAssistantController(
       const text = draft.trim();
       setComposerError(null);
       setPendingAction({ kind: "send", text });
+      setActiveStream(
+        createStreamOverlay({
+          kind: "send",
+          threadId: activeThreadId,
+          triggerNodeId: null,
+        }),
+      );
       setDraft("");
 
       try {
-        await sendMessage.mutate({
-          projectId,
-          threadId: activeThreadId,
-          text,
-          context: contextSnapshot,
-        });
+        await sendMessageStream.startAsync(
+          {
+            projectId,
+            threadId: activeThreadId,
+            text,
+            context: contextSnapshot,
+          },
+          {
+            onEvent: (event) => {
+              setActiveStream((current) =>
+                current == null ? current : applyStreamEvent(current, event),
+              );
+            },
+          },
+        );
       } catch (error) {
         setDraft(text);
+        if (error instanceof Error && error.name === "RpcStreamAborted") {
+          return;
+        }
         setComposerError(error instanceof Error ? error.message : "发送消息失败。");
       } finally {
         setPendingAction(null);
+        setActiveStream(null);
       }
     },
-    [activeThreadId, canSubmit, contextSnapshot, draft, projectId, sendMessage],
+    [activeThreadId, canSubmit, contextSnapshot, draft, projectId, sendMessageStream],
   );
 
   const handleRetry = useCallback(
@@ -274,21 +487,41 @@ export function useAiAssistantController(
 
       setComposerError(null);
       setPendingAction({ kind: "retry", triggerNodeId });
-
-      try {
-        await retryMessage.mutate({
-          projectId,
+      setActiveStream(
+        createStreamOverlay({
+          kind: "retry",
           threadId: activeThreadId,
           triggerNodeId,
-          context: contextSnapshot,
-        });
+        }),
+      );
+
+      try {
+        await retryMessageStream.startAsync(
+          {
+            projectId,
+            threadId: activeThreadId,
+            triggerNodeId,
+            context: contextSnapshot,
+          },
+          {
+            onEvent: (event) => {
+              setActiveStream((current) =>
+                current == null ? current : applyStreamEvent(current, event),
+              );
+            },
+          },
+        );
       } catch (error) {
+        if (error instanceof Error && error.name === "RpcStreamAborted") {
+          return;
+        }
         setComposerError(error instanceof Error ? error.message : "重试失败。");
       } finally {
         setPendingAction(null);
+        setActiveStream(null);
       }
     },
-    [activeThreadId, contextSnapshot, projectId, retryMessage],
+    [activeThreadId, contextSnapshot, projectId, retryMessageStream],
   );
 
   const handleCreateThread = useCallback(async () => {
@@ -406,6 +639,7 @@ export function useAiAssistantController(
   );
 
   return {
+    activeStream,
     activeThreadId,
     canSubmit,
     composerError,
@@ -428,7 +662,7 @@ export function useAiAssistantController(
     isBusy,
     isGenerating,
     isLoadingSelection,
-    isRetrying: retryMessage.isPending,
+    isRetrying: retryMessageStream.isStreaming,
     isThreadBusy,
     isThreadMutating,
     messages,
