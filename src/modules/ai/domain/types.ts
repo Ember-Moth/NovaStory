@@ -12,6 +12,7 @@ export type AiConnectionCustomModelRow = InferSelectModel<typeof schema.aiConnec
 export type AiRegistryStateRow = InferSelectModel<typeof schema.aiRegistryState>;
 export type AiProjectMessageRow = InferSelectModel<typeof schema.aiProjectMessages>;
 export type AiProjectHeadRow = InferSelectModel<typeof schema.aiProjectHeads>;
+export type AiProjectAssistantStateRow = InferSelectModel<typeof schema.aiProjectAssistantState>;
 export type AiProjectGenerationAttemptRow = InferSelectModel<
   typeof schema.aiProjectGenerationAttempts
 >;
@@ -82,6 +83,13 @@ export interface AiProjectHeadView {
   forkedFromHeadId: string | null;
   forkedFromMessageId: string | null;
   isArchived: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface AiProjectAssistantStateView {
+  projectId: string;
+  activeHeadId: string | null;
   createdAt: number;
   updatedAt: number;
 }

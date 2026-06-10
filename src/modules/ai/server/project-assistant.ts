@@ -7,12 +7,13 @@ import {
   appendMessage,
   completeGenerationAttemptError,
   completeGenerationAttemptSuccess,
-  createHead,
+  getHeadOrThrowView,
   hasPendingGenerationAttempt,
   listHeadGenerationAttempts,
   recordGenerationAttempt,
+  resolveActiveAssistantHead,
   resolveHeadMessages,
-  resolveProjectMainHead,
+  setActiveAssistantHead,
 } from "@/modules/ai/domain/logs";
 import type {
   AiConnectionRow,
@@ -193,16 +194,6 @@ function resolveProjectAssistantModelSelection(
   };
 }
 
-function resolveOrCreateMainHead(projectId: string) {
-  return (
-    resolveProjectMainHead(projectId) ??
-    createHead({
-      projectId,
-      name: "主会话",
-    })
-  );
-}
-
 function getHeadState(head: AiProjectHeadView | null): ProjectAssistantStateView {
   if (!head) {
     return {
@@ -269,18 +260,22 @@ export function createProjectAssistantService(
 
   return {
     getProjectAssistantState(projectId: string): ProjectAssistantStateView {
-      return getHeadState(resolveProjectMainHead(projectId));
+      return getHeadState(resolveActiveAssistantHead(projectId));
     },
 
     async sendProjectAssistantMessage({
       projectId,
+      headId,
       text,
     }: {
       projectId: string;
+      headId: string;
       text: string;
     }): Promise<ProjectAssistantSendResult> {
       const selection = resolveProjectAssistantModelSelection(readStoredSelection);
-      const head = resolveOrCreateMainHead(projectId);
+      const head = getHeadOrThrowView(headId);
+      invariant(head.projectId === projectId, "AI 会话不属于当前项目。");
+      invariant(!head.isArchived, "不能向已归档会话发送消息。");
       assertNoPendingAttempt(head);
 
       const normalizedText = normalizeUserText(text);
@@ -332,9 +327,10 @@ export function createProjectAssistantService(
           assistantMessageId: assistantMessage.id,
           usage: result.usage,
         });
+        const activeHead = setActiveAssistantHead(projectId, head.id);
 
         return {
-          head: resolveProjectMainHead(projectId)!,
+          head: activeHead,
           userMessage,
           assistantMessage,
           attempt: completedAttempt,
@@ -350,14 +346,17 @@ export function createProjectAssistantService(
 
     async retryProjectAssistantMessage({
       projectId,
+      headId,
       triggerMessageId,
     }: {
       projectId: string;
+      headId: string;
       triggerMessageId: string;
     }): Promise<ProjectAssistantRetryResult> {
       const selection = resolveProjectAssistantModelSelection(readStoredSelection);
-      const head = resolveProjectMainHead(projectId);
-      invariant(head, "当前项目还没有 AI 会话可供重试。");
+      const head = getHeadOrThrowView(headId);
+      invariant(head.projectId === projectId, "AI 会话不属于当前项目。");
+      invariant(!head.isArchived, "不能重试已归档会话。");
       assertNoPendingAttempt(head);
       invariant(head.currentMessageId === triggerMessageId, "当前版本只能重试会话末尾的失败请求。");
 
@@ -404,9 +403,10 @@ export function createProjectAssistantService(
           assistantMessageId: assistantMessage.id,
           usage: result.usage,
         });
+        const activeHead = setActiveAssistantHead(projectId, head.id);
 
         return {
-          head: resolveProjectMainHead(projectId)!,
+          head: activeHead,
           assistantMessage,
           attempt: completedAttempt,
         };

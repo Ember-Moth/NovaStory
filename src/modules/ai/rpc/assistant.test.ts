@@ -52,6 +52,7 @@ test("getProjectAssistantState watches project heads, attempts, and active head 
   );
 
   expect(result.watch).toEqual([
+    rpcTags.aiProjectAssistantState("rpc_assistant_state"),
     rpcTags.aiProjectHeads("rpc_assistant_state"),
     rpcTags.aiGenerationAttempts("rpc_assistant_state"),
     rpcTags.aiHeadMessages("ai_head_state"),
@@ -161,12 +162,14 @@ test("sendProjectAssistantMessage invalidates head messages and attempts on succ
   const result = await handlers.sendProjectAssistantMessage.handler(
     {
       projectId: "rpc_assistant_send",
+      headId: "ai_head_send",
       text: "Hello",
     },
     requestCtx,
   );
 
   expect(result.invalidate).toEqual([
+    rpcTags.aiProjectAssistantState("rpc_assistant_send"),
     rpcTags.aiProjectHeads("rpc_assistant_send"),
     rpcTags.aiHeadMessages("ai_head_send"),
     rpcTags.aiGenerationAttempts("rpc_assistant_send"),
@@ -252,12 +255,14 @@ test("retryProjectAssistantMessage invalidates head messages and attempts on suc
   const result = await handlers.retryProjectAssistantMessage.handler(
     {
       projectId: "rpc_assistant_retry",
+      headId: "ai_head_retry",
       triggerMessageId: "msg_user_retry",
     },
     requestCtx,
   );
 
   expect(result.invalidate).toEqual([
+    rpcTags.aiProjectAssistantState("rpc_assistant_retry"),
     rpcTags.aiProjectHeads("rpc_assistant_retry"),
     rpcTags.aiHeadMessages("ai_head_retry"),
     rpcTags.aiGenerationAttempts("rpc_assistant_retry"),

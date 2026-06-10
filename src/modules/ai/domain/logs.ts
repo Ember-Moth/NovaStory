@@ -6,6 +6,8 @@ import type {
   AiGenerationAttemptStatus,
   AiProjectGenerationAttemptRow,
   AiProjectGenerationAttemptView,
+  AiProjectAssistantStateRow,
+  AiProjectAssistantStateView,
   AiProjectHeadRow,
   AiProjectHeadView,
   AiProjectMessageRole,
@@ -172,6 +174,14 @@ function getHeadOrThrow(executor: DatabaseExecutor, headId: string) {
   return head;
 }
 
+function getAssistantStateRow(executor: DatabaseExecutor, projectId: string) {
+  return executor
+    .select()
+    .from(schema.aiProjectAssistantState)
+    .where(eq(schema.aiProjectAssistantState.projectId, projectId))
+    .get();
+}
+
 function getMessageById(executor: DatabaseExecutor, messageId: string) {
   return executor
     .select()
@@ -263,6 +273,15 @@ function mapHeadRow(row: AiProjectHeadRow): AiProjectHeadView {
     forkedFromHeadId: row.forkedFromHeadId,
     forkedFromMessageId: row.forkedFromMessageId,
     isArchived: row.isArchived,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+function mapAssistantStateRow(row: AiProjectAssistantStateRow): AiProjectAssistantStateView {
+  return {
+    projectId: row.projectId,
+    activeHeadId: row.activeHeadId,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -410,6 +429,84 @@ function insertMessage(
   return mapMessageRow(getProjectMessageOrThrow(executor, input.projectId, id));
 }
 
+function getLatestUnarchivedHeadRow(executor: DatabaseExecutor, projectId: string) {
+  return executor
+    .select()
+    .from(schema.aiProjectHeads)
+    .where(
+      and(
+        eq(schema.aiProjectHeads.projectId, projectId),
+        eq(schema.aiProjectHeads.isArchived, false),
+      ),
+    )
+    .orderBy(desc(schema.aiProjectHeads.updatedAt), desc(schema.aiProjectHeads.createdAt))
+    .get();
+}
+
+function upsertAssistantState(
+  executor: DatabaseExecutor,
+  projectId: string,
+  activeHeadId: string | null,
+) {
+  getProjectOrThrow(executor, projectId);
+  const timestamp = now();
+  const existing = getAssistantStateRow(executor, projectId);
+
+  if (existing) {
+    executor
+      .update(schema.aiProjectAssistantState)
+      .set({
+        activeHeadId,
+        updatedAt: timestamp,
+      })
+      .where(eq(schema.aiProjectAssistantState.projectId, projectId))
+      .run();
+  } else {
+    executor
+      .insert(schema.aiProjectAssistantState)
+      .values({
+        projectId,
+        activeHeadId,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      })
+      .run();
+  }
+
+  return mapAssistantStateRow(getAssistantStateRow(executor, projectId)!);
+}
+
+function createHeadWithExecutor(executor: DatabaseExecutor, input: CreateHeadInput) {
+  getProjectOrThrow(executor, input.projectId);
+
+  const initialMessage = input.initialMessage
+    ? insertMessage(executor, {
+        projectId: input.projectId,
+        prevMessageId: null,
+        ...input.initialMessage,
+      })
+    : null;
+  const headId = createId("ai_head");
+  const timestamp = now();
+  executor
+    .insert(schema.aiProjectHeads)
+    .values({
+      id: headId,
+      projectId: input.projectId,
+      name: normalizeHeadName(input.name, initialMessage?.summaryText ?? undefined),
+      currentMessageId: initialMessage?.id ?? null,
+      forkedFromHeadId: null,
+      forkedFromMessageId: null,
+      isArchived: false,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    })
+    .run();
+
+  touchProject(executor, input.projectId);
+  return mapHeadRow(getHeadOrThrow(executor, headId));
+}
+
 export function listProjectHeads(projectId: string, options?: { archived?: boolean }) {
   getProjectOrThrow(db, projectId);
   const archived = options?.archived;
@@ -431,18 +528,36 @@ export function listProjectHeads(projectId: string, options?: { archived?: boole
 
 export function resolveProjectMainHead(projectId: string) {
   getProjectOrThrow(db, projectId);
-  const row = db
-    .select()
-    .from(schema.aiProjectHeads)
-    .where(
-      and(
-        eq(schema.aiProjectHeads.projectId, projectId),
-        eq(schema.aiProjectHeads.isArchived, false),
-      ),
-    )
-    .orderBy(desc(schema.aiProjectHeads.updatedAt), desc(schema.aiProjectHeads.createdAt))
-    .get();
+  const row = getLatestUnarchivedHeadRow(db, projectId);
   return row ? mapHeadRow(row) : null;
+}
+
+export function getProjectAssistantStateView(projectId: string) {
+  getProjectOrThrow(db, projectId);
+  const row = getAssistantStateRow(db, projectId);
+  return row ? mapAssistantStateRow(row) : null;
+}
+
+export function resolveActiveAssistantHead(projectId: string) {
+  return db.transaction((tx) => {
+    getProjectOrThrow(tx, projectId);
+    const assistantState = getAssistantStateRow(tx, projectId);
+
+    if (assistantState?.activeHeadId) {
+      const activeHead = tx
+        .select()
+        .from(schema.aiProjectHeads)
+        .where(eq(schema.aiProjectHeads.id, assistantState.activeHeadId))
+        .get();
+      if (activeHead && activeHead.projectId === projectId && !activeHead.isArchived) {
+        return mapHeadRow(activeHead);
+      }
+    }
+
+    const fallbackHead = getLatestUnarchivedHeadRow(tx, projectId);
+    upsertAssistantState(tx, projectId, fallbackHead?.id ?? null);
+    return fallbackHead ? mapHeadRow(fallbackHead) : null;
+  });
 }
 
 export function listProjectRoots(projectId: string) {
@@ -482,33 +597,50 @@ export function getHeadOrThrowView(headId: string) {
 }
 
 export function createHead(input: CreateHeadInput) {
+  return db.transaction((tx) => createHeadWithExecutor(tx, input));
+}
+
+export function setActiveAssistantHead(projectId: string, headId: string) {
   return db.transaction((tx) => {
-    getProjectOrThrow(tx, input.projectId);
+    getProjectOrThrow(tx, projectId);
+    const head = getHeadOrThrow(tx, headId);
+    invariant(head.projectId === projectId, "AI 分支不属于当前项目。");
+    invariant(!head.isArchived, "不能激活已归档的 AI 会话。");
+    upsertAssistantState(tx, projectId, head.id);
+    return mapHeadRow(getHeadOrThrow(tx, head.id));
+  });
+}
 
-    const initialMessage = input.initialMessage
-      ? insertMessage(tx, {
-          projectId: input.projectId,
-          prevMessageId: null,
-          ...input.initialMessage,
-        })
-      : null;
-    const headId = createId("ai_head");
-    const timestamp = now();
-    tx.insert(schema.aiProjectHeads)
-      .values({
-        id: headId,
-        projectId: input.projectId,
-        name: normalizeHeadName(input.name, initialMessage?.summaryText ?? undefined),
-        currentMessageId: initialMessage?.id ?? null,
-        forkedFromHeadId: null,
-        forkedFromMessageId: null,
-        isArchived: false,
-        createdAt: timestamp,
-        updatedAt: timestamp,
+export function createAssistantSession(projectId: string) {
+  return db.transaction((tx) => {
+    getProjectOrThrow(tx, projectId);
+    const sessionCount = tx
+      .select({ id: schema.aiProjectHeads.id })
+      .from(schema.aiProjectHeads)
+      .where(eq(schema.aiProjectHeads.projectId, projectId))
+      .all().length;
+    const head = createHeadWithExecutor(tx, {
+      projectId,
+      name: `新会话 ${sessionCount + 1}`,
+    });
+    upsertAssistantState(tx, projectId, head.id);
+    return head;
+  });
+}
+
+export function renameHead(headId: string, name: string) {
+  return db.transaction((tx) => {
+    const head = getHeadOrThrow(tx, headId);
+    const normalizedName = trimOptionalString(name);
+    invariant(normalizedName, "名称不能为空。");
+    tx.update(schema.aiProjectHeads)
+      .set({
+        name: normalizedName,
+        updatedAt: now(),
       })
+      .where(eq(schema.aiProjectHeads.id, headId))
       .run();
-
-    touchProject(tx, input.projectId);
+    touchProject(tx, head.projectId);
     return mapHeadRow(getHeadOrThrow(tx, headId));
   });
 }
@@ -632,12 +764,22 @@ export function forkHeadFromMessage(input: ForkHeadFromMessageInput) {
 export function archiveHead(headId: string, archived: boolean) {
   return db.transaction((tx) => {
     const head = getHeadOrThrow(tx, headId);
+    const timestamp = now();
     tx.update(schema.aiProjectHeads)
-      .set({ isArchived: archived, updatedAt: now() })
+      .set({ isArchived: archived, updatedAt: timestamp })
       .where(eq(schema.aiProjectHeads.id, headId))
       .run();
+    const nextHead = getHeadOrThrow(tx, headId);
+    const assistantState = getAssistantStateRow(tx, head.projectId);
+    if (archived && assistantState?.activeHeadId === headId) {
+      const fallbackHead = getLatestUnarchivedHeadRow(tx, head.projectId);
+      upsertAssistantState(tx, head.projectId, fallbackHead?.id ?? null);
+    }
+    if (!archived && !assistantState?.activeHeadId) {
+      upsertAssistantState(tx, head.projectId, nextHead.id);
+    }
     touchProject(tx, head.projectId);
-    return mapHeadRow(getHeadOrThrow(tx, headId));
+    return mapHeadRow(nextHead);
   });
 }
 

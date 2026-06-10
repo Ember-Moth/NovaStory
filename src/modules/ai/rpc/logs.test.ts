@@ -82,6 +82,7 @@ test("appendMessage invalidates the head chain and parent children tags", async 
   );
 
   expect(result.invalidate).toEqual([
+    rpcTags.aiProjectAssistantState("rpc_ai_append"),
     rpcTags.aiProjectHeads("rpc_ai_append"),
     rpcTags.aiHeadMessages(head.id),
     rpcTags.aiMessageChildren("rpc_ai_append", head.currentMessageId!),
@@ -121,6 +122,7 @@ test("forkHeadFromMessage invalidates the source message children and new head c
   );
 
   expect(result.invalidate).toEqual([
+    rpcTags.aiProjectAssistantState("rpc_ai_fork"),
     rpcTags.aiProjectHeads("rpc_ai_fork"),
     rpcTags.aiHeadMessages(result.data.id),
     rpcTags.aiMessageChildren("rpc_ai_fork", branchA.id),
@@ -160,4 +162,36 @@ test("finishing a generation attempt invalidates the project attempt tag", async
 
   expect(result.invalidate).toEqual([rpcTags.aiGenerationAttempts("rpc_ai_attempt")]);
   expect(result.data.status).toBe("error");
+});
+
+test("createProjectAssistantSession invalidates assistant state, heads, and the new head messages", async () => {
+  seedProject("rpc_ai_create_session");
+
+  const result = await handlers.createProjectAssistantSession.handler(
+    { projectId: "rpc_ai_create_session" },
+    requestCtx,
+  );
+
+  expect(result.invalidate).toEqual([
+    rpcTags.aiProjectAssistantState("rpc_ai_create_session"),
+    rpcTags.aiProjectHeads("rpc_ai_create_session"),
+    rpcTags.aiHeadMessages(result.data.id),
+  ]);
+});
+
+test("renameProjectHead invalidates assistant state, heads, and head messages", async () => {
+  seedProject("rpc_ai_rename_head");
+  const head = logs.createAssistantSession("rpc_ai_rename_head");
+
+  const result = await handlers.renameProjectHead.handler(
+    { headId: head.id, name: "  Renamed Session  " },
+    requestCtx,
+  );
+
+  expect(result.data.name).toBe("Renamed Session");
+  expect(result.invalidate).toEqual([
+    rpcTags.aiProjectAssistantState("rpc_ai_rename_head"),
+    rpcTags.aiProjectHeads("rpc_ai_rename_head"),
+    rpcTags.aiHeadMessages(head.id),
+  ]);
 });

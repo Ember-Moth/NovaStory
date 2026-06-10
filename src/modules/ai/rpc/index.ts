@@ -16,13 +16,15 @@ import {
   archiveHead as archiveProjectAiHead,
   completeGenerationAttemptError,
   completeGenerationAttemptSuccess,
+  createAssistantSession,
   createHead as createProjectAiHead,
   forkHeadFromMessage,
   listHeadChildren,
   listProjectHeads as listProjectAiHeads,
-  resolveProjectMainHead,
+  renameHead as renameProjectAiHead,
   recordGenerationAttempt,
   resolveHeadMessages,
+  setActiveAssistantHead as setProjectAssistantActiveHeadInDomain,
 } from "@/modules/ai/domain/logs";
 import {
   getProjectAssistantService,
@@ -169,11 +171,13 @@ interface ProjectAssistantStateInput {
 
 interface SendProjectAssistantMessageInput {
   projectId: string;
+  headId: string;
   text: string;
 }
 
 interface RetryProjectAssistantMessageInput {
   projectId: string;
+  headId: string;
   triggerMessageId: string;
 }
 
@@ -196,6 +200,7 @@ function invalidateProjectAiState(
     messageParentId?: string | null;
   },
 ) {
+  ctx.invalidate(rpcTags.aiProjectAssistantState(projectId));
   ctx.invalidate(rpcTags.aiProjectHeads(projectId));
   if (options?.headId) {
     ctx.invalidate(rpcTags.aiHeadMessages(options.headId));
@@ -690,6 +695,7 @@ export const getProjectAssistantState = query<
   RpcTagList
 >({
   watch: ({ projectId }, result) => [
+    rpcTags.aiProjectAssistantState(projectId),
     rpcTags.aiProjectHeads(projectId),
     rpcTags.aiGenerationAttempts(projectId),
     ...(result.head ? [rpcTags.aiHeadMessages(result.head.id)] : []),
@@ -714,6 +720,42 @@ export const getMessageChildren = query<
 export const createHead = mutation<CreateHeadInput, AiProjectHeadView, RpcTagList>((input, ctx) => {
   const head = createProjectAiHead(input);
   invalidateProjectAiState(ctx, input.projectId, {
+    headId: head.id,
+  });
+  return head;
+});
+
+export const createProjectAssistantSession = mutation<
+  { projectId: string },
+  AiProjectHeadView,
+  RpcTagList
+>(({ projectId }, ctx) => {
+  const head = createAssistantSession(projectId);
+  invalidateProjectAiState(ctx, projectId, {
+    headId: head.id,
+  });
+  return head;
+});
+
+export const setProjectAssistantActiveHead = mutation<
+  { projectId: string; headId: string },
+  AiProjectHeadView,
+  RpcTagList
+>(({ projectId, headId }, ctx) => {
+  const head = setProjectAssistantActiveHeadInDomain(projectId, headId);
+  invalidateProjectAiState(ctx, projectId, {
+    headId: head.id,
+  });
+  return head;
+});
+
+export const renameProjectHead = mutation<
+  { headId: string; name: string },
+  AiProjectHeadView,
+  RpcTagList
+>(({ headId, name }, ctx) => {
+  const head = renameProjectAiHead(headId, name);
+  invalidateProjectAiState(ctx, head.projectId, {
     headId: head.id,
   });
   return head;
@@ -795,24 +837,21 @@ export const sendProjectAssistantMessage = mutation<
   SendProjectAssistantMessageInput,
   ProjectAssistantSendResult,
   RpcTagList
->(async ({ projectId, text }, ctx) => {
+>(async ({ projectId, headId, text }, ctx) => {
   try {
     const result = await getProjectAssistantService().sendProjectAssistantMessage({
       projectId,
+      headId,
       text,
     });
-    ctx.invalidate(
-      rpcTags.aiProjectHeads(projectId),
-      rpcTags.aiHeadMessages(result.head.id),
-      rpcTags.aiGenerationAttempts(projectId),
-    );
+    invalidateProjectAiState(ctx, projectId, {
+      headId: result.head.id,
+    });
+    ctx.invalidate(rpcTags.aiGenerationAttempts(projectId));
     return result;
   } catch (error) {
-    const head = resolveProjectMainHead(projectId);
-    ctx.invalidate(rpcTags.aiProjectHeads(projectId), rpcTags.aiGenerationAttempts(projectId));
-    if (head) {
-      ctx.invalidate(rpcTags.aiHeadMessages(head.id));
-    }
+    invalidateProjectAiState(ctx, projectId, { headId });
+    ctx.invalidate(rpcTags.aiGenerationAttempts(projectId));
     throw error;
   }
 });
@@ -821,24 +860,21 @@ export const retryProjectAssistantMessage = mutation<
   RetryProjectAssistantMessageInput,
   ProjectAssistantRetryResult,
   RpcTagList
->(async ({ projectId, triggerMessageId }, ctx) => {
+>(async ({ projectId, headId, triggerMessageId }, ctx) => {
   try {
     const result = await getProjectAssistantService().retryProjectAssistantMessage({
       projectId,
+      headId,
       triggerMessageId,
     });
-    ctx.invalidate(
-      rpcTags.aiProjectHeads(projectId),
-      rpcTags.aiHeadMessages(result.head.id),
-      rpcTags.aiGenerationAttempts(projectId),
-    );
+    invalidateProjectAiState(ctx, projectId, {
+      headId: result.head.id,
+    });
+    ctx.invalidate(rpcTags.aiGenerationAttempts(projectId));
     return result;
   } catch (error) {
-    const head = resolveProjectMainHead(projectId);
-    ctx.invalidate(rpcTags.aiProjectHeads(projectId), rpcTags.aiGenerationAttempts(projectId));
-    if (head) {
-      ctx.invalidate(rpcTags.aiHeadMessages(head.id));
-    }
+    invalidateProjectAiState(ctx, projectId, { headId });
+    ctx.invalidate(rpcTags.aiGenerationAttempts(projectId));
     throw error;
   }
 });

@@ -3,8 +3,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterAll, beforeEach, expect, test } from "bun:test";
-import { eq } from "drizzle-orm";
-
 const tempDir = mkdtempSync(join(tmpdir(), "novel-evolver-ai-assistant-"));
 const dbPath = join(tempDir, "assistant.sqlite");
 process.env.DATABASE_URL = dbPath;
@@ -99,7 +97,7 @@ afterAll(() => {
   rmSync(tempDir, { recursive: true, force: true });
 });
 
-test("send lazily creates the main head and records user, assistant, and attempt state", async () => {
+test("send appends messages to the explicit head and records attempt state", async () => {
   seedProject("assistant_send");
   const seeded = seedCustomConnection({
     connectionId: "conn_send",
@@ -118,14 +116,16 @@ test("send lazily creates the main head and records user, assistant, and attempt
       };
     },
   });
+  const head = logs.createAssistantSession("assistant_send");
 
   const result = await service.sendProjectAssistantMessage({
     projectId: "assistant_send",
+    headId: head.id,
     text: "  Hello world  ",
   });
   const state = service.getProjectAssistantState("assistant_send");
 
-  expect(result.head.name).toBe("主会话");
+  expect(result.head.id).toBe(head.id);
   expect(state.messages.map((message) => message.role)).toEqual(["user", "assistant"]);
   expect(getText(state.messages[0]?.content)).toBe("Hello world");
   expect(getText(state.messages[1]?.content)).toBe("Assistant reply");
@@ -138,12 +138,12 @@ test("send lazily creates the main head and records user, assistant, and attempt
   expect(calls[0]?.messages).toEqual([{ role: "user", content: "Hello world" }]);
 });
 
-test("send always targets the most recently updated unarchived head", async () => {
-  seedProject("assistant_main_head");
+test("send uses the provided head and makes it the active assistant session", async () => {
+  seedProject("assistant_active_head");
   const seeded = seedCustomConnection({
-    connectionId: "conn_main_head",
+    connectionId: "conn_active_head",
     modelId: "story-model",
-    modelRowId: "cmodel_main_head",
+    modelRowId: "cmodel_active_head",
   });
   const service = createProjectAssistantService({
     readStoredSelection: () => seeded.selection,
@@ -155,28 +155,26 @@ test("send always targets the most recently updated unarchived head", async () =
   });
 
   const headA = logs.createHead({
-    projectId: "assistant_main_head",
+    projectId: "assistant_active_head",
     name: "Head A",
   });
   const headB = logs.createHead({
-    projectId: "assistant_main_head",
+    projectId: "assistant_active_head",
     name: "Head B",
   });
   logs.appendMessage({
-    projectId: "assistant_main_head",
+    projectId: "assistant_active_head",
     headId: headA.id,
     prevMessageId: null,
     role: "user",
     content: { text: "existing" },
     summaryText: "existing",
   });
-  db.update(schema.aiProjectHeads)
-    .set({ updatedAt: headB.updatedAt + 10_000 })
-    .where(eq(schema.aiProjectHeads.id, headA.id))
-    .run();
+  logs.setActiveAssistantHead("assistant_active_head", headB.id);
 
   const result = await service.sendProjectAssistantMessage({
-    projectId: "assistant_main_head",
+    projectId: "assistant_active_head",
+    headId: headA.id,
     text: "Next prompt",
   });
 
@@ -187,6 +185,7 @@ test("send always targets the most recently updated unarchived head", async () =
     "Follow-up",
   ]);
   expect(logs.resolveHeadMessages(headB.id)).toEqual([]);
+  expect(service.getProjectAssistantState("assistant_active_head").head?.id).toBe(headA.id);
 });
 
 test("retry reuses the trigger user message and appends only a new assistant reply", async () => {
@@ -228,6 +227,7 @@ test("retry reuses the trigger user message and appends only a new assistant rep
 
   await service.retryProjectAssistantMessage({
     projectId: "assistant_retry",
+    headId: head.id,
     triggerMessageId,
   });
 
@@ -255,6 +255,7 @@ test("send records an error attempt when generation fails", async () => {
   await expect(
     service.sendProjectAssistantMessage({
       projectId: "assistant_failure",
+      headId: logs.createAssistantSession("assistant_failure").id,
       text: "Hello",
     }),
   ).rejects.toThrow("provider exploded");
@@ -295,6 +296,7 @@ test("send rejects while the head has a pending attempt", async () => {
   await expect(
     service.sendProjectAssistantMessage({
       projectId: "assistant_pending",
+      headId: head.id,
       text: "Blocked",
     }),
   ).rejects.toThrow("当前会话正在生成回复，请稍后再试。");

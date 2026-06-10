@@ -25,6 +25,8 @@ export const rpcTags = defineTags({
   aiConnections: () => ["ai", "connections"] as const,
   aiConnectionModels: (connectionId: string) =>
     ["ai", "connections", "models", connectionId] as const,
+  aiProjectAssistantState: (projectId: string) =>
+    ["ai", "project-assistant-state", projectId] as const,
   aiProjectHeads: (projectId: string) => ["ai", "project-heads", projectId] as const,
   aiHeadMessages: (headId: string) => ["ai", "head-messages", headId] as const,
   aiMessageChildren: (projectId: string, messageId: string) =>

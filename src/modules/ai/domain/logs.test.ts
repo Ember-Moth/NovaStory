@@ -290,3 +290,60 @@ test("generation attempts can be completed with success or error payloads", () =
   expect(failed.status).toBe("error");
   expect(failed.error).toEqual({ message: "rate limited" });
 });
+
+test("resolveActiveAssistantHead falls back to the latest unarchived head and persists assistant state", () => {
+  seedProject("project_ai_active_fallback");
+
+  const older = logs.createHead({
+    projectId: "project_ai_active_fallback",
+    name: "Older",
+  });
+  const newer = logs.createHead({
+    projectId: "project_ai_active_fallback",
+    name: "Newer",
+  });
+
+  db.update(schema.aiProjectHeads)
+    .set({ updatedAt: newer.updatedAt + 5_000 })
+    .where(eq(schema.aiProjectHeads.id, older.id))
+    .run();
+
+  const active = logs.resolveActiveAssistantHead("project_ai_active_fallback");
+  const assistantState = logs.getProjectAssistantStateView("project_ai_active_fallback");
+
+  expect(active?.id).toBe(older.id);
+  expect(assistantState?.activeHeadId).toBe(older.id);
+});
+
+test("createAssistantSession activates the new head and renameHead trims whitespace", () => {
+  seedProject("project_ai_assistant_session");
+
+  const head = logs.createAssistantSession("project_ai_assistant_session");
+  expect(head.name).toBe("新会话 1");
+  expect(logs.resolveActiveAssistantHead("project_ai_assistant_session")?.id).toBe(head.id);
+
+  const renamed = logs.renameHead(head.id, "  第一轮脑暴  ");
+  expect(renamed.name).toBe("第一轮脑暴");
+  expect(() => logs.renameHead(head.id, "   ")).toThrow("名称不能为空。");
+});
+
+test("archiving the active head switches to another unarchived head and restoring only auto-activates when none exists", () => {
+  seedProject("project_ai_archive_active");
+
+  const headA = logs.createAssistantSession("project_ai_archive_active");
+  const headB = logs.createAssistantSession("project_ai_archive_active");
+  logs.setActiveAssistantHead("project_ai_archive_active", headA.id);
+
+  logs.archiveHead(headA.id, true);
+  expect(logs.resolveActiveAssistantHead("project_ai_archive_active")?.id).toBe(headB.id);
+
+  logs.archiveHead(headA.id, false);
+  expect(logs.resolveActiveAssistantHead("project_ai_archive_active")?.id).toBe(headB.id);
+
+  logs.archiveHead(headA.id, true);
+  logs.archiveHead(headB.id, true);
+  expect(logs.resolveActiveAssistantHead("project_ai_archive_active")).toBeNull();
+
+  logs.archiveHead(headA.id, false);
+  expect(logs.resolveActiveAssistantHead("project_ai_archive_active")?.id).toBe(headA.id);
+});

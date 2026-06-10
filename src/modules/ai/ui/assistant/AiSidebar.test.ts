@@ -12,6 +12,7 @@ test("canSendAssistantMessage requires a hydrated model selection, non-empty dra
   expect(
     canSendAssistantMessage({
       draft: "Hello",
+      headId: "head_1",
       selectedConnectionId: "conn_1",
       selectedModelId: "custom:model_1",
       selectionHydrated: true,
@@ -23,6 +24,7 @@ test("canSendAssistantMessage requires a hydrated model selection, non-empty dra
   expect(
     canSendAssistantMessage({
       draft: "   ",
+      headId: "head_1",
       selectedConnectionId: "conn_1",
       selectedModelId: "custom:model_1",
       selectionHydrated: true,
@@ -34,6 +36,7 @@ test("canSendAssistantMessage requires a hydrated model selection, non-empty dra
   expect(
     canSendAssistantMessage({
       draft: "Hello",
+      headId: "head_1",
       selectedConnectionId: "",
       selectedModelId: "custom:model_1",
       selectionHydrated: true,
@@ -45,10 +48,23 @@ test("canSendAssistantMessage requires a hydrated model selection, non-empty dra
   expect(
     canSendAssistantMessage({
       draft: "Hello",
+      headId: "head_1",
       selectedConnectionId: "conn_1",
       selectedModelId: "custom:model_1",
       selectionHydrated: true,
       isBusy: true,
+      hasPendingAttempt: false,
+    }),
+  ).toBe(false);
+
+  expect(
+    canSendAssistantMessage({
+      draft: "Hello",
+      headId: null,
+      selectedConnectionId: "conn_1",
+      selectedModelId: "custom:model_1",
+      selectionHydrated: true,
+      isBusy: false,
       hasPendingAttempt: false,
     }),
   ).toBe(false);

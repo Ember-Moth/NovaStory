@@ -403,6 +403,23 @@ export const aiProjectHeads = sqliteTable(
   ],
 );
 
+export const aiProjectAssistantState = sqliteTable(
+  "ai_project_assistant_state",
+  {
+    projectId: text("project_id")
+      .primaryKey()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    activeHeadId: text("active_head_id").references(() => aiProjectHeads.id, {
+      onDelete: "set null",
+    }),
+    ...timestampColumns,
+  },
+  (table) => [
+    index("ai_project_assistant_state_active_head_idx").on(table.activeHeadId),
+    index("ai_project_assistant_state_updated_at_idx").on(table.updatedAt),
+  ],
+);
+
 export const aiProjectGenerationAttempts = sqliteTable(
   "ai_project_generation_attempts",
   {
