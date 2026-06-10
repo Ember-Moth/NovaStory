@@ -442,18 +442,13 @@ export function resolvePreviewSessionBodyHeight({
 }
 
 export function resolvePeekSessionHeight({
-  sessionHeaderHeight,
   previewBodyHeight,
   maxHeight,
 }: {
-  sessionHeaderHeight: number;
   previewBodyHeight: number;
   maxHeight: number;
 }) {
-  return clampSessionSectionHeight(
-    Math.max(0, sessionHeaderHeight) + Math.max(0, previewBodyHeight),
-    maxHeight,
-  );
+  return clampSessionSectionHeight(Math.max(0, previewBodyHeight), maxHeight);
 }
 
 function getMessageText(content: unknown) {
@@ -780,7 +775,7 @@ function HeadRow({
       type="button"
       onClick={onActivate}
       disabled={isBusy || head.isArchived}
-      className={`group flex w-full items-center gap-2 px-2 py-1.5 text-left transition ${
+      className={`group flex w-full items-center gap-2 px-3 py-2 text-left transition ${
         isActive
           ? "bg-list-active-background text-foreground"
           : "text-foreground-muted hover:bg-list-hover-background hover:text-foreground"
@@ -898,11 +893,9 @@ export function AiSidebar({ projectId }: { projectId: string }) {
   const [sheetState, setSheetState] = useState<SheetState>("peek");
   const [sessionSectionHeight, setSessionSectionHeight] = useState(0);
   const [availableBodyHeight, setAvailableBodyHeight] = useState(0);
-  const [sessionHeaderHeight, setSessionHeaderHeight] = useState(0);
   const [previewBodyHeight, setPreviewBodyHeight] = useState(0);
   const [isDraggingSheet, setIsDraggingSheet] = useState(false);
   const bodyFrameRef = useRef<HTMLDivElement>(null);
-  const sessionHeaderRef = useRef<HTMLDivElement>(null);
   const sessionBodyContentRef = useRef<HTMLDivElement>(null);
   const emptyStateRef = useRef<HTMLDivElement>(null);
   const headRowRefs = useRef(new Map<string, HTMLDivElement>());
@@ -1009,7 +1002,6 @@ export function AiSidebar({ projectId }: { projectId: string }) {
     () => ({
       closed: 0,
       peek: resolvePeekSessionHeight({
-        sessionHeaderHeight,
         previewBodyHeight,
         maxHeight: availableBodyHeight,
       }),
@@ -1018,7 +1010,7 @@ export function AiSidebar({ projectId }: { projectId: string }) {
         availableBodyHeight,
       ),
     }),
-    [availableBodyHeight, previewBodyHeight, sessionHeaderHeight],
+    [availableBodyHeight, previewBodyHeight],
   );
   const clampedSessionSectionHeight = clampSessionSectionHeight(
     sessionSectionHeight,
@@ -1067,15 +1059,13 @@ export function AiSidebar({ projectId }: { projectId: string }) {
 
   useEffect(() => {
     const frame = bodyFrameRef.current;
-    const header = sessionHeaderRef.current;
     const bodyContent = sessionBodyContentRef.current;
-    if (!frame || !header || !bodyContent) {
+    if (!frame || !bodyContent) {
       return;
     }
 
     const measureLayout = () => {
       setAvailableBodyHeight(Math.round(frame.getBoundingClientRect().height));
-      setSessionHeaderHeight(Math.round(header.getBoundingClientRect().height));
 
       const visibleRowBottoms = previewHeadIds
         .map((headId) => {
@@ -1102,7 +1092,6 @@ export function AiSidebar({ projectId }: { projectId: string }) {
       measureLayout();
     });
     observer.observe(frame);
-    observer.observe(header);
     observer.observe(bodyContent);
     previewHeadIds.forEach((headId) => {
       const row = headRowRefs.current.get(headId);
@@ -1370,27 +1359,20 @@ export function AiSidebar({ projectId }: { projectId: string }) {
         </button>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-3">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div
           ref={bodyFrameRef}
-          className="flex min-h-0 flex-1 flex-col overflow-hidden border border-border bg-editor-background"
+          className="flex min-h-0 flex-1 flex-col overflow-hidden bg-editor-background"
         >
           <div
             style={{ height: `${clampedSessionSectionHeight}px` }}
             className={`min-h-0 shrink-0 overflow-hidden ${sectionHeightTransitionClass}`}
           >
             <div className="flex h-full min-h-0 flex-col bg-editor-background">
-              <div ref={sessionHeaderRef} className="shrink-0 border-b border-border px-3 py-2">
-                <div className="flex items-center gap-2 text-[12px] font-medium text-foreground">
-                  <span className="icon-[material-symbols--forum]" />
-                  <span>会话</span>
-                </div>
-              </div>
-
               <OverlayScrollbar variant="panel">
-                <div ref={sessionBodyContentRef} className="flex min-h-full flex-col gap-1 p-2">
+                <div ref={sessionBodyContentRef} className="flex min-h-full flex-col gap-1 py-1">
                   {projectHeadsQuery.isInitialLoading && heads.length === 0 ? (
-                    <div className="px-2 py-1 text-[12px] text-foreground-muted">
+                    <div className="px-3 py-1.5 text-[12px] text-foreground-muted">
                       正在加载会话...
                     </div>
                   ) : null}
@@ -1398,7 +1380,7 @@ export function AiSidebar({ projectId }: { projectId: string }) {
                   {unarchivedHeads.length === 0 ? (
                     <div
                       ref={emptyStateRef}
-                      className="border border-dashed border-border px-3 py-2 text-[12px] text-foreground-muted"
+                      className="mx-3 border border-dashed border-border px-3 py-2 text-[12px] text-foreground-muted"
                     >
                       还没有可用会话。点击右上角新建会话开始。
                     </div>
@@ -1435,11 +1417,11 @@ export function AiSidebar({ projectId }: { projectId: string }) {
                   )}
 
                   {archivedHeads.length > 0 ? (
-                    <div className="mt-1 border-t border-border pt-2">
+                    <div className="mt-1 border-t border-border pt-1.5">
                       <button
                         type="button"
                         onClick={() => setShowArchivedHeads((current) => !current)}
-                        className="flex w-full items-center justify-between px-2 py-1 text-[11px] text-foreground-muted transition hover:bg-list-hover-background hover:text-foreground"
+                        className="flex w-full items-center justify-between px-3 py-1.5 text-[11px] text-foreground-muted transition hover:bg-list-hover-background hover:text-foreground"
                       >
                         <span>归档会话</span>
                         <span className="flex items-center gap-1">
@@ -1454,7 +1436,7 @@ export function AiSidebar({ projectId }: { projectId: string }) {
                         </span>
                       </button>
                       {showArchivedHeads ? (
-                        <div className="mt-1 flex flex-col gap-1">
+                        <div className="mt-1 flex flex-col gap-1 pb-1">
                           {archivedHeads.map((head) => (
                             <div
                               key={head.id}
@@ -1521,7 +1503,7 @@ export function AiSidebar({ projectId }: { projectId: string }) {
 
               <div className="min-h-0 flex-1 overflow-hidden">
                 <OverlayScrollbar variant="panel">
-                  <div className="flex min-h-full flex-col gap-3 p-3">
+                  <div className="flex min-h-full flex-col gap-2.5 px-2.5 py-2">
                     {assistantStateQuery.isInitialLoading && showEmptyState ? (
                       <div className="border border-border bg-sidebar-background px-3 py-2 text-[12px] text-foreground-muted">
                         正在加载会话...
@@ -1602,7 +1584,7 @@ export function AiSidebar({ projectId }: { projectId: string }) {
                 aria-label="AI 对话输入"
                 onSubmit={handleSubmit}
               >
-                <div className="space-y-2 p-2.5">
+                <div className="space-y-2 p-2">
                   <div className="border border-border bg-editor-background focus-within:border-accent-foreground">
                     <textarea
                       value={draft}

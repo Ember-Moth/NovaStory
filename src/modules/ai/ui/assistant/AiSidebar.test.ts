@@ -296,18 +296,16 @@ test("resolvePreviewSessionBodyHeight picks the first three visible session rows
   ).toBe(132);
 });
 
-test("resolvePeekSessionHeight adds session chrome and respects the available height", () => {
+test("resolvePeekSessionHeight uses only preview body height and respects the available height", () => {
   expect(
     resolvePeekSessionHeight({
-      sessionHeaderHeight: 40,
       previewBodyHeight: 132,
       maxHeight: 320,
     }),
-  ).toBe(172);
+  ).toBe(132);
 
   expect(
     resolvePeekSessionHeight({
-      sessionHeaderHeight: 40,
       previewBodyHeight: 132,
       maxHeight: 120,
     }),
