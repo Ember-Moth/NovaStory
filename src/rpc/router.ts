@@ -24,6 +24,7 @@ export const ai = {
   createCustomModel: aiHandlers.createCustomModel,
   updateCustomModel: aiHandlers.updateCustomModel,
   deleteCustomModel: aiHandlers.deleteCustomModel,
+  getProjectAssistantState: aiHandlers.getProjectAssistantState,
   listProjectHeads: aiHandlers.listProjectHeads,
   getHeadMessages: aiHandlers.getHeadMessages,
   getMessageChildren: aiHandlers.getMessageChildren,
@@ -34,6 +35,8 @@ export const ai = {
   recordGenerationAttempt: aiHandlers.createGenerationAttempt,
   finishGenerationAttemptSuccess: aiHandlers.finishGenerationAttemptSuccess,
   finishGenerationAttemptError: aiHandlers.finishGenerationAttemptError,
+  sendProjectAssistantMessage: aiHandlers.sendProjectAssistantMessage,
+  retryProjectAssistantMessage: aiHandlers.retryProjectAssistantMessage,
 };
 
 export const config = {

@@ -322,7 +322,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
               onAuxContentChange={actions.handleAuxContentChange}
             />
           </div>
-          <AiSidebar />
+          <AiSidebar projectId={projectId} />
         </div>
       </AppShell>
     </>

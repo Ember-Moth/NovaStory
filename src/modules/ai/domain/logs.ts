@@ -429,6 +429,22 @@ export function listProjectHeads(projectId: string, options?: { archived?: boole
   return rows.map(mapHeadRow);
 }
 
+export function resolveProjectMainHead(projectId: string) {
+  getProjectOrThrow(db, projectId);
+  const row = db
+    .select()
+    .from(schema.aiProjectHeads)
+    .where(
+      and(
+        eq(schema.aiProjectHeads.projectId, projectId),
+        eq(schema.aiProjectHeads.isArchived, false),
+      ),
+    )
+    .orderBy(desc(schema.aiProjectHeads.updatedAt), desc(schema.aiProjectHeads.createdAt))
+    .get();
+  return row ? mapHeadRow(row) : null;
+}
+
 export function listProjectRoots(projectId: string) {
   getProjectOrThrow(db, projectId);
   return db
@@ -545,6 +561,32 @@ export function resolveHeadMessages(headId: string) {
   }
 
   return chain.reverse().map(mapMessageRow);
+}
+
+export function listHeadGenerationAttempts(headId: string) {
+  const head = getHeadOrThrow(db, headId);
+  return db
+    .select()
+    .from(schema.aiProjectGenerationAttempts)
+    .where(eq(schema.aiProjectGenerationAttempts.headId, head.id))
+    .orderBy(schema.aiProjectGenerationAttempts.createdAt)
+    .all()
+    .map(mapAttemptRow);
+}
+
+export function hasPendingGenerationAttempt(headId: string) {
+  getHeadOrThrow(db, headId);
+  const pending = db
+    .select({ id: schema.aiProjectGenerationAttempts.id })
+    .from(schema.aiProjectGenerationAttempts)
+    .where(
+      and(
+        eq(schema.aiProjectGenerationAttempts.headId, headId),
+        eq(schema.aiProjectGenerationAttempts.status, "pending"),
+      ),
+    )
+    .get();
+  return pending != null;
 }
 
 export function forkHeadFromMessage(input: ForkHeadFromMessageInput) {
