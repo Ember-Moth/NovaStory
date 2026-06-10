@@ -24,6 +24,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { AnimatePresence, motion } from "motion/react";
 
 import type {
   AiProjectGenerationAttemptView,
@@ -358,6 +359,19 @@ type EditingHeadState = {
   headId: string;
   name: string;
 };
+
+type SessionListRow =
+  | {
+      key: string;
+      type: "head";
+      head: AiProjectHeadView;
+      className?: string;
+    }
+  | {
+      key: "archived-toggle";
+      type: "archived-toggle";
+      count: number;
+    };
 
 const EMPTY_ASSISTANT_STATE: AssistantState = {
   head: null,
@@ -828,6 +842,124 @@ function HeadRow({
   );
 }
 
+function AnimatedHeadRow({
+  head,
+  isActive,
+  isEditing,
+  editingName,
+  isBusy,
+  className,
+  onActivate,
+  onEditingNameChange,
+  onRenameStart,
+  onRenameCancel,
+  onRenameSubmit,
+  onArchive,
+  onRestore,
+}: {
+  head: AiProjectHeadView;
+  isActive: boolean;
+  isEditing: boolean;
+  editingName: string;
+  isBusy: boolean;
+  className?: string;
+  onActivate: () => void;
+  onEditingNameChange: (_value: string) => void;
+  onRenameStart: () => void;
+  onRenameCancel: () => void;
+  onRenameSubmit: () => void;
+  onArchive: () => void;
+  onRestore: () => void;
+}) {
+  return (
+    <motion.div
+      className={className}
+      layout="position"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.16, ease: "easeOut" }}
+    >
+      <HeadRow
+        head={head}
+        isActive={isActive}
+        isEditing={isEditing}
+        editingName={editingName}
+        isBusy={isBusy}
+        onActivate={onActivate}
+        onEditingNameChange={onEditingNameChange}
+        onRenameStart={onRenameStart}
+        onRenameCancel={onRenameCancel}
+        onRenameSubmit={onRenameSubmit}
+        onArchive={onArchive}
+        onRestore={onRestore}
+      />
+    </motion.div>
+  );
+}
+
+function ArchivedSectionToggleRow({
+  count,
+  expanded,
+  onToggle,
+}: {
+  count: number;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <motion.div
+      layout="position"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.16, ease: "easeOut" }}
+      className="mt-1 border-t border-border pt-1.5"
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center justify-between px-3 py-1.5 text-[11px] text-foreground-muted transition hover:bg-list-hover-background hover:text-foreground"
+      >
+        <span>归档会话</span>
+        <span className="flex items-center gap-1">
+          <span>{count}</span>
+          <span
+            className={
+              expanded
+                ? "icon-[material-symbols--expand-less]"
+                : "icon-[material-symbols--expand-more]"
+            }
+          />
+        </span>
+      </button>
+    </motion.div>
+  );
+}
+
+function SessionStatusOverlay({ state }: { state: "loading" | "empty" }) {
+  const content =
+    state === "loading" ? (
+      <div className="px-3 py-1.5 text-[12px] text-foreground-muted">正在加载会话...</div>
+    ) : (
+      <div className="border border-dashed border-border bg-editor-background/95 px-3 py-2 text-[12px] text-foreground-muted backdrop-blur-sm">
+        还没有可用会话。点击右上角新建会话开始。
+      </div>
+    );
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.16, ease: "easeOut" }}
+      className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-3"
+    >
+      {content}
+    </motion.div>
+  );
+}
+
 function PendingAssistantBubble({ label }: { label: string }) {
   return (
     <div className="flex justify-start">
@@ -965,6 +1097,55 @@ export function AiSidebar({ projectId }: { projectId: string }) {
   const heads = projectHeadsQuery.data ?? EMPTY_HEADS;
   const unarchivedHeads = useMemo(() => heads.filter((head) => !head.isArchived), [heads]);
   const archivedHeads = useMemo(() => heads.filter((head) => head.isArchived), [heads]);
+  const sessionOverlayState =
+    projectHeadsQuery.isInitialLoading && heads.length === 0
+      ? "loading"
+      : unarchivedHeads.length === 0
+        ? "empty"
+        : null;
+  const sessionRows = useMemo<SessionListRow[]>(() => {
+    const rows: SessionListRow[] = [];
+
+    rows.push(
+      ...unarchivedHeads.map((head) => ({
+        key: head.id,
+        type: "head" as const,
+        head,
+      })),
+    );
+
+    if (archivedHeads.length === 0) {
+      return rows;
+    }
+
+    rows.push({
+      key: "archived-toggle",
+      type: "archived-toggle",
+      count: archivedHeads.length,
+    });
+
+    if (!showArchivedHeads) {
+      return rows;
+    }
+
+    archivedHeads.forEach((head, index) => {
+      const classNames = [
+        index === 0 ? "mt-1" : "",
+        index === archivedHeads.length - 1 ? "pb-1" : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+
+      rows.push({
+        key: head.id,
+        type: "head",
+        head,
+        className: classNames || undefined,
+      });
+    });
+
+    return rows;
+  }, [archivedHeads, showArchivedHeads, unarchivedHeads]);
   const retryableAttempt = selectRetryableAttempt(assistantStateQuery.data);
   const pendingAttempt = selectPendingAttempt(assistantStateQuery.data);
   const isGenerating = sendMessage.isPending || retryMessage.isPending;
@@ -1326,92 +1507,52 @@ export function AiSidebar({ projectId }: { projectId: string }) {
             className={`min-h-0 shrink-0 overflow-hidden ${sectionHeightTransitionClass}`}
           >
             <div className="flex h-full min-h-0 flex-col bg-editor-background">
-              <OverlayScrollbar variant="panel">
-                <div className="flex min-h-full flex-col">
-                  {projectHeadsQuery.isInitialLoading && heads.length === 0 ? (
-                    <div className="px-3 py-1.5 text-[12px] text-foreground-muted">
-                      正在加载会话...
-                    </div>
-                  ) : null}
-
-                  {unarchivedHeads.length === 0 ? (
-                    <div className="mx-3 border border-dashed border-border px-3 py-2 text-[12px] text-foreground-muted">
-                      还没有可用会话。点击右上角新建会话开始。
-                    </div>
-                  ) : (
-                    unarchivedHeads.map((head) => (
-                      <div key={head.id}>
-                        <HeadRow
-                          head={head}
-                          isActive={head.id === activeHeadId}
-                          isEditing={editingHead?.headId === head.id}
-                          editingName={editingHead?.headId === head.id ? editingHead.name : ""}
-                          isBusy={isSessionMutating}
-                          onActivate={() => handleHeadActivate(head.id)}
-                          onEditingNameChange={(value) =>
-                            setEditingHead({ headId: head.id, name: value })
-                          }
-                          onRenameStart={() => setEditingHead({ headId: head.id, name: head.name })}
-                          onRenameCancel={() => setEditingHead(null)}
-                          onRenameSubmit={() => void handleRenameSubmit()}
-                          onArchive={() => void handleArchiveToggle(head, true)}
-                          onRestore={() => void handleArchiveToggle(head, false)}
-                        />
-                      </div>
-                    ))
-                  )}
-
-                  {archivedHeads.length > 0 ? (
-                    <div className="mt-1 border-t border-border pt-1.5">
-                      <button
-                        type="button"
-                        onClick={() => setShowArchivedHeads((current) => !current)}
-                        className="flex w-full items-center justify-between px-3 py-1.5 text-[11px] text-foreground-muted transition hover:bg-list-hover-background hover:text-foreground"
-                      >
-                        <span>归档会话</span>
-                        <span className="flex items-center gap-1">
-                          <span>{archivedHeads.length}</span>
-                          <span
-                            className={
-                              showArchivedHeads
-                                ? "icon-[material-symbols--expand-less]"
-                                : "icon-[material-symbols--expand-more]"
-                            }
+              <div className="relative min-h-0 flex-1">
+                <OverlayScrollbar variant="panel">
+                  <div className="flex min-h-full flex-col">
+                    <AnimatePresence initial={false} mode="popLayout">
+                      {sessionRows.map((row) =>
+                        row.type === "archived-toggle" ? (
+                          <ArchivedSectionToggleRow
+                            key={row.key}
+                            count={row.count}
+                            expanded={showArchivedHeads}
+                            onToggle={() => setShowArchivedHeads((current) => !current)}
                           />
-                        </span>
-                      </button>
-                      {showArchivedHeads ? (
-                        <div className="mt-1 flex flex-col gap-1 pb-1">
-                          {archivedHeads.map((head) => (
-                            <div key={head.id}>
-                              <HeadRow
-                                head={head}
-                                isActive={head.id === activeHeadId}
-                                isEditing={editingHead?.headId === head.id}
-                                editingName={
-                                  editingHead?.headId === head.id ? editingHead.name : ""
-                                }
-                                isBusy={isSessionMutating}
-                                onActivate={() => handleHeadActivate(head.id)}
-                                onEditingNameChange={(value) =>
-                                  setEditingHead({ headId: head.id, name: value })
-                                }
-                                onRenameStart={() =>
-                                  setEditingHead({ headId: head.id, name: head.name })
-                                }
-                                onRenameCancel={() => setEditingHead(null)}
-                                onRenameSubmit={() => void handleRenameSubmit()}
-                                onArchive={() => void handleArchiveToggle(head, true)}
-                                onRestore={() => void handleArchiveToggle(head, false)}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
+                        ) : (
+                          <AnimatedHeadRow
+                            key={row.key}
+                            head={row.head}
+                            isActive={row.head.id === activeHeadId}
+                            isEditing={editingHead?.headId === row.head.id}
+                            editingName={
+                              editingHead?.headId === row.head.id ? editingHead.name : ""
+                            }
+                            isBusy={isSessionMutating}
+                            className={row.className}
+                            onActivate={() => handleHeadActivate(row.head.id)}
+                            onEditingNameChange={(value) =>
+                              setEditingHead({ headId: row.head.id, name: value })
+                            }
+                            onRenameStart={() =>
+                              setEditingHead({ headId: row.head.id, name: row.head.name })
+                            }
+                            onRenameCancel={() => setEditingHead(null)}
+                            onRenameSubmit={() => void handleRenameSubmit()}
+                            onArchive={() => void handleArchiveToggle(row.head, true)}
+                            onRestore={() => void handleArchiveToggle(row.head, false)}
+                          />
+                        ),
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </OverlayScrollbar>
+                <AnimatePresence initial={false}>
+                  {sessionOverlayState ? (
+                    <SessionStatusOverlay key={sessionOverlayState} state={sessionOverlayState} />
                   ) : null}
-                </div>
-              </OverlayScrollbar>
+                </AnimatePresence>
+              </div>
             </div>
           </div>
 
