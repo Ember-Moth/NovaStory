@@ -4,7 +4,7 @@ import type {
   AgentThreadNodeView,
   AgentThreadStateView,
   AgentThreadView,
-  AgentToolSummaryEntry,
+  AgentToolTraceStatus,
   ProjectAssistantContextSnapshot,
 } from "@/modules/ai/domain/types";
 
@@ -33,6 +33,17 @@ export const EMPTY_ASSISTANT_STATE: AssistantState = {
 };
 
 export const EMPTY_THREADS: AgentThreadView[] = [];
+
+export interface AssistantToolTraceEntry {
+  toolCallId: string | null;
+  toolName: string;
+  status: AgentToolTraceStatus | "pending";
+  summary: string;
+  nodeId: string;
+  runId: string | null;
+  requestPayload: unknown | null;
+  responsePayload: unknown | null;
+}
 
 export function getMessageText(node: AgentThreadNodeView | null | undefined) {
   const content = (node?.message as { content?: unknown } | undefined)?.content;
@@ -66,64 +77,131 @@ function summarizeToolPayload(payload: unknown, fallback: string) {
   return fallback.replace("{tool}", "工具");
 }
 
-export function getAssistantToolTrace(node: AgentThreadNodeView | null | undefined) {
-  return (node?.parts ?? []).flatMap<AgentToolSummaryEntry>((part) => {
-    if (part.partKind === "tool-call") {
-      return [
-        {
-          toolCallId:
-            typeof (part.payload as Record<string, unknown>)?.toolCallId === "string"
-              ? ((part.payload as Record<string, unknown>).toolCallId as string)
-              : null,
-          toolName:
-            typeof (part.payload as Record<string, unknown>)?.toolName === "string"
-              ? ((part.payload as Record<string, unknown>).toolName as string)
-              : "tool",
-          summary: summarizeToolPayload(part.payload, "调用 {tool}"),
-          status: "success" as const,
-          nodeId: node?.id ?? "",
-          runId: node?.createdByRunId ?? null,
-        },
-      ];
+function getToolPayloadField(payload: unknown, key: string) {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  return Reflect.get(payload as Record<string, unknown>, key) ?? null;
+}
+
+function getToolPayloadString(payload: unknown, key: string) {
+  const value = getToolPayloadField(payload, key);
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+function getToolResultStatus(payload: unknown, partKind: "tool-result" | "tool-error") {
+  if (partKind === "tool-error") {
+    return "error" as const;
+  }
+
+  const output = getToolPayloadField(payload, "output");
+  if (output && typeof output === "object") {
+    if (Reflect.get(output as Record<string, unknown>, "ok") === false) {
+      return "error" as const;
     }
-    if (part.partKind === "tool-result") {
-      return [
-        {
-          toolCallId:
-            typeof (part.payload as Record<string, unknown>)?.toolCallId === "string"
-              ? ((part.payload as Record<string, unknown>).toolCallId as string)
-              : null,
-          toolName:
-            typeof (part.payload as Record<string, unknown>)?.toolName === "string"
-              ? ((part.payload as Record<string, unknown>).toolName as string)
-              : "tool",
-          summary: summarizeToolPayload(part.payload, "{tool} 返回结果"),
-          status: "success" as const,
-          nodeId: node?.id ?? "",
-          runId: node?.createdByRunId ?? null,
-        },
-      ];
+
+    const nestedValue = Reflect.get(output as Record<string, unknown>, "value");
+    if (nestedValue && typeof nestedValue === "object") {
+      if (Reflect.get(nestedValue as Record<string, unknown>, "ok") === false) {
+        return "error" as const;
+      }
     }
-    if (part.partKind === "tool-error") {
-      return [
-        {
-          toolCallId:
-            typeof (part.payload as Record<string, unknown>)?.toolCallId === "string"
-              ? ((part.payload as Record<string, unknown>).toolCallId as string)
-              : null,
-          toolName:
-            typeof (part.payload as Record<string, unknown>)?.toolName === "string"
-              ? ((part.payload as Record<string, unknown>).toolName as string)
-              : "tool",
-          summary: summarizeToolPayload(part.payload, "{tool} 执行失败"),
-          status: "error" as const,
-          nodeId: node?.id ?? "",
-          runId: node?.createdByRunId ?? null,
-        },
-      ];
-    }
+  }
+
+  return "success" as const;
+}
+
+function createToolTraceEntry({
+  node,
+  payload,
+}: {
+  node: AgentThreadNodeView;
+  payload: unknown;
+}): AssistantToolTraceEntry {
+  const toolName = getToolPayloadString(payload, "toolName") ?? "tool";
+  return {
+    toolCallId: getToolPayloadString(payload, "toolCallId"),
+    toolName,
+    status: "pending",
+    summary: summarizeToolPayload(payload, "调用 {tool}"),
+    nodeId: node.id,
+    runId: node.createdByRunId ?? null,
+    requestPayload: getToolPayloadField(payload, "input"),
+    responsePayload: null,
+  };
+}
+
+export function getAssistantToolTrace(
+  messages: AgentThreadNodeView[],
+  messageIndex: number,
+): AssistantToolTraceEntry[] {
+  const node = messages[messageIndex];
+  if (!node || node.role !== "assistant") {
     return [];
+  }
+
+  const entries: AssistantToolTraceEntry[] = [];
+  const entryByCallId = new Map<string, AssistantToolTraceEntry>();
+
+  node.parts.forEach((part) => {
+    if (part.partKind !== "tool-call") {
+      return;
+    }
+
+    const entry = createToolTraceEntry({
+      node,
+      payload: part.payload,
+    });
+    entries.push(entry);
+    if (entry.toolCallId) {
+      entryByCallId.set(entry.toolCallId, entry);
+    }
   });
+
+  for (let index = messageIndex + 1; index < messages.length; index += 1) {
+    const toolNode = messages[index];
+    if (!toolNode || toolNode.role !== "tool") {
+      break;
+    }
+
+    toolNode.parts.forEach((part) => {
+      if (part.partKind !== "tool-result" && part.partKind !== "tool-error") {
+        return;
+      }
+
+      const toolCallId = getToolPayloadString(part.payload, "toolCallId");
+      const matchedEntry = toolCallId ? entryByCallId.get(toolCallId) : null;
+      const targetEntry =
+        matchedEntry ??
+        (() => {
+          const fallbackEntry = {
+            ...createToolTraceEntry({
+              node,
+              payload: part.payload,
+            }),
+            status: getToolResultStatus(part.payload, part.partKind),
+            summary:
+              getToolResultStatus(part.payload, part.partKind) === "error"
+                ? summarizeToolPayload(part.payload, "{tool} 执行失败")
+                : summarizeToolPayload(part.payload, "调用 {tool}"),
+          } satisfies AssistantToolTraceEntry;
+          entries.push(fallbackEntry);
+          if (fallbackEntry.toolCallId) {
+            entryByCallId.set(fallbackEntry.toolCallId, fallbackEntry);
+          }
+          return fallbackEntry;
+        })();
+
+      targetEntry.status = getToolResultStatus(part.payload, part.partKind);
+      targetEntry.responsePayload = getToolPayloadField(part.payload, "output");
+      if (targetEntry.status === "error") {
+        targetEntry.summary = summarizeToolPayload(part.payload, "{tool} 执行失败");
+      }
+    });
+  }
+
+  return entries;
 }
 
 export function listAssistantContextDetails(context: ProjectAssistantContextSnapshot) {
