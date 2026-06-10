@@ -354,6 +354,67 @@ test("getAssistantContentBlocks preserves reasoning and text order", () => {
   ]);
 });
 
+test("getAssistantContentBlocks preserves markdown-significant whitespace between text parts", () => {
+  expect(
+    getAssistantContentBlocks({
+      id: "node_markdown",
+      threadId: "thread_1",
+      parentNodeId: "node_user",
+      role: "assistant",
+      createdByRunId: "run_1",
+      sourceStepId: "step_1",
+      sourceKind: "model_response",
+      summaryText: "assistant markdown",
+      message: {
+        role: "assistant",
+        content: [
+          { type: "text", text: "```md\n# 标题" },
+          { type: "text", text: "\n\n- 列表项\n```" },
+        ],
+      },
+      parts: [
+        {
+          id: "part_markdown_1",
+          nodeId: "node_markdown",
+          partIndex: 0,
+          partKind: "text",
+          visibility: "public",
+          state: "done",
+          providerOptions: null,
+          providerMetadata: null,
+          payload: {
+            type: "text",
+            text: "```md\n# 标题",
+          },
+          createdAt: 1,
+        },
+        {
+          id: "part_markdown_2",
+          nodeId: "node_markdown",
+          partIndex: 1,
+          partKind: "text",
+          visibility: "public",
+          state: "done",
+          providerOptions: null,
+          providerMetadata: null,
+          payload: {
+            type: "text",
+            text: "\n\n- 列表项\n```",
+          },
+          createdAt: 2,
+        },
+      ],
+      createdAt: 1,
+    }),
+  ).toEqual([
+    {
+      kind: "text",
+      blockId: "part_markdown_1",
+      text: "```md\n# 标题\n\n\n- 列表项\n```",
+    },
+  ]);
+});
+
 test("getUsageTotalTokens prefers totalTokens and falls back to input/output sum", () => {
   expect(getUsageTotalTokens({ totalTokens: 12, inputTokens: 1, outputTokens: 2 })).toBe(12);
   expect(getUsageTotalTokens({ inputTokens: 4, outputTokens: 6 })).toBe(10);

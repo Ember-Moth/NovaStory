@@ -106,3 +106,83 @@ test("applyStreamEvent accumulates usage tokens as steps finish", () => {
   expect(afterSecondStep.stepCount).toBe(2);
   expect(afterSecondStep.totalTokens).toBe(81);
 });
+
+test("applyStreamEvent keeps reasoning, text, and tool traces aligned in one stream block", () => {
+  const overlay = createStreamOverlay({
+    kind: "send",
+    threadId: "thread_a",
+    triggerNodeId: null,
+  });
+
+  const nextOverlay = [
+    {
+      type: "assistant-message-started" as const,
+      nodeId: "assistant_1",
+      parentNodeId: "user_1",
+      stepIndex: 0,
+    },
+    {
+      type: "assistant-reasoning-delta" as const,
+      nodeId: "assistant_1",
+      reasoningId: "reasoning_1",
+      delta: "先检查上下文。",
+      accumulatedText: "先检查上下文。",
+    },
+    {
+      type: "assistant-text-delta" as const,
+      nodeId: "assistant_1",
+      delta: "最终回复",
+      accumulatedText: "最终回复",
+    },
+    {
+      type: "tool-call" as const,
+      assistantNodeId: "assistant_1",
+      toolCallId: "tool_1",
+      toolName: "lookup",
+      input: { query: "scene" },
+    },
+    {
+      type: "tool-result" as const,
+      toolNodeId: "tool_node_1",
+      toolCallId: "tool_1",
+      toolName: "lookup",
+      output: { ok: true },
+      status: "success" as const,
+    },
+  ].reduce(applyStreamEvent, overlay);
+
+  expect(nextOverlay.blocks).toEqual([
+    {
+      assistantNodeId: "assistant_1",
+      assistantText: "最终回复",
+      reasoningTrace: [
+        {
+          reasoningId: "reasoning_1",
+          text: "先检查上下文。",
+        },
+      ],
+      contentOrder: [
+        {
+          kind: "reasoning",
+          id: "reasoning_1",
+        },
+        {
+          kind: "text",
+          id: "text",
+        },
+      ],
+      toolTrace: [
+        {
+          toolCallId: "tool_1",
+          toolName: "lookup",
+          status: "success",
+          summary: "调用 lookup",
+          nodeId: "assistant_1",
+          runId: null,
+          requestPayload: { query: "scene" },
+          responsePayload: { ok: true },
+        },
+      ],
+    },
+  ]);
+});

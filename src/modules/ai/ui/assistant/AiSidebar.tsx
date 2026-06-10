@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { AnimatePresence } from "./AiSidebarView";
+import { AiMarkdown } from "./AiMarkdown";
 import type {
   AgentRunSummaryView,
   ProjectAssistantContextSnapshot,
@@ -255,16 +256,18 @@ export function AiSidebar({
                   {!isUser
                     ? assistantContentBlocks.map((block) =>
                         block.kind === "text" ? (
-                          <div
-                            key={block.blockId}
-                            className="text-[13px] leading-5 whitespace-pre-wrap text-foreground"
-                          >
-                            {block.text}
+                          <div key={block.blockId} className="text-foreground">
+                            <AiMarkdown
+                              content={block.text}
+                              isStreaming={false}
+                              variant="assistant"
+                            />
                           </div>
                         ) : (
                           <ReasoningTraceCard
                             key={block.blockId}
                             reasoningText={block.text}
+                            isStreaming={false}
                             expanded={expandedReasoningKeys.has(`${message.id}:${block.blockId}`)}
                             onToggle={() => toggleReasoning(`${message.id}:${block.blockId}`)}
                           />
@@ -284,9 +287,13 @@ export function AiSidebar({
                               block.assistantText.trim().length > 0 ? (
                                 <div
                                   key={`${message.id}:stream:${block.assistantNodeId}:text`}
-                                  className="text-[13px] leading-5 whitespace-pre-wrap text-foreground"
+                                  className="text-foreground"
                                 >
-                                  {block.assistantText}
+                                  <AiMarkdown
+                                    content={block.assistantText}
+                                    isStreaming
+                                    variant="assistant"
+                                  />
                                 </div>
                               ) : null
                             ) : (
@@ -296,6 +303,7 @@ export function AiSidebar({
                                   block.reasoningTrace,
                                   entry.id,
                                 )}
+                                isStreaming
                                 expanded={expandedReasoningKeys.has(
                                   `${message.id}:stream:${block.assistantNodeId}:${entry.id}`,
                                 )}
@@ -435,15 +443,20 @@ export function AiSidebar({
                             block.assistantText.trim().length > 0 ? (
                               <div
                                 key={`send-stream:${block.assistantNodeId}:text`}
-                                className="text-[13px] leading-5 whitespace-pre-wrap text-foreground"
+                                className="text-foreground"
                               >
-                                {block.assistantText}
+                                <AiMarkdown
+                                  content={block.assistantText}
+                                  isStreaming
+                                  variant="assistant"
+                                />
                               </div>
                             ) : null
                           ) : (
                             <ReasoningTraceCard
                               key={`send-stream:${block.assistantNodeId}:${entry.id}`}
                               reasoningText={getReasoningTraceText(block.reasoningTrace, entry.id)}
+                              isStreaming
                               expanded={expandedReasoningKeys.has(
                                 `send-stream:${block.assistantNodeId}:${entry.id}`,
                               )}
@@ -608,15 +621,17 @@ function getReasoningTraceText(
   reasoningId: string,
 ) {
   const matchedEntry = entries.find((entry) => entry.reasoningId === reasoningId);
-  return matchedEntry?.text.trim() ?? "";
+  return matchedEntry?.text ?? "";
 }
 
 function ReasoningTraceCard({
   reasoningText,
+  isStreaming,
   expanded,
   onToggle,
 }: {
   reasoningText: string;
+  isStreaming: boolean;
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -640,9 +655,7 @@ function ReasoningTraceCard({
 
       {expanded ? (
         <div className="border-t border-current/10 px-2 py-1.5">
-          <pre className="overflow-x-auto rounded bg-sidebar-background/70 px-2 py-1 text-[10px] leading-4 break-all whitespace-pre-wrap text-foreground">
-            {reasoningText}
-          </pre>
+          <AiMarkdown content={reasoningText} isStreaming={isStreaming} variant="reasoning" />
         </div>
       ) : null}
     </div>

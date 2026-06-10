@@ -128,14 +128,14 @@ export function getAssistantContentBlocks(node: AgentThreadNodeView | null | und
     }
 
     const text = Reflect.get(payload as Record<string, unknown>, "text");
-    if (typeof text !== "string" || text.trim().length === 0) {
+    if (typeof text !== "string" || text.length === 0) {
       return;
     }
 
     const kind = part.partKind;
     const previousBlock = blocks.at(-1);
     if (previousBlock?.kind === kind) {
-      previousBlock.text = `${previousBlock.text}\n${text}`.trim();
+      previousBlock.text = `${previousBlock.text}\n${text}`;
       return;
     }
 
