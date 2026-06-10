@@ -828,7 +828,7 @@ function HeadRow({
 function PendingAssistantBubble({ label }: { label: string }) {
   return (
     <div className="flex justify-start">
-      <div className="max-w-[88%] border border-border bg-editor-background px-3 py-2 text-[12px] text-foreground-muted">
+      <div className="max-w-[88%] rounded-lg border border-border bg-editor-background px-3 py-2 text-[12px] text-foreground-muted">
         <div className="flex items-center gap-2">
           <span className="icon-[material-symbols--progress-activity] animate-spin text-sm text-accent-foreground" />
           <span>{label}</span>
@@ -851,7 +851,7 @@ function AttemptErrorCard({
 }) {
   return (
     <div className="mt-2 flex justify-start">
-      <div className="max-w-[88%] border border-red-500/30 bg-red-500/8 px-3 py-2 text-[12px] text-red-200">
+      <div className="max-w-[88%] rounded-lg border border-red-500/30 bg-red-500/8 px-3 py-2 text-[12px] text-red-200">
         <div className="flex items-start gap-2">
           <span className="icon-[material-symbols--warning]" />
           <div className="min-w-0 flex-1">
@@ -1537,7 +1537,7 @@ export function AiSidebar({ projectId }: { projectId: string }) {
                         <div key={message.id}>
                           <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
                             <div
-                              className={`max-w-[88%] px-3 py-2 text-[13px] leading-5 whitespace-pre-wrap ${
+                              className={`max-w-[88%] rounded-lg px-3 py-2 text-[13px] leading-5 whitespace-pre-wrap ${
                                 isUser
                                   ? "bg-accent-foreground text-sidebar-background"
                                   : "border border-border bg-sidebar-background text-foreground"
@@ -1568,7 +1568,7 @@ export function AiSidebar({ projectId }: { projectId: string }) {
                     {pendingAction?.kind === "send" ? (
                       <>
                         <div className="flex justify-end">
-                          <div className="max-w-[88%] bg-accent-foreground px-3 py-2 text-[13px] leading-5 whitespace-pre-wrap text-sidebar-background">
+                          <div className="max-w-[88%] rounded-lg bg-accent-foreground px-3 py-2 text-[13px] leading-5 whitespace-pre-wrap text-sidebar-background">
                             {pendingAction.text}
                           </div>
                         </div>
