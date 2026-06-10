@@ -51,7 +51,7 @@ export function AiSidebar({
   }
 
   return (
-    <aside className="flex h-full w-80 max-w-[38vw] min-w-72 shrink-0 flex-col overflow-hidden border-l border-border bg-sidebar-background">
+    <aside className="flex h-full w-96 max-w-[42vw] min-w-72 shrink-0 flex-col overflow-hidden border-l border-border bg-sidebar-background">
       <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border bg-title-bar-background px-3">
         <span className="icon-[material-symbols--smart-toy] text-lg text-accent-foreground" />
         <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">
@@ -165,17 +165,17 @@ export function AiSidebar({
               return (
                 <div key={message.id}>
                   {showMessageBubble ? (
-                    <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-                      <div
-                        className={`max-w-[88%] rounded-lg px-3 py-2 text-[13px] leading-5 whitespace-pre-wrap ${
-                          isUser
-                            ? "bg-accent-foreground text-sidebar-background"
-                            : "border border-border bg-sidebar-background text-foreground"
-                        }`}
-                      >
+                    isUser ? (
+                      <div className="flex justify-end">
+                        <div className="max-w-[88%] rounded-lg bg-accent-foreground px-3 py-2 text-[13px] leading-5 whitespace-pre-wrap text-sidebar-background">
+                          {text}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="py-1 text-[13px] leading-5 whitespace-pre-wrap text-foreground">
                         {text}
                       </div>
-                    </div>
+                    )
                   ) : null}
 
                   {showRetryError ? (
