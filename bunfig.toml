@@ -1,3 +1,6 @@
+[test]
+preload = ["./src/test/preload-db.ts"]
+
 [install]
 # Keep a single React instance for hooks (rpc, jotai, wouter, etc.).
 dedupe = ["react", "react-dom"]

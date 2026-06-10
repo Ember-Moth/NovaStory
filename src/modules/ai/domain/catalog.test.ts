@@ -1,12 +1,8 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { expect, test } from "bun:test";
 
-import { afterAll, beforeEach, expect, test } from "bun:test";
+import { setupMockDatabase } from "@/test/mock-db";
 
-const tempDir = mkdtempSync(join(tmpdir(), "novel-evolver-ai-"));
-const dbPath = join(tempDir, "ai-test.sqlite");
-process.env.DATABASE_URL = dbPath;
+setupMockDatabase();
 
 const { db, schema } = await import("@/db");
 const {
@@ -15,19 +11,6 @@ const {
   listResolvedModelsForConnection,
   syncAiCatalogFromPayload,
 } = await import("./catalog");
-
-beforeEach(() => {
-  db.delete(schema.aiConnectionCatalogOverrides).run();
-  db.delete(schema.aiConnectionCustomModels).run();
-  db.delete(schema.aiConnections).run();
-  db.delete(schema.aiRegistryState).run();
-  db.delete(schema.aiCatalogModels).run();
-  db.delete(schema.aiCatalogProviders).run();
-});
-
-afterAll(() => {
-  rmSync(tempDir, { recursive: true, force: true });
-});
 
 const payloadV1 = JSON.stringify({
   openai: {

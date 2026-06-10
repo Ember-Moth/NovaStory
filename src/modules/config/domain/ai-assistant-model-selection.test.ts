@@ -1,25 +1,11 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { expect, test } from "bun:test";
 
-import { afterAll, beforeEach, expect, test } from "bun:test";
+import { setupMockDatabase } from "@/test/mock-db";
 
-const tempDir = mkdtempSync(join(tmpdir(), "novel-evolver-ai-selection-"));
-const dbPath = join(tempDir, "ai-selection-test.sqlite");
-process.env.DATABASE_URL = dbPath;
-
-const { db, schema } = await import("@/db");
+setupMockDatabase();
 const { setGlobalConfig } = await import("./global-config");
 const { getAiAssistantModelSelection, setAiAssistantModelSelection } =
   await import("./ai-assistant-model-selection");
-
-beforeEach(() => {
-  db.delete(schema.globalConfigOptions).run();
-});
-
-afterAll(() => {
-  rmSync(tempDir, { recursive: true, force: true });
-});
 
 test("reads back a stored ai assistant model selection", () => {
   const selection = setAiAssistantModelSelection({

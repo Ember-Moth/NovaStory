@@ -1,12 +1,8 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { expect, test } from "bun:test";
 
-import { afterAll, beforeEach, expect, test } from "bun:test";
+import { setupMockDatabase } from "@/test/mock-db";
 
-const tempDir = mkdtempSync(join(tmpdir(), "novel-evolver-workspaces-rpc-"));
-const dbPath = join(tempDir, "workspaces-rpc-test.sqlite");
-process.env.DATABASE_URL = dbPath;
+setupMockDatabase();
 
 const { db, schema } = await import("@/db");
 const service = await import("@/modules/workspace/domain");
@@ -26,19 +22,6 @@ function seedProject(projectId: string) {
     .run();
   return service.createDefaultWorkspace(projectId);
 }
-
-beforeEach(() => {
-  db.delete(schema.auxNodeLayers).run();
-  db.delete(schema.contentNodes).run();
-  db.delete(schema.timelinePoints).run();
-  db.delete(schema.auxNodes).run();
-  db.delete(schema.workspaces).run();
-  db.delete(schema.projects).run();
-});
-
-afterAll(() => {
-  rmSync(tempDir, { recursive: true, force: true });
-});
 
 test("workspace detail query watches the workspace tag and returns the workspace", async () => {
   const workspace = seedProject("rpc_workspace_detail");

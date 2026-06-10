@@ -1,25 +1,13 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
-import { afterAll, beforeEach, expect, test } from "bun:test";
+import { expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 
-const tempDir = mkdtempSync(join(tmpdir(), "novel-evolver-global-config-"));
-const dbPath = join(tempDir, "global-config-test.sqlite");
-process.env.DATABASE_URL = dbPath;
+import { setupMockDatabase } from "@/test/mock-db";
+
+setupMockDatabase();
 
 const { db, schema } = await import("@/db");
 const { deleteGlobalConfig, getGlobalConfig, listGlobalConfigOptions, setGlobalConfig } =
   await import("./global-config");
-
-beforeEach(() => {
-  db.delete(schema.globalConfigOptions).run();
-});
-
-afterAll(() => {
-  rmSync(tempDir, { recursive: true, force: true });
-});
 
 test("setGlobalConfig stores and getGlobalConfig reads JSON values", () => {
   const fallback = {

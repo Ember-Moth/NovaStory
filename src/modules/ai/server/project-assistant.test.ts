@@ -1,13 +1,9 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
-import { afterAll, beforeEach, expect, test } from "bun:test";
+import { expect, test } from "bun:test";
 import { modelMessageSchema, type ModelMessage } from "ai";
 
-const tempDir = mkdtempSync(join(tmpdir(), "novel-evolver-project-assistant-"));
-const dbPath = join(tempDir, "assistant.sqlite");
-process.env.DATABASE_URL = dbPath;
+import { setupMockDatabase } from "@/test/mock-db";
+
+setupMockDatabase();
 
 const { db, schema } = await import("@/db");
 const logs = await import("@/modules/ai/domain/logs");
@@ -140,35 +136,6 @@ function seedOpenAiConnection({
     },
   };
 }
-
-beforeEach(() => {
-  db.run("PRAGMA foreign_keys = OFF;");
-  db.delete(schema.agentRunEvents).run();
-  db.delete(schema.agentThreadNodeParts).run();
-  db.delete(schema.agentThreadNodes).run();
-  db.delete(schema.agentRunSteps).run();
-  db.delete(schema.agentArtifacts).run();
-  db.delete(schema.agentRuns).run();
-  db.delete(schema.agentProjectState).run();
-  db.delete(schema.agentThreads).run();
-  db.delete(schema.aiConnectionCatalogOverrides).run();
-  db.delete(schema.aiConnectionCustomModels).run();
-  db.delete(schema.aiConnections).run();
-  db.delete(schema.aiCatalogModels).run();
-  db.delete(schema.aiCatalogProviders).run();
-  db.delete(schema.aiRegistryState).run();
-  db.delete(schema.auxNodeLayers).run();
-  db.delete(schema.contentNodes).run();
-  db.delete(schema.timelinePoints).run();
-  db.delete(schema.auxNodes).run();
-  db.delete(schema.workspaces).run();
-  db.delete(schema.projects).run();
-  db.run("PRAGMA foreign_keys = ON;");
-});
-
-afterAll(() => {
-  rmSync(tempDir, { recursive: true, force: true });
-});
 
 test("sendProjectAssistantMessage materializes user and assistant nodes and records a run", async () => {
   seedProject("assistant_send");

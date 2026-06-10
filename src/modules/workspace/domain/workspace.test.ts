@@ -1,14 +1,10 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
-import { afterAll, beforeEach, expect, test } from "bun:test";
+import { expect, test } from "bun:test";
 
 import { eq } from "drizzle-orm";
 
-const tempDir = mkdtempSync(join(tmpdir(), "novel-evolver-"));
-const dbPath = join(tempDir, "workspace-test.sqlite");
-process.env.DATABASE_URL = dbPath;
+import { setupMockDatabase } from "@/test/mock-db";
+
+setupMockDatabase();
 
 const { db, schema } = await import("@/db");
 const service = await import("./index");
@@ -29,19 +25,6 @@ function seedProject(projectId: string) {
 function flattenAuxNodes(nodes: ExportedAuxNode[]): ExportedAuxNode[] {
   return nodes.flatMap((node) => [node, ...flattenAuxNodes(node.children)]);
 }
-
-beforeEach(() => {
-  db.delete(schema.auxNodeLayers).run();
-  db.delete(schema.contentNodes).run();
-  db.delete(schema.timelinePoints).run();
-  db.delete(schema.auxNodes).run();
-  db.delete(schema.workspaces).run();
-  db.delete(schema.projects).run();
-});
-
-afterAll(() => {
-  rmSync(tempDir, { recursive: true, force: true });
-});
 
 test("content export preserves sibling order and nesting", () => {
   const workspace = seedProject("project_content");
