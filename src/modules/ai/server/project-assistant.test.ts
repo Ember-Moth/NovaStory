@@ -7,6 +7,7 @@ setupMockDatabase();
 
 const { db, schema } = await import("@/db");
 const logs = await import("@/modules/ai/domain/logs");
+const { createDefaultWorkspace } = await import("@/modules/workspace/domain");
 const { createProjectAssistantService } = await import("./project-assistant");
 
 function createMockStream({
@@ -855,6 +856,327 @@ test("sendProjectAssistantMessage records tool input and output artifacts for ex
   expect(trace.artifacts.map((artifact) => artifact.artifactKind)).toContain("tool-output");
   expect(trace.events.some((event) => event.eventKind === "tool-call-started")).toBe(true);
   expect(trace.events.some((event) => event.eventKind === "tool-call-finished")).toBe(true);
+});
+
+test("sendProjectAssistantMessageStream emits workspace-mutated after a successful aux write tool", async () => {
+  seedProject("assistant_workspace_mutation_stream");
+  const workspace = createDefaultWorkspace("assistant_workspace_mutation_stream");
+  const seeded = seedCustomConnection({
+    connectionId: "conn_workspace_mutation_stream",
+    modelId: "story-model",
+    modelRowId: "cmodel_workspace_mutation_stream",
+    supportsToolUse: true,
+  });
+  const service = createProjectAssistantService({
+    readStoredSelection: () => seeded.selection,
+    streamAssistantText: createMockStream({
+      chunks: [
+        { type: "start-step", stepNumber: 0 },
+        {
+          type: "tool-result",
+          stepNumber: 0,
+          toolResult: {
+            toolCallId: "tool_write_stream",
+            toolName: "write_aux_file",
+            output: {
+              ok: true,
+              data: {
+                action: "created",
+                path: "/设定/角色.md",
+                nodeId: "aux_stream",
+              },
+            },
+          },
+        },
+        {
+          type: "finish-step",
+          stepNumber: 0,
+          finishReason: "stop",
+          usage: { totalTokens: 3 },
+        },
+      ],
+      text: "",
+      usage: { totalTokens: 3 },
+      finishReason: "stop",
+      steps: [
+        {
+          stepNumber: 0,
+          preparedMessages: [],
+          model: { provider: "openai", modelId: "story-model" },
+          finishReason: "stop",
+          rawFinishReason: "stop",
+          usage: { totalTokens: 3 },
+          request: { body: { step: 0 } },
+          response: { body: { id: "resp_workspace_mutation_stream" }, messages: [] },
+          providerMetadata: {},
+          toolCalls: [],
+          toolResults: [
+            {
+              toolCallId: "tool_write_stream",
+              toolName: "write_aux_file",
+              output: {
+                ok: true,
+                data: {
+                  action: "created",
+                  path: "/设定/角色.md",
+                  nodeId: "aux_stream",
+                },
+              },
+            },
+          ],
+        },
+      ],
+    }) as any,
+  });
+  const thread = service.createProjectAssistantThread("assistant_workspace_mutation_stream");
+  const emitted: Array<Record<string, unknown>> = [];
+
+  const handle = service.sendProjectAssistantMessageStream({
+    projectId: "assistant_workspace_mutation_stream",
+    threadId: thread.id,
+    text: "写入辅助资料",
+    activeTools: [
+      "read_current_writing_context",
+      "read_content_subtree",
+      "list_timeline_points",
+      "list_aux_dir",
+      "read_aux_path",
+      "mkdir_aux_dir",
+      "write_aux_file",
+    ],
+  });
+  handle.subscribe((event) => {
+    emitted.push(event as Record<string, unknown>);
+  });
+
+  await handle.finalResult;
+
+  expect(emitted).toContainEqual({
+    type: "workspace-mutated",
+    workspaceId: workspace.id,
+    area: "aux",
+    timelinePointId: "origin",
+    toolName: "write_aux_file",
+    action: "created",
+    path: "/设定/角色.md",
+    nodeId: "aux_stream",
+  });
+});
+
+test("sendProjectAssistantMessageStream emits workspace-mutated for mkdir_aux_dir", async () => {
+  seedProject("assistant_workspace_mutation_mkdir");
+  const workspace = createDefaultWorkspace("assistant_workspace_mutation_mkdir");
+  const seeded = seedCustomConnection({
+    connectionId: "conn_workspace_mutation_mkdir",
+    modelId: "story-model",
+    modelRowId: "cmodel_workspace_mutation_mkdir",
+    supportsToolUse: true,
+  });
+  const service = createProjectAssistantService({
+    readStoredSelection: () => seeded.selection,
+    streamAssistantText: createMockStream({
+      chunks: [
+        { type: "start-step", stepNumber: 0 },
+        {
+          type: "tool-result",
+          stepNumber: 0,
+          toolResult: {
+            toolCallId: "tool_mkdir_stream",
+            toolName: "mkdir_aux_dir",
+            output: {
+              ok: true,
+              data: {
+                action: "created",
+                path: "/设定",
+                nodeId: "aux_dir_stream",
+              },
+            },
+          },
+        },
+        {
+          type: "finish-step",
+          stepNumber: 0,
+          finishReason: "stop",
+          usage: { totalTokens: 2 },
+        },
+      ],
+      text: "",
+      usage: { totalTokens: 2 },
+      finishReason: "stop",
+      steps: [
+        {
+          stepNumber: 0,
+          preparedMessages: [],
+          model: { provider: "openai", modelId: "story-model" },
+          finishReason: "stop",
+          rawFinishReason: "stop",
+          usage: { totalTokens: 2 },
+          request: { body: { step: 0 } },
+          response: { body: { id: "resp_workspace_mutation_mkdir" }, messages: [] },
+          providerMetadata: {},
+          toolCalls: [],
+          toolResults: [
+            {
+              toolCallId: "tool_mkdir_stream",
+              toolName: "mkdir_aux_dir",
+              output: {
+                ok: true,
+                data: {
+                  action: "created",
+                  path: "/设定",
+                  nodeId: "aux_dir_stream",
+                },
+              },
+            },
+          ],
+        },
+      ],
+    }) as any,
+  });
+  const thread = service.createProjectAssistantThread("assistant_workspace_mutation_mkdir");
+  const emitted: Array<Record<string, unknown>> = [];
+
+  const handle = service.sendProjectAssistantMessageStream({
+    projectId: "assistant_workspace_mutation_mkdir",
+    threadId: thread.id,
+    text: "创建辅助资料目录",
+    activeTools: [
+      "read_current_writing_context",
+      "read_content_subtree",
+      "list_timeline_points",
+      "list_aux_dir",
+      "read_aux_path",
+      "mkdir_aux_dir",
+      "write_aux_file",
+    ],
+  });
+  handle.subscribe((event) => {
+    emitted.push(event as Record<string, unknown>);
+  });
+
+  await handle.finalResult;
+
+  expect(emitted).toContainEqual({
+    type: "workspace-mutated",
+    workspaceId: workspace.id,
+    area: "aux",
+    timelinePointId: "origin",
+    toolName: "mkdir_aux_dir",
+    action: "created",
+    path: "/设定",
+    nodeId: "aux_dir_stream",
+  });
+});
+
+test("sendProjectAssistantMessageStream does not emit workspace-mutated for non-write or failed tool results", async () => {
+  seedProject("assistant_workspace_mutation_filtered");
+  const seeded = seedCustomConnection({
+    connectionId: "conn_workspace_mutation_filtered",
+    modelId: "story-model",
+    modelRowId: "cmodel_workspace_mutation_filtered",
+    supportsToolUse: true,
+  });
+  const service = createProjectAssistantService({
+    readStoredSelection: () => seeded.selection,
+    streamAssistantText: createMockStream({
+      chunks: [
+        { type: "start-step", stepNumber: 0 },
+        {
+          type: "tool-result",
+          stepNumber: 0,
+          toolResult: {
+            toolCallId: "tool_read_only",
+            toolName: "read_aux_path",
+            output: {
+              ok: true,
+              data: {
+                path: "/设定",
+              },
+            },
+          },
+        },
+        {
+          type: "tool-result",
+          stepNumber: 0,
+          toolResult: {
+            toolCallId: "tool_failed_write",
+            toolName: "write_aux_file",
+            output: {
+              ok: false,
+              error: "写入失败",
+            },
+          },
+        },
+        {
+          type: "finish-step",
+          stepNumber: 0,
+          finishReason: "stop",
+          usage: { totalTokens: 3 },
+        },
+      ],
+      text: "",
+      usage: { totalTokens: 3 },
+      finishReason: "stop",
+      steps: [
+        {
+          stepNumber: 0,
+          preparedMessages: [],
+          model: { provider: "openai", modelId: "story-model" },
+          finishReason: "stop",
+          rawFinishReason: "stop",
+          usage: { totalTokens: 3 },
+          request: { body: { step: 0 } },
+          response: { body: { id: "resp_workspace_mutation_filtered" }, messages: [] },
+          providerMetadata: {},
+          toolCalls: [],
+          toolResults: [
+            {
+              toolCallId: "tool_read_only",
+              toolName: "read_aux_path",
+              output: {
+                ok: true,
+                data: {
+                  path: "/设定",
+                },
+              },
+            },
+            {
+              toolCallId: "tool_failed_write",
+              toolName: "write_aux_file",
+              output: {
+                ok: false,
+                error: "写入失败",
+              },
+            },
+          ],
+        },
+      ],
+    }) as any,
+  });
+  const thread = service.createProjectAssistantThread("assistant_workspace_mutation_filtered");
+  const emitted: Array<Record<string, unknown>> = [];
+
+  const handle = service.sendProjectAssistantMessageStream({
+    projectId: "assistant_workspace_mutation_filtered",
+    threadId: thread.id,
+    text: "测试刷新事件",
+    activeTools: [
+      "read_current_writing_context",
+      "read_content_subtree",
+      "list_timeline_points",
+      "list_aux_dir",
+      "read_aux_path",
+      "mkdir_aux_dir",
+      "write_aux_file",
+    ],
+  });
+  handle.subscribe((event) => {
+    emitted.push(event as Record<string, unknown>);
+  });
+
+  await handle.finalResult;
+
+  expect(emitted.some((event) => event.type === "workspace-mutated")).toBe(false);
 });
 
 test("sendProjectAssistantMessageStream keeps running after subscribers detach", async () => {

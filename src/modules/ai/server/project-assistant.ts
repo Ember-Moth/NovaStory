@@ -50,13 +50,20 @@ import type {
 } from "@/modules/ai/domain/types";
 import {
   PROJECT_ASSISTANT_READ_ONLY_TOOL_NAMES,
+  PROJECT_ASSISTANT_AUX_WRITE_TOOL_NAMES,
   PROJECT_ASSISTANT_TOOL_NAMES,
+} from "@/modules/ai/domain/types";
+import type {
+  ProjectAssistantAuxWriteToolName,
+  WorkspaceMutationAction,
+  WorkspaceMutationEvent,
 } from "@/modules/ai/domain/types";
 import { listResolvedModelsForConnection } from "@/modules/ai/domain/catalog";
 import {
   getAiAssistantModelSelection,
   type AiAssistantModelSelection,
 } from "@/modules/config/domain/ai-assistant-model-selection";
+import { getDefaultWorkspace, ORIGIN_TIMELINE_POINT_ID } from "@/modules/workspace/domain";
 import { invariant } from "@/shared/lib/domain";
 
 import { createAssistantTools } from "./assistant-tools";
@@ -718,6 +725,78 @@ function getToolStatus(toolResult: Record<string, unknown>): ProjectAssistantStr
   return "success";
 }
 
+function unwrapToolResultOutput(output: unknown) {
+  if (!output || typeof output !== "object") {
+    return null;
+  }
+
+  const value = Reflect.get(output as Record<string, unknown>, "value");
+  if (value && typeof value === "object") {
+    return value;
+  }
+
+  return output as Record<string, unknown>;
+}
+
+function isAuxWriteToolName(value: unknown): value is ProjectAssistantAuxWriteToolName {
+  return (
+    typeof value === "string" &&
+    (PROJECT_ASSISTANT_AUX_WRITE_TOOL_NAMES as readonly string[]).includes(value)
+  );
+}
+
+function extractWorkspaceMutationEventFromToolResult({
+  projectId,
+  context,
+  toolResult,
+}: {
+  projectId: string;
+  context: ProjectAssistantContextSnapshot | null;
+  toolResult: Record<string, unknown>;
+}): WorkspaceMutationEvent | null {
+  const toolName = Reflect.get(toolResult, "toolName");
+  if (!isAuxWriteToolName(toolName)) {
+    return null;
+  }
+
+  if (getToolStatus(toolResult) !== "success") {
+    return null;
+  }
+
+  const workspace = getDefaultWorkspace(projectId);
+  if (!workspace) {
+    return null;
+  }
+
+  const output = unwrapToolResultOutput(Reflect.get(toolResult, "output"));
+  if (!output || Reflect.get(output, "ok") !== true) {
+    return null;
+  }
+
+  const data = Reflect.get(output, "data");
+  if (!data || typeof data !== "object") {
+    return null;
+  }
+
+  const action = Reflect.get(data as Record<string, unknown>, "action");
+  const path = Reflect.get(data as Record<string, unknown>, "path");
+  const nodeId = Reflect.get(data as Record<string, unknown>, "nodeId");
+  if ((action !== "created" && action !== "updated") || typeof path !== "string") {
+    return null;
+  }
+
+  return {
+    type: "workspace-mutated",
+    workspaceId: workspace.id,
+    area: "aux",
+    timelinePointId: context?.activeTimelinePointId ?? ORIGIN_TIMELINE_POINT_ID,
+    toolName,
+    action: action as WorkspaceMutationAction,
+    path,
+    nodeId: typeof nodeId === "string" && nodeId.trim().length > 0 ? nodeId : null,
+  };
+}
+
 function assertNoPendingRunForThread(thread: AgentThreadView) {
   invariant(!hasPendingRun(thread.id), "当前会话正在生成回复，请稍后再试。");
 }
@@ -1167,6 +1246,14 @@ async function executeProjectAssistantRun<TResult>({
           output: Reflect.get(chunk.toolResult, "output") ?? null,
           status: getToolStatus(chunk.toolResult),
         });
+        const workspaceMutationEvent = extractWorkspaceMutationEventFromToolResult({
+          projectId: prepared.projectId,
+          context: prepared.context,
+          toolResult: chunk.toolResult,
+        });
+        if (workspaceMutationEvent) {
+          relay.emit(workspaceMutationEvent);
+        }
         continue;
       }
 

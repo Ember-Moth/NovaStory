@@ -125,9 +125,30 @@ test("sendProjectAssistantMessage invalidates overview, thread view, candidates,
     getThreadView: () => {
       throw new Error("unused");
     },
-    getRunTrace: () => {
-      throw new Error("unused");
-    },
+    getRunTrace: () => ({
+      run: {
+        id: "run_send",
+        threadId: "thread_send",
+        parentRunId: null,
+        parentEventId: null,
+        triggerNodeId: "node_user",
+        baseTipNodeId: "node_user",
+        runMode: "send",
+        status: "succeeded",
+        agentProfile: "project-assistant",
+        selectionSnapshot: {},
+        contextSnapshot: null,
+        errorArtifactId: null,
+        startedAt: 1,
+        completedAt: 2,
+        createdAt: 1,
+        updatedAt: 2,
+      },
+      steps: [],
+      events: [],
+      artifacts: [],
+      childRuns: [],
+    }),
     getNodeCandidates: () => {
       throw new Error("unused");
     },
@@ -217,6 +238,184 @@ test("sendProjectAssistantMessage invalidates overview, thread view, candidates,
     rpcTags.aiNodeCandidates("node_user"),
     rpcTags.aiRunTrace("run_send"),
     rpcTags.aiChildRuns("run_send"),
+  ]);
+});
+
+test("sendProjectAssistantMessage additionally invalidates aux workspace when the run includes a successful aux write tool", async () => {
+  useService({
+    getProjectAssistantState: () => ({
+      activeThreadId: null,
+      threads: [],
+      state: {
+        thread: null,
+        activePath: [],
+        candidateGroups: [],
+        latestRuns: [],
+        runSummaries: [],
+      },
+    }),
+    createProjectAssistantThread: () => {
+      throw new Error("unused");
+    },
+    setProjectAssistantActiveThread: () => {
+      throw new Error("unused");
+    },
+    renameProjectAssistantThread: () => {
+      throw new Error("unused");
+    },
+    archiveProjectAssistantThread: () => {
+      throw new Error("unused");
+    },
+    getThreadView: () => {
+      throw new Error("unused");
+    },
+    getRunTrace: () => ({
+      run: {
+        id: "run_send_aux",
+        threadId: "thread_send_aux",
+        parentRunId: null,
+        parentEventId: null,
+        triggerNodeId: "node_user_aux",
+        baseTipNodeId: "node_user_aux",
+        runMode: "send" as const,
+        status: "succeeded" as const,
+        agentProfile: "project-assistant",
+        selectionSnapshot: {},
+        contextSnapshot: {
+          workspaceId: "workspace_aux",
+          activeContentNodeId: null,
+          activeContentTitle: null,
+          activeAuxNodeId: null,
+          activeAuxPath: null,
+          activeTimelinePointId: "origin",
+          activeTimelineLabel: "原点",
+        },
+        errorArtifactId: null,
+        startedAt: 1,
+        completedAt: 2,
+        createdAt: 1,
+        updatedAt: 2,
+      },
+      steps: [],
+      events: [],
+      artifacts: [
+        {
+          id: "artifact_tool_output",
+          runId: "run_send_aux",
+          stepId: "step_1",
+          artifactKind: "tool-output" as const,
+          visibility: "internal" as const,
+          mimeType: null,
+          content: {
+            toolName: "write_aux_file",
+            output: {
+              ok: true,
+              data: {
+                action: "created",
+                path: "/设定/角色.md",
+                nodeId: "aux_1",
+              },
+            },
+          },
+          summaryText: null,
+          createdAt: 1,
+        },
+      ],
+      childRuns: [],
+    }),
+    getNodeCandidates: () => {
+      throw new Error("unused");
+    },
+    getChildRuns: () => {
+      throw new Error("unused");
+    },
+    selectThreadTip: () => {
+      throw new Error("unused");
+    },
+    sendProjectAssistantMessage: async () => ({
+      thread: {
+        id: "thread_send_aux",
+        projectId: "rpc_assistant_send_aux",
+        agentProfile: "project-assistant",
+        title: "主会话",
+        activeTipNodeId: "node_assistant_aux",
+        archivedAt: null,
+        createdAt: 1,
+        updatedAt: 2,
+      },
+      userNode: {
+        id: "node_user_aux",
+        threadId: "thread_send_aux",
+        parentNodeId: null,
+        role: "user" as const,
+        createdByRunId: null,
+        sourceStepId: null,
+        sourceKind: "user_input" as const,
+        summaryText: "Hello",
+        message: { role: "user" as const, content: [{ type: "text" as const, text: "Hello" }] },
+        parts: [],
+        createdAt: 1,
+      },
+      assistantNode: null,
+      run: {
+        id: "run_send_aux",
+        threadId: "thread_send_aux",
+        parentRunId: null,
+        parentEventId: null,
+        triggerNodeId: "node_user_aux",
+        baseTipNodeId: "node_user_aux",
+        runMode: "send" as const,
+        status: "succeeded" as const,
+        agentProfile: "project-assistant",
+        selectionSnapshot: {},
+        contextSnapshot: {
+          workspaceId: "workspace_aux",
+          activeContentNodeId: null,
+          activeContentTitle: null,
+          activeAuxNodeId: null,
+          activeAuxPath: null,
+          activeTimelinePointId: "origin",
+          activeTimelineLabel: "原点",
+        },
+        errorArtifactId: null,
+        startedAt: 1,
+        completedAt: 2,
+        createdAt: 1,
+        updatedAt: 2,
+      },
+      state: {
+        thread: null,
+        activePath: [],
+        candidateGroups: [],
+        latestRuns: [],
+        runSummaries: [],
+      },
+    }),
+    retryProjectAssistantMessage: async () => {
+      throw new Error("unused");
+    },
+    editProjectAssistantMessage: async () => {
+      throw new Error("unused");
+    },
+  } as unknown as ProjectAssistantService);
+
+  const result = await handlers.sendProjectAssistantMessage.handler(
+    {
+      projectId: "rpc_assistant_send_aux",
+      threadId: "thread_send_aux",
+      text: "Hello",
+    },
+    requestCtx,
+  );
+
+  expect(result.invalidate).toEqual([
+    rpcTags.aiProjectAssistantOverview("rpc_assistant_send_aux"),
+    rpcTags.aiProjectThreads("rpc_assistant_send_aux"),
+    rpcTags.aiThreadView("thread_send_aux"),
+    rpcTags.aiNodeCandidates("node_user_aux"),
+    rpcTags.aiRunTrace("run_send_aux"),
+    rpcTags.aiChildRuns("run_send_aux"),
+    rpcTags.auxWorkspace("workspace_aux"),
   ]);
 });
 

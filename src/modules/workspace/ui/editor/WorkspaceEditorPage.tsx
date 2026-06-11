@@ -1,8 +1,11 @@
 import { ScopeProvider } from "bunshi/react";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 
 import { AppShell, AppSidebar } from "@/app/shell/AppShell";
-import type { ProjectAssistantContextSnapshot } from "@/modules/ai/domain/types";
+import type {
+  ProjectAssistantContextSnapshot,
+  WorkspaceMutationEvent,
+} from "@/modules/ai/domain/types";
 import { ActionErrorBubble } from "@/modules/workspace/ui/editor/components/ActionErrorBubble";
 import { AiSidebar } from "@/modules/ai/ui/assistant/AiSidebar";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
@@ -16,6 +19,7 @@ import { ContentTreePanel } from "@/modules/workspace/ui/editor/panels/ContentTr
 import { EditorArea } from "@/modules/workspace/ui/editor/panels/EditorArea";
 import { TimelinePanel } from "@/modules/workspace/ui/editor/panels/TimelinePanel";
 import { useProjectActions } from "@/modules/workspace/ui/editor/state/hooks/useProjectActions";
+import type { AuxTreeNodeVM } from "@/modules/workspace/ui/editor/model/types";
 import {
   useProjectAuxData,
   useProjectContentData,
@@ -26,7 +30,10 @@ import {
   useProjectWorkspaceIdentity,
 } from "@/modules/workspace/ui/editor/state/hooks/useProjectWorkspace";
 import { useProjectWorkspaceEffects } from "@/modules/workspace/ui/editor/state/hooks/useProjectWorkspaceEffects";
-import { useWorkspaceState } from "@/modules/workspace/ui/editor/state/molecules/workspaceStore";
+import {
+  useWorkspaceState,
+  useWorkspaceStoreApi,
+} from "@/modules/workspace/ui/editor/state/molecules/workspaceStore";
 import { ProjectScope } from "@/modules/workspace/ui/editor/state/scopes";
 import { ORIGIN_TIMELINE_POINT_ID } from "@/modules/workspace/domain/constants";
 
@@ -35,6 +42,81 @@ const AUX_CREATE_DIR_ANCHOR = actionAnchorId("aux", "create-dir");
 const AUX_CREATE_FILE_ANCHOR = actionAnchorId("aux", "create-file");
 const TIMELINE_ADD_ANCHOR = actionAnchorId("timeline", "add");
 const PAGE_ERROR_ANCHOR = actionAnchorId("sidebar", "page-error");
+
+export function shouldRefetchAuxForWorkspaceMutation({
+  event,
+  workspaceId,
+  activeTimelinePointId,
+}: {
+  event: WorkspaceMutationEvent;
+  workspaceId: string | null | undefined;
+  activeTimelinePointId: string | null;
+}) {
+  return (
+    event.area === "aux" &&
+    workspaceId != null &&
+    event.workspaceId === workspaceId &&
+    activeTimelinePointId != null &&
+    event.timelinePointId === activeTimelinePointId
+  );
+}
+
+export function isActiveAuxFileMutationTarget({
+  event,
+  activeAuxNode,
+}: {
+  event: WorkspaceMutationEvent;
+  activeAuxNode: AuxTreeNodeVM | null;
+}) {
+  if (activeAuxNode?.nodeType !== "file") {
+    return false;
+  }
+
+  if (event.nodeId && event.nodeId === activeAuxNode.id) {
+    return true;
+  }
+
+  return activeAuxNode.path === event.path;
+}
+
+export function handleAuxWorkspaceMutationForEditor({
+  event,
+  workspaceId,
+  activeTimelinePointId,
+  activeAuxNode,
+  refetchAux,
+  clearActiveAuxDraftState,
+}: {
+  event: WorkspaceMutationEvent;
+  workspaceId: string | null | undefined;
+  activeTimelinePointId: string | null;
+  activeAuxNode: AuxTreeNodeVM | null;
+  refetchAux: () => void;
+  clearActiveAuxDraftState: (_nodeId: string) => void;
+}) {
+  if (
+    !shouldRefetchAuxForWorkspaceMutation({
+      event,
+      workspaceId,
+      activeTimelinePointId,
+    })
+  ) {
+    return false;
+  }
+
+  if (
+    isActiveAuxFileMutationTarget({
+      event,
+      activeAuxNode,
+    }) &&
+    activeAuxNode?.nodeType === "file"
+  ) {
+    clearActiveAuxDraftState(activeAuxNode.id);
+  }
+
+  refetchAux();
+  return true;
+}
 
 export function WorkspaceEditorPage({
   projectId,
@@ -78,6 +160,7 @@ function ProjectWorkspace({
   const pageErrorState = useProjectPageErrorState(pageError);
   const workspace = { identity, content, timeline, aux, selection, editor: editorView };
   const actions = useProjectActions(workspace);
+  const workspaceStore = useWorkspaceStoreApi();
   const setContentError = useWorkspaceState((state) => state.setContentError);
   const setTimelineError = useWorkspaceState((state) => state.setTimelineError);
   const setAuxError = useWorkspaceState((state) => state.setAuxError);
@@ -144,6 +227,54 @@ function ProjectWorkspace({
       browsingTimelineLabel,
       workspaceId,
     ],
+  );
+  const handleAssistantWorkspaceMutation = useCallback(
+    (event: WorkspaceMutationEvent) => {
+      handleAuxWorkspaceMutationForEditor({
+        event,
+        workspaceId,
+        activeTimelinePointId,
+        activeAuxNode,
+        refetchAux: () => {
+          void aux.query.refetch();
+        },
+        clearActiveAuxDraftState: (activeNodeId) => {
+          workspaceStore.getState().setDrafts((previous) => {
+            if (!(activeNodeId in previous)) {
+              return previous;
+            }
+            const next = { ...previous };
+            delete next[activeNodeId];
+            return next;
+          });
+          workspaceStore.getState().setCommittedBodies((previous) => {
+            if (!(activeNodeId in previous)) {
+              return previous;
+            }
+            const next = { ...previous };
+            delete next[activeNodeId];
+            return next;
+          });
+          workspaceStore.getState().setPendingSaveCounts((previous) => {
+            if (!(activeNodeId in previous)) {
+              return previous;
+            }
+            const next = { ...previous };
+            delete next[activeNodeId];
+            return next;
+          });
+          workspaceStore.getState().setSaveErrors((previous) => {
+            if (!(activeNodeId in previous)) {
+              return previous;
+            }
+            const next = { ...previous };
+            delete next[activeNodeId];
+            return next;
+          });
+        },
+      });
+    },
+    [activeAuxNode, activeTimelinePointId, aux.query, workspaceId, workspaceStore],
   );
 
   if (workspaceInitialLoading) {
@@ -357,7 +488,11 @@ function ProjectWorkspace({
               onAuxContentChange={actions.handleAuxContentChange}
             />
           </div>
-          <AiSidebar projectId={projectId} contextSnapshot={assistantContext} />
+          <AiSidebar
+            projectId={projectId}
+            contextSnapshot={assistantContext}
+            onWorkspaceMutation={handleAssistantWorkspaceMutation}
+          />
         </div>
       </AppShell>
     </>

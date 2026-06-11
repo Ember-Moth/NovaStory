@@ -45,8 +45,10 @@ import type {
   ProjectAssistantContextSnapshot,
   ProjectAssistantToolName,
 } from "@/modules/ai/domain/types";
+import { PROJECT_ASSISTANT_AUX_WRITE_TOOL_NAMES } from "@/modules/ai/domain/types";
 import { assertRpcFound } from "@/rpc/errors";
 import { rpcTags, type RpcTagList } from "@/rpc/tags";
+import { getDefaultWorkspace } from "@/modules/workspace/domain";
 
 type ConnectionInsert = InferInsertModel<typeof schema.aiConnections>;
 type CustomModelInsert = InferInsertModel<typeof schema.aiConnectionCustomModels>;
@@ -161,6 +163,65 @@ function invalidateProjectAiState(
     ctx.invalidate(rpcTags.aiRunTrace(options.runId));
     ctx.invalidate(rpcTags.aiChildRuns(options.runId));
   }
+}
+
+function unwrapToolOutputValue(output: unknown) {
+  if (!output || typeof output !== "object") {
+    return null;
+  }
+
+  const value = Reflect.get(output as Record<string, unknown>, "value");
+  if (value && typeof value === "object") {
+    return value as Record<string, unknown>;
+  }
+
+  return output as Record<string, unknown>;
+}
+
+function isSuccessfulAuxWriteToolOutput(content: unknown) {
+  if (!content || typeof content !== "object") {
+    return false;
+  }
+
+  const toolName = Reflect.get(content as Record<string, unknown>, "toolName");
+  if (
+    typeof toolName !== "string" ||
+    !(PROJECT_ASSISTANT_AUX_WRITE_TOOL_NAMES as readonly string[]).includes(toolName)
+  ) {
+    return false;
+  }
+
+  const output = unwrapToolOutputValue(Reflect.get(content as Record<string, unknown>, "output"));
+  return !!output && Reflect.get(output, "ok") === true;
+}
+
+function invalidateAuxWorkspaceForRun(ctx: RpcMutationCtx, projectId: string, runId: string) {
+  const trace = getProjectAssistantService().getRunTrace(runId);
+  const hasSuccessfulAuxWrite = trace.artifacts.some(
+    (artifact) =>
+      artifact.artifactKind === "tool-output" && isSuccessfulAuxWriteToolOutput(artifact.content),
+  );
+  if (!hasSuccessfulAuxWrite) {
+    return;
+  }
+
+  let defaultWorkspaceId: string | null = null;
+  try {
+    defaultWorkspaceId = getDefaultWorkspace(projectId)?.id ?? null;
+  } catch {
+    defaultWorkspaceId = null;
+  }
+
+  const workspaceId =
+    defaultWorkspaceId ??
+    (typeof trace.run.contextSnapshot?.workspaceId === "string"
+      ? trace.run.contextSnapshot.workspaceId
+      : null);
+  if (!workspaceId) {
+    return;
+  }
+
+  ctx.invalidate(rpcTags.auxWorkspace(workspaceId));
 }
 
 function sanitizeName(name: string): string {
@@ -769,6 +830,7 @@ export const sendProjectAssistantMessage = mutation<
       runId: result.run.id,
       candidateParentNodeId: result.userNode.id,
     });
+    invalidateAuxWorkspaceForRun(ctx, projectId, result.run.id);
     return result;
   } catch (error) {
     invalidateProjectAiState(ctx, projectId, { threadId });
@@ -839,6 +901,7 @@ export const retryProjectAssistantMessage = mutation<
       runId: result.run.id,
       candidateParentNodeId: triggerNodeId,
     });
+    invalidateAuxWorkspaceForRun(ctx, projectId, result.run.id);
     return result;
   } catch (error) {
     invalidateProjectAiState(ctx, projectId, { threadId });
@@ -910,6 +973,7 @@ export const editProjectAssistantMessage = mutation<
       runId: result.run.id,
       candidateParentNodeId: result.replacementNode.parentNodeId,
     });
+    invalidateAuxWorkspaceForRun(ctx, projectId, result.run.id);
     return result;
   } catch (error) {
     invalidateProjectAiState(ctx, projectId, { threadId });

@@ -6,6 +6,7 @@ import type {
   ProjectAssistantContextSnapshot,
   ProjectAssistantStreamEvent,
   ProjectAssistantToolName,
+  WorkspaceMutationEvent,
 } from "@/modules/ai/domain/types";
 import {
   PROJECT_ASSISTANT_AUX_WRITE_TOOL_NAMES,
@@ -416,6 +417,7 @@ function patchAssistantOverviewState({
 export function useAiAssistantController(
   projectId: string,
   contextSnapshot: ProjectAssistantContextSnapshot,
+  onWorkspaceMutation?: (_event: WorkspaceMutationEvent) => void,
 ) {
   const [selectedConnectionId, setSelectedConnectionId] = useState("");
   const [selectedModelId, setSelectedModelId] = useState("");
@@ -621,6 +623,9 @@ export function useAiAssistantController(
           },
           {
             onEvent: (event) => {
+              if (event.type === "workspace-mutated") {
+                onWorkspaceMutation?.(event);
+              }
               setActiveStream((current) =>
                 current == null ? current : applyStreamEvent(current, event),
               );
@@ -668,6 +673,7 @@ export function useAiAssistantController(
       contextSnapshot,
       draft,
       includeContext,
+      onWorkspaceMutation,
       projectId,
       sendMessageStream,
       selectedModelSupportsToolUse,
@@ -703,6 +709,9 @@ export function useAiAssistantController(
           },
           {
             onEvent: (event) => {
+              if (event.type === "workspace-mutated") {
+                onWorkspaceMutation?.(event);
+              }
               setActiveStream((current) =>
                 current == null ? current : applyStreamEvent(current, event),
               );
@@ -745,6 +754,7 @@ export function useAiAssistantController(
       projectId,
       retryMessageStream,
       selectedModelSupportsToolUse,
+      onWorkspaceMutation,
     ],
   );
 

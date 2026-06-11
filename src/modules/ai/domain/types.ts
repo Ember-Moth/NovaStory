@@ -87,6 +87,10 @@ export const PROJECT_ASSISTANT_TOOL_NAMES = [
 ] as const;
 
 export type ProjectAssistantToolName = (typeof PROJECT_ASSISTANT_TOOL_NAMES)[number];
+export type ProjectAssistantAuxWriteToolName =
+  (typeof PROJECT_ASSISTANT_AUX_WRITE_TOOL_NAMES)[number];
+export type WorkspaceMutationArea = "aux";
+export type WorkspaceMutationAction = "created" | "updated";
 
 export interface ProjectAssistantContextSnapshot {
   workspaceId: string | null;
@@ -253,6 +257,17 @@ export interface AgentRunSummaryView {
   errorMessage: string | null;
 }
 
+export interface WorkspaceMutationEvent {
+  type: "workspace-mutated";
+  workspaceId: string;
+  area: WorkspaceMutationArea;
+  timelinePointId: string;
+  toolName: ProjectAssistantAuxWriteToolName;
+  action: WorkspaceMutationAction;
+  path: string;
+  nodeId: string | null;
+}
+
 export type ProjectAssistantStreamEvent =
   | {
       type: "run-started";
@@ -305,7 +320,8 @@ export type ProjectAssistantStreamEvent =
       stepIndex: number;
       finishReason: string | undefined;
       usage: unknown;
-    };
+    }
+  | WorkspaceMutationEvent;
 
 export interface AgentRunStepView {
   id: string;

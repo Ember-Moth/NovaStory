@@ -6,6 +6,7 @@ import { AiMarkdown } from "./AiMarkdown";
 import type {
   AgentRunSummaryView,
   ProjectAssistantContextSnapshot,
+  WorkspaceMutationEvent,
 } from "@/modules/ai/domain/types";
 import {
   AnimatedHeadRow,
@@ -28,12 +29,14 @@ import { OverlayScrollbar } from "@/shared/ui/OverlayScrollbar";
 export function AiSidebar({
   projectId,
   contextSnapshot,
+  onWorkspaceMutation,
 }: {
   projectId: string;
   contextSnapshot: ProjectAssistantContextSnapshot;
+  onWorkspaceMutation?: (_event: WorkspaceMutationEvent) => void;
 }) {
   const messagesViewportRef = useRef<HTMLElement | null>(null);
-  const controller = useAiAssistantController(projectId, contextSnapshot);
+  const controller = useAiAssistantController(projectId, contextSnapshot, onWorkspaceMutation);
   const layout = useAssistantSheetLayout({
     defaultState: "peek",
   });
