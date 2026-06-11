@@ -538,13 +538,17 @@ export function AiSidebar({
                     disabled={!controller.canSubmit}
                     title={controller.canSubmit ? "发送" : "当前无法发送"}
                     aria-label="发送"
-                    className="flex size-7 shrink-0 items-center justify-center rounded-md text-foreground-muted transition hover:bg-list-hover-background disabled:cursor-not-allowed disabled:opacity-40"
+                    className={`flex size-7 shrink-0 items-center justify-center rounded-md transition disabled:cursor-not-allowed ${
+                      controller.canSubmit
+                        ? "bg-accent-foreground text-sidebar-background hover:brightness-110"
+                        : "text-foreground-muted hover:bg-list-hover-background"
+                    }`}
                   >
                     <span
                       className={`text-base ${
                         controller.isBusy
                           ? "icon-[material-symbols--progress-activity] animate-spin"
-                          : "icon-[material-symbols--send]"
+                          : "icon-[material-symbols--arrow-upward]"
                       }`}
                     />
                   </button>
