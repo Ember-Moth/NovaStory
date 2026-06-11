@@ -187,19 +187,11 @@ export function ModelPicker({
             : triggerLabel
         }
         aria-label="选择连接和模型"
-        className="grid h-11 max-w-full min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-2 items-center gap-x-2 rounded-md border border-transparent px-1.5 py-1 text-left transition outline-none hover:border-border hover:bg-list-hover-background focus:border-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex h-7 max-w-full min-w-0 flex-1 items-center gap-x-1.5 rounded-md border border-transparent px-1.5 text-left text-[12px] leading-4 font-medium transition outline-none hover:border-border hover:bg-list-hover-background focus:border-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
         {...getReferenceProps()}
       >
-        <span className="col-start-1 row-span-2 row-start-1 icon-[material-symbols--token] shrink-0 text-base text-accent-foreground" />
-        <span className="col-start-2 row-start-1 min-w-0 self-end truncate text-[11px] leading-4 text-foreground-muted">
-          {selectedConnection?.name ?? "连接"}
-        </span>
-        <span className="col-start-2 row-start-2 min-w-0 self-start truncate text-[12px] leading-4 font-medium text-foreground">
-          {triggerLabel}
-        </span>
-        <span
-          className={`col-start-3 row-span-2 row-start-1 shrink-0 text-base text-foreground-muted ${effectiveOpen ? "icon-[material-symbols--keyboard-arrow-up]" : "icon-[material-symbols--keyboard-arrow-down]"}`}
-        />
+        <span className="icon-[material-symbols--token] shrink-0 text-sm text-accent-foreground" />
+        <span className="min-w-0 flex-1 truncate">{triggerLabel}</span>
       </button>
 
       {effectiveOpen ? (
@@ -208,7 +200,7 @@ export function ModelPicker({
             <div
               ref={setFloating}
               style={floatingStyles}
-              className="z-50 flex min-h-0 flex-col overflow-hidden border border-border bg-sidebar-background text-[12px] text-foreground outline-none"
+              className="z-50 flex min-h-0 flex-col overflow-hidden rounded-md border border-border bg-sidebar-background text-[12px] text-foreground outline-none"
               {...getFloatingProps()}
             >
               <OverlayScrollbar variant="panel">

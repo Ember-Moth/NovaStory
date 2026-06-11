@@ -514,7 +514,7 @@ export function AiSidebar({
                     controller.isBusy
                   }
                   rows={3}
-                  className="field-sizing-content w-full resize-none border-none bg-transparent px-2.5 py-2 text-[13px] leading-5 text-editor-foreground outline-none placeholder:text-foreground-muted/70 disabled:cursor-not-allowed disabled:opacity-70"
+                  className="field-sizing-content w-full resize-none border-none bg-transparent px-2.5 pt-2 text-[13px] leading-5 text-editor-foreground outline-none placeholder:text-foreground-muted/70 disabled:cursor-not-allowed disabled:opacity-70"
                   placeholder={
                     controller.isLoadingSelection
                       ? "加载模型选择中..."
@@ -525,7 +525,7 @@ export function AiSidebar({
                           : "选择可用模型后输入..."
                   }
                 />
-                <div className="flex min-w-0 items-center gap-2 border-t border-border p-1.5">
+                <div className="flex min-w-0 items-center gap-2 px-1.5 pb-1.5">
                   <ModelPicker
                     selectedConnectionId={controller.selectedConnectionId}
                     selectedModelId={controller.selectedModelId}
@@ -538,10 +538,10 @@ export function AiSidebar({
                     disabled={!controller.canSubmit}
                     title={controller.canSubmit ? "发送" : "当前无法发送"}
                     aria-label="发送"
-                    className="flex size-9 shrink-0 items-center justify-center rounded-md text-foreground-muted transition hover:bg-list-hover-background disabled:cursor-not-allowed disabled:opacity-40"
+                    className="flex size-7 shrink-0 items-center justify-center rounded-md text-foreground-muted transition hover:bg-list-hover-background disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <span
-                      className={`text-xl ${
+                      className={`text-base ${
                         controller.isBusy
                           ? "icon-[material-symbols--progress-activity] animate-spin"
                           : "icon-[material-symbols--send]"
