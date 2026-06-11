@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { shouldAnimateMessageMount } from "./AiSidebar";
+import { getMessagesViewportSessionKey, shouldAnimateMessageMount } from "./AiSidebar";
 import {
   applyStreamEvent,
   buildSessionRows,
@@ -196,4 +196,9 @@ test("shouldAnimateMessageMount skips enter animation for streamed assistant mes
     true,
   );
   expect(shouldAnimateMessageMount("user", "assistant_1", new Set(["assistant_1"]))).toBe(true);
+});
+
+test("getMessagesViewportSessionKey falls back for empty thread selection", () => {
+  expect(getMessagesViewportSessionKey("thread_a")).toBe("thread_a");
+  expect(getMessagesViewportSessionKey(null)).toBe("__empty-thread__");
 });

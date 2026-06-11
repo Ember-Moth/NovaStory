@@ -7,19 +7,15 @@ import type { AssistantSheetLayout } from "./useAssistantSheetLayout";
 export type AiAssistantSheetLayoutProps = {
   layout: AssistantSheetLayout;
   sessionPane: ReactNode;
-  messagesPane: ReactNode;
+  messagesViewportPane: ReactNode;
   composerPane: ReactNode;
-  messagesViewportRef?: { current: HTMLElement | null };
-  onMessagesScroll?: (_event: Event) => void;
 };
 
 export function AiAssistantSheetLayout({
   layout,
   sessionPane,
-  messagesPane,
+  messagesViewportPane,
   composerPane,
-  messagesViewportRef,
-  onMessagesScroll,
 }: AiAssistantSheetLayoutProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -58,15 +54,7 @@ export function AiAssistantSheetLayout({
             />
           </div>
 
-          <div className="min-h-0 flex-1 overflow-hidden">
-            <OverlayScrollbar
-              variant="panel"
-              viewportRef={messagesViewportRef}
-              onViewportScroll={onMessagesScroll}
-            >
-              {messagesPane}
-            </OverlayScrollbar>
-          </div>
+          <div className="min-h-0 flex-1 overflow-hidden">{messagesViewportPane}</div>
 
           <div className="shrink-0 border-t border-border">{composerPane}</div>
         </div>

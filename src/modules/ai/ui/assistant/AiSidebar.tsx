@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 
 import { AnimatePresence } from "./AiSidebarView";
@@ -23,6 +23,7 @@ import {
 } from "./assistantState";
 import { type AssistantStreamOverlay, useAiAssistantController } from "./useAiAssistantController";
 import { useAssistantSheetLayout } from "./useAssistantSheetLayout";
+import { OverlayScrollbar } from "@/shared/ui/OverlayScrollbar";
 
 export function AiSidebar({
   projectId,
@@ -45,14 +46,19 @@ export function AiSidebar({
     controller.activeStream?.kind === "send"
       ? buildStreamRunSummary(controller.activeStream)
       : null;
-  const visibleMessages = controller.messages.flatMap((message, index) =>
-    message.role === "tool" ? [] : [{ message, index }],
-  );
+  const messagesViewportSessionKey = getMessagesViewportSessionKey(controller.activeThreadId);
+  const previousThreadIdRef = useRef(controller.activeThreadId);
   const prevMessagesLengthRef = useRef(controller.messages.length);
 
   useEffect(() => {
+    if (previousThreadIdRef.current === controller.activeThreadId) {
+      return;
+    }
+
+    previousThreadIdRef.current = controller.activeThreadId;
     setShouldStickToBottom(true);
-  }, [controller.activeThreadId]);
+    prevMessagesLengthRef.current = controller.messages.length;
+  }, [controller.activeThreadId, controller.messages.length]);
 
   useEffect(() => {
     streamedAssistantMessageIdsRef.current.clear();
@@ -160,8 +166,6 @@ export function AiSidebar({
 
       <AiAssistantSheetLayout
         layout={layout}
-        messagesViewportRef={messagesViewportRef}
-        onMessagesScroll={handleMessagesScroll}
         sessionPane={
           <>
             <div className="flex min-h-full flex-col">
@@ -218,381 +222,26 @@ export function AiSidebar({
             </AnimatePresence>
           </>
         }
-        messagesPane={
-          <div className="flex min-h-full flex-col gap-2 px-3.5 py-2">
-            <AnimatePresence initial={false}>
-              {controller.assistantStateIsInitialLoading && controller.showEmptyState ? (
-                <motion.div
-                  key="loading-state"
-                  className="rounded-md border border-border bg-sidebar-background px-3 py-2 text-[12px] text-foreground-muted"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.15, ease: "easeOut" }}
-                >
-                  正在加载会话...
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
-
-            <AnimatePresence initial={false}>
-              {controller.showEmptyState ? (
-                <motion.div
-                  key="empty-state"
-                  className="rounded-md border border-border bg-sidebar-background px-3 py-2"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.15, ease: "easeOut" }}
-                >
-                  <div className="mb-2 flex items-center gap-2 text-[12px] text-foreground-muted">
-                    <span className="icon-[material-symbols--auto-awesome] text-sm text-accent-foreground" />
-                    <span>
-                      {controller.activeThreadId ? "这个会话还没有对话内容" : "还没有当前会话"}
-                    </span>
-                  </div>
-                  <p className="text-[12px] leading-5 text-foreground-muted">
-                    {controller.activeThreadId
-                      ? "选择模型后可以直接开始对话。"
-                      : "先新建一个会话，或从上方切换到已有会话。"}
-                  </p>
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
-
-            <AnimatePresence initial={false} mode="popLayout">
-              {visibleMessages.map(({ message, index }) => {
-                const text = getMessageText(message);
-                const assistantContentBlocks = getAssistantContentBlocks(message);
-                const toolTrace = getAssistantToolTrace(controller.messages, index);
-                const isUser = message.role === "user";
-                const showMessageBubble = isUser || text.trim().length > 0;
-                const candidateGroup = controller.getCandidateGroupForNode(message);
-                const streamOverlayForMessage =
-                  controller.activeStream?.kind === "retry" &&
-                  controller.activeStream.triggerNodeId === message.id
-                    ? controller.activeStream
-                    : null;
-                const streamSummaryForMessage =
-                  streamOverlayForMessage != null
-                    ? buildStreamRunSummary(streamOverlayForMessage)
-                    : null;
-                const persistedSummaries = getRunSummaryByDisplayNode(
-                  controller.runSummaries,
-                  message.id,
-                ).filter((summary) => summary.runId !== controller.activeStream?.runId);
-                const shouldAnimateMount = shouldAnimateMessageMount(
-                  message.role,
-                  message.id,
-                  streamedAssistantMessageIdsRef.current,
-                );
-
-                return (
-                  <motion.div
-                    key={message.id}
-                    className="flex flex-col gap-1.5"
-                    initial={shouldAnimateMount ? { opacity: 0 } : false}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.15, ease: "easeOut" }}
-                  >
-                    {isUser ? (
-                      showMessageBubble ? (
-                        <div className="flex justify-end">
-                          <div className="max-w-[88%] rounded-lg bg-accent-foreground px-3 py-2 text-[13px] leading-5 whitespace-pre-wrap text-sidebar-background">
-                            {text}
-                          </div>
-                        </div>
-                      ) : null
-                    ) : null}
-
-                    {!isUser
-                      ? assistantContentBlocks.map((block) =>
-                          block.kind === "text" ? (
-                            <div key={block.blockId} className="text-foreground">
-                              <AiMarkdown
-                                content={block.text}
-                                isStreaming={false}
-                                variant="assistant"
-                              />
-                            </div>
-                          ) : (
-                            <ReasoningTraceCard
-                              key={block.blockId}
-                              reasoningText={block.text}
-                              isStreaming={false}
-                              expanded={expandedReasoningKeys.has(`${message.id}:${block.blockId}`)}
-                              onToggle={() => toggleReasoning(`${message.id}:${block.blockId}`)}
-                            />
-                          ),
-                        )
-                      : null}
-
-                    {streamOverlayForMessage ? (
-                      <div className="flex flex-col gap-1.5">
-                        {streamOverlayForMessage.blocks.map((block, blockIndex) => (
-                          <motion.div
-                            key={`${message.id}:stream-block:${block.assistantNodeId}:${blockIndex}`}
-                            className="flex flex-col gap-1.5"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ duration: 0.15, ease: "easeOut" }}
-                          >
-                            {block.contentOrder.map((entry) =>
-                              entry.kind === "text" ? (
-                                block.assistantText.trim().length > 0 ? (
-                                  <div
-                                    key={`${message.id}:stream:${block.assistantNodeId}:text`}
-                                    className="text-foreground"
-                                  >
-                                    <AiMarkdown
-                                      content={block.assistantText}
-                                      isStreaming
-                                      variant="assistant"
-                                    />
-                                  </div>
-                                ) : null
-                              ) : (
-                                <ReasoningTraceCard
-                                  key={`${message.id}:stream:${block.assistantNodeId}:${entry.id}`}
-                                  reasoningText={getReasoningTraceText(
-                                    block.reasoningTrace,
-                                    entry.id,
-                                  )}
-                                  isStreaming
-                                  expanded={expandedReasoningKeys.has(
-                                    `${message.id}:stream:${block.assistantNodeId}:${entry.id}`,
-                                  )}
-                                  onToggle={() =>
-                                    toggleReasoning(
-                                      `${message.id}:stream:${block.assistantNodeId}:${entry.id}`,
-                                    )
-                                  }
-                                />
-                              ),
-                            )}
-                            {block.toolTrace.length > 0 ? (
-                              <div className="flex flex-col gap-1">
-                                {block.toolTrace.map((entry, entryIndex) => (
-                                  <ToolTraceCard
-                                    key={`${message.id}:stream:${block.assistantNodeId}:${entry.toolCallId ?? entry.toolName}:${entryIndex}`}
-                                    entry={entry}
-                                    expanded={expandedToolTraceKeys.has(
-                                      `${message.id}:stream:${block.assistantNodeId}:${entry.toolCallId ?? entry.toolName}:${entryIndex}`,
-                                    )}
-                                    onToggle={() =>
-                                      toggleToolTrace(
-                                        `${message.id}:stream:${block.assistantNodeId}:${entry.toolCallId ?? entry.toolName}:${entryIndex}`,
-                                      )
-                                    }
-                                  />
-                                ))}
-                              </div>
-                            ) : null}
-                          </motion.div>
-                        ))}
-                      </div>
-                    ) : null}
-
-                    {!isUser && toolTrace.length > 0 ? (
-                      <div className="flex flex-col gap-1">
-                        {toolTrace.map((entry, index) => (
-                          <ToolTraceCard
-                            key={`${message.id}:${entry.toolCallId ?? entry.toolName}:${index}`}
-                            entry={entry}
-                            expanded={expandedToolTraceKeys.has(
-                              `${message.id}:${entry.toolCallId ?? entry.toolName}:${index}`,
-                            )}
-                            onToggle={() =>
-                              toggleToolTrace(
-                                `${message.id}:${entry.toolCallId ?? entry.toolName}:${index}`,
-                              )
-                            }
-                          />
-                        ))}
-                      </div>
-                    ) : null}
-
-                    {candidateGroup ? (
-                      <div className="flex items-center gap-1.5">
-                        {candidateGroup.nodes.map((candidate, index) => {
-                          const active = candidate.id === candidateGroup.activeNodeId;
-                          return (
-                            <motion.button
-                              key={candidate.id}
-                              type="button"
-                              disabled={active || controller.isThreadBusy}
-                              onClick={() =>
-                                void controller.handleSelectCandidate(candidate.tipNodeId)
-                              }
-                              className={`rounded-md border px-2 py-1 text-[11px] leading-4 ${
-                                active
-                                  ? "border-accent-foreground bg-accent-foreground/10 text-accent-foreground"
-                                  : "border-border bg-editor-background text-foreground-muted hover:text-foreground"
-                              }`}
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              exit={{ opacity: 0 }}
-                              transition={{ duration: 0.14, ease: "easeOut" }}
-                            >
-                              候选 {index + 1}
-                            </motion.button>
-                          );
-                        })}
-                      </div>
-                    ) : null}
-
-                    {streamSummaryForMessage ? (
-                      <motion.div
-                        key={streamSummaryForMessage.key}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.15, ease: "easeOut" }}
-                      >
-                        <RunSummaryRow
-                          status={streamSummaryForMessage.status}
-                          stepCount={streamSummaryForMessage.stepCount}
-                          totalTokens={streamSummaryForMessage.totalTokens}
-                          durationMs={streamSummaryForMessage.durationMs}
-                          errorMessage={streamSummaryForMessage.errorMessage}
-                          expanded={expandedRunSummaryKeys.has(streamSummaryForMessage.key)}
-                          onToggle={() => toggleRunSummary(streamSummaryForMessage.key)}
-                        />
-                      </motion.div>
-                    ) : null}
-
-                    {persistedSummaries.map((summary) => {
-                      const key = getRunSummaryKey(summary);
-                      const retryTriggerNodeId = summary.triggerNodeId;
-                      const canRetry =
-                        summary.status === "failed" &&
-                        controller.retryableRun?.id === summary.runId &&
-                        message.id === summary.displayNodeId;
-                      return (
-                        <motion.div
-                          key={summary.runId}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          transition={{ duration: 0.15, ease: "easeOut" }}
-                        >
-                          <RunSummaryRow
-                            status={summary.status}
-                            stepCount={summary.stepCount}
-                            totalTokens={summary.totalTokens}
-                            durationMs={summary.durationMs}
-                            errorMessage={summary.errorMessage}
-                            canRetry={canRetry}
-                            isRetrying={canRetry && controller.isRetrying}
-                            onRetry={
-                              canRetry && retryTriggerNodeId
-                                ? () => void controller.handleRetry(retryTriggerNodeId)
-                                : undefined
-                            }
-                            expanded={expandedRunSummaryKeys.has(key)}
-                            onToggle={() => toggleRunSummary(key)}
-                          />
-                        </motion.div>
-                      );
-                    })}
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
-
-            <AnimatePresence initial={false}>
-              {controller.pendingAction?.kind === "send" ? (
-                <motion.div
-                  key="pending-send"
-                  className="flex flex-col gap-1.5"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.15, ease: "easeOut" }}
-                >
-                  <div className="flex justify-end">
-                    <div className="max-w-[88%] rounded-lg bg-accent-foreground px-3 py-2 text-[13px] leading-5 whitespace-pre-wrap text-sidebar-background">
-                      {controller.pendingAction.text}
-                    </div>
-                  </div>
-                  {controller.activeStream?.kind === "send"
-                    ? controller.activeStream.blocks.map((block, blockIndex) => (
-                        <motion.div
-                          key={`send-stream-block:${block.assistantNodeId}:${blockIndex}`}
-                          className="flex flex-col gap-1.5"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          transition={{ duration: 0.15, ease: "easeOut" }}
-                        >
-                          {block.contentOrder.map((entry) =>
-                            entry.kind === "text" ? (
-                              block.assistantText.trim().length > 0 ? (
-                                <div
-                                  key={`send-stream:${block.assistantNodeId}:text`}
-                                  className="text-foreground"
-                                >
-                                  <AiMarkdown
-                                    content={block.assistantText}
-                                    isStreaming
-                                    variant="assistant"
-                                  />
-                                </div>
-                              ) : null
-                            ) : (
-                              <ReasoningTraceCard
-                                key={`send-stream:${block.assistantNodeId}:${entry.id}`}
-                                reasoningText={getReasoningTraceText(
-                                  block.reasoningTrace,
-                                  entry.id,
-                                )}
-                                isStreaming
-                                expanded={expandedReasoningKeys.has(
-                                  `send-stream:${block.assistantNodeId}:${entry.id}`,
-                                )}
-                                onToggle={() =>
-                                  toggleReasoning(
-                                    `send-stream:${block.assistantNodeId}:${entry.id}`,
-                                  )
-                                }
-                              />
-                            ),
-                          )}
-                          {block.toolTrace.length > 0 ? (
-                            <div className="flex flex-col gap-1">
-                              {block.toolTrace.map((entry, index) => (
-                                <ToolTraceCard
-                                  key={`send-stream:${block.assistantNodeId}:${entry.toolCallId ?? entry.toolName}:${index}`}
-                                  entry={entry}
-                                  expanded={expandedToolTraceKeys.has(
-                                    `send-stream:${block.assistantNodeId}:${entry.toolCallId ?? entry.toolName}:${index}`,
-                                  )}
-                                  onToggle={() =>
-                                    toggleToolTrace(
-                                      `send-stream:${block.assistantNodeId}:${entry.toolCallId ?? entry.toolName}:${index}`,
-                                    )
-                                  }
-                                />
-                              ))}
-                            </div>
-                          ) : null}
-                        </motion.div>
-                      ))
-                    : null}
-                  {pendingSendSummary ? (
-                    <RunSummaryRow
-                      status={pendingSendSummary.status}
-                      stepCount={pendingSendSummary.stepCount}
-                      totalTokens={pendingSendSummary.totalTokens}
-                      durationMs={pendingSendSummary.durationMs}
-                      errorMessage={pendingSendSummary.errorMessage}
-                      expanded={expandedRunSummaryKeys.has(pendingSendSummary.key)}
-                      onToggle={() => toggleRunSummary(pendingSendSummary.key)}
-                    />
-                  ) : null}
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
-          </div>
+        messagesViewportPane={
+          <AnimatePresence initial={false} mode="wait">
+            <AiSidebarMessagesViewport
+              key={messagesViewportSessionKey}
+              viewportRef={messagesViewportRef}
+              onViewportScroll={handleMessagesScroll}
+            >
+              <AiSidebarMessagesContent
+                controller={controller}
+                expandedReasoningKeys={expandedReasoningKeys}
+                expandedRunSummaryKeys={expandedRunSummaryKeys}
+                expandedToolTraceKeys={expandedToolTraceKeys}
+                pendingSendSummary={pendingSendSummary}
+                streamedAssistantMessageIds={streamedAssistantMessageIdsRef.current}
+                toggleReasoning={toggleReasoning}
+                toggleRunSummary={toggleRunSummary}
+                toggleToolTrace={toggleToolTrace}
+              />
+            </AiSidebarMessagesViewport>
+          </AnimatePresence>
         }
         composerPane={
           <form className="shrink-0" aria-label="AI 对话输入" onSubmit={controller.handleSubmit}>
@@ -678,8 +327,462 @@ export function AiSidebar({
   );
 }
 
+type AiAssistantController = ReturnType<typeof useAiAssistantController>;
+
+function AiSidebarMessagesViewport({
+  children,
+  viewportRef,
+  onViewportScroll,
+}: {
+  children: ReactNode;
+  viewportRef: { current: HTMLElement | null };
+  onViewportScroll: (_event: Event) => void;
+}) {
+  useEffect(() => {
+    let frameId = 0;
+    let cancelled = false;
+
+    const scrollToBottomWhenReady = (attempt: number) => {
+      if (cancelled) {
+        return;
+      }
+
+      const viewport = viewportRef.current;
+      if (viewport != null) {
+        frameId = requestAnimationFrame(() => {
+          viewport.scrollTop = viewport.scrollHeight;
+        });
+        return;
+      }
+
+      if (attempt >= 8) {
+        return;
+      }
+
+      frameId = requestAnimationFrame(() => {
+        scrollToBottomWhenReady(attempt + 1);
+      });
+    };
+
+    scrollToBottomWhenReady(0);
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frameId);
+    };
+  }, [viewportRef]);
+
+  return (
+    <motion.div
+      className="flex h-full min-h-0 flex-col overflow-hidden"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15, ease: "easeOut" }}
+    >
+      <OverlayScrollbar
+        variant="panel"
+        viewportRef={viewportRef}
+        onViewportScroll={onViewportScroll}
+      >
+        {children}
+      </OverlayScrollbar>
+    </motion.div>
+  );
+}
+
+function AiSidebarMessagesContent({
+  controller,
+  expandedReasoningKeys,
+  expandedRunSummaryKeys,
+  expandedToolTraceKeys,
+  pendingSendSummary,
+  streamedAssistantMessageIds,
+  toggleReasoning,
+  toggleRunSummary,
+  toggleToolTrace,
+}: {
+  controller: AiAssistantController;
+  expandedReasoningKeys: ReadonlySet<string>;
+  expandedRunSummaryKeys: ReadonlySet<string>;
+  expandedToolTraceKeys: ReadonlySet<string>;
+  pendingSendSummary: ReturnType<typeof buildStreamRunSummary> | null;
+  streamedAssistantMessageIds: ReadonlySet<string>;
+  toggleReasoning: (_key: string) => void;
+  toggleRunSummary: (_key: string) => void;
+  toggleToolTrace: (_key: string) => void;
+}) {
+  const visibleMessages = controller.messages.flatMap((message, index) =>
+    message.role === "tool" ? [] : [{ message, index }],
+  );
+
+  return (
+    <div className="flex min-h-full flex-col gap-2 px-3.5 py-2">
+      <AnimatePresence initial={false}>
+        {controller.assistantStateIsInitialLoading && controller.showEmptyState ? (
+          <motion.div
+            key="loading-state"
+            className="rounded-md border border-border bg-sidebar-background px-3 py-2 text-[12px] text-foreground-muted"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+          >
+            正在加载会话...
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence initial={false}>
+        {controller.showEmptyState ? (
+          <motion.div
+            key="empty-state"
+            className="rounded-md border border-border bg-sidebar-background px-3 py-2"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+          >
+            <div className="mb-2 flex items-center gap-2 text-[12px] text-foreground-muted">
+              <span className="icon-[material-symbols--auto-awesome] text-sm text-accent-foreground" />
+              <span>{controller.activeThreadId ? "这个会话还没有对话内容" : "还没有当前会话"}</span>
+            </div>
+            <p className="text-[12px] leading-5 text-foreground-muted">
+              {controller.activeThreadId
+                ? "选择模型后可以直接开始对话。"
+                : "先新建一个会话，或从上方切换到已有会话。"}
+            </p>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence initial={false} mode="popLayout">
+        {visibleMessages.map(({ message, index }) => {
+          const text = getMessageText(message);
+          const assistantContentBlocks = getAssistantContentBlocks(message);
+          const toolTrace = getAssistantToolTrace(controller.messages, index);
+          const isUser = message.role === "user";
+          const showMessageBubble = isUser || text.trim().length > 0;
+          const candidateGroup = controller.getCandidateGroupForNode(message);
+          const streamOverlayForMessage =
+            controller.activeStream?.kind === "retry" &&
+            controller.activeStream.triggerNodeId === message.id
+              ? controller.activeStream
+              : null;
+          const streamSummaryForMessage =
+            streamOverlayForMessage != null ? buildStreamRunSummary(streamOverlayForMessage) : null;
+          const persistedSummaries = getRunSummaryByDisplayNode(
+            controller.runSummaries,
+            message.id,
+          ).filter((summary) => summary.runId !== controller.activeStream?.runId);
+          const shouldAnimateMount = shouldAnimateMessageMount(
+            message.role,
+            message.id,
+            streamedAssistantMessageIds,
+          );
+
+          return (
+            <motion.div
+              key={message.id}
+              className="flex flex-col gap-1.5"
+              initial={shouldAnimateMount ? { opacity: 0 } : false}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15, ease: "easeOut" }}
+            >
+              {isUser ? (
+                showMessageBubble ? (
+                  <div className="flex justify-end">
+                    <div className="max-w-[88%] rounded-lg bg-accent-foreground px-3 py-2 text-[13px] leading-5 whitespace-pre-wrap text-sidebar-background">
+                      {text}
+                    </div>
+                  </div>
+                ) : null
+              ) : null}
+
+              {!isUser
+                ? assistantContentBlocks.map((block) =>
+                    block.kind === "text" ? (
+                      <div key={block.blockId} className="text-foreground">
+                        <AiMarkdown content={block.text} isStreaming={false} variant="assistant" />
+                      </div>
+                    ) : (
+                      <ReasoningTraceCard
+                        key={block.blockId}
+                        reasoningText={block.text}
+                        isStreaming={false}
+                        expanded={expandedReasoningKeys.has(`${message.id}:${block.blockId}`)}
+                        onToggle={() => toggleReasoning(`${message.id}:${block.blockId}`)}
+                      />
+                    ),
+                  )
+                : null}
+
+              {streamOverlayForMessage ? (
+                <div className="flex flex-col gap-1.5">
+                  {streamOverlayForMessage.blocks.map((block, blockIndex) => (
+                    <motion.div
+                      key={`${message.id}:stream-block:${block.assistantNodeId}:${blockIndex}`}
+                      className="flex flex-col gap-1.5"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.15, ease: "easeOut" }}
+                    >
+                      {block.contentOrder.map((entry) =>
+                        entry.kind === "text" ? (
+                          block.assistantText.trim().length > 0 ? (
+                            <div
+                              key={`${message.id}:stream:${block.assistantNodeId}:text`}
+                              className="text-foreground"
+                            >
+                              <AiMarkdown
+                                content={block.assistantText}
+                                isStreaming
+                                variant="assistant"
+                              />
+                            </div>
+                          ) : null
+                        ) : (
+                          <ReasoningTraceCard
+                            key={`${message.id}:stream:${block.assistantNodeId}:${entry.id}`}
+                            reasoningText={getReasoningTraceText(block.reasoningTrace, entry.id)}
+                            isStreaming
+                            expanded={expandedReasoningKeys.has(
+                              `${message.id}:stream:${block.assistantNodeId}:${entry.id}`,
+                            )}
+                            onToggle={() =>
+                              toggleReasoning(
+                                `${message.id}:stream:${block.assistantNodeId}:${entry.id}`,
+                              )
+                            }
+                          />
+                        ),
+                      )}
+                      {block.toolTrace.length > 0 ? (
+                        <div className="flex flex-col gap-1">
+                          {block.toolTrace.map((entry, entryIndex) => (
+                            <ToolTraceCard
+                              key={`${message.id}:stream:${block.assistantNodeId}:${entry.toolCallId ?? entry.toolName}:${entryIndex}`}
+                              entry={entry}
+                              expanded={expandedToolTraceKeys.has(
+                                `${message.id}:stream:${block.assistantNodeId}:${entry.toolCallId ?? entry.toolName}:${entryIndex}`,
+                              )}
+                              onToggle={() =>
+                                toggleToolTrace(
+                                  `${message.id}:stream:${block.assistantNodeId}:${entry.toolCallId ?? entry.toolName}:${entryIndex}`,
+                                )
+                              }
+                            />
+                          ))}
+                        </div>
+                      ) : null}
+                    </motion.div>
+                  ))}
+                </div>
+              ) : null}
+
+              {!isUser && toolTrace.length > 0 ? (
+                <div className="flex flex-col gap-1">
+                  {toolTrace.map((entry, entryIndex) => (
+                    <ToolTraceCard
+                      key={`${message.id}:${entry.toolCallId ?? entry.toolName}:${entryIndex}`}
+                      entry={entry}
+                      expanded={expandedToolTraceKeys.has(
+                        `${message.id}:${entry.toolCallId ?? entry.toolName}:${entryIndex}`,
+                      )}
+                      onToggle={() =>
+                        toggleToolTrace(
+                          `${message.id}:${entry.toolCallId ?? entry.toolName}:${entryIndex}`,
+                        )
+                      }
+                    />
+                  ))}
+                </div>
+              ) : null}
+
+              {candidateGroup ? (
+                <div className="flex items-center gap-1.5">
+                  {candidateGroup.nodes.map((candidate, candidateIndex) => {
+                    const active = candidate.id === candidateGroup.activeNodeId;
+                    return (
+                      <motion.button
+                        key={candidate.id}
+                        type="button"
+                        disabled={active || controller.isThreadBusy}
+                        onClick={() => void controller.handleSelectCandidate(candidate.tipNodeId)}
+                        className={`rounded-md border px-2 py-1 text-[11px] leading-4 ${
+                          active
+                            ? "border-accent-foreground bg-accent-foreground/10 text-accent-foreground"
+                            : "border-border bg-editor-background text-foreground-muted hover:text-foreground"
+                        }`}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.14, ease: "easeOut" }}
+                      >
+                        候选 {candidateIndex + 1}
+                      </motion.button>
+                    );
+                  })}
+                </div>
+              ) : null}
+
+              {streamSummaryForMessage ? (
+                <motion.div
+                  key={streamSummaryForMessage.key}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15, ease: "easeOut" }}
+                >
+                  <RunSummaryRow
+                    status={streamSummaryForMessage.status}
+                    stepCount={streamSummaryForMessage.stepCount}
+                    totalTokens={streamSummaryForMessage.totalTokens}
+                    durationMs={streamSummaryForMessage.durationMs}
+                    errorMessage={streamSummaryForMessage.errorMessage}
+                    expanded={expandedRunSummaryKeys.has(streamSummaryForMessage.key)}
+                    onToggle={() => toggleRunSummary(streamSummaryForMessage.key)}
+                  />
+                </motion.div>
+              ) : null}
+
+              {persistedSummaries.map((summary) => {
+                const key = getRunSummaryKey(summary);
+                const retryTriggerNodeId = summary.triggerNodeId;
+                const canRetry =
+                  summary.status === "failed" &&
+                  controller.retryableRun?.id === summary.runId &&
+                  message.id === summary.displayNodeId;
+
+                return (
+                  <motion.div
+                    key={summary.runId}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15, ease: "easeOut" }}
+                  >
+                    <RunSummaryRow
+                      status={summary.status}
+                      stepCount={summary.stepCount}
+                      totalTokens={summary.totalTokens}
+                      durationMs={summary.durationMs}
+                      errorMessage={summary.errorMessage}
+                      canRetry={canRetry}
+                      isRetrying={canRetry && controller.isRetrying}
+                      onRetry={
+                        canRetry && retryTriggerNodeId
+                          ? () => void controller.handleRetry(retryTriggerNodeId)
+                          : undefined
+                      }
+                      expanded={expandedRunSummaryKeys.has(key)}
+                      onToggle={() => toggleRunSummary(key)}
+                    />
+                  </motion.div>
+                );
+              })}
+            </motion.div>
+          );
+        })}
+      </AnimatePresence>
+
+      <AnimatePresence initial={false}>
+        {controller.pendingAction?.kind === "send" ? (
+          <motion.div
+            key="pending-send"
+            className="flex flex-col gap-1.5"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+          >
+            <div className="flex justify-end">
+              <div className="max-w-[88%] rounded-lg bg-accent-foreground px-3 py-2 text-[13px] leading-5 whitespace-pre-wrap text-sidebar-background">
+                {controller.pendingAction.text}
+              </div>
+            </div>
+            {controller.activeStream?.kind === "send"
+              ? controller.activeStream.blocks.map((block, blockIndex) => (
+                  <motion.div
+                    key={`send-stream-block:${block.assistantNodeId}:${blockIndex}`}
+                    className="flex flex-col gap-1.5"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.15, ease: "easeOut" }}
+                  >
+                    {block.contentOrder.map((entry) =>
+                      entry.kind === "text" ? (
+                        block.assistantText.trim().length > 0 ? (
+                          <div
+                            key={`send-stream:${block.assistantNodeId}:text`}
+                            className="text-foreground"
+                          >
+                            <AiMarkdown
+                              content={block.assistantText}
+                              isStreaming
+                              variant="assistant"
+                            />
+                          </div>
+                        ) : null
+                      ) : (
+                        <ReasoningTraceCard
+                          key={`send-stream:${block.assistantNodeId}:${entry.id}`}
+                          reasoningText={getReasoningTraceText(block.reasoningTrace, entry.id)}
+                          isStreaming
+                          expanded={expandedReasoningKeys.has(
+                            `send-stream:${block.assistantNodeId}:${entry.id}`,
+                          )}
+                          onToggle={() =>
+                            toggleReasoning(`send-stream:${block.assistantNodeId}:${entry.id}`)
+                          }
+                        />
+                      ),
+                    )}
+                    {block.toolTrace.length > 0 ? (
+                      <div className="flex flex-col gap-1">
+                        {block.toolTrace.map((entry, entryIndex) => (
+                          <ToolTraceCard
+                            key={`send-stream:${block.assistantNodeId}:${entry.toolCallId ?? entry.toolName}:${entryIndex}`}
+                            entry={entry}
+                            expanded={expandedToolTraceKeys.has(
+                              `send-stream:${block.assistantNodeId}:${entry.toolCallId ?? entry.toolName}:${entryIndex}`,
+                            )}
+                            onToggle={() =>
+                              toggleToolTrace(
+                                `send-stream:${block.assistantNodeId}:${entry.toolCallId ?? entry.toolName}:${entryIndex}`,
+                              )
+                            }
+                          />
+                        ))}
+                      </div>
+                    ) : null}
+                  </motion.div>
+                ))
+              : null}
+            {pendingSendSummary ? (
+              <RunSummaryRow
+                status={pendingSendSummary.status}
+                stepCount={pendingSendSummary.stepCount}
+                totalTokens={pendingSendSummary.totalTokens}
+                durationMs={pendingSendSummary.durationMs}
+                errorMessage={pendingSendSummary.errorMessage}
+                expanded={expandedRunSummaryKeys.has(pendingSendSummary.key)}
+                onToggle={() => toggleRunSummary(pendingSendSummary.key)}
+              />
+            ) : null}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function isViewportNearBottom(viewport: HTMLElement) {
   return viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop <= 24;
+}
+
+export function getMessagesViewportSessionKey(activeThreadId: string | null) {
+  return activeThreadId ?? "__empty-thread__";
 }
 
 export function shouldAnimateMessageMount(
