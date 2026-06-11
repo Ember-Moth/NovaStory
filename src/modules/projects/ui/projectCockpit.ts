@@ -20,11 +20,11 @@ export function sortProjectBranches<TBranch extends BranchLike>(
 
 export function resolveSelectedBranchId<TBranch extends BranchLike>(
   branches: readonly TBranch[],
-  routeBranchId: string | null,
+  rememberedBranchId: string | null,
   defaultBranchId: string | null,
 ) {
-  if (routeBranchId && branches.some((branch) => branch.id === routeBranchId)) {
-    return routeBranchId;
+  if (rememberedBranchId && branches.some((branch) => branch.id === rememberedBranchId)) {
+    return rememberedBranchId;
   }
 
   const sorted = sortProjectBranches(branches, defaultBranchId);

@@ -7,24 +7,15 @@ import {
   resolveProjectRouteTarget,
 } from "./useCachedProjectRoute";
 
-test("parseAppRoute recognizes home, overview, branches, workspace, settings, and unknown routes", () => {
+test("parseAppRoute recognizes home, project, workspace, settings, and unknown routes", () => {
   expect(parseAppRoute("/")).toEqual({ kind: "home" });
   expect(parseAppRoute("/settings/ai")).toEqual({ kind: "settings" });
   expect(parseAppRoute("/project/project_1")).toEqual({
     kind: "project",
     projectId: "project_1",
-    section: "overview",
   });
-  expect(parseAppRoute("/project/project_1/branches")).toEqual({
-    kind: "projectBranches",
-    projectId: "project_1",
-    branchId: null,
-  });
-  expect(parseAppRoute("/project/project_1/branches/branch_1")).toEqual({
-    kind: "projectBranches",
-    projectId: "project_1",
-    branchId: "branch_1",
-  });
+  expect(parseAppRoute("/project/project_1/branches")).toEqual({ kind: "unknown" });
+  expect(parseAppRoute("/project/project_1/branches/branch_1")).toEqual({ kind: "unknown" });
   expect(parseAppRoute("/project/project_1/workspace/workspace_1")).toEqual({
     kind: "workspace",
     projectId: "project_1",
@@ -37,12 +28,9 @@ test("parseAppRoute accepts non-uuid project and workspace ids", () => {
   expect(parseAppRoute("/project/V1sibl4A5sWB6UlUjzT4w")).toEqual({
     kind: "project",
     projectId: "V1sibl4A5sWB6UlUjzT4w",
-    section: "overview",
   });
   expect(parseAppRoute("/project/V1sibl4A5sWB6UlUjzT4w/branches/branch_4A5sWB6UlUjzT4w")).toEqual({
-    kind: "projectBranches",
-    projectId: "V1sibl4A5sWB6UlUjzT4w",
-    branchId: "branch_4A5sWB6UlUjzT4w",
+    kind: "unknown",
   });
   expect(
     parseAppRoute("/project/V1sibl4A5sWB6UlUjzT4w/workspace/workspace_4A5sWB6UlUjzT4w"),
@@ -65,17 +53,6 @@ test("resolveCachedWorkspaceRoute clears mounted workspace on home route", () =>
       {
         kind: "project",
         projectId: "project_1",
-        section: "overview",
-      },
-      lastWorkspaceRoute,
-    ),
-  ).toEqual(lastWorkspaceRoute);
-  expect(
-    resolveCachedWorkspaceRoute(
-      {
-        kind: "projectBranches",
-        projectId: "project_1",
-        branchId: "branch_1",
       },
       lastWorkspaceRoute,
     ),
@@ -107,17 +84,6 @@ test("resolveLastWorkspaceRoute clears recent workspace on home route", () => {
       {
         kind: "project",
         projectId: "project_1",
-        section: "overview",
-      },
-      lastWorkspaceRoute,
-    ),
-  ).toEqual(lastWorkspaceRoute);
-  expect(
-    resolveLastWorkspaceRoute(
-      {
-        kind: "projectBranches",
-        projectId: "project_1",
-        branchId: null,
       },
       lastWorkspaceRoute,
     ),
@@ -138,16 +104,9 @@ test("resolveLastWorkspaceRoute clears recent workspace on home route", () => {
 });
 
 test("resolveProjectRouteTarget reopens the current or last project detail route", () => {
-  expect(
-    resolveProjectRouteTarget(
-      {
-        kind: "projectBranches",
-        projectId: "project_1",
-        branchId: "branch_1",
-      },
-      null,
-    ),
-  ).toBe("/project/project_1");
+  expect(resolveProjectRouteTarget({ kind: "project", projectId: "project_1" }, null)).toBe(
+    "/project/project_1",
+  );
 
   expect(
     resolveProjectRouteTarget(

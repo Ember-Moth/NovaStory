@@ -20,7 +20,7 @@ test("sortProjectBranches keeps the default branch first, then sorts by updatedA
   ]);
 });
 
-test("resolveSelectedBranchId falls back to the default branch, then most recent branch", () => {
+test("resolveSelectedBranchId prefers remembered branch, then default branch, then most recent branch", () => {
   expect(resolveSelectedBranchId(branches, null, "branch_default")).toBe("branch_default");
   expect(resolveSelectedBranchId(branches, "branch_new", "branch_default")).toBe("branch_new");
   expect(resolveSelectedBranchId(branches, "missing", null)).toBe("branch_new");

@@ -1,15 +1,22 @@
 import { skipToken } from "@codehz/rpc/react";
-import { useAtomValue, useSetAtom } from "jotai";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 
 import { AppShell, AppSidebar } from "@/app/shell/AppShell";
-import { lastProjectIdAtom, lastWorkspaceRouteAtom } from "@/app/state/lastProject";
+import {
+  lastProjectIdAtom,
+  lastWorkspaceRouteAtom,
+  projectBranchSelectionAtom,
+} from "@/app/state/lastProject";
+import { SidebarSection } from "@/modules/workspace/ui/editor/components/SidebarSection";
 import { rpc } from "@/rpc/client";
-import { createProjectId } from "@/shared/lib/domain";
 import { cn } from "@/shared/lib/cn";
+import { createProjectId } from "@/shared/lib/domain";
 import { FullPageMessage } from "@/shared/ui/FullPageMessage";
+import { IconButton } from "@/shared/ui/IconButton";
 import { LoadingBlock } from "@/shared/ui/Loading";
+import { OverlayScrollbar } from "@/shared/ui/OverlayScrollbar";
 import { SidebarListRow } from "@/shared/ui/tree/SidebarListRow";
 
 import {
@@ -45,19 +52,12 @@ const buttonBase =
 const secondaryButton = `${buttonBase} border border-border bg-sidebar-background text-foreground hover:bg-list-hover-background`;
 const primaryButton = `${buttonBase} bg-accent-background text-foreground hover:brightness-110`;
 
-export function ProjectsPage({
-  projectId = null,
-  section = "overview",
-  branchId = null,
-}: {
-  projectId?: string | null;
-  section?: "overview" | "branches";
-  branchId?: string | null;
-}) {
+export function ProjectsPage({ projectId = null }: { projectId?: string | null }) {
   const [, navigate] = useLocation();
   const lastProjectId = useAtomValue(lastProjectIdAtom);
   const setLastProjectId = useSetAtom(lastProjectIdAtom);
   const setLastWorkspaceRoute = useSetAtom(lastWorkspaceRouteAtom);
+  const [projectBranchSelection, setProjectBranchSelection] = useAtom(projectBranchSelectionAtom);
 
   const createProjectDialogRef = useRef<HTMLDialogElement>(null);
   const createBranchDialogRef = useRef<HTMLDialogElement>(null);
@@ -97,12 +97,14 @@ export function ProjectsPage({
   const branches = branchesQuery.data ?? [];
   const workspaces = workspacesQuery.data ?? [];
   const sortedBranches = sortProjectBranches(branches, project?.defaultBranchId ?? null);
+  const rememberedBranchId = projectId ? (projectBranchSelection[projectId] ?? null) : null;
   const selectedBranchId = resolveSelectedBranchId(
     sortedBranches,
-    branchId,
+    rememberedBranchId,
     project?.defaultBranchId ?? null,
   );
   const selectedBranch = sortedBranches.find((item) => item.id === selectedBranchId) ?? null;
+
   const commitHistoryQuery = rpc.useQuery(
     "commits.history",
     selectedBranchId ? { branchId: selectedBranchId } : skipToken,
@@ -116,6 +118,9 @@ export function ProjectsPage({
   const selectedWorkspace = selectedBranch ? (workspaceMap.get(selectedBranch.id) ?? null) : null;
   const defaultWorkspace =
     project?.defaultBranchId != null ? (workspaceMap.get(project.defaultBranchId) ?? null) : null;
+  const defaultBranch = project
+    ? (sortedBranches.find((item) => item.id === project.defaultBranchId) ?? null)
+    : null;
 
   const createProject = rpc.useMutation<"projects.create", ProjectMutationContext>(
     "projects.create",
@@ -198,9 +203,6 @@ export function ProjectsPage({
   const createCommit = rpc.useMutation("commits.create");
 
   const projectList = [...(projectsQuery.data ?? [])].sort((a, b) => b.updatedAt - a.updatedAt);
-  const defaultBranch = project
-    ? (sortedBranches.find((item) => item.id === project.defaultBranchId) ?? null)
-    : null;
 
   useEffect(() => {
     if (!project) {
@@ -219,6 +221,23 @@ export function ProjectsPage({
     setCommitMessage("");
     setCommitError(null);
   }, [selectedBranchId]);
+
+  useEffect(() => {
+    if (!projectId) {
+      return;
+    }
+
+    setProjectBranchSelection((current) => {
+      if ((current[projectId] ?? null) === selectedBranchId) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [projectId]: selectedBranchId,
+      };
+    });
+  }, [projectId, selectedBranchId, setProjectBranchSelection]);
 
   const openCreateProjectDialog = () => {
     setFormError(null);
@@ -264,6 +283,29 @@ export function ProjectsPage({
     setForkBranchError(null);
   };
 
+  const rememberSelectedBranch = (nextBranchId: string | null) => {
+    if (!projectId) {
+      return;
+    }
+
+    setProjectBranchSelection((current) => ({
+      ...current,
+      [projectId]: nextBranchId,
+    }));
+  };
+
+  const forgetProjectBranch = (nextProjectId: string) => {
+    setProjectBranchSelection((current) => {
+      if (!(nextProjectId in current)) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[nextProjectId];
+      return next;
+    });
+  };
+
   const handleCreateProject = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmedName = name.trim();
@@ -300,6 +342,7 @@ export function ProjectsPage({
       await deleteProject.mutate({ id });
       setLastProjectId((current) => (current === id ? null : current));
       setLastWorkspaceRoute((current) => (current?.projectId === id ? null : current));
+      forgetProjectBranch(id);
       if (projectId === id) {
         navigate("/");
       }
@@ -372,8 +415,9 @@ export function ProjectsPage({
         name: trimmedName,
         fromCommitId: sourceCommitId,
       });
+      rememberSelectedBranch(workspace.branchId);
       closeCreateBranchDialog();
-      navigate(`/project/${project.id}/branches/${workspace.branchId}`);
+      navigate(`/project/${project.id}`);
     } catch (mutationError) {
       setNewBranchError(
         mutationError instanceof Error ? mutationError.message : "创建分支失败，请稍后重试。",
@@ -399,8 +443,9 @@ export function ProjectsPage({
         name: trimmedName,
         fromCommitId: forkCommit.id,
       });
+      rememberSelectedBranch(workspace.branchId);
       closeForkDialog();
-      navigate(`/project/${project.id}/branches/${workspace.branchId}`);
+      navigate(`/project/${project.id}`);
     } catch (mutationError) {
       setForkBranchError(
         mutationError instanceof Error ? mutationError.message : "Fork 分支失败，请稍后重试。",
@@ -443,12 +488,20 @@ export function ProjectsPage({
       return;
     }
 
+    const remainingBranches = sortedBranches.filter((item) => item.id !== branch.id);
+    const nextSelectedBranchId = resolveSelectedBranchId(
+      remainingBranches,
+      selectedBranchId === branch.id ? null : selectedBranchId,
+      project.defaultBranchId,
+    );
+
     await deleteBranch.mutate({
       projectId: project.id,
       branchId: branch.id,
     });
 
-    navigate("/project/" + project.id + "/branches");
+    rememberSelectedBranch(nextSelectedBranchId);
+    navigate(`/project/${project.id}`);
   };
 
   const handleSetDefaultBranch = async (branch: BranchRow) => {
@@ -471,12 +524,27 @@ export function ProjectsPage({
       <AppShell
         active="home"
         sidebar={
-          projectId ? (
-            <ProjectCockpitSidebar
-              projectName={project?.name ?? "项目驾驶舱"}
-              section={section}
-              onOpenOverview={() => navigate(`/project/${projectId}`)}
-              onOpenBranches={() => navigate(`/project/${projectId}/branches`)}
+          projectId && project ? (
+            <ProjectWorkbenchSidebar
+              project={project}
+              branches={sortedBranches}
+              branchesLoading={branchesQuery.isInitialLoading && sortedBranches.length === 0}
+              branchesError={branchesQuery.error?.message ?? null}
+              selectedBranch={selectedBranch}
+              defaultBranch={defaultBranch}
+              defaultWorkspace={defaultWorkspace}
+              detailName={detailName}
+              detailDescription={detailDescription}
+              detailError={detailError ?? updateProject.error?.message ?? null}
+              isSaving={updateProject.isPending}
+              onNameChange={setDetailName}
+              onDescriptionChange={setDetailDescription}
+              onMetadataCommit={() => void commitProjectMetadata()}
+              onSelectBranch={rememberSelectedBranch}
+              onCreateBranch={openCreateBranchDialog}
+              onOpenWorkspace={(workspaceId) =>
+                navigate(`/project/${project.id}/workspace/${workspaceId}`)
+              }
             />
           ) : undefined
         }
@@ -496,7 +564,7 @@ export function ProjectsPage({
         ) : projectQuery.isInitialLoading && !project ? (
           <FullPageMessage
             icon="icon-[material-symbols--sync] animate-spin"
-            title="正在加载项目驾驶舱"
+            title="正在加载项目工作台"
             description="正在读取项目、分支和工作副本。"
             embedded
           />
@@ -508,16 +576,8 @@ export function ProjectsPage({
             embedded
           />
         ) : project ? (
-          <ProjectCockpitView
+          <ProjectWorkbenchMain
             project={project}
-            section={section}
-            detailName={detailName}
-            detailDescription={detailDescription}
-            detailError={detailError ?? updateProject.error?.message ?? null}
-            isSaving={updateProject.isPending}
-            branches={sortedBranches}
-            branchesLoading={branchesQuery.isInitialLoading && sortedBranches.length === 0}
-            branchesError={branchesQuery.error?.message ?? null}
             selectedBranch={selectedBranch}
             selectedWorkspace={selectedWorkspace}
             commitHistory={commitHistory}
@@ -526,22 +586,12 @@ export function ProjectsPage({
             commitMessage={commitMessage}
             commitError={commitError ?? createCommit.error?.message ?? null}
             isCommitting={createCommit.isPending}
-            defaultBranch={defaultBranch}
-            defaultWorkspace={defaultWorkspace}
             isSettingDefault={setDefaultBranch.isPending}
             isDeletingBranch={deleteBranch.isPending}
             onClose={() => navigate("/")}
-            onNameChange={setDetailName}
-            onDescriptionChange={setDetailDescription}
-            onMetadataCommit={() => void commitProjectMetadata()}
-            onOpenBranches={() => navigate(`/project/${project.id}/branches`)}
-            onOpenBranch={(nextBranchId) =>
-              navigate(`/project/${project.id}/branches/${nextBranchId}`)
-            }
             onOpenWorkspace={(workspaceId) =>
               navigate(`/project/${project.id}/workspace/${workspaceId}`)
             }
-            onCreateBranch={openCreateBranchDialog}
             onSetDefaultBranch={handleSetDefaultBranch}
             onDeleteBranch={() =>
               selectedBranch ? void handleDeleteBranch(selectedBranch) : undefined
@@ -662,7 +712,7 @@ function ProjectListView({
   isLoading: boolean;
   isDeleting: boolean;
   deletingId: string | null;
-  renderError: React.ReactNode;
+  renderError: ReactNode;
   onCreateProject: () => void;
   onOpenProject: (_projectId: string) => void;
   onDeleteProject: (_projectId: string, _projectName: string) => void;
@@ -746,182 +796,178 @@ function ProjectListView({
   );
 }
 
-function ProjectCockpitSidebar({
-  projectName,
-  section,
-  onOpenOverview,
-  onOpenBranches,
+function ProjectWorkbenchSidebar({
+  project,
+  branches,
+  branchesLoading,
+  branchesError,
+  selectedBranch,
+  defaultBranch,
+  defaultWorkspace,
+  detailName,
+  detailDescription,
+  detailError,
+  isSaving,
+  onNameChange,
+  onDescriptionChange,
+  onMetadataCommit,
+  onSelectBranch,
+  onCreateBranch,
+  onOpenWorkspace,
 }: {
-  projectName: string;
-  section: "overview" | "branches";
-  onOpenOverview: () => void;
-  onOpenBranches: () => void;
+  project: ProjectRow;
+  branches: BranchList;
+  branchesLoading: boolean;
+  branchesError: string | null;
+  selectedBranch: BranchRow | null;
+  defaultBranch: BranchRow | null;
+  defaultWorkspace: WorkspaceRow | null;
+  detailName: string;
+  detailDescription: string;
+  detailError: string | null;
+  isSaving: boolean;
+  onNameChange: (_value: string) => void;
+  onDescriptionChange: (_value: string) => void;
+  onMetadataCommit: () => void;
+  onSelectBranch: (_branchId: string | null) => void;
+  onCreateBranch: () => void;
+  onOpenWorkspace: (_workspaceId: string) => void;
 }) {
+  const [branchesCollapsed, setBranchesCollapsed] = useState(false);
+  const [metaCollapsed, setMetaCollapsed] = useState(false);
+
   return (
     <AppSidebar>
       <div className="border-b border-border px-3 py-3">
         <div className="text-[11px] font-semibold tracking-wider text-foreground-muted uppercase">
-          项目驾驶舱
+          项目工作台
         </div>
-        <div className="mt-1 truncate text-sm font-medium text-foreground">{projectName}</div>
+        <div className="mt-1 truncate text-sm font-medium text-foreground">{project.name}</div>
       </div>
 
-      <div className="py-2">
-        <SidebarListRow
-          isActive={section === "overview"}
-          onClick={onOpenOverview}
-          icon={
-            <span className="icon-[material-symbols--dashboard] text-base text-foreground-muted" />
-          }
-          label="Overview"
-        />
-        <SidebarListRow
-          isActive={section === "branches"}
-          onClick={onOpenBranches}
-          icon={
-            <span className="icon-[material-symbols--account-tree] text-base text-foreground-muted" />
-          }
-          label="Branches"
-        />
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className={cn("min-h-0", branchesCollapsed ? "shrink-0" : "flex-1")}>
+          <SidebarSection
+            title={`Branches · ${branches.length}`}
+            actions={
+              <IconButton
+                icon="icon-[material-symbols--add]"
+                title="新建分支"
+                onClick={onCreateBranch}
+              />
+            }
+            collapsed={branchesCollapsed}
+            onToggleCollapse={() => setBranchesCollapsed((current) => !current)}
+          >
+            <ProjectBranchListPanel
+              project={project}
+              branches={branches}
+              branchesLoading={branchesLoading}
+              branchesError={branchesError}
+              selectedBranch={selectedBranch}
+              onSelectBranch={onSelectBranch}
+            />
+          </SidebarSection>
+        </div>
+
+        <div
+          className={cn("min-h-0 border-t border-border", metaCollapsed ? "shrink-0" : "flex-1")}
+        >
+          <SidebarSection
+            title="Project Meta"
+            collapsed={metaCollapsed}
+            onToggleCollapse={() => setMetaCollapsed((current) => !current)}
+          >
+            <ProjectMetaPanel
+              project={project}
+              detailName={detailName}
+              detailDescription={detailDescription}
+              detailError={detailError}
+              isSaving={isSaving}
+              defaultBranch={defaultBranch}
+              defaultWorkspace={defaultWorkspace}
+              branchCount={branches.length}
+              onNameChange={onNameChange}
+              onDescriptionChange={onDescriptionChange}
+              onMetadataCommit={onMetadataCommit}
+              onOpenWorkspace={onOpenWorkspace}
+            />
+          </SidebarSection>
+        </div>
       </div>
     </AppSidebar>
   );
 }
 
-function ProjectCockpitView({
+function ProjectBranchListPanel({
   project,
-  section,
-  detailName,
-  detailDescription,
-  detailError,
-  isSaving,
   branches,
   branchesLoading,
   branchesError,
   selectedBranch,
-  selectedWorkspace,
-  commitHistory,
-  commitHistoryLoading,
-  commitHistoryError,
-  commitMessage,
-  commitError,
-  isCommitting,
-  defaultBranch,
-  defaultWorkspace,
-  isSettingDefault,
-  isDeletingBranch,
-  onClose,
-  onNameChange,
-  onDescriptionChange,
-  onMetadataCommit,
-  onOpenBranches,
-  onOpenBranch,
-  onOpenWorkspace,
-  onCreateBranch,
-  onSetDefaultBranch,
-  onDeleteBranch,
-  onOpenFork,
-  onCommitMessageChange,
-  onSubmitCommit,
+  onSelectBranch,
 }: {
   project: ProjectRow;
-  section: "overview" | "branches";
-  detailName: string;
-  detailDescription: string;
-  detailError: string | null;
-  isSaving: boolean;
   branches: BranchList;
   branchesLoading: boolean;
   branchesError: string | null;
   selectedBranch: BranchRow | null;
-  selectedWorkspace: WorkspaceRow | null;
-  commitHistory: CommitHistory;
-  commitHistoryLoading: boolean;
-  commitHistoryError: string | null;
-  commitMessage: string;
-  commitError: string | null;
-  isCommitting: boolean;
-  defaultBranch: BranchRow | null;
-  defaultWorkspace: WorkspaceRow | null;
-  isSettingDefault: boolean;
-  isDeletingBranch: boolean;
-  onClose: () => void;
-  onNameChange: (_value: string) => void;
-  onDescriptionChange: (_value: string) => void;
-  onMetadataCommit: () => void;
-  onOpenBranches: () => void;
-  onOpenBranch: (_branchId: string) => void;
-  onOpenWorkspace: (_workspaceId: string) => void;
-  onCreateBranch: () => void;
-  onSetDefaultBranch: (_branch: BranchRow) => void;
-  onDeleteBranch: () => void;
-  onOpenFork: (_commit: CommitRow) => void;
-  onCommitMessageChange: (_value: string) => void;
-  onSubmitCommit: (_event: FormEvent<HTMLFormElement>) => void;
+  onSelectBranch: (_branchId: string | null) => void;
 }) {
-  return (
-    <div className="flex h-full flex-col overflow-hidden">
-      <PageHeader
-        icon="icon-[material-symbols--folder-open]"
-        title={project.name}
-        subtitle={section === "overview" ? "Overview" : "Branches"}
-        trailing={
-          <button type="button" onClick={onClose} className={secondaryButton}>
-            <span className="icon-[material-symbols--close] text-sm" />
-            关闭项目
-          </button>
-        }
-      />
-
-      <div className="flex-1 overflow-y-auto p-6">
-        {section === "overview" ? (
-          <OverviewSection
-            project={project}
-            detailName={detailName}
-            detailDescription={detailDescription}
-            detailError={detailError}
-            isSaving={isSaving}
-            defaultBranch={defaultBranch}
-            defaultWorkspace={defaultWorkspace}
-            branchCount={branches.length}
-            onNameChange={onNameChange}
-            onDescriptionChange={onDescriptionChange}
-            onMetadataCommit={onMetadataCommit}
-            onOpenBranches={onOpenBranches}
-            onOpenWorkspace={(workspaceId) => onOpenWorkspace(workspaceId)}
-          />
-        ) : (
-          <BranchesSection
-            project={project}
-            branches={branches}
-            branchesLoading={branchesLoading}
-            branchesError={branchesError}
-            selectedBranch={selectedBranch}
-            selectedWorkspace={selectedWorkspace}
-            commitHistory={commitHistory}
-            commitHistoryLoading={commitHistoryLoading}
-            commitHistoryError={commitHistoryError}
-            commitMessage={commitMessage}
-            commitError={commitError}
-            isCommitting={isCommitting}
-            isSettingDefault={isSettingDefault}
-            isDeletingBranch={isDeletingBranch}
-            onOpenBranch={onOpenBranch}
-            onCreateBranch={onCreateBranch}
-            onSetDefaultBranch={onSetDefaultBranch}
-            onDeleteBranch={onDeleteBranch}
-            onOpenWorkspace={onOpenWorkspace}
-            onOpenFork={onOpenFork}
-            onCommitMessageChange={onCommitMessageChange}
-            onSubmitCommit={onSubmitCommit}
-          />
-        )}
+  if (branchesError) {
+    return (
+      <div className="p-3">
+        <InlineError message={branchesError} />
       </div>
+    );
+  }
+
+  if (branchesLoading) {
+    return (
+      <div className="p-3">
+        <LoadingBlock label="正在加载分支..." />
+      </div>
+    );
+  }
+
+  if (branches.length === 0) {
+    return (
+      <div className="p-3">
+        <div className="rounded-md border border-dashed border-border bg-editor-background px-4 py-8 text-sm text-foreground-muted">
+          当前项目还没有 branch，先创建一个分支开始工作。
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="py-1">
+      {branches.map((branch) => (
+        <SidebarListRow
+          key={branch.id}
+          isActive={branch.id === selectedBranch?.id}
+          onClick={() => onSelectBranch(branch.id)}
+          icon={
+            <span className="icon-[material-symbols--fork-right] text-base text-foreground-muted" />
+          }
+          label={
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="truncate">{branch.name}</span>
+              {project.defaultBranchId === branch.id ? (
+                <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-accent-foreground">
+                  默认
+                </span>
+              ) : null}
+            </div>
+          }
+          trailing={branch.headCommitId ? shortId(branch.headCommitId) : "空分支"}
+        />
+      ))}
     </div>
   );
 }
 
-function OverviewSection({
+function ProjectMetaPanel({
   project,
   detailName,
   detailDescription,
@@ -933,7 +979,6 @@ function OverviewSection({
   onNameChange,
   onDescriptionChange,
   onMetadataCommit,
-  onOpenBranches,
   onOpenWorkspace,
 }: {
   project: ProjectRow;
@@ -947,152 +992,125 @@ function OverviewSection({
   onNameChange: (_value: string) => void;
   onDescriptionChange: (_value: string) => void;
   onMetadataCommit: () => void;
-  onOpenBranches: () => void;
   onOpenWorkspace: (_workspaceId: string) => void;
 }) {
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-      <section className="rounded-xl border border-border bg-sidebar-background p-5 shadow-sm">
-        <div className="flex items-center gap-2">
-          <span className="icon-[material-symbols--info] text-base text-accent-foreground" />
-          <h2 className="text-sm font-semibold text-foreground">基础信息</h2>
+    <OverlayScrollbar className="h-full min-h-0 w-full">
+      <div className="space-y-4 p-3">
+        <div className="flex items-center gap-2 text-xs text-foreground-muted">
           {isSaving ? (
-            <span className="ml-auto inline-flex items-center gap-1 text-xs text-foreground-muted">
+            <>
               <span className="icon-[material-symbols--sync] animate-spin text-sm" />
               保存中
-            </span>
+            </>
           ) : (
-            <span className="ml-auto text-xs text-foreground-muted">失焦或回车保存</span>
+            <>
+              <span className="icon-[material-symbols--edit] text-sm" />
+              失焦或回车保存
+            </>
           )}
         </div>
 
-        <div className="mt-4 grid gap-4">
-          <label className="grid gap-1.5">
-            <span className="text-xs font-medium text-foreground-muted">项目名</span>
-            <input
-              value={detailName}
-              disabled={isSaving}
-              onChange={(event) => onNameChange(event.target.value)}
-              onBlur={onMetadataCommit}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  event.currentTarget.blur();
-                }
-              }}
-              className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-sm text-foreground transition outline-none focus:border-accent-foreground disabled:cursor-wait disabled:opacity-70"
-            />
-          </label>
+        <label className="grid gap-1.5">
+          <span className="text-xs font-medium text-foreground-muted">项目名</span>
+          <input
+            value={detailName}
+            disabled={isSaving}
+            onChange={(event) => onNameChange(event.target.value)}
+            onBlur={onMetadataCommit}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                event.currentTarget.blur();
+              }
+            }}
+            className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-sm text-foreground transition outline-none focus:border-accent-foreground disabled:cursor-wait disabled:opacity-70"
+          />
+        </label>
 
-          <label className="grid gap-1.5">
-            <span className="text-xs font-medium text-foreground-muted">描述</span>
-            <textarea
-              value={detailDescription}
-              disabled={isSaving}
-              rows={4}
-              onChange={(event) => onDescriptionChange(event.target.value)}
-              onBlur={onMetadataCommit}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  event.currentTarget.blur();
-                }
-              }}
-              className="w-full resize-y rounded-md border border-border bg-editor-background px-3 py-2 text-sm leading-relaxed text-foreground transition outline-none focus:border-accent-foreground disabled:cursor-wait disabled:opacity-70"
-              placeholder="为这个项目补充背景、目标或当前进度。"
-            />
-            <span className="text-[11px] text-foreground-muted">
-              `Enter` 保存，`Shift+Enter` 换行。
-            </span>
-          </label>
+        <label className="grid gap-1.5">
+          <span className="text-xs font-medium text-foreground-muted">描述</span>
+          <textarea
+            value={detailDescription}
+            disabled={isSaving}
+            rows={5}
+            onChange={(event) => onDescriptionChange(event.target.value)}
+            onBlur={onMetadataCommit}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                event.currentTarget.blur();
+              }
+            }}
+            className="w-full resize-y rounded-md border border-border bg-editor-background px-3 py-2 text-sm leading-relaxed text-foreground transition outline-none focus:border-accent-foreground disabled:cursor-wait disabled:opacity-70"
+            placeholder="为这个项目补充背景、目标或当前进度。"
+          />
+          <span className="text-[11px] text-foreground-muted">
+            `Enter` 保存，`Shift+Enter` 换行。
+          </span>
+        </label>
 
-          {detailError ? <InlineError message={detailError} /> : null}
+        {detailError ? <InlineError message={detailError} /> : null}
 
-          <div className="text-xs text-foreground-muted">
-            上次更新于 {dateFormatter.format(project.updatedAt)}
+        <div className="rounded-md border border-border bg-editor-background p-3">
+          <div className="text-[11px] tracking-wide text-foreground-muted/70 uppercase">
+            Default Branch
           </div>
-        </div>
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-        <div className="rounded-xl border border-border bg-sidebar-background p-5 shadow-sm">
-          <div className="flex items-center gap-2">
-            <span className="icon-[material-symbols--target] text-base text-accent-foreground" />
-            <h2 className="text-sm font-semibold text-foreground">默认分支</h2>
-          </div>
-
-          <div className="mt-4 flex flex-col gap-4">
+          <div className="mt-2">
             {defaultBranch ? (
               <>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-foreground">
-                      {defaultBranch.name}
-                    </span>
-                    <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-accent-foreground">
-                      默认
-                    </span>
-                  </div>
-                  <div className="mt-1 text-xs text-foreground-muted">
-                    {defaultBranch.headCommitId
-                      ? `HEAD ${shortId(defaultBranch.headCommitId)}`
-                      : "还没有提交历史"}
-                  </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-foreground">{defaultBranch.name}</span>
+                  <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-accent-foreground">
+                    默认
+                  </span>
                 </div>
-
+                <div className="mt-1 text-xs text-foreground-muted">
+                  {defaultBranch.headCommitId
+                    ? `HEAD ${shortId(defaultBranch.headCommitId)}`
+                    : "还没有提交历史"}
+                </div>
                 {defaultWorkspace ? (
                   <button
                     type="button"
                     onClick={() => onOpenWorkspace(defaultWorkspace.id)}
-                    className={primaryButton}
+                    className={cn(primaryButton, "mt-3 w-full justify-center")}
                   >
                     <span className="icon-[material-symbols--edit] text-base" />
                     打开默认分支工作区
                   </button>
                 ) : (
-                  <div className="rounded-md border border-dashed border-border bg-editor-background px-3 py-3 text-sm text-foreground-muted">
-                    默认分支当前没有对应 workspace，只能先在 Branches 里只读查看。
+                  <div className="mt-3 rounded-md border border-dashed border-border bg-sidebar-background px-3 py-3 text-sm text-foreground-muted">
+                    默认分支当前没有对应 workspace。
                   </div>
                 )}
               </>
             ) : (
-              <div className="rounded-md border border-dashed border-border bg-editor-background px-3 py-3 text-sm text-foreground-muted">
-                当前项目还没有默认分支。
-              </div>
+              <div className="text-sm text-foreground-muted">当前项目还没有默认分支。</div>
             )}
           </div>
         </div>
 
-        <div className="rounded-xl border border-border bg-sidebar-background p-5 shadow-sm">
-          <div className="flex items-center gap-2">
-            <span className="icon-[material-symbols--account-tree] text-base text-accent-foreground" />
-            <h2 className="text-sm font-semibold text-foreground">仓库摘要</h2>
-          </div>
-
-          <div className="mt-4 grid gap-4">
-            <SummaryMetric label="Branch 数量" value={String(branchCount)} />
-            <SummaryMetric
-              label="默认分支来源"
-              value={
-                defaultBranch?.forkedFromCommitId ? shortId(defaultBranch.forkedFromCommitId) : "—"
-              }
-            />
-            <button type="button" onClick={onOpenBranches} className={secondaryButton}>
-              <span className="icon-[material-symbols--arrow-forward] text-base" />
-              进入 Branches
-            </button>
+        <div className="rounded-md border border-border bg-editor-background p-3">
+          <div className="text-[11px] tracking-wide text-foreground-muted/70 uppercase">Stats</div>
+          <div className="mt-2 space-y-2 text-sm text-foreground">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-foreground-muted">Branch 数量</span>
+              <span>{branchCount}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-foreground-muted">上次更新</span>
+              <span className="text-right text-xs">{dateFormatter.format(project.updatedAt)}</span>
+            </div>
           </div>
         </div>
-      </section>
-    </div>
+      </div>
+    </OverlayScrollbar>
   );
 }
 
-function BranchesSection({
+function ProjectWorkbenchMain({
   project,
-  branches,
-  branchesLoading,
-  branchesError,
   selectedBranch,
   selectedWorkspace,
   commitHistory,
@@ -1103,19 +1121,15 @@ function BranchesSection({
   isCommitting,
   isSettingDefault,
   isDeletingBranch,
-  onOpenBranch,
-  onCreateBranch,
+  onClose,
+  onOpenWorkspace,
   onSetDefaultBranch,
   onDeleteBranch,
-  onOpenWorkspace,
   onOpenFork,
   onCommitMessageChange,
   onSubmitCommit,
 }: {
   project: ProjectRow;
-  branches: BranchList;
-  branchesLoading: boolean;
-  branchesError: string | null;
   selectedBranch: BranchRow | null;
   selectedWorkspace: WorkspaceRow | null;
   commitHistory: CommitHistory;
@@ -1126,241 +1140,267 @@ function BranchesSection({
   isCommitting: boolean;
   isSettingDefault: boolean;
   isDeletingBranch: boolean;
-  onOpenBranch: (_branchId: string) => void;
-  onCreateBranch: () => void;
+  onClose: () => void;
+  onOpenWorkspace: (_workspaceId: string) => void;
   onSetDefaultBranch: (_branch: BranchRow) => void;
   onDeleteBranch: () => void;
-  onOpenWorkspace: (_workspaceId: string) => void;
   onOpenFork: (_commit: CommitRow) => void;
   onCommitMessageChange: (_value: string) => void;
   onSubmitCommit: (_event: FormEvent<HTMLFormElement>) => void;
 }) {
-  const workspaceMissing = selectedBranch != null && selectedWorkspace == null;
+  return (
+    <div className="flex h-full flex-col overflow-hidden">
+      <PageHeader
+        icon="icon-[material-symbols--folder-open]"
+        title={project.name}
+        subtitle={selectedBranch ? `Branch · ${selectedBranch.name}` : "Branch Workspace"}
+        trailing={
+          <button type="button" onClick={onClose} className={secondaryButton}>
+            <span className="icon-[material-symbols--close] text-sm" />
+            关闭项目
+          </button>
+        }
+      />
+
+      <div className="flex-1 overflow-y-auto p-6">
+        <BranchDetailPanel
+          project={project}
+          selectedBranch={selectedBranch}
+          selectedWorkspace={selectedWorkspace}
+          commitHistory={commitHistory}
+          commitHistoryLoading={commitHistoryLoading}
+          commitHistoryError={commitHistoryError}
+          commitMessage={commitMessage}
+          commitError={commitError}
+          isCommitting={isCommitting}
+          isSettingDefault={isSettingDefault}
+          isDeletingBranch={isDeletingBranch}
+          onOpenWorkspace={onOpenWorkspace}
+          onSetDefaultBranch={onSetDefaultBranch}
+          onDeleteBranch={onDeleteBranch}
+          onOpenFork={onOpenFork}
+          onCommitMessageChange={onCommitMessageChange}
+          onSubmitCommit={onSubmitCommit}
+        />
+      </div>
+    </div>
+  );
+}
+
+function BranchDetailPanel({
+  project,
+  selectedBranch,
+  selectedWorkspace,
+  commitHistory,
+  commitHistoryLoading,
+  commitHistoryError,
+  commitMessage,
+  commitError,
+  isCommitting,
+  isSettingDefault,
+  isDeletingBranch,
+  onOpenWorkspace,
+  onSetDefaultBranch,
+  onDeleteBranch,
+  onOpenFork,
+  onCommitMessageChange,
+  onSubmitCommit,
+}: {
+  project: ProjectRow;
+  selectedBranch: BranchRow | null;
+  selectedWorkspace: WorkspaceRow | null;
+  commitHistory: CommitHistory;
+  commitHistoryLoading: boolean;
+  commitHistoryError: string | null;
+  commitMessage: string;
+  commitError: string | null;
+  isCommitting: boolean;
+  isSettingDefault: boolean;
+  isDeletingBranch: boolean;
+  onOpenWorkspace: (_workspaceId: string) => void;
+  onSetDefaultBranch: (_branch: BranchRow) => void;
+  onDeleteBranch: () => void;
+  onOpenFork: (_commit: CommitRow) => void;
+  onCommitMessageChange: (_value: string) => void;
+  onSubmitCommit: (_event: FormEvent<HTMLFormElement>) => void;
+}) {
+  if (!selectedBranch) {
+    return (
+      <FullPageMessage
+        icon="icon-[material-symbols--account-tree]"
+        title="还没有可查看的分支"
+        description="从左侧创建一个 branch，或等待已有 branch 加载完成。"
+        embedded
+      />
+    );
+  }
+
+  const workspaceMissing = selectedWorkspace == null;
 
   return (
-    <div className="grid min-h-full gap-6 xl:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)]">
-      <section className="rounded-xl border border-border bg-sidebar-background p-4 shadow-sm">
-        <div className="flex items-center gap-2 border-b border-border pb-3">
-          <span className="icon-[material-symbols--account-tree] text-base text-accent-foreground" />
-          <h2 className="text-sm font-semibold text-foreground">Branches</h2>
-          <span className="ml-auto text-xs text-foreground-muted">{branches.length} 个分支</span>
+    <div className="mx-auto grid min-h-full w-full max-w-6xl gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]">
+      <section className="rounded-xl border border-border bg-sidebar-background p-5 shadow-sm">
+        <div className="flex flex-wrap items-start gap-3 border-b border-border pb-4">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h2 className="truncate text-lg font-semibold text-foreground">
+                {selectedBranch.name}
+              </h2>
+              {project.defaultBranchId === selectedBranch.id ? (
+                <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-accent-foreground">
+                  默认分支
+                </span>
+              ) : null}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-3 text-xs text-foreground-muted">
+              <span>更新时间 {dateFormatter.format(selectedBranch.updatedAt)}</span>
+              <span>
+                HEAD {selectedBranch.headCommitId ? shortId(selectedBranch.headCommitId) : "—"}
+              </span>
+              <span>
+                Fork 自{" "}
+                {selectedBranch.forkedFromCommitId
+                  ? shortId(selectedBranch.forkedFromCommitId)
+                  : "空分支"}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {selectedWorkspace ? (
+              <button
+                type="button"
+                onClick={() => onOpenWorkspace(selectedWorkspace.id)}
+                className={primaryButton}
+              >
+                <span className="icon-[material-symbols--edit] text-base" />
+                打开 workspace
+              </button>
+            ) : (
+              <button type="button" disabled className={primaryButton}>
+                <span className="icon-[material-symbols--warning] text-base" />无 workspace
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => onSetDefaultBranch(selectedBranch)}
+              disabled={project.defaultBranchId === selectedBranch.id || isSettingDefault}
+              className={secondaryButton}
+            >
+              <span className="icon-[material-symbols--target] text-base" />
+              设为默认
+            </button>
+            <button
+              type="button"
+              onClick={onDeleteBranch}
+              disabled={project.defaultBranchId === selectedBranch.id || isDeletingBranch}
+              className={cn(
+                secondaryButton,
+                "text-accent-foreground hover:bg-red-500/10 hover:text-red-200",
+              )}
+            >
+              <span className="icon-[material-symbols--delete] text-base" />
+              删除分支
+            </button>
+          </div>
         </div>
 
-        <div className="mt-4 flex min-h-0 flex-col gap-3">
-          <button type="button" onClick={onCreateBranch} className={primaryButton}>
-            <span className="icon-[material-symbols--add] text-base" />
-            新建分支
-          </button>
+        {workspaceMissing ? (
+          <div className="mt-4 rounded-md border border-border bg-editor-background px-4 py-3 text-sm text-accent-foreground">
+            该分支当前没有对应 workspace，只支持只读查看历史，不能打开编辑器或直接提交。
+          </div>
+        ) : null}
 
-          {branchesError ? (
-            <InlineError message={branchesError} />
-          ) : branchesLoading ? (
-            <LoadingBlock label="正在加载分支..." />
-          ) : branches.length === 0 ? (
-            <div className="rounded-md border border-dashed border-border bg-editor-background px-4 py-10 text-sm text-foreground-muted">
-              当前项目还没有 branch，先创建一个分支开始工作。
-            </div>
-          ) : (
-            <div className="overflow-hidden rounded-lg border border-border bg-editor-background">
-              {branches.map((branch) => (
-                <SidebarListRow
-                  key={branch.id}
-                  isActive={branch.id === selectedBranch?.id}
-                  onClick={() => onOpenBranch(branch.id)}
-                  icon={
-                    <span className="icon-[material-symbols--fork-right] text-base text-foreground-muted" />
-                  }
-                  label={
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="truncate">{branch.name}</span>
-                      {project.defaultBranchId === branch.id ? (
-                        <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-accent-foreground">
-                          默认
-                        </span>
-                      ) : null}
+        <section className="mt-6 rounded-lg border border-border bg-editor-background p-4">
+          <div className="flex items-center gap-2">
+            <span className="icon-[material-symbols--history] text-base text-accent-foreground" />
+            <h3 className="text-sm font-semibold text-foreground">提交历史</h3>
+          </div>
+
+          <div className="mt-4">
+            {commitHistoryError ? (
+              <InlineError message={commitHistoryError} />
+            ) : commitHistoryLoading ? (
+              <LoadingBlock label="正在加载提交历史..." />
+            ) : commitHistory.length === 0 ? (
+              <div className="rounded-md border border-dashed border-border bg-sidebar-background px-4 py-8 text-sm text-foreground-muted">
+                这个分支还没有提交历史。
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {commitHistory.map((commit) => (
+                  <article
+                    key={commit.id}
+                    className="rounded-lg border border-border bg-sidebar-background px-4 py-3"
+                  >
+                    <div className="flex flex-wrap items-start gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="font-medium text-foreground">{commit.message}</div>
+                          {commit.id === selectedBranch.headCommitId ? (
+                            <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-accent-foreground">
+                              HEAD
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="mt-1 flex flex-wrap gap-3 text-xs text-foreground-muted">
+                          <span>{shortId(commit.id)}</span>
+                          <span>{dateFormatter.format(commit.committedAt)}</span>
+                          <span>父提交 {commit.parents.length}</span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => onOpenFork(commit)}
+                        className={secondaryButton}
+                      >
+                        <span className="icon-[material-symbols--fork-right] text-base" />
+                        Fork
+                      </button>
                     </div>
-                  }
-                  trailing={branch.headCommitId ? shortId(branch.headCommitId) : "空分支"}
-                />
-              ))}
-            </div>
-          )}
-        </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
       </section>
 
       <section className="rounded-xl border border-border bg-sidebar-background p-5 shadow-sm">
-        {!selectedBranch ? (
-          <FullPageMessage
-            icon="icon-[material-symbols--account-tree]"
-            title="还没有选中的分支"
-            description="从左侧选择一个 branch，或先创建新的 branch。"
-            embedded
+        <div className="flex items-center gap-2">
+          <span className="icon-[material-symbols--upload] text-base text-accent-foreground" />
+          <h3 className="text-sm font-semibold text-foreground">Commit</h3>
+        </div>
+
+        <form className="mt-4 grid gap-3" onSubmit={onSubmitCommit}>
+          <textarea
+            value={commitMessage}
+            onChange={(event) => onCommitMessageChange(event.target.value)}
+            rows={5}
+            disabled={workspaceMissing || isCommitting}
+            placeholder="描述这次提交做了什么。"
+            className="w-full resize-y rounded-md border border-border bg-editor-background px-3 py-2 text-sm leading-relaxed text-foreground transition outline-none focus:border-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
           />
-        ) : (
-          <div className="flex flex-col gap-6">
-            <div className="flex flex-wrap items-start gap-3 border-b border-border pb-4">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <h2 className="truncate text-lg font-semibold text-foreground">
-                    {selectedBranch.name}
-                  </h2>
-                  {project.defaultBranchId === selectedBranch.id ? (
-                    <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-accent-foreground">
-                      默认分支
-                    </span>
-                  ) : null}
-                </div>
-                <div className="mt-2 flex flex-wrap gap-3 text-xs text-foreground-muted">
-                  <span>更新时间 {dateFormatter.format(selectedBranch.updatedAt)}</span>
-                  <span>
-                    HEAD {selectedBranch.headCommitId ? shortId(selectedBranch.headCommitId) : "—"}
-                  </span>
-                  <span>
-                    Fork 自{" "}
-                    {selectedBranch.forkedFromCommitId
-                      ? shortId(selectedBranch.forkedFromCommitId)
-                      : "空分支"}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {selectedWorkspace ? (
-                  <button
-                    type="button"
-                    onClick={() => onOpenWorkspace(selectedWorkspace.id)}
-                    className={primaryButton}
-                  >
-                    <span className="icon-[material-symbols--edit] text-base" />
-                    打开 workspace
-                  </button>
-                ) : (
-                  <button type="button" disabled className={primaryButton}>
-                    <span className="icon-[material-symbols--warning] text-base" />无 workspace
-                  </button>
+          {commitError ? <InlineError message={commitError} /> : null}
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={workspaceMissing || isCommitting}
+              className={primaryButton}
+            >
+              <span
+                className={cn(
+                  "text-base",
+                  isCommitting
+                    ? "icon-[material-symbols--sync] animate-spin"
+                    : "icon-[material-symbols--check-circle]",
                 )}
-                <button
-                  type="button"
-                  onClick={() => onSetDefaultBranch(selectedBranch)}
-                  disabled={project.defaultBranchId === selectedBranch.id || isSettingDefault}
-                  className={secondaryButton}
-                >
-                  <span className="icon-[material-symbols--target] text-base" />
-                  设为默认
-                </button>
-                <button
-                  type="button"
-                  onClick={onDeleteBranch}
-                  disabled={project.defaultBranchId === selectedBranch.id || isDeletingBranch}
-                  className={cn(
-                    secondaryButton,
-                    "text-accent-foreground hover:bg-red-500/10 hover:text-red-200",
-                  )}
-                >
-                  <span className="icon-[material-symbols--delete] text-base" />
-                  删除分支
-                </button>
-              </div>
-            </div>
-
-            {workspaceMissing ? (
-              <div className="rounded-md border border-border bg-editor-background px-4 py-3 text-sm text-accent-foreground">
-                该分支当前没有对应 workspace，只支持只读查看历史，不能打开编辑器或直接提交。
-              </div>
-            ) : null}
-
-            <section className="rounded-lg border border-border bg-editor-background p-4">
-              <div className="flex items-center gap-2">
-                <span className="icon-[material-symbols--upload] text-base text-accent-foreground" />
-                <h3 className="text-sm font-semibold text-foreground">Commit</h3>
-              </div>
-
-              <form className="mt-4 grid gap-3" onSubmit={onSubmitCommit}>
-                <textarea
-                  value={commitMessage}
-                  onChange={(event) => onCommitMessageChange(event.target.value)}
-                  rows={3}
-                  disabled={workspaceMissing || isCommitting}
-                  placeholder="描述这次提交做了什么。"
-                  className="w-full resize-y rounded-md border border-border bg-sidebar-background px-3 py-2 text-sm leading-relaxed text-foreground transition outline-none focus:border-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                />
-                {commitError ? <InlineError message={commitError} /> : null}
-                <div className="flex justify-end">
-                  <button
-                    type="submit"
-                    disabled={workspaceMissing || isCommitting}
-                    className={primaryButton}
-                  >
-                    <span
-                      className={cn(
-                        "text-base",
-                        isCommitting
-                          ? "icon-[material-symbols--sync] animate-spin"
-                          : "icon-[material-symbols--check-circle]",
-                      )}
-                    />
-                    提交到当前分支
-                  </button>
-                </div>
-              </form>
-            </section>
-
-            <section className="rounded-lg border border-border bg-editor-background p-4">
-              <div className="flex items-center gap-2">
-                <span className="icon-[material-symbols--history] text-base text-accent-foreground" />
-                <h3 className="text-sm font-semibold text-foreground">提交历史</h3>
-              </div>
-
-              <div className="mt-4">
-                {commitHistoryError ? (
-                  <InlineError message={commitHistoryError} />
-                ) : commitHistoryLoading ? (
-                  <LoadingBlock label="正在加载提交历史..." />
-                ) : commitHistory.length === 0 ? (
-                  <div className="rounded-md border border-dashed border-border bg-sidebar-background px-4 py-8 text-sm text-foreground-muted">
-                    这个分支还没有提交历史。
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {commitHistory.map((commit) => (
-                      <article
-                        key={commit.id}
-                        className="rounded-lg border border-border bg-sidebar-background px-4 py-3"
-                      >
-                        <div className="flex flex-wrap items-start gap-3">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <div className="font-medium text-foreground">{commit.message}</div>
-                              {commit.id === selectedBranch.headCommitId ? (
-                                <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-accent-foreground">
-                                  HEAD
-                                </span>
-                              ) : null}
-                            </div>
-                            <div className="mt-1 flex flex-wrap gap-3 text-xs text-foreground-muted">
-                              <span>{shortId(commit.id)}</span>
-                              <span>{dateFormatter.format(commit.committedAt)}</span>
-                              <span>父提交 {commit.parents.length}</span>
-                            </div>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => onOpenFork(commit)}
-                            className={secondaryButton}
-                          >
-                            <span className="icon-[material-symbols--fork-right] text-base" />
-                            Fork
-                          </button>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </section>
+              />
+              提交到当前分支
+            </button>
           </div>
-        )}
+        </form>
       </section>
     </div>
   );
@@ -1387,7 +1427,7 @@ function ProjectDialog({
   isPending: boolean;
   pendingLabel: string;
   submitLabel: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <dialog
@@ -1409,7 +1449,6 @@ function ProjectDialog({
 
         <div className="space-y-4 p-4">
           {children}
-
           {error ? <InlineError message={error} /> : null}
         </div>
 
@@ -1442,15 +1481,6 @@ function InlineError({ message }: { message: string }) {
   );
 }
 
-function SummaryMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="text-[11px] tracking-wide text-foreground-muted/70 uppercase">{label}</div>
-      <div className="mt-1 text-sm text-foreground">{value}</div>
-    </div>
-  );
-}
-
 function PageHeader({
   icon,
   title,
@@ -1460,7 +1490,7 @@ function PageHeader({
   icon: string;
   title: string;
   subtitle: string;
-  trailing?: React.ReactNode;
+  trailing?: ReactNode;
 }) {
   return (
     <div className="flex shrink-0 items-center gap-3 border-b border-border bg-title-bar-background px-4 py-2">
