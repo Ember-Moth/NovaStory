@@ -964,20 +964,6 @@ function ProjectMetaPanel({
   return (
     <OverlayScrollbar className="h-full min-h-0 w-full">
       <div className="space-y-4 p-3">
-        <div className="flex items-center gap-2 text-xs text-foreground-muted">
-          {isSaving ? (
-            <>
-              <span className="icon-[material-symbols--sync] animate-spin text-sm" />
-              保存中
-            </>
-          ) : (
-            <>
-              <span className="icon-[material-symbols--edit] text-sm" />
-              失焦或回车保存
-            </>
-          )}
-        </div>
-
         <label className="grid gap-1.5">
           <span className="text-xs font-medium text-foreground-muted">项目名</span>
           <input
@@ -985,12 +971,6 @@ function ProjectMetaPanel({
             disabled={isSaving}
             onChange={(event) => onNameChange(event.target.value)}
             onBlur={onMetadataCommit}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                event.currentTarget.blur();
-              }
-            }}
             className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-sm text-foreground transition outline-none focus:border-accent-foreground disabled:cursor-wait disabled:opacity-70"
           />
         </label>
@@ -1003,18 +983,9 @@ function ProjectMetaPanel({
             rows={5}
             onChange={(event) => onDescriptionChange(event.target.value)}
             onBlur={onMetadataCommit}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                event.currentTarget.blur();
-              }
-            }}
             className="w-full resize-y rounded-md border border-border bg-editor-background px-3 py-2 text-sm leading-relaxed text-foreground transition outline-none focus:border-accent-foreground disabled:cursor-wait disabled:opacity-70"
             placeholder="为这个项目补充背景、目标或当前进度。"
           />
-          <span className="text-[11px] text-foreground-muted">
-            `Enter` 保存，`Shift+Enter` 换行。
-          </span>
         </label>
 
         {detailError ? <InlineError message={detailError} /> : null}
