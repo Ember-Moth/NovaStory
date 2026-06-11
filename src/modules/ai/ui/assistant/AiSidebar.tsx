@@ -196,13 +196,13 @@ export function AiSidebar({
         messagesPane={
           <div className="flex min-h-full flex-col gap-2 px-3.5 py-2">
             {controller.assistantStateIsInitialLoading && controller.showEmptyState ? (
-              <div className="border border-border bg-sidebar-background px-3 py-2 text-[12px] text-foreground-muted">
+              <div className="rounded-md border border-border bg-sidebar-background px-3 py-2 text-[12px] text-foreground-muted">
                 正在加载会话...
               </div>
             ) : null}
 
             {controller.showEmptyState ? (
-              <div className="border border-border bg-sidebar-background px-3 py-2">
+              <div className="rounded-md border border-border bg-sidebar-background px-3 py-2">
                 <div className="mb-2 flex items-center gap-2 text-[12px] text-foreground-muted">
                   <span className="icon-[material-symbols--auto-awesome] text-sm text-accent-foreground" />
                   <span>

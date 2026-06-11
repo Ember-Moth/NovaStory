@@ -579,7 +579,7 @@ export function SessionStatusOverlay({ state }: { state: "loading" | "empty" }) 
     state === "loading" ? (
       <div className="px-3 py-1.5 text-[12px] text-foreground-muted">正在加载会话...</div>
     ) : (
-      <div className="border border-dashed border-border bg-editor-background/95 px-3 py-2 text-[12px] text-foreground-muted backdrop-blur-sm">
+      <div className="rounded-md border border-dashed border-border bg-editor-background/95 px-3 py-2 text-[12px] text-foreground-muted backdrop-blur-sm">
         还没有可用会话。点击右上角新建会话开始。
       </div>
     );
