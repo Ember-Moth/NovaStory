@@ -1,5 +1,4 @@
-import { ScopeProvider, useMolecule } from "bunshi/react";
-import { useAtomValue, useSetAtom } from "jotai";
+import { ScopeProvider } from "bunshi/react";
 import { useMemo } from "react";
 
 import { AppShell, AppSidebar } from "@/app/shell/AppShell";
@@ -27,8 +26,7 @@ import {
   useProjectWorkspaceIdentity,
 } from "@/modules/workspace/ui/editor/state/hooks/useProjectWorkspace";
 import { useProjectWorkspaceEffects } from "@/modules/workspace/ui/editor/state/hooks/useProjectWorkspaceEffects";
-import { ErrorsMolecule } from "@/modules/workspace/ui/editor/state/molecules/errors";
-import { SelectionMolecule } from "@/modules/workspace/ui/editor/state/molecules/selection";
+import { useWorkspaceState } from "@/modules/workspace/ui/editor/state/molecules/workspaceStore";
 import { ProjectScope } from "@/modules/workspace/ui/editor/state/scopes";
 import { ORIGIN_TIMELINE_POINT_ID } from "@/modules/workspace/domain/constants";
 
@@ -64,8 +62,7 @@ function ProjectWorkspace({
   const identity = useProjectWorkspaceIdentity(projectId, requestedWorkspaceId);
   const content = useProjectContentData(identity.workspaceId);
   const timeline = useProjectTimelineData(identity.workspaceId);
-  const selectionMolecule = useMolecule(SelectionMolecule);
-  const rawActiveTimelinePointId = useAtomValue(selectionMolecule.activeTimelinePointIdAtom);
+  const rawActiveTimelinePointId = useWorkspaceState((state) => state.activeTimelinePointId);
   const aux = useProjectAuxData(
     identity.workspaceId,
     identity.workspaceAuxRootId,
@@ -81,10 +78,9 @@ function ProjectWorkspace({
   const pageErrorState = useProjectPageErrorState(pageError);
   const workspace = { identity, content, timeline, aux, selection, editor: editorView };
   const actions = useProjectActions(workspace);
-  const errors = useMolecule(ErrorsMolecule);
-  const setContentError = useSetAtom(errors.contentErrorAtom);
-  const setTimelineError = useSetAtom(errors.timelineErrorAtom);
-  const setAuxError = useSetAtom(errors.auxErrorAtom);
+  const setContentError = useWorkspaceState((state) => state.setContentError);
+  const setTimelineError = useWorkspaceState((state) => state.setTimelineError);
+  const setAuxError = useWorkspaceState((state) => state.setAuxError);
   useProjectWorkspaceEffects(workspace, actions.flushBodySave, actions.flushAuxSave);
 
   const { workspaceId, contentRootId, workspaceQuery, workspaceInitialLoading, routeMismatch } =
@@ -122,9 +118,9 @@ function ProjectWorkspace({
   } = selection;
   const { editorBody, editorContent, activeSaveState, auxSaveState, editorTarget } = editorView;
   const { pageErrorDismissed, setPageErrorDismissed } = pageErrorState;
-  const contentError = useAtomValue(errors.contentErrorAtom);
-  const timelineError = useAtomValue(errors.timelineErrorAtom);
-  const auxError = useAtomValue(errors.auxErrorAtom);
+  const contentError = useWorkspaceState((state) => state.contentError);
+  const timelineError = useWorkspaceState((state) => state.timelineError);
+  const auxError = useWorkspaceState((state) => state.auxError);
 
   const pageErrorBubble =
     pageError && !pageErrorDismissed ? { message: pageError, anchorId: PAGE_ERROR_ANCHOR } : null;

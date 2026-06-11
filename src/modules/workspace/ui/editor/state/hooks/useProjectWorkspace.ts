@@ -1,6 +1,4 @@
 import { skipToken } from "@codehz/rpc/react";
-import { useMolecule } from "bunshi/react";
-import { useAtomValue, useSetAtom } from "jotai";
 import { useEffect, useMemo } from "react";
 
 import {
@@ -11,9 +9,7 @@ import {
 import { rpc } from "@/rpc/client";
 
 import { deriveProjectEditorState, deriveProjectSelectionState } from "../helpers/projectView";
-import { EditorMolecule } from "../molecules/editor";
-import { ErrorsMolecule } from "../molecules/errors";
-import { SelectionMolecule } from "../molecules/selection";
+import { useWorkspaceState } from "../molecules/workspaceStore";
 
 type AuxSnapshotData = NonNullable<ReturnType<typeof rpc.useQuery<"aux.snapshotTree">>["data"]>;
 type RefreshableQueryState = {
@@ -281,14 +277,12 @@ export function useProjectSelectionView(data: {
   auxNodeMap: ProjectAuxData["nodeMap"];
   timelineLabelMap: ProjectTimelineData["labelMap"];
 }) {
-  const selection = useMolecule(SelectionMolecule);
-
-  const activeContentNodeId = useAtomValue(selection.activeContentNodeIdAtom);
-  const activeAuxNodeId = useAtomValue(selection.activeAuxNodeIdAtom);
-  const shouldAutoSelectContent = useAtomValue(selection.shouldAutoSelectContentAtom);
-  const activeTimelinePointId = useAtomValue(selection.activeTimelinePointIdAtom);
-  const expandedContentIds = useAtomValue(selection.expandedContentIdsAtom);
-  const expandedAuxIds = useAtomValue(selection.expandedAuxIdsAtom);
+  const activeContentNodeId = useWorkspaceState((state) => state.activeContentNodeId);
+  const activeAuxNodeId = useWorkspaceState((state) => state.activeAuxNodeId);
+  const shouldAutoSelectContent = useWorkspaceState((state) => state.shouldAutoSelectContent);
+  const activeTimelinePointId = useWorkspaceState((state) => state.activeTimelinePointId);
+  const expandedContentIds = useWorkspaceState((state) => state.expandedContentIds);
+  const expandedAuxIds = useWorkspaceState((state) => state.expandedAuxIds);
 
   const derivedSelection = useMemo(
     () =>
@@ -327,12 +321,10 @@ export function useProjectEditorView(
     "activeContentNode" | "activeAuxNode" | "shouldAutoSelectContent"
   >,
 ) {
-  const editor = useMolecule(EditorMolecule);
-
-  const drafts = useAtomValue(editor.draftsAtom);
-  const committedBodies = useAtomValue(editor.committedBodiesAtom);
-  const pendingSaveCounts = useAtomValue(editor.pendingSaveCountsAtom);
-  const saveErrors = useAtomValue(editor.saveErrorsAtom);
+  const drafts = useWorkspaceState((state) => state.drafts);
+  const committedBodies = useWorkspaceState((state) => state.committedBodies);
+  const pendingSaveCounts = useWorkspaceState((state) => state.pendingSaveCounts);
+  const saveErrors = useWorkspaceState((state) => state.saveErrors);
 
   return useMemo(
     () =>
@@ -358,9 +350,8 @@ export function useProjectEditorView(
 }
 
 export function useProjectPageErrorState(pageError: string | null) {
-  const errors = useMolecule(ErrorsMolecule);
-  const pageErrorDismissed = useAtomValue(errors.pageErrorDismissedAtom);
-  const setPageErrorDismissed = useSetAtom(errors.pageErrorDismissedAtom);
+  const pageErrorDismissed = useWorkspaceState((state) => state.pageErrorDismissed);
+  const setPageErrorDismissed = useWorkspaceState((state) => state.setPageErrorDismissed);
 
   useEffect(() => {
     if (pageError) {

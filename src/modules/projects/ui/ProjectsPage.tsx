@@ -1,15 +1,10 @@
 import { skipToken } from "@codehz/rpc/react";
 import { ScopeProvider } from "bunshi/react";
-import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 
 import { AppShell, AppSidebar } from "@/app/shell/AppShell";
-import {
-  lastProjectIdAtom,
-  lastWorkspaceRouteAtom,
-  projectBranchSelectionAtom,
-} from "@/app/state/lastProject";
+import { useLastProjectStore } from "@/app/state/lastProject";
 import { SidebarLayoutScope, SidebarPanels } from "@/shared/ui/sidebar";
 import { rpc } from "@/rpc/client";
 import { cn } from "@/shared/lib/cn";
@@ -58,10 +53,11 @@ const primaryButton = `${buttonBase} bg-accent-background text-foreground hover:
 
 export function ProjectsPage({ projectId = null }: { projectId?: string | null }) {
   const [, navigate] = useLocation();
-  const lastProjectId = useAtomValue(lastProjectIdAtom);
-  const setLastProjectId = useSetAtom(lastProjectIdAtom);
-  const setLastWorkspaceRoute = useSetAtom(lastWorkspaceRouteAtom);
-  const [projectBranchSelection, setProjectBranchSelection] = useAtom(projectBranchSelectionAtom);
+  const lastProjectId = useLastProjectStore((state) => state.lastProjectId);
+  const setLastProjectId = useLastProjectStore((state) => state.setLastProjectId);
+  const setLastWorkspaceRoute = useLastProjectStore((state) => state.setLastWorkspaceRoute);
+  const projectBranchSelection = useLastProjectStore((state) => state.projectBranchSelection);
+  const setProjectBranchSelection = useLastProjectStore((state) => state.setProjectBranchSelection);
 
   const createProjectDialogRef = useRef<HTMLDialogElement>(null);
   const createBranchDialogRef = useRef<HTMLDialogElement>(null);

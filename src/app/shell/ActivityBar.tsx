@@ -1,8 +1,7 @@
-import { useAtomValue } from "jotai";
 import { useLocation } from "wouter";
 
 import { parseAppRoute, resolveProjectRouteTarget } from "@/app/routing/useCachedProjectRoute";
-import { lastProjectIdAtom, lastWorkspaceRouteAtom } from "@/app/state/lastProject";
+import { useLastProjectStore } from "@/app/state/lastProject";
 import { cn } from "@/shared/lib/cn";
 
 export type ActivityBarItem = "home" | "project" | "settings";
@@ -52,8 +51,8 @@ function ActivityBarButton({
 
 export function ActivityBar({ active }: { active: ActivityBarItem }) {
   const [location, navigate] = useLocation();
-  const lastProjectId = useAtomValue(lastProjectIdAtom);
-  const lastWorkspaceRoute = useAtomValue(lastWorkspaceRouteAtom);
+  const lastProjectId = useLastProjectStore((state) => state.lastProjectId);
+  const lastWorkspaceRoute = useLastProjectStore((state) => state.lastWorkspaceRoute);
   const route = parseAppRoute(location);
   const projectTarget = resolveProjectRouteTarget(route, lastProjectId);
 

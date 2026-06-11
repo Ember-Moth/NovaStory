@@ -1,5 +1,3 @@
-import { useMolecule } from "bunshi/react";
-import { useAtomValue, useSetAtom } from "jotai";
 import { useCallback, useState } from "react";
 
 import { moveArrayItem } from "@/shared/lib/array";
@@ -27,9 +25,7 @@ import { rpc } from "@/rpc/client";
 import { ORIGIN_TIMELINE_POINT_ID } from "@/modules/workspace/domain/constants";
 
 import { mergeProjectActionGroups } from "../actions/actionGroups";
-import { EditorMolecule } from "../molecules/editor";
-import { ErrorsMolecule } from "../molecules/errors";
-import { SelectionMolecule } from "../molecules/selection";
+import { useWorkspaceStoreApi } from "../molecules/workspaceStore";
 import type { ProjectWorkspaceState } from "./useProjectWorkspace";
 
 type TimelineDeleteDialogState = {
@@ -57,30 +53,7 @@ function formatTimelineContentAnchorError(
 }
 
 export function useProjectActions(workspace: ProjectWorkspaceState) {
-  const selection = useMolecule(SelectionMolecule);
-  const editor = useMolecule(EditorMolecule);
-  const errors = useMolecule(ErrorsMolecule);
-
-  const activeContentNodeId = useAtomValue(selection.activeContentNodeIdAtom);
-  const setActiveContentNodeId = useSetAtom(selection.activeContentNodeIdAtom);
-  const activeAuxNodeId = useAtomValue(selection.activeAuxNodeIdAtom);
-  const setActiveAuxNodeId = useSetAtom(selection.activeAuxNodeIdAtom);
-  const setPendingContentNodeId = useSetAtom(selection.pendingContentNodeIdAtom);
-  const setPendingAuxNodeId = useSetAtom(selection.pendingAuxNodeIdAtom);
-  const setShouldAutoSelectContent = useSetAtom(selection.shouldAutoSelectContentAtom);
-  const activeTimelinePointId = useAtomValue(selection.activeTimelinePointIdAtom);
-  const setActiveTimelinePointId = useSetAtom(selection.activeTimelinePointIdAtom);
-  const setExpandedContentIds = useSetAtom(selection.expandedContentIdsAtom);
-  const setExpandedAuxIds = useSetAtom(selection.expandedAuxIdsAtom);
-  const drafts = useAtomValue(editor.draftsAtom);
-  const setDrafts = useSetAtom(editor.draftsAtom);
-  const committedBodies = useAtomValue(editor.committedBodiesAtom);
-  const setCommittedBodies = useSetAtom(editor.committedBodiesAtom);
-  const setPendingSaveCounts = useSetAtom(editor.pendingSaveCountsAtom);
-  const setSaveErrors = useSetAtom(editor.saveErrorsAtom);
-  const setContentError = useSetAtom(errors.contentErrorAtom);
-  const setTimelineError = useSetAtom(errors.timelineErrorAtom);
-  const setAuxError = useSetAtom(errors.auxErrorAtom);
+  const store = useWorkspaceStoreApi();
 
   const {
     identity: { workspaceId, contentRootId },
@@ -120,13 +93,14 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
 
   const finishTimelineDelete = useCallback(
     (pointId: string) => {
-      if (activeTimelinePointId === pointId) {
-        setActiveTimelinePointId(ORIGIN_TIMELINE_POINT_ID);
-        setPendingAuxNodeId(null);
-        setActiveAuxNodeId(null);
+      const state = store.getState();
+      if (state.activeTimelinePointId === pointId) {
+        state.setActiveTimelinePointId(ORIGIN_TIMELINE_POINT_ID);
+        state.setPendingAuxNodeId(null);
+        state.setActiveAuxNodeId(null);
       }
     },
-    [activeTimelinePointId, setActiveAuxNodeId, setActiveTimelinePointId, setPendingAuxNodeId],
+    [store],
   );
 
   const flushBodySave = useCallback(
@@ -135,11 +109,12 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         return;
       }
 
-      setPendingSaveCounts((previous) => ({
+      const state = store.getState();
+      state.setPendingSaveCounts((previous) => ({
         ...previous,
         [nodeId]: (previous[nodeId] ?? 0) + 1,
       }));
-      setSaveErrors((previous) => omitRecordKey(previous, nodeId));
+      state.setSaveErrors((previous) => omitRecordKey(previous, nodeId));
 
       try {
         await updateContent.mutate({
@@ -147,17 +122,17 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
           nodeId,
           body,
         });
-        setCommittedBodies((previous) => ({
+        store.getState().setCommittedBodies((previous) => ({
           ...previous,
           [nodeId]: body,
         }));
       } catch (error) {
-        setSaveErrors((previous) => ({
+        store.getState().setSaveErrors((previous) => ({
           ...previous,
           [nodeId]: error instanceof Error ? error.message : "保存失败，请稍后重试。",
         }));
       } finally {
-        setPendingSaveCounts((previous) => {
+        store.getState().setPendingSaveCounts((previous) => {
           const nextCount = (previous[nodeId] ?? 1) - 1;
           if (nextCount <= 0) {
             return omitRecordKey(previous, nodeId);
@@ -170,20 +145,25 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         });
       }
     },
-    [setCommittedBodies, setPendingSaveCounts, setSaveErrors, updateContent, workspaceId],
+    [store, updateContent, workspaceId],
   );
 
   const flushAuxSave = useCallback(
-    async (nodeId: string, content: string, timelinePointId = activeTimelinePointId) => {
+    async (
+      nodeId: string,
+      content: string,
+      timelinePointId = store.getState().activeTimelinePointId,
+    ) => {
       if (!workspaceId || !timelinePointId) {
         return;
       }
 
-      setPendingSaveCounts((previous) => ({
+      const state = store.getState();
+      state.setPendingSaveCounts((previous) => ({
         ...previous,
         [nodeId]: (previous[nodeId] ?? 0) + 1,
       }));
-      setSaveErrors((previous) => omitRecordKey(previous, nodeId));
+      state.setSaveErrors((previous) => omitRecordKey(previous, nodeId));
 
       try {
         await writeFileAux.mutate({
@@ -192,17 +172,17 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
           nodeId,
           content,
         });
-        setCommittedBodies((previous) => ({
+        store.getState().setCommittedBodies((previous) => ({
           ...previous,
           [nodeId]: content,
         }));
       } catch (error) {
-        setSaveErrors((previous) => ({
+        store.getState().setSaveErrors((previous) => ({
           ...previous,
           [nodeId]: error instanceof Error ? error.message : "保存失败，请稍后重试。",
         }));
       } finally {
-        setPendingSaveCounts((previous) => {
+        store.getState().setPendingSaveCounts((previous) => {
           const nextCount = (previous[nodeId] ?? 1) - 1;
           if (nextCount <= 0) {
             return omitRecordKey(previous, nodeId);
@@ -215,14 +195,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         });
       }
     },
-    [
-      activeTimelinePointId,
-      setCommittedBodies,
-      setPendingSaveCounts,
-      setSaveErrors,
-      workspaceId,
-      writeFileAux,
-    ],
+    [store, workspaceId, writeFileAux],
   );
 
   const flushDirtyContent = useCallback(() => {
@@ -230,15 +203,17 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
       return;
     }
 
+    const { drafts, committedBodies } = store.getState();
     const currentBody = drafts[activeContentNode.id] ?? activeContentNode.body;
     const baseline = committedBodies[activeContentNode.id] ?? activeContentNode.body;
     if (currentBody !== baseline) {
       void flushBodySave(activeContentNode.id, currentBody);
     }
-  }, [activeContentNode, committedBodies, drafts, flushBodySave]);
+  }, [activeContentNode, flushBodySave, store]);
 
   const flushDirtyAux = useCallback(
-    (timelinePointId = activeTimelinePointId) => {
+    (timelinePointId = store.getState().activeTimelinePointId) => {
+      const { activeAuxNodeId, drafts, committedBodies } = store.getState();
       if (!activeAuxNodeId || !timelinePointId) {
         return;
       }
@@ -254,12 +229,12 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         void flushAuxSave(auxNode.id, currentContent, timelinePointId);
       }
     },
-    [activeAuxNodeId, activeTimelinePointId, auxNodeMap, committedBodies, drafts, flushAuxSave],
+    [auxNodeMap, flushAuxSave, store],
   );
 
   const toggleContentExpanded = useCallback(
     (nodeId: string) => {
-      setExpandedContentIds((previous) => {
+      store.getState().setExpandedContentIds((previous) => {
         const next = new Set(previous);
         if (next.has(nodeId)) {
           next.delete(nodeId);
@@ -269,12 +244,12 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         return next;
       });
     },
-    [setExpandedContentIds],
+    [store],
   );
 
   const toggleAuxExpanded = useCallback(
     (nodeId: string) => {
-      setExpandedAuxIds((previous) => {
+      store.getState().setExpandedAuxIds((previous) => {
         const next = new Set(previous);
         if (next.has(nodeId)) {
           next.delete(nodeId);
@@ -284,12 +259,12 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         return next;
       });
     },
-    [setExpandedAuxIds],
+    [store],
   );
 
   const expandContentParent = useCallback(
     (parentId: string) => {
-      setExpandedContentIds((previous) => {
+      store.getState().setExpandedContentIds((previous) => {
         if (previous.has(parentId)) {
           return previous;
         }
@@ -299,12 +274,12 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         return next;
       });
     },
-    [setExpandedContentIds],
+    [store],
   );
 
   const expandAuxParent = useCallback(
     (parentId: string) => {
-      setExpandedAuxIds((previous) => {
+      store.getState().setExpandedAuxIds((previous) => {
         if (previous.has(parentId)) {
           return previous;
         }
@@ -314,7 +289,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         return next;
       });
     },
-    [setExpandedAuxIds],
+    [store],
   );
 
   const resolveAuxParentForSibling = useCallback(
@@ -334,6 +309,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
 
   const createAuxDir = useCallback(
     async (parentDirId: string, anchorId: string) => {
+      const { activeTimelinePointId, setAuxError } = store.getState();
       if (!workspaceId || !activeTimelinePointId) {
         return;
       }
@@ -350,37 +326,26 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
           parentDirId,
           name,
         });
-        setShouldAutoSelectContent(false);
-        setPendingContentNodeId(null);
-        setPendingAuxNodeId(auxNodeMap.has(node.id) ? null : node.id);
-        setActiveAuxNodeId(node.id);
+        const state = store.getState();
+        state.setShouldAutoSelectContent(false);
+        state.setPendingContentNodeId(null);
+        state.setPendingAuxNodeId(auxNodeMap.has(node.id) ? null : node.id);
+        state.setActiveAuxNodeId(node.id);
         expandAuxParent(parentDirId);
       } catch (error) {
         setActionError(
-          setAuxError,
+          store.getState().setAuxError,
           error instanceof Error ? error.message : "创建辅助文件夹失败，请稍后重试。",
           anchorId,
         );
       }
     },
-    [
-      activeTimelinePointId,
-      auxNodeMap,
-      auxRootId,
-      auxTree,
-      expandAuxParent,
-      mkdirAux,
-      setActiveAuxNodeId,
-      setAuxError,
-      setPendingAuxNodeId,
-      setPendingContentNodeId,
-      setShouldAutoSelectContent,
-      workspaceId,
-    ],
+    [auxNodeMap, auxRootId, auxTree, expandAuxParent, mkdirAux, store, workspaceId],
   );
 
   const createAuxFile = useCallback(
     async (parentDirId: string, anchorId: string) => {
+      const { activeTimelinePointId, setAuxError } = store.getState();
       if (!workspaceId || !activeTimelinePointId) {
         return;
       }
@@ -398,53 +363,34 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
           name,
           content: "",
         });
-        setShouldAutoSelectContent(false);
-        setPendingContentNodeId(null);
-        setPendingAuxNodeId(auxNodeMap.has(node.id) ? null : node.id);
-        setActiveAuxNodeId(node.id);
+        const state = store.getState();
+        state.setShouldAutoSelectContent(false);
+        state.setPendingContentNodeId(null);
+        state.setPendingAuxNodeId(auxNodeMap.has(node.id) ? null : node.id);
+        state.setActiveAuxNodeId(node.id);
         expandAuxParent(parentDirId);
       } catch (error) {
         setActionError(
-          setAuxError,
+          store.getState().setAuxError,
           error instanceof Error ? error.message : "创建辅助文件失败，请稍后重试。",
           anchorId,
         );
       }
     },
-    [
-      activeTimelinePointId,
-      auxNodeMap,
-      auxRootId,
-      auxTree,
-      expandAuxParent,
-      setActiveAuxNodeId,
-      setAuxError,
-      setPendingAuxNodeId,
-      setPendingContentNodeId,
-      setShouldAutoSelectContent,
-      workspaceId,
-      writeFileAux,
-    ],
+    [auxNodeMap, auxRootId, auxTree, expandAuxParent, store, workspaceId, writeFileAux],
   );
 
   const activateContentNode = useCallback(
     (nodeId: string, anchorTimelinePointId: string) => {
-      setShouldAutoSelectContent(true);
-      setPendingAuxNodeId(null);
-      setActiveAuxNodeId(null);
-      setPendingContentNodeId(contentNodeMap.has(nodeId) ? null : nodeId);
-      setActiveContentNodeId(nodeId);
-      setActiveTimelinePointId(anchorTimelinePointId);
+      const state = store.getState();
+      state.setShouldAutoSelectContent(true);
+      state.setPendingAuxNodeId(null);
+      state.setActiveAuxNodeId(null);
+      state.setPendingContentNodeId(contentNodeMap.has(nodeId) ? null : nodeId);
+      state.setActiveContentNodeId(nodeId);
+      state.setActiveTimelinePointId(anchorTimelinePointId);
     },
-    [
-      contentNodeMap,
-      setActiveAuxNodeId,
-      setActiveContentNodeId,
-      setActiveTimelinePointId,
-      setPendingAuxNodeId,
-      setPendingContentNodeId,
-      setShouldAutoSelectContent,
-    ],
+    [contentNodeMap, store],
   );
 
   const flushDirtyContentBeforeSwitch = useCallback(() => {
@@ -454,12 +400,13 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
       return;
     }
 
+    const { drafts, committedBodies } = store.getState();
     const currentBody = drafts[activeContentNode.id] ?? activeContentNode.body;
     const currentBaseline = committedBodies[activeContentNode.id] ?? activeContentNode.body;
     if (currentBody !== currentBaseline) {
       void flushBodySave(activeContentNode.id, currentBody);
     }
-  }, [activeContentNode, committedBodies, drafts, flushBodySave, flushDirtyAux]);
+  }, [activeContentNode, flushBodySave, flushDirtyAux, store]);
 
   const handleContentSelect = useCallback(
     (node: ContentTreeNodeVM) => {
@@ -476,6 +423,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
     (node: AuxTreeNodeVM) => {
       flushDirtyContent();
 
+      const { activeAuxNodeId, drafts, committedBodies } = store.getState();
       if (activeAuxNodeId && activeAuxNodeId !== node.id) {
         const previousNode = auxNodeMap.get(activeAuxNodeId) ?? null;
         if (previousNode?.nodeType === "file") {
@@ -487,29 +435,19 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         }
       }
 
-      setShouldAutoSelectContent(false);
-      setPendingContentNodeId(null);
-      setActiveContentNodeId(null);
-      setPendingAuxNodeId(auxNodeMap.has(node.id) ? null : node.id);
-      setActiveAuxNodeId(node.id);
+      const state = store.getState();
+      state.setShouldAutoSelectContent(false);
+      state.setPendingContentNodeId(null);
+      state.setActiveContentNodeId(null);
+      state.setPendingAuxNodeId(auxNodeMap.has(node.id) ? null : node.id);
+      state.setActiveAuxNodeId(node.id);
     },
-    [
-      activeAuxNodeId,
-      auxNodeMap,
-      committedBodies,
-      drafts,
-      flushAuxSave,
-      flushDirtyContent,
-      setActiveAuxNodeId,
-      setActiveContentNodeId,
-      setPendingAuxNodeId,
-      setPendingContentNodeId,
-      setShouldAutoSelectContent,
-    ],
+    [auxNodeMap, flushAuxSave, flushDirtyContent, store],
   );
 
   const handleAuxContentChange = useCallback(
     (nextContent: string) => {
+      const { activeAuxNodeId } = store.getState();
       if (!activeAuxNodeId) {
         return;
       }
@@ -519,17 +457,19 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         return;
       }
 
-      setDrafts((previous) => ({
+      const state = store.getState();
+      state.setDrafts((previous) => ({
         ...previous,
         [auxNode.id]: nextContent,
       }));
-      setSaveErrors((previous) => omitRecordKey(previous, auxNode.id));
+      state.setSaveErrors((previous) => omitRecordKey(previous, auxNode.id));
     },
-    [activeAuxNodeId, auxNodeMap, setDrafts, setSaveErrors],
+    [auxNodeMap, store],
   );
 
   const handleTimelineSelect = useCallback(
     (pointId: string) => {
+      const { activeTimelinePointId, activeAuxNodeId } = store.getState();
       if (pointId === activeTimelinePointId) {
         return;
       }
@@ -537,24 +477,16 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
       flushDirtyAux(activeTimelinePointId ?? undefined);
 
       if (activeAuxNodeId) {
-        setDrafts((previous) => omitRecordKey(previous, activeAuxNodeId));
-        setCommittedBodies((previous) => omitRecordKey(previous, activeAuxNodeId));
-        setPendingSaveCounts((previous) => omitRecordKey(previous, activeAuxNodeId));
-        setSaveErrors((previous) => omitRecordKey(previous, activeAuxNodeId));
+        const state = store.getState();
+        state.setDrafts((previous) => omitRecordKey(previous, activeAuxNodeId));
+        state.setCommittedBodies((previous) => omitRecordKey(previous, activeAuxNodeId));
+        state.setPendingSaveCounts((previous) => omitRecordKey(previous, activeAuxNodeId));
+        state.setSaveErrors((previous) => omitRecordKey(previous, activeAuxNodeId));
       }
 
-      setActiveTimelinePointId(pointId);
+      store.getState().setActiveTimelinePointId(pointId);
     },
-    [
-      activeAuxNodeId,
-      activeTimelinePointId,
-      flushDirtyAux,
-      setActiveTimelinePointId,
-      setCommittedBodies,
-      setDrafts,
-      setPendingSaveCounts,
-      setSaveErrors,
-    ],
+    [flushDirtyAux, store],
   );
 
   const handleBodyChange = useCallback(
@@ -563,13 +495,14 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         return;
       }
 
-      setDrafts((previous) => ({
+      const state = store.getState();
+      state.setDrafts((previous) => ({
         ...previous,
         [activeContentNode.id]: nextBody,
       }));
-      setSaveErrors((previous) => omitRecordKey(previous, activeContentNode.id));
+      state.setSaveErrors((previous) => omitRecordKey(previous, activeContentNode.id));
     },
-    [activeContentNode, setDrafts, setSaveErrors],
+    [activeContentNode, store],
   );
 
   const clearAuxNodeLocalState = useCallback(
@@ -588,12 +521,13 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         return changed ? next : record;
       };
 
-      setDrafts((previous) => omitMany(previous));
-      setCommittedBodies((previous) => omitMany(previous));
-      setPendingSaveCounts((previous) => omitMany(previous));
-      setSaveErrors((previous) => omitMany(previous));
+      const state = store.getState();
+      state.setDrafts((previous) => omitMany(previous));
+      state.setCommittedBodies((previous) => omitMany(previous));
+      state.setPendingSaveCounts((previous) => omitMany(previous));
+      state.setSaveErrors((previous) => omitMany(previous));
     },
-    [setCommittedBodies, setDrafts, setPendingSaveCounts, setSaveErrors],
+    [store],
   );
 
   const clearContentNodeLocalState = useCallback(
@@ -612,11 +546,12 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         return changed ? next : record;
       };
 
-      setDrafts((previous) => omitMany(previous));
-      setCommittedBodies((previous) => omitMany(previous));
-      setPendingSaveCounts((previous) => omitMany(previous));
-      setSaveErrors((previous) => omitMany(previous));
-      setExpandedContentIds((previous) => {
+      const state = store.getState();
+      state.setDrafts((previous) => omitMany(previous));
+      state.setCommittedBodies((previous) => omitMany(previous));
+      state.setPendingSaveCounts((previous) => omitMany(previous));
+      state.setSaveErrors((previous) => omitMany(previous));
+      state.setExpandedContentIds((previous) => {
         let changed = false;
         const next = new Set(previous);
 
@@ -629,11 +564,12 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         return changed ? next : previous;
       });
     },
-    [setCommittedBodies, setDrafts, setExpandedContentIds, setPendingSaveCounts, setSaveErrors],
+    [store],
   );
 
   const handleContentCreateSibling = useCallback(
     async (anchorId: string) => {
+      const { activeTimelinePointId, setContentError } = store.getState();
       if (!workspaceId || !contentRootId || !activeTimelinePointId) {
         return;
       }
@@ -662,7 +598,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         expandContentParent(parentId);
       } catch (error) {
         setActionError(
-          setContentError,
+          store.getState().setContentError,
           error instanceof Error ? error.message : "创建正文节点失败，请稍后重试。",
           anchorId,
         );
@@ -671,7 +607,6 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
     [
       activateContentNode,
       activeContentNode,
-      activeTimelinePointId,
       contentTree,
       contentParentMap,
       contentRootId,
@@ -679,13 +614,14 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
       expandContentParent,
       flatContentNodes.length,
       flushDirtyContentBeforeSwitch,
-      setContentError,
+      store,
       workspaceId,
     ],
   );
 
   const handleContentCreateChild = useCallback(
     async (parentNode: ContentTreeNodeVM, anchorId: string) => {
+      const { activeTimelinePointId, setContentError } = store.getState();
       if (!workspaceId || !activeTimelinePointId) {
         return;
       }
@@ -708,7 +644,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         expandContentParent(parentNode.id);
       } catch (error) {
         setActionError(
-          setContentError,
+          store.getState().setContentError,
           error instanceof Error ? error.message : "创建正文节点失败，请稍后重试。",
           anchorId,
         );
@@ -716,12 +652,11 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
     },
     [
       activateContentNode,
-      activeTimelinePointId,
       createContent,
       expandContentParent,
       flatContentNodes.length,
       flushDirtyContentBeforeSwitch,
-      setContentError,
+      store,
       workspaceId,
     ],
   );
@@ -737,6 +672,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         return;
       }
 
+      const { activeContentNodeId, setContentError } = store.getState();
       const deletedIds = collectContentSubtreeIds(targetNode);
       const shouldReselect = Boolean(activeContentNodeId && deletedIds.has(activeContentNodeId));
       const fallbackNode = shouldReselect
@@ -758,14 +694,15 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
           if (fallbackNode) {
             activateContentNode(fallbackNode.id, fallbackNode.anchorTimelinePointId);
           } else {
-            setShouldAutoSelectContent(false);
-            setPendingContentNodeId(null);
-            setActiveContentNodeId(null);
+            const state = store.getState();
+            state.setShouldAutoSelectContent(false);
+            state.setPendingContentNodeId(null);
+            state.setActiveContentNodeId(null);
           }
         }
       } catch (error) {
         setActionError(
-          setContentError,
+          store.getState().setContentError,
           error instanceof Error ? error.message : "删除正文节点失败，请稍后重试。",
           anchorId,
         );
@@ -773,17 +710,13 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
     },
     [
       activateContentNode,
-      activeContentNodeId,
       clearContentNodeLocalState,
       contentNodeMap,
       contentParentMap,
       contentRootId,
       contentTree,
       deleteContent,
-      setActiveContentNodeId,
-      setContentError,
-      setPendingContentNodeId,
-      setShouldAutoSelectContent,
+      store,
       workspaceId,
     ],
   );
@@ -798,7 +731,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         return;
       }
 
-      clearActionError(setContentError);
+      clearActionError(store.getState().setContentError);
 
       try {
         await updateContent.mutate({
@@ -806,16 +739,16 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
           nodeId: activeContentNode.id,
           anchorPointId: pointId,
         });
-        setActiveTimelinePointId(pointId);
+        store.getState().setActiveTimelinePointId(pointId);
       } catch (error) {
         setActionError(
-          setContentError,
+          store.getState().setContentError,
           error instanceof Error ? error.message : "设置时间锚点失败，请稍后重试。",
           anchorId,
         );
       }
     },
-    [activeContentNode, setActiveTimelinePointId, setContentError, updateContent, workspaceId],
+    [activeContentNode, store, updateContent, workspaceId],
   );
 
   const handleContentRename = useCallback(
@@ -824,7 +757,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         return false;
       }
 
-      clearActionError(setContentError);
+      clearActionError(store.getState().setContentError);
 
       try {
         await updateContent.mutate({
@@ -835,14 +768,14 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         return true;
       } catch (error) {
         setActionError(
-          setContentError,
+          store.getState().setContentError,
           error instanceof Error ? error.message : "重命名正文节点失败，请稍后重试。",
           actionAnchorId("content", "row", nodeId),
         );
         return false;
       }
     },
-    [setContentError, updateContent, workspaceId],
+    [store, updateContent, workspaceId],
   );
 
   const handleContentMove = useCallback(
@@ -863,7 +796,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         return;
       }
 
-      clearActionError(setContentError);
+      clearActionError(store.getState().setContentError);
 
       if (move.position === "inside") {
         expandContentParent(move.newParentId);
@@ -878,7 +811,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         });
       } catch (error) {
         setActionError(
-          setContentError,
+          store.getState().setContentError,
           error instanceof Error ? error.message : "调整正文顺序失败，请稍后重试。",
           actionAnchorId("content", "row", move.nodeId),
         );
@@ -891,7 +824,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
       contentTree,
       expandContentParent,
       moveContent,
-      setContentError,
+      store,
       workspaceId,
     ],
   );
@@ -907,7 +840,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         return false;
       }
 
-      clearActionError(setTimelineError);
+      clearActionError(store.getState().setTimelineError);
 
       try {
         await updateTimeline.mutate({
@@ -918,18 +851,19 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         return true;
       } catch (error) {
         setActionError(
-          setTimelineError,
+          store.getState().setTimelineError,
           error instanceof Error ? error.message : "重命名时间点失败，请稍后重试。",
           actionAnchorId("timeline", "row", pointId),
         );
         return false;
       }
     },
-    [setTimelineError, updateTimeline, workspaceId],
+    [store, updateTimeline, workspaceId],
   );
 
   const handleTimelineAdd = useCallback(
     async (anchorId: string) => {
+      const { activeTimelinePointId, setTimelineError } = store.getState();
       if (!workspaceId || !activeTimelinePointId) {
         return;
       }
@@ -945,23 +879,16 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
           label: `新时间点 ${newIndex}`,
           description: "",
         });
-        setActiveTimelinePointId(point.id);
+        store.getState().setActiveTimelinePointId(point.id);
       } catch (error) {
         setActionError(
-          setTimelineError,
+          store.getState().setTimelineError,
           error instanceof Error ? error.message : "创建时间点失败，请稍后重试。",
           anchorId,
         );
       }
     },
-    [
-      activeTimelinePointId,
-      createTimeline,
-      setActiveTimelinePointId,
-      setTimelineError,
-      timelinePoints,
-      workspaceId,
-    ],
+    [createTimeline, store, timelinePoints, workspaceId],
   );
 
   const handleTimelineReorder = useCallback(
@@ -986,7 +913,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
           ? ORIGIN_TIMELINE_POINT_ID
           : (orderedMovablePoints[newIndex - 1]?.id ?? ORIGIN_TIMELINE_POINT_ID);
 
-      clearActionError(setTimelineError);
+      clearActionError(store.getState().setTimelineError);
       rpc.cancelQueries("timeline.list", { workspaceId });
       const previousTimeline = rpc.getQueryData("timeline.list", { workspaceId });
       rpc.updateQueryData("timeline.list", { workspaceId }, (points) =>
@@ -1004,37 +931,37 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
           rpc.setQueryData("timeline.list", { workspaceId }, previousTimeline);
         }
         setActionError(
-          setTimelineError,
+          store.getState().setTimelineError,
           error instanceof Error ? error.message : "调整时间轴顺序失败，请稍后重试。",
           actionAnchorId("timeline", "row", movedPoint.id),
         );
       }
     },
-    [moveTimeline, setTimelineError, timelinePoints, workspaceId],
+    [moveTimeline, store, timelinePoints, workspaceId],
   );
 
   const handleAuxCreateSiblingDir = useCallback(
     async (anchorId: string) => {
-      const parentDirId = resolveAuxParentForSibling(activeAuxNodeId);
+      const parentDirId = resolveAuxParentForSibling(store.getState().activeAuxNodeId);
       if (!parentDirId) {
         return;
       }
 
       await createAuxDir(parentDirId, anchorId);
     },
-    [activeAuxNodeId, createAuxDir, resolveAuxParentForSibling],
+    [createAuxDir, resolveAuxParentForSibling, store],
   );
 
   const handleAuxCreateSiblingFile = useCallback(
     async (anchorId: string) => {
-      const parentDirId = resolveAuxParentForSibling(activeAuxNodeId);
+      const parentDirId = resolveAuxParentForSibling(store.getState().activeAuxNodeId);
       if (!parentDirId) {
         return;
       }
 
       await createAuxFile(parentDirId, anchorId);
     },
-    [activeAuxNodeId, createAuxFile, resolveAuxParentForSibling],
+    [createAuxFile, resolveAuxParentForSibling, store],
   );
 
   const handleAuxCreateChildDir = useCallback(
@@ -1061,6 +988,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
 
   const handleAuxRename = useCallback(
     async (nodeId: string, name: string) => {
+      const { activeTimelinePointId, setAuxError } = store.getState();
       if (!workspaceId || !activeTimelinePointId) {
         return false;
       }
@@ -1098,27 +1026,19 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         return true;
       } catch (error) {
         setActionError(
-          setAuxError,
+          store.getState().setAuxError,
           error instanceof Error ? error.message : "重命名辅助节点失败，请稍后重试。",
           anchorId,
         );
         return false;
       }
     },
-    [
-      activeTimelinePointId,
-      auxNodeMap,
-      auxParentMap,
-      auxRootId,
-      auxTree,
-      moveAux,
-      setAuxError,
-      workspaceId,
-    ],
+    [auxNodeMap, auxParentMap, auxRootId, auxTree, moveAux, store, workspaceId],
   );
 
   const handleAuxDelete = useCallback(
     async (nodeId: string, anchorId: string) => {
+      const { activeTimelinePointId, setAuxError } = store.getState();
       if (!workspaceId || !activeTimelinePointId) {
         return;
       }
@@ -1132,40 +1052,30 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
           nodeId,
         });
         clearAuxNodeLocalState(new Set([nodeId]));
-        if (activeAuxNodeId === nodeId) {
-          setShouldAutoSelectContent(false);
-          setPendingContentNodeId(null);
-          setActiveContentNodeId(null);
+        const state = store.getState();
+        if (state.activeAuxNodeId === nodeId) {
+          state.setShouldAutoSelectContent(false);
+          state.setPendingContentNodeId(null);
+          state.setActiveContentNodeId(null);
           if (activeTimelinePointId === ORIGIN_TIMELINE_POINT_ID) {
-            setPendingAuxNodeId(null);
-            setActiveAuxNodeId(null);
+            state.setPendingAuxNodeId(null);
+            state.setActiveAuxNodeId(null);
           }
         }
       } catch (error) {
         setActionError(
-          setAuxError,
+          store.getState().setAuxError,
           error instanceof Error ? error.message : "删除辅助节点失败，请稍后重试。",
           anchorId,
         );
       }
     },
-    [
-      activeAuxNodeId,
-      activeTimelinePointId,
-      clearAuxNodeLocalState,
-      deleteAux,
-      setActiveContentNodeId,
-      setActiveAuxNodeId,
-      setAuxError,
-      setPendingAuxNodeId,
-      setPendingContentNodeId,
-      setShouldAutoSelectContent,
-      workspaceId,
-    ],
+    [clearAuxNodeLocalState, deleteAux, store, workspaceId],
   );
 
   const handleAuxRestore = useCallback(
     async (nodeId: string, anchorId: string) => {
+      const { activeTimelinePointId, setAuxError } = store.getState();
       if (!workspaceId || !activeTimelinePointId) {
         return;
       }
@@ -1181,13 +1091,13 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         clearAuxNodeLocalState(new Set([nodeId]));
       } catch (error) {
         setActionError(
-          setAuxError,
+          store.getState().setAuxError,
           error instanceof Error ? error.message : "恢复辅助节点失败，请稍后重试。",
           anchorId,
         );
       }
     },
-    [activeTimelinePointId, clearAuxNodeLocalState, restoreAux, setAuxError, workspaceId],
+    [clearAuxNodeLocalState, restoreAux, store, workspaceId],
   );
 
   const handleTimelineDelete = useCallback(
@@ -1196,14 +1106,14 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         return;
       }
 
-      clearActionError(setTimelineError);
+      clearActionError(store.getState().setTimelineError);
 
       const anchoredNodes = flatContentNodes.filter(
         (node) => node.anchorTimelinePointId === pointId,
       );
       if (anchoredNodes.length > 0) {
         setActionError(
-          setTimelineError,
+          store.getState().setTimelineError,
           formatTimelineContentAnchorError(
             anchoredNodes,
             contentParentMap,
@@ -1241,7 +1151,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         finishTimelineDelete(pointId);
       } catch (error) {
         setActionError(
-          setTimelineError,
+          store.getState().setTimelineError,
           error instanceof Error ? error.message : "删除时间点失败，请稍后重试。",
           anchorId,
         );
@@ -1254,7 +1164,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
       deleteTimeline,
       finishTimelineDelete,
       flatContentNodes,
-      setTimelineError,
+      store,
       timelinePoints,
       workspaceId,
     ],
@@ -1273,7 +1183,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
     }
 
     const { pointId, anchorId } = timelineDeleteDialog;
-    clearActionError(setTimelineError);
+    clearActionError(store.getState().setTimelineError);
 
     try {
       await deleteTimeline.mutate({
@@ -1286,12 +1196,12 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
     } catch (error) {
       setTimelineDeleteDialog(null);
       setActionError(
-        setTimelineError,
+        store.getState().setTimelineError,
         error instanceof Error ? error.message : "删除时间点失败，请稍后重试。",
         anchorId,
       );
     }
-  }, [deleteTimeline, finishTimelineDelete, setTimelineError, timelineDeleteDialog, workspaceId]);
+  }, [deleteTimeline, finishTimelineDelete, store, timelineDeleteDialog, workspaceId]);
 
   return mergeProjectActionGroups({
     editor: {
@@ -1319,7 +1229,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
       handleTimelineDeleteCancel,
       handleTimelineDeleteConfirm,
       timelineDeleteDialog,
-      setActiveTimelinePointId,
+      setActiveTimelinePointId: store.getState().setActiveTimelinePointId,
     },
     aux: {
       toggleAuxExpanded,
@@ -1331,7 +1241,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
       handleAuxRename,
       handleAuxDelete,
       handleAuxRestore,
-      setActiveAuxNodeId,
+      setActiveAuxNodeId: store.getState().setActiveAuxNodeId,
     },
     misc: {},
   });

@@ -1,5 +1,3 @@
-import { useMolecule } from "bunshi/react";
-import { useAtomValue, useSetAtom } from "jotai";
 import { useEffect } from "react";
 
 import {
@@ -8,8 +6,7 @@ import {
 } from "@/modules/workspace/ui/editor/model/tree";
 
 import { AUTOSAVE_DELAY_MS } from "../constants";
-import { EditorMolecule } from "../molecules/editor";
-import { SelectionMolecule } from "../molecules/selection";
+import { useWorkspaceState } from "../molecules/workspaceStore";
 import type { ProjectWorkspaceState } from "./useProjectWorkspace";
 
 export function useProjectWorkspaceEffects(
@@ -17,22 +14,19 @@ export function useProjectWorkspaceEffects(
   flushBodySave: (_nodeId: string, _body: string) => Promise<void>,
   flushAuxSave: (_nodeId: string, _content: string) => Promise<void>,
 ) {
-  const selection = useMolecule(SelectionMolecule);
-  const editor = useMolecule(EditorMolecule);
-
-  const setActiveContentNodeId = useSetAtom(selection.activeContentNodeIdAtom);
-  const setActiveAuxNodeId = useSetAtom(selection.activeAuxNodeIdAtom);
-  const pendingContentNodeId = useAtomValue(selection.pendingContentNodeIdAtom);
-  const setPendingContentNodeId = useSetAtom(selection.pendingContentNodeIdAtom);
-  const pendingAuxNodeId = useAtomValue(selection.pendingAuxNodeIdAtom);
-  const setPendingAuxNodeId = useSetAtom(selection.pendingAuxNodeIdAtom);
-  const shouldAutoSelectContent = useAtomValue(selection.shouldAutoSelectContentAtom);
-  const setActiveTimelinePointId = useSetAtom(selection.activeTimelinePointIdAtom);
-  const setExpandedContentIds = useSetAtom(selection.expandedContentIdsAtom);
-  const setExpandedAuxIds = useSetAtom(selection.expandedAuxIdsAtom);
-  const drafts = useAtomValue(editor.draftsAtom);
-  const committedBodies = useAtomValue(editor.committedBodiesAtom);
-  const setCommittedBodies = useSetAtom(editor.committedBodiesAtom);
+  const setActiveContentNodeId = useWorkspaceState((state) => state.setActiveContentNodeId);
+  const setActiveAuxNodeId = useWorkspaceState((state) => state.setActiveAuxNodeId);
+  const pendingContentNodeId = useWorkspaceState((state) => state.pendingContentNodeId);
+  const setPendingContentNodeId = useWorkspaceState((state) => state.setPendingContentNodeId);
+  const pendingAuxNodeId = useWorkspaceState((state) => state.pendingAuxNodeId);
+  const setPendingAuxNodeId = useWorkspaceState((state) => state.setPendingAuxNodeId);
+  const shouldAutoSelectContent = useWorkspaceState((state) => state.shouldAutoSelectContent);
+  const setActiveTimelinePointId = useWorkspaceState((state) => state.setActiveTimelinePointId);
+  const setExpandedContentIds = useWorkspaceState((state) => state.setExpandedContentIds);
+  const setExpandedAuxIds = useWorkspaceState((state) => state.setExpandedAuxIds);
+  const drafts = useWorkspaceState((state) => state.drafts);
+  const committedBodies = useWorkspaceState((state) => state.committedBodies);
+  const setCommittedBodies = useWorkspaceState((state) => state.setCommittedBodies);
 
   const {
     identity: { workspaceId },

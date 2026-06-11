@@ -1,8 +1,7 @@
-import { useAtom } from "jotai";
 import { useLayoutEffect } from "react";
 import { useLocation } from "wouter";
 
-import { lastProjectIdAtom, lastWorkspaceRouteAtom } from "@/app/state/lastProject";
+import { useLastProjectStore } from "@/app/state/lastProject";
 
 export type AppRoute =
   | { kind: "home" }
@@ -100,8 +99,10 @@ export function resolveProjectRouteTarget(route: AppRoute, lastProjectId: string
 
 export function useCachedProjectRoute() {
   const [location] = useLocation();
-  const [lastProjectId, setLastProjectId] = useAtom(lastProjectIdAtom);
-  const [lastWorkspaceRoute, setLastWorkspaceRoute] = useAtom(lastWorkspaceRouteAtom);
+  const lastProjectId = useLastProjectStore((state) => state.lastProjectId);
+  const setLastProjectId = useLastProjectStore((state) => state.setLastProjectId);
+  const lastWorkspaceRoute = useLastProjectStore((state) => state.lastWorkspaceRoute);
+  const setLastWorkspaceRoute = useLastProjectStore((state) => state.setLastWorkspaceRoute);
   const route = parseAppRoute(location);
   const routeProjectId =
     route.kind === "project" || route.kind === "workspace" ? route.projectId : null;
