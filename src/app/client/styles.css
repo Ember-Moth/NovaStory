@@ -163,8 +163,7 @@
   color: var(--color-foreground);
 }
 
-.main-text-editor .cm-content,
-.main-text-editor .cm-gutter {
+.main-text-editor .cm-content {
   padding-top: 1rem;
   padding-bottom: 1rem;
 }
