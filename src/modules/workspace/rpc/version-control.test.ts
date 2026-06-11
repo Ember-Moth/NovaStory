@@ -124,6 +124,25 @@ test("commit checkout invalidates the workspace content views", async () => {
   ]);
 });
 
+test("working tree status watches branch, history and workspace tags", async () => {
+  const workspace = seedProject("rpc_working_tree_status");
+
+  const result = await commitHandlers.workingTreeStatus.handler(
+    { branchId: workspace.branchId },
+    requestCtx,
+  );
+
+  expect(result.watch).toEqual([
+    rpcTags.branch(workspace.branchId),
+    rpcTags.commitHistory(workspace.branchId),
+    rpcTags.contentTree(workspace.id),
+    rpcTags.timelineList(workspace.id),
+    rpcTags.auxWorkspace(workspace.id),
+  ]);
+  expect(result.data.hasChanges).toBe(true);
+  expect(result.data.headCommitId).toBeNull();
+});
+
 test("commit history returns the mainline newest first", async () => {
   const workspace = seedProject("rpc_commit_history");
   service.createContentNode({

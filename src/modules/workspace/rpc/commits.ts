@@ -1,18 +1,41 @@
 import { mutation, query } from "@codehz/rpc/core";
 
+import { db } from "@/db";
 import {
   checkoutCommit,
   createCommit,
   getBranch,
   getCommit,
   getWorkspace,
+  getWorkingTreeStatus,
   listCommits,
 } from "@/modules/workspace/domain";
+import { getWorkspaceForBranch } from "@/modules/workspace/domain/internal/access";
 import { rpcTags, type RpcTagList } from "@/rpc/tags";
 
 export const history = query<{ branchId: string }, ReturnType<typeof listCommits>, RpcTagList>({
   watch: ({ branchId }) => [rpcTags.commitHistory(branchId)],
   handler: ({ branchId }) => listCommits(branchId),
+});
+
+export const workingTreeStatus = query<
+  { branchId: string },
+  ReturnType<typeof getWorkingTreeStatus>,
+  RpcTagList
+>({
+  watch: ({ branchId }) => {
+    const workspace = getWorkspaceForBranch(db, branchId);
+    return workspace
+      ? [
+          rpcTags.branch(branchId),
+          rpcTags.commitHistory(branchId),
+          rpcTags.contentTree(workspace.id),
+          rpcTags.timelineList(workspace.id),
+          rpcTags.auxWorkspace(workspace.id),
+        ]
+      : [rpcTags.branch(branchId)];
+  },
+  handler: ({ branchId }) => getWorkingTreeStatus(branchId),
 });
 
 export const get = query<

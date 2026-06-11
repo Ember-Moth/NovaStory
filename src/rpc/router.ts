@@ -78,6 +78,7 @@ export const commits = {
   get: commitHandlers.get,
   create: commitHandlers.create,
   checkout: commitHandlers.checkout,
+  workingTreeStatus: commitHandlers.workingTreeStatus,
 };
 
 export const timeline = {

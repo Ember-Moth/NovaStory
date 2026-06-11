@@ -39,6 +39,9 @@ type WorkspaceList = NonNullable<ReturnType<typeof rpc.useQuery<"workspaces.list
 type WorkspaceRow = WorkspaceList[number];
 type CommitHistory = NonNullable<ReturnType<typeof rpc.useQuery<"commits.history">>["data"]>;
 type CommitRow = CommitHistory[number];
+type WorkingTreeStatus = NonNullable<
+  ReturnType<typeof rpc.useQuery<"commits.workingTreeStatus">>["data"]
+>;
 type ProjectMutationContext = {
   previousProjects?: ProjectList;
 };
@@ -113,7 +116,15 @@ export function ProjectsPage({ projectId = null }: { projectId?: string | null }
       refetchOnWindowFocus: true,
     },
   );
+  const workingTreeStatusQuery = rpc.useQuery(
+    "commits.workingTreeStatus",
+    selectedBranchId ? { branchId: selectedBranchId } : skipToken,
+    {
+      refetchOnWindowFocus: true,
+    },
+  );
   const commitHistory = commitHistoryQuery.data ?? [];
+  const workingTreeStatus = workingTreeStatusQuery.data ?? null;
 
   const workspaceMap = new Map(workspaces.map((workspace) => [workspace.branchId, workspace]));
   const selectedWorkspace = selectedBranch ? (workspaceMap.get(selectedBranch.id) ?? null) : null;
@@ -454,6 +465,12 @@ export function ProjectsPage({ projectId = null }: { projectId?: string | null }
       return;
     }
 
+    const commitBlockedByCleanTree =
+      workingTreeStatus?.headCommitId != null && workingTreeStatus.hasChanges === false;
+    if (commitBlockedByCleanTree) {
+      return;
+    }
+
     const trimmedMessage = commitMessage.trim();
     if (!trimmedMessage) {
       setCommitError("提交信息不能为空。");
@@ -575,6 +592,11 @@ export function ProjectsPage({ projectId = null }: { projectId?: string | null }
             commitHistory={commitHistory}
             commitHistoryLoading={commitHistoryQuery.isInitialLoading && commitHistory.length === 0}
             commitHistoryError={commitHistoryQuery.error?.message ?? null}
+            workingTreeStatus={workingTreeStatus}
+            workingTreeStatusLoading={
+              workingTreeStatusQuery.isInitialLoading && workingTreeStatus == null
+            }
+            workingTreeStatusError={workingTreeStatusQuery.error?.message ?? null}
             commitMessage={commitMessage}
             commitError={commitError ?? createCommit.error?.message ?? null}
             isCommitting={createCommit.isPending}
@@ -1015,6 +1037,9 @@ function ProjectWorkbenchMain({
   commitHistory,
   commitHistoryLoading,
   commitHistoryError,
+  workingTreeStatus,
+  workingTreeStatusLoading,
+  workingTreeStatusError,
   commitMessage,
   commitError,
   isCommitting,
@@ -1034,6 +1059,9 @@ function ProjectWorkbenchMain({
   commitHistory: CommitHistory;
   commitHistoryLoading: boolean;
   commitHistoryError: string | null;
+  workingTreeStatus: WorkingTreeStatus | null;
+  workingTreeStatusLoading: boolean;
+  workingTreeStatusError: string | null;
   commitMessage: string;
   commitError: string | null;
   isCommitting: boolean;
@@ -1069,6 +1097,9 @@ function ProjectWorkbenchMain({
           commitHistory={commitHistory}
           commitHistoryLoading={commitHistoryLoading}
           commitHistoryError={commitHistoryError}
+          workingTreeStatus={workingTreeStatus}
+          workingTreeStatusLoading={workingTreeStatusLoading}
+          workingTreeStatusError={workingTreeStatusError}
           commitMessage={commitMessage}
           commitError={commitError}
           isCommitting={isCommitting}
@@ -1093,6 +1124,9 @@ function BranchDetailPanel({
   commitHistory,
   commitHistoryLoading,
   commitHistoryError,
+  workingTreeStatus,
+  workingTreeStatusLoading,
+  workingTreeStatusError,
   commitMessage,
   commitError,
   isCommitting,
@@ -1111,6 +1145,9 @@ function BranchDetailPanel({
   commitHistory: CommitHistory;
   commitHistoryLoading: boolean;
   commitHistoryError: string | null;
+  workingTreeStatus: WorkingTreeStatus | null;
+  workingTreeStatusLoading: boolean;
+  workingTreeStatusError: string | null;
   commitMessage: string;
   commitError: string | null;
   isCommitting: boolean;
@@ -1135,6 +1172,9 @@ function BranchDetailPanel({
   }
 
   const workspaceMissing = selectedWorkspace == null;
+  const commitDisabledByCleanTree =
+    workingTreeStatus?.headCommitId != null && workingTreeStatus.hasChanges === false;
+  const commitDisabled = workspaceMissing || isCommitting || commitDisabledByCleanTree;
 
   return (
     <div className="mx-auto grid min-h-full w-full max-w-6xl gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]">
@@ -1272,22 +1312,26 @@ function BranchDetailPanel({
           <h3 className="text-sm font-semibold text-foreground">Commit</h3>
         </div>
 
+        {!workspaceMissing ? (
+          <WorkingTreeStatusPanel
+            status={workingTreeStatus}
+            loading={workingTreeStatusLoading}
+            error={workingTreeStatusError}
+          />
+        ) : null}
+
         <form className="mt-4 grid gap-3" onSubmit={onSubmitCommit}>
           <textarea
             value={commitMessage}
             onChange={(event) => onCommitMessageChange(event.target.value)}
             rows={5}
-            disabled={workspaceMissing || isCommitting}
+            disabled={commitDisabled}
             placeholder="描述这次提交做了什么。"
             className="w-full resize-y rounded-md border border-border bg-editor-background px-3 py-2 text-sm leading-relaxed text-foreground transition outline-none focus:border-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
           />
           {commitError ? <InlineError message={commitError} /> : null}
           <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={workspaceMissing || isCommitting}
-              className={primaryButton}
-            >
+            <button type="submit" disabled={commitDisabled} className={primaryButton}>
               <span
                 className={cn(
                   "text-base",
@@ -1368,6 +1412,132 @@ function ProjectDialog({
         </div>
       </form>
     </dialog>
+  );
+}
+
+const workingTreeChangeKindLabels: Record<
+  WorkingTreeStatus["areas"]["content"]["changes"][number]["kind"],
+  string
+> = {
+  added: "新增",
+  modified: "修改",
+  deleted: "删除",
+};
+
+const workingTreeAreaLabels = {
+  content: "正文",
+  timeline: "时间线",
+  aux: "辅助信息",
+} as const;
+
+function WorkingTreeStatusPanel({
+  status,
+  loading,
+  error,
+}: {
+  status: WorkingTreeStatus | null;
+  loading: boolean;
+  error: string | null;
+}) {
+  return (
+    <section className="mt-4 rounded-lg border border-border bg-editor-background p-4">
+      <div className="flex items-center gap-2">
+        <span className="icon-[material-symbols--difference] text-base text-accent-foreground" />
+        <h4 className="text-sm font-semibold text-foreground">未提交变更</h4>
+      </div>
+
+      <div className="mt-3">
+        {error ? (
+          <InlineError message={error} />
+        ) : loading ? (
+          <LoadingBlock label="正在对比工作区与 HEAD..." />
+        ) : status == null ? null : status.headCommitId == null ? (
+          <p className="text-sm text-foreground-muted">尚无提交，可创建首次提交。</p>
+        ) : !status.hasChanges ? (
+          <p className="text-sm text-foreground-muted">工作区与 HEAD 一致，无未提交变更。</p>
+        ) : (
+          <div className="space-y-4">
+            {(Object.keys(workingTreeAreaLabels) as Array<keyof typeof workingTreeAreaLabels>).map(
+              (areaKey) => {
+                const area = status.areas[areaKey];
+                if (!area.changed) {
+                  return null;
+                }
+
+                return (
+                  <div key={areaKey}>
+                    <div className="text-xs font-medium text-foreground-muted">
+                      {workingTreeAreaLabels[areaKey]}
+                    </div>
+                    <ul className="mt-2 space-y-1.5">
+                      {area.changes.map((change) => (
+                        <li
+                          key={`${areaKey}-${change.kind}-${change.label}`}
+                          className="flex items-center gap-2 text-sm text-foreground"
+                        >
+                          <WorkingTreeChangeBadge kind={change.kind} />
+                          <WorkingTreeChangeLabel
+                            label={change.label}
+                            emphasizeTimeline={areaKey === "aux"}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              },
+            )}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function WorkingTreeChangeLabel({
+  label,
+  emphasizeTimeline,
+}: {
+  label: string;
+  emphasizeTimeline: boolean;
+}) {
+  if (!emphasizeTimeline) {
+    return <span className="min-w-0 truncate">{label}</span>;
+  }
+
+  const timelineMarkerIndex = label.lastIndexOf("@");
+  if (timelineMarkerIndex < 0) {
+    return <span className="min-w-0 truncate">{label}</span>;
+  }
+
+  const path = label.slice(0, timelineMarkerIndex);
+  const timelineRef = label.slice(timelineMarkerIndex);
+
+  return (
+    <span className="min-w-0 truncate">
+      {path}
+      <span className="text-foreground-muted italic">{timelineRef}</span>
+    </span>
+  );
+}
+
+function WorkingTreeChangeBadge({
+  kind,
+}: {
+  kind: WorkingTreeStatus["areas"]["content"]["changes"][number]["kind"];
+}) {
+  const label = workingTreeChangeKindLabels[kind];
+  const className =
+    kind === "added"
+      ? "bg-emerald-500/15 text-emerald-200"
+      : kind === "deleted"
+        ? "bg-red-500/15 text-red-200"
+        : "bg-amber-500/15 text-amber-200";
+
+  return (
+    <span className={cn("shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium", className)}>
+      {label}
+    </span>
   );
 }
 

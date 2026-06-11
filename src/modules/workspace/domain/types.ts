@@ -78,3 +78,25 @@ export interface WritingContext {
 export interface ResolvedAuxSnapshotNode extends ResolvedAuxNode {
   reachable: boolean;
 }
+
+export type WorkingTreeChangeKind = "added" | "modified" | "deleted";
+
+export interface WorkingTreeChangeItem {
+  label: string;
+  kind: WorkingTreeChangeKind;
+}
+
+export interface WorkingTreeAreaSummary {
+  changed: boolean;
+  changes: WorkingTreeChangeItem[];
+}
+
+export interface WorkingTreeStatus {
+  hasChanges: boolean;
+  headCommitId: string | null;
+  areas: {
+    content: WorkingTreeAreaSummary;
+    timeline: WorkingTreeAreaSummary;
+    aux: WorkingTreeAreaSummary;
+  };
+}
