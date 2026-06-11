@@ -1,38 +1,15 @@
-import type { PartialOptions } from "overlayscrollbars";
-import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
-import { type ComponentProps, type ReactNode, useEffect } from "react";
+import SimpleBar from "simplebar-react";
+import { type ComponentProps, type ReactNode, type UIEvent, useEffect } from "react";
+
+import { cn } from "../lib/cn";
 
 export type OverlayScrollbarVariant = "panel" | "card" | "inline";
 
-const VARIANT_THEMES: Record<OverlayScrollbarVariant, string> = {
-  panel: "os-theme-panel",
-  card: "os-theme-card",
-  inline: "os-theme-inline",
+const VARIANT_CLASSES: Record<OverlayScrollbarVariant, string> = {
+  panel: "scrollbar-panel",
+  card: "scrollbar-card",
+  inline: "scrollbar-inline",
 };
-
-function getScrollbarOptions(variant: OverlayScrollbarVariant): PartialOptions {
-  const overflow =
-    variant === "inline"
-      ? {
-          x: "scroll" as const,
-          y: "hidden" as const,
-        }
-      : {
-          x: "scroll" as const,
-          y: "scroll" as const,
-        };
-  return {
-    overflow,
-    scrollbars: {
-      theme: VARIANT_THEMES[variant],
-      visibility: "auto",
-      autoHide: "leave",
-      autoHideDelay: 700,
-      dragScroll: true,
-      pointers: ["mouse", "pen"],
-    },
-  };
-}
 
 export function OverlayScrollbar({
   children,
@@ -48,12 +25,11 @@ export function OverlayScrollbar({
   viewportRef?: { current: HTMLElement | null };
   onViewportScroll?: (_event: Event) => void;
 } & Omit<ComponentProps<"div">, "children" | "className" | "ref">) {
-  const rootClassName = [
+  const rootClassName = cn(
     variant === "inline" ? "w-full max-w-full min-w-0" : "h-full w-full min-h-0 flex-1",
+    VARIANT_CLASSES[variant],
     className,
-  ]
-    .filter(Boolean)
-    .join(" ");
+  );
 
   useEffect(() => {
     return () => {
@@ -64,27 +40,25 @@ export function OverlayScrollbar({
   }, [viewportRef]);
 
   return (
-    <OverlayScrollbarsComponent
-      defer
-      options={getScrollbarOptions(variant)}
-      events={{
-        initialized(instance) {
+    <SimpleBar
+      autoHide
+      scrollableNodeProps={{
+        ref(node: HTMLElement | null) {
           if (viewportRef) {
-            viewportRef.current = instance.elements().viewport;
+            viewportRef.current = node;
           }
         },
-        scroll(instance, event) {
+        onScroll(event: UIEvent<HTMLElement>) {
           if (viewportRef) {
-            viewportRef.current = instance.elements().viewport;
+            viewportRef.current = event.currentTarget;
           }
-          onViewportScroll?.(event);
+          onViewportScroll?.(event.nativeEvent);
         },
       }}
       className={rootClassName}
-      data-overlayscrollbars-initialize
       {...props}
     >
       {children}
-    </OverlayScrollbarsComponent>
+    </SimpleBar>
   );
 }

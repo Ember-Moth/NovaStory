@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import "overlayscrollbars/styles/overlayscrollbars.css";
+@import "simplebar-react/dist/simplebar.min.css";
 @import "streamdown/styles.css";
 @plugin "@iconify/tailwind4";
 @source "../../../node_modules/streamdown/dist/*.js";
@@ -95,81 +95,107 @@
   }
 }
 
-.os-theme-panel,
-.os-theme-card,
-.os-theme-inline {
-  --os-handle-bg: var(--color-scrollbar-thumb);
-  --os-handle-bg-hover: var(--color-scrollbar-thumb-hover);
-  --os-handle-bg-active: var(--color-scrollbar-thumb-dragging);
+.scrollbar-panel .simplebar-scrollbar::before,
+.scrollbar-card .simplebar-scrollbar::before,
+.scrollbar-inline .simplebar-scrollbar::before {
+  background: var(--color-scrollbar-thumb);
 }
 
-.os-theme-panel {
-  --os-size: 12px;
-  --os-padding-perpendicular: 0;
-  --os-padding-axis: 0;
-  --os-track-border-radius: 0;
-  --os-handle-border-radius: 0;
-  --os-handle-min-size: 20px;
-  --os-handle-perpendicular-size: 12px;
-  --os-handle-perpendicular-size-hover: 12px;
-  --os-handle-perpendicular-size-active: 12px;
+.scrollbar-panel.simplebar-mouse-entered .simplebar-scrollbar.simplebar-visible::before,
+.scrollbar-card.simplebar-mouse-entered .simplebar-scrollbar.simplebar-visible::before,
+.scrollbar-inline.simplebar-mouse-entered .simplebar-scrollbar.simplebar-visible::before {
+  background: var(--color-scrollbar-thumb-hover);
+  opacity: 0.78;
 }
 
-.os-theme-card {
-  --os-size: 10px;
-  --os-padding-perpendicular: 4px;
-  --os-padding-axis: 2px;
-  --os-track-border-radius: 999px;
-  --os-handle-border-radius: 999px;
-  --os-handle-min-size: 24px;
-  --os-handle-perpendicular-size: 5px;
-  --os-handle-perpendicular-size-hover: 5px;
-  --os-handle-perpendicular-size-active: 6px;
+.scrollbar-panel.simplebar-dragging .simplebar-scrollbar::before,
+.scrollbar-card.simplebar-dragging .simplebar-scrollbar::before,
+.scrollbar-inline.simplebar-dragging .simplebar-scrollbar::before {
+  background: var(--color-scrollbar-thumb-dragging);
+  opacity: 0.92;
+  transition-delay: 0s;
 }
 
-.os-theme-inline {
-  --os-size: 8px;
-  --os-padding-perpendicular: 0;
-  --os-padding-axis: 2px;
-  --os-track-border-radius: 999px;
-  --os-handle-border-radius: 999px;
-  --os-handle-min-size: 24px;
-  --os-handle-perpendicular-size: 4px;
-  --os-handle-perpendicular-size-hover: 5px;
-  --os-handle-perpendicular-size-active: 5px;
+.scrollbar-panel .simplebar-track.simplebar-vertical {
+  width: 12px;
 }
 
-.os-theme-panel.os-scrollbar,
-.os-theme-card.os-scrollbar,
-.os-theme-inline.os-scrollbar {
-  transition:
-    opacity 100ms ease-in,
-    visibility 100ms ease-in allow-discrete;
+.scrollbar-panel .simplebar-track.simplebar-horizontal {
+  height: 12px;
 }
 
-.os-theme-panel.os-scrollbar.os-scrollbar-auto-hide-hidden,
-.os-theme-card.os-scrollbar.os-scrollbar-auto-hide-hidden,
-.os-theme-inline.os-scrollbar.os-scrollbar-auto-hide-hidden {
-  transition:
-    opacity 500ms ease-out,
-    visibility 500ms ease-out allow-discrete;
+.scrollbar-panel .simplebar-scrollbar {
+  min-height: 20px;
 }
 
-@starting-style {
-  .os-theme-panel.os-scrollbar.os-scrollbar-visible,
-  .os-theme-panel.os-scrollbar.os-scrollbar-interaction,
-  .os-theme-card.os-scrollbar.os-scrollbar-visible,
-  .os-theme-card.os-scrollbar.os-scrollbar-interaction,
-  .os-theme-inline.os-scrollbar.os-scrollbar-visible,
-  .os-theme-inline.os-scrollbar.os-scrollbar-interaction {
-    opacity: 0;
-  }
+.scrollbar-panel .simplebar-track.simplebar-horizontal .simplebar-scrollbar {
+  min-width: 20px;
+}
+
+.scrollbar-panel .simplebar-scrollbar::before {
+  inset: 0;
+  border-radius: 0;
+}
+
+.scrollbar-card .simplebar-track.simplebar-vertical {
+  top: 2px;
+  bottom: 2px;
+  width: 10px;
+}
+
+.scrollbar-card .simplebar-track.simplebar-horizontal {
+  left: 2px;
+  right: 2px;
+  height: 10px;
+}
+
+.scrollbar-card .simplebar-scrollbar {
+  min-height: 24px;
+}
+
+.scrollbar-card .simplebar-track.simplebar-horizontal .simplebar-scrollbar {
+  min-width: 24px;
+}
+
+.scrollbar-card .simplebar-scrollbar::before {
+  inset: 2px;
+  border-radius: 999px;
+}
+
+.scrollbar-inline .simplebar-content-wrapper {
+  overflow-y: hidden !important;
+}
+
+.scrollbar-inline .simplebar-track.simplebar-vertical {
+  display: none;
+}
+
+.scrollbar-inline .simplebar-track.simplebar-horizontal {
+  left: 2px;
+  right: 2px;
+  height: 8px;
+}
+
+.scrollbar-inline .simplebar-scrollbar {
+  min-height: 24px;
+}
+
+.scrollbar-inline .simplebar-track.simplebar-horizontal .simplebar-scrollbar {
+  min-width: 24px;
+}
+
+.scrollbar-inline .simplebar-scrollbar::before {
+  top: 2px;
+  right: 2px;
+  bottom: 1px;
+  left: 2px;
+  border-radius: 999px;
 }
 
 @media (pointer: coarse) {
-  .os-theme-panel.os-scrollbar,
-  .os-theme-card.os-scrollbar,
-  .os-theme-inline.os-scrollbar {
+  .scrollbar-panel .simplebar-track,
+  .scrollbar-card .simplebar-track,
+  .scrollbar-inline .simplebar-track {
     display: none !important;
   }
 }
@@ -267,7 +293,7 @@
   max-width: 100%;
 }
 
-.ai-markdown [data-streamdown="code-block-body"] .os-viewport {
+.ai-markdown [data-streamdown="code-block-body"] .simplebar-content {
   padding: 0.75rem;
 }
 
