@@ -27,6 +27,14 @@ test("AiMarkdown tolerates incomplete fenced code blocks while streaming", () =>
   expect(render()).toContain('data-streamdown="code-block"');
 });
 
+test("AiMarkdown enables streamdown text animation while streaming", () => {
+  const html = renderToStaticMarkup(
+    <AiMarkdown content="alpha beta gamma" isStreaming variant="assistant" />,
+  );
+
+  expect(html).toContain("data-sd-animate");
+});
+
 test("AiMarkdown escapes raw html and blocks unsafe links and images", () => {
   const html = renderToStaticMarkup(
     <AiMarkdown

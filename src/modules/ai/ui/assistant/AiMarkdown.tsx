@@ -32,6 +32,10 @@ const MARKDOWN_COMPONENTS: NonNullable<StreamdownProps["components"]> = {
   code: MarkdownCode,
 };
 
+const MARKDOWN_ANIMATION: NonNullable<StreamdownProps["animated"]> = {
+  animation: "slideUp",
+};
+
 export function AiMarkdown({
   content,
   isStreaming,
@@ -45,7 +49,8 @@ export function AiMarkdown({
     <Streamdown
       mode={isStreaming ? "streaming" : "static"}
       parseIncompleteMarkdown={isStreaming}
-      isAnimating={false}
+      animated={MARKDOWN_ANIMATION}
+      isAnimating={isStreaming}
       controls={false}
       rehypePlugins={AI_MARKDOWN_REHYPE_PLUGINS}
       components={MARKDOWN_COMPONENTS}
