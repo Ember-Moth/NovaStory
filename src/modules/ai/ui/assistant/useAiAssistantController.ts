@@ -446,7 +446,7 @@ export function useAiAssistantController(
   const sessionOverlayState =
     assistantOverviewQuery.isInitialLoading && threads.length === 0
       ? ("loading" as const)
-      : unarchivedThreads.length === 0
+      : threads.length === 0
         ? ("empty" as const)
         : null;
   const sessionRows = useMemo(
