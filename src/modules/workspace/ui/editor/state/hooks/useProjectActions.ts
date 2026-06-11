@@ -1,6 +1,5 @@
 import { useCallback, useState } from "react";
 
-import { moveArrayItem } from "@/shared/lib/array";
 import { createTimelineKey } from "@/shared/lib/domain";
 import {
   actionAnchorId,
@@ -26,8 +25,8 @@ import {
   type ContentMoveIntent,
 } from "@/modules/workspace/ui/editor/model/tree";
 import type { AuxTreeNodeVM, ContentTreeNodeVM } from "@/modules/workspace/ui/editor/model/types";
-import { rpc } from "@/rpc/client";
 import { ORIGIN_TIMELINE_POINT_ID } from "@/modules/workspace/domain/constants";
+import { rpc } from "@/rpc/client";
 
 import { mergeProjectActionGroups } from "../actions/actionGroups";
 import { useWorkspaceStoreApi } from "../molecules/workspaceStore";
@@ -1042,45 +1041,26 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
     [createTimeline, store, timelinePoints, workspaceId],
   );
 
-  const handleTimelineReorder = useCallback(
-    async (fromIndex: number, toIndex: number) => {
+  const handleTimelineMove = useCallback(
+    async (pointId: string, afterPointId: string) => {
       if (!workspaceId) {
         return;
       }
 
-      const movedPoint = timelinePoints[fromIndex];
+      const movedPoint = timelinePoints.find((point) => point.id === pointId);
       if (!movedPoint || movedPoint.isImplicitOrigin) {
         return;
       }
 
-      const reorderedPoints = [...timelinePoints];
-      reorderedPoints.splice(fromIndex, 1);
-      reorderedPoints.splice(toIndex, 0, movedPoint);
-
-      const orderedMovablePoints = reorderedPoints.filter((point) => !point.isImplicitOrigin);
-      const newIndex = orderedMovablePoints.findIndex((point) => point.id === movedPoint.id);
-      const afterPointId =
-        newIndex <= 0
-          ? ORIGIN_TIMELINE_POINT_ID
-          : (orderedMovablePoints[newIndex - 1]?.id ?? ORIGIN_TIMELINE_POINT_ID);
-
       clearActionError(store.getState().setTimelineError);
-      rpc.cancelQueries("timeline.list", { workspaceId });
-      const previousTimeline = rpc.getQueryData("timeline.list", { workspaceId });
-      rpc.updateQueryData("timeline.list", { workspaceId }, (points) =>
-        moveArrayItem(points, fromIndex, toIndex),
-      );
 
       try {
         await moveTimeline.mutate({
           workspaceId,
-          pointId: movedPoint.id,
+          pointId,
           afterPointId,
         });
       } catch (error) {
-        if (previousTimeline) {
-          rpc.setQueryData("timeline.list", { workspaceId }, previousTimeline);
-        }
         setActionError(
           store.getState().setTimelineError,
           error instanceof Error ? error.message : "调整时间轴顺序失败，请稍后重试。",
@@ -1346,7 +1326,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
           setTimelineDeleteDialog({
             pointId,
             pointLabel,
-            auxPaths: (auxChanges ?? []).map((change) =>
+            auxPaths: (auxChanges ?? []).map((change: { path: string; isDeleted: boolean }) =>
               change.isDeleted ? `${change.path}（已删除）` : change.path,
             ),
             anchorId,
@@ -1434,7 +1414,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
       handleTimelineSelect,
       handleTimelineAdd,
       handleTimelineRename,
-      handleTimelineReorder,
+      handleTimelineMove,
       handleTimelineDelete,
       handleTimelineDeleteCancel,
       handleTimelineDeleteConfirm,

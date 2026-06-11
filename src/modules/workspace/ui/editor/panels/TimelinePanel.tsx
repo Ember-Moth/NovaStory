@@ -1,13 +1,191 @@
-import { Reorder, useDragControls } from "motion/react";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { type ReactNode, useLayoutEffect, useMemo, useRef, useState } from "react";
 
+import {
+  resolveTimelineMoveAfterPointId,
+  type TimelineDropPosition,
+} from "@/modules/workspace/ui/editor/model/timeline";
+import { actionAnchorId } from "@/modules/workspace/ui/editor/model/action-error";
+import type { TimelinePointVM } from "@/modules/workspace/ui/editor/model/types";
+import { cn } from "@/shared/lib/cn";
 import { InlineEditableText } from "@/shared/ui/InlineEditableText";
 import { RefreshOverlay } from "@/shared/ui/RefreshOverlay";
-import { RowActionButton, SidebarListRow } from "@/shared/ui/tree";
-import { actionAnchorId } from "@/modules/workspace/ui/editor/model/action-error";
-import { cn } from "@/shared/lib/cn";
+import {
+  rowPaddingLeft,
+  RowActionButton,
+  SidebarListRow,
+  useRowPointerGesture,
+} from "@/shared/ui/tree";
 
-import type { TimelinePointVM } from "@/modules/workspace/ui/editor/model/types";
+const TIMELINE_ROW_SELECTOR = "[data-row-id]";
+
+type TimelineDropIntent = {
+  pointId: string;
+  targetId: string | null;
+  position: TimelineDropPosition;
+  afterPointId: string;
+};
+
+type DropIndicatorRect = {
+  top: number;
+  left: number;
+  width: number;
+};
+
+function dropPositionFromPointer(clientY: number, row: HTMLElement) {
+  const rect = row.getBoundingClientRect();
+  return clientY < rect.top + rect.height / 2 ? ("before" as const) : ("after" as const);
+}
+
+function DropIndicatorOverlay({ rect }: { rect: DropIndicatorRect }) {
+  return (
+    <motion.span
+      className="pointer-events-none absolute z-30 block"
+      initial={{ opacity: 0, scale: 0.96 }}
+      animate={{
+        opacity: 1,
+        scale: 1,
+        top: rect.top - 6,
+        left: rect.left,
+        width: rect.width,
+        height: 12,
+      }}
+      exit={{
+        opacity: 0,
+        scale: 0.96,
+        top: rect.top - 6,
+        left: rect.left,
+        width: rect.width,
+        height: 12,
+      }}
+      transition={{ duration: 0.14, ease: "easeOut" }}
+      style={{
+        top: rect.top - 6,
+        left: rect.left,
+        width: rect.width,
+        height: 12,
+        originX: 0,
+        originY: 0.5,
+      }}
+    >
+      <motion.span
+        className="absolute top-1/2 left-0 size-1.5 -translate-y-1/2 rounded-full bg-drag-border"
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.12, ease: "easeOut" }}
+      />
+      <motion.span
+        className="absolute top-1/2 right-0 left-1.5 h-0.5 -translate-y-1/2 rounded-full bg-drag-border"
+        animate={{ opacity: 1, scaleX: 1 }}
+        transition={{ duration: 0.12, ease: "easeOut" }}
+        style={{ originX: 0 }}
+      />
+    </motion.span>
+  );
+}
+
+function TimelinePointRow({
+  point,
+  isActive,
+  isAnchored,
+  canSetAnchor,
+  isBusy,
+  isDragging,
+  onSelect,
+  onSetAnchor,
+  onDelete,
+  onRename,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+}: {
+  point: TimelinePointVM;
+  isActive: boolean;
+  isAnchored: boolean;
+  canSetAnchor: boolean;
+  isBusy: boolean;
+  isDragging: boolean;
+  onSelect: (_id: string) => void;
+  onSetAnchor?: (_id: string, _anchorId: string) => void;
+  onDelete: (_id: string, _anchorId: string) => void;
+  onRename: (_pointId: string, _label: string) => Promise<boolean>;
+  onDragStart: (_pointId: string) => void;
+  onDragMove: (_pointId: string, _point: { x: number; y: number }) => void;
+  onDragEnd: (_pointId: string, _point: { x: number; y: number }) => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const dragDisabled = point.isImplicitOrigin || isBusy || isEditing;
+  const showSetAnchor = canSetAnchor && !isAnchored && onSetAnchor;
+  const showDelete = !point.isImplicitOrigin;
+  const rowAnchorId = actionAnchorId("timeline", "row", point.id);
+  const anchorActionId = actionAnchorId("timeline", "anchor", point.id);
+  const deleteAnchorId = actionAnchorId("timeline", "delete", point.id);
+  const gesture = useRowPointerGesture({
+    scope: "timeline",
+    rowId: point.id,
+    canStartDrag: !dragDisabled,
+    onClick: () => onSelect(point.id),
+    onDoubleClickLabel: () => {},
+    onDragStart,
+    onDragMove,
+    onDragEnd,
+  });
+
+  return (
+    <SidebarListRow
+      depth={0}
+      isActive={isActive}
+      group={!!showSetAnchor || showDelete}
+      anchorId={rowAnchorId}
+      dataRowId={point.id}
+      className={cn(
+        point.isImplicitOrigin ? "opacity-90" : "",
+        isDragging ? "pointer-events-none z-10 opacity-75 shadow-sm" : "",
+      )}
+      onClick={gesture.handleClick}
+      onPointerDown={gesture.handlePointerDown}
+      icon={<TimelinePointMarker />}
+      label={
+        <InlineEditableText
+          value={point.label}
+          editable={!point.isImplicitOrigin}
+          disabled={isBusy}
+          onEditStart={() => onSelect(point.id)}
+          onEditingChange={setIsEditing}
+          onCommit={(label) => onRename(point.id, label)}
+          className={cn(
+            "min-w-0 flex-1 truncate leading-5.5",
+            isAnchored ? "font-bold text-accent-foreground" : "",
+          )}
+        />
+      }
+      trailing={point.description || undefined}
+      actions={
+        showSetAnchor || showDelete ? (
+          <>
+            {showSetAnchor ? (
+              <RowActionButton
+                anchorId={anchorActionId}
+                onClick={() => onSetAnchor(point.id, anchorActionId)}
+                disabled={isBusy}
+                title="设为锚点"
+                icon="icon-[material-symbols--anchor]"
+              />
+            ) : null}
+            {showDelete ? (
+              <RowActionButton
+                anchorId={deleteAnchorId}
+                onClick={() => onDelete(point.id, deleteAnchorId)}
+                disabled={isBusy}
+                title="删除时间点"
+                icon="icon-[material-symbols--close]"
+              />
+            ) : null}
+          </>
+        ) : undefined
+      }
+    />
+  );
+}
 
 export function TimelinePanel({
   points,
@@ -18,7 +196,7 @@ export function TimelinePanel({
   isPending = false,
   onSelect,
   onSetAnchor,
-  onReorder,
+  onMove,
   onDelete,
   onRename,
 }: {
@@ -30,117 +208,187 @@ export function TimelinePanel({
   isPending?: boolean;
   onSelect: (_id: string) => void;
   onSetAnchor?: (_id: string, _anchorId: string) => void;
-  onReorder: (_fromIndex: number, _toIndex: number) => void;
+  onMove: (_pointId: string, _afterPointId: string) => void;
   onDelete: (_id: string, _anchorId: string) => void;
   onRename: (_pointId: string, _label: string) => Promise<boolean>;
 }) {
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dropIntent, setDropIntent] = useState<TimelineDropIntent | null>(null);
+  const [dropIndicatorRect, setDropIndicatorRect] = useState<DropIndicatorRect | null>(null);
+  const [panelMinHeight, setPanelMinHeight] = useState<number | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const pointById = useMemo(() => new Map(points.map((point) => [point.id, point])), [points]);
-  const fixedPoints = useMemo(() => points.filter((point) => point.isImplicitOrigin), [points]);
-  const draggableIds = useMemo(
-    () => points.filter((point) => !point.isImplicitOrigin).map((point) => point.id),
-    [points],
-  );
-  const draggableIdsKey = draggableIds.join("\u001f");
-  const draggingIdRef = useRef<string | null>(null);
-  const orderedIdsRef = useRef(draggableIds);
-  const [orderedIds, setOrderedIds] = useState(draggableIds);
 
-  useEffect(() => {
-    orderedIdsRef.current = draggableIds;
-    setOrderedIds(draggableIds);
-  }, [draggableIds, draggableIdsKey]);
-
-  const handleVisualReorder = (nextIds: string[]) => {
-    const validIds = nextIds.filter((id) => {
-      const point = pointById.get(id);
-      return point && !point.isImplicitOrigin;
-    });
-
-    orderedIdsRef.current = validIds;
-    setOrderedIds(validIds);
-  };
-
-  const handleDragStart = (pointId: string) => {
-    draggingIdRef.current = pointId;
-  };
-
-  const handleDragEnd = (pointId: string) => {
-    const movedPointId = draggingIdRef.current ?? pointId;
-    draggingIdRef.current = null;
-
-    const fromIndex = points.findIndex((point) => point.id === movedPointId);
-    const toMovableIndex = orderedIdsRef.current.indexOf(movedPointId);
-    const toIndex = fixedPoints.length + toMovableIndex;
-
-    if (fromIndex < 0 || toMovableIndex < 0 || fromIndex === toIndex) {
+  useLayoutEffect(() => {
+    const panelElement = panelRef.current;
+    const viewportElement = panelElement?.closest(".simplebar-content")?.parentElement;
+    if (!(panelElement instanceof HTMLElement) || !(viewportElement instanceof HTMLElement)) {
+      setPanelMinHeight(null);
       return;
     }
 
-    onReorder(fromIndex, toIndex);
+    const updateMinHeight = () => {
+      setPanelMinHeight(viewportElement.clientHeight);
+    };
+
+    updateMinHeight();
+    const observer = new ResizeObserver(() => {
+      updateMinHeight();
+    });
+    observer.observe(viewportElement);
+    return () => observer.disconnect();
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!dropIntent) {
+      setDropIndicatorRect(null);
+      return;
+    }
+
+    const panelElement = panelRef.current;
+    if (!(panelElement instanceof HTMLElement)) {
+      setDropIndicatorRect(null);
+      return;
+    }
+
+    const panelRect = panelElement.getBoundingClientRect();
+    const anchorElement =
+      dropIntent.targetId === null
+        ? panelElement
+            .querySelectorAll(TIMELINE_ROW_SELECTOR)
+            .item(panelElement.querySelectorAll(TIMELINE_ROW_SELECTOR).length - 1)
+        : panelElement.querySelector(`[data-row-id="${CSS.escape(dropIntent.targetId)}"]`);
+
+    if (!(anchorElement instanceof HTMLElement)) {
+      setDropIndicatorRect(null);
+      return;
+    }
+
+    const anchorRect = anchorElement.getBoundingClientRect();
+    const targetPoint = dropIntent.targetId ? pointById.get(dropIntent.targetId) : null;
+    const top =
+      dropIntent.targetId === null ||
+      dropIntent.position === "after" ||
+      targetPoint?.isImplicitOrigin
+        ? anchorRect.bottom - panelRect.top
+        : anchorRect.top - panelRect.top;
+    const clampedTop = Math.min(Math.max(top, 1), Math.max(panelRect.height - 1, 1));
+    const left = Math.max(rowPaddingLeft(0) + 8, 8);
+    const width = Math.max(panelRect.width - left, 24);
+
+    setDropIndicatorRect({
+      top: clampedTop,
+      left,
+      width,
+    });
+  }, [dropIntent, pointById]);
+
+  const findBlankAreaDropIntent = (pointId: string, point: { x: number; y: number }) => {
+    const panelElement = panelRef.current;
+    if (!(panelElement instanceof HTMLElement)) {
+      return null;
+    }
+
+    const panelRect = panelElement.getBoundingClientRect();
+    if (
+      point.x < panelRect.left ||
+      point.x > panelRect.right ||
+      point.y < panelRect.top ||
+      point.y > panelRect.bottom
+    ) {
+      return null;
+    }
+
+    const visibleRows = panelElement.querySelectorAll(TIMELINE_ROW_SELECTOR);
+    const lastVisibleRow = visibleRows.item(visibleRows.length - 1);
+    if (!(lastVisibleRow instanceof HTMLElement)) {
+      return null;
+    }
+
+    if (point.y < lastVisibleRow.getBoundingClientRect().bottom) {
+      return null;
+    }
+
+    const afterPointId = resolveTimelineMoveAfterPointId({
+      points,
+      pointId,
+      targetId: null,
+      position: "after",
+    });
+    if (!afterPointId) {
+      return null;
+    }
+
+    return {
+      pointId,
+      targetId: null,
+      position: "after" as const,
+      afterPointId,
+    } satisfies TimelineDropIntent;
   };
 
-  const renderPointRow = (point: TimelinePointVM, icon?: ReactNode) => {
-    const isActive = activeId === point.id;
-    const isAnchored = anchoredPointId === point.id;
-    const showSetAnchor = canSetAnchor && !isAnchored && onSetAnchor;
-    const showDelete = !point.isImplicitOrigin;
-    const rowAnchorId = actionAnchorId("timeline", "row", point.id);
-    const anchorActionId = actionAnchorId("timeline", "anchor", point.id);
-    const deleteAnchorId = actionAnchorId("timeline", "delete", point.id);
+  const findDropIntent = (pointId: string, point: { x: number; y: number }) => {
+    const source = document.elementFromPoint(point.x, point.y);
+    const row = source?.closest(TIMELINE_ROW_SELECTOR);
 
-    return (
-      <SidebarListRow
-        depth={0}
-        isActive={isActive}
-        group={!!showSetAnchor || !point.isImplicitOrigin}
-        anchorId={rowAnchorId}
-        className={point.isImplicitOrigin ? "opacity-90" : ""}
-        onClick={() => onSelect(point.id)}
-        icon={icon ?? <TimelinePointMarker />}
-        label={
-          <InlineEditableText
-            value={point.label}
-            editable={!point.isImplicitOrigin}
-            disabled={isBusy}
-            onEditStart={() => onSelect(point.id)}
-            onCommit={(label) => onRename(point.id, label)}
-            className={cn(
-              "min-w-0 flex-1 truncate leading-5.5",
-              isAnchored ? "font-bold text-accent-foreground" : "",
-            )}
-          />
-        }
-        trailing={point.description || undefined}
-        actions={
-          showSetAnchor || showDelete ? (
-            <>
-              {showSetAnchor ? (
-                <RowActionButton
-                  anchorId={anchorActionId}
-                  onClick={() => onSetAnchor(point.id, anchorActionId)}
-                  disabled={isBusy}
-                  title="设为锚点"
-                  icon="icon-[material-symbols--anchor]"
-                />
-              ) : null}
-              {showDelete ? (
-                <RowActionButton
-                  anchorId={deleteAnchorId}
-                  onClick={() => onDelete(point.id, deleteAnchorId)}
-                  disabled={isBusy}
-                  title="删除时间点"
-                  icon="icon-[material-symbols--close]"
-                />
-              ) : null}
-            </>
-          ) : undefined
-        }
-      />
-    );
+    if (!(row instanceof HTMLElement)) {
+      return findBlankAreaDropIntent(pointId, point);
+    }
+
+    const targetId = row.dataset.rowId;
+    if (!targetId || targetId === pointId) {
+      return null;
+    }
+
+    const targetPoint = pointById.get(targetId);
+    const position =
+      targetPoint?.isImplicitOrigin === true ? "after" : dropPositionFromPointer(point.y, row);
+    const afterPointId = resolveTimelineMoveAfterPointId({
+      points,
+      pointId,
+      targetId,
+      position,
+    });
+    if (!afterPointId) {
+      return null;
+    }
+
+    return {
+      pointId,
+      targetId,
+      position,
+      afterPointId,
+    } satisfies TimelineDropIntent;
+  };
+
+  const handleDragStart = (pointId: string) => {
+    setDraggedId(pointId);
+    setDropIntent(null);
+    setDropIndicatorRect(null);
+  };
+
+  const handleDragMove = (pointId: string, point: { x: number; y: number }) => {
+    setDropIntent(findDropIntent(pointId, point));
+  };
+
+  const handleDragEnd = (pointId: string, point: { x: number; y: number }) => {
+    const finalIntent = findDropIntent(pointId, point) ?? dropIntent;
+    setDraggedId(null);
+    setDropIntent(null);
+    setDropIndicatorRect(null);
+
+    if (finalIntent) {
+      onMove(pointId, finalIntent.afterPointId);
+    }
   };
 
   return (
-    <div className="relative pb-2" aria-busy={isPending}>
+    <div
+      ref={panelRef}
+      className="relative min-h-full pb-2"
+      style={panelMinHeight == null ? undefined : { minHeight: panelMinHeight }}
+      aria-busy={isPending}
+    >
       <RefreshOverlay active={isPending} />
       <div
         inert={isPending}
@@ -149,96 +397,31 @@ export function TimelinePanel({
           isPending ? "pointer-events-none opacity-70 select-none" : "opacity-100",
         )}
       >
-        {fixedPoints.map((point) => (
-          <div key={point.id}>{renderPointRow(point)}</div>
+        {points.map((point) => (
+          <TimelinePointRow
+            key={point.id}
+            point={point}
+            isActive={activeId === point.id}
+            isAnchored={anchoredPointId === point.id}
+            canSetAnchor={canSetAnchor}
+            isBusy={isBusy}
+            isDragging={draggedId === point.id}
+            onSelect={onSelect}
+            onSetAnchor={onSetAnchor}
+            onDelete={onDelete}
+            onRename={onRename}
+            onDragStart={handleDragStart}
+            onDragMove={handleDragMove}
+            onDragEnd={handleDragEnd}
+          />
         ))}
-        <Reorder.Group
-          as="div"
-          axis="y"
-          values={orderedIds}
-          onReorder={handleVisualReorder}
-          className="contents"
-        >
-          {orderedIds.map((pointId) => {
-            const point = pointById.get(pointId);
-
-            if (!point) {
-              return null;
-            }
-
-            return (
-              <TimelineReorderItem
-                key={point.id}
-                pointId={point.id}
-                disabled={isBusy}
-                onDragStart={handleDragStart}
-                onDragEnd={handleDragEnd}
-              >
-                {(icon) => renderPointRow(point, icon)}
-              </TimelineReorderItem>
-            );
-          })}
-        </Reorder.Group>
+        <AnimatePresence>
+          {dropIndicatorRect ? (
+            <DropIndicatorOverlay key="timeline-drop-indicator" rect={dropIndicatorRect} />
+          ) : null}
+        </AnimatePresence>
       </div>
     </div>
-  );
-}
-
-function TimelineReorderItem({
-  pointId,
-  disabled,
-  onDragStart,
-  onDragEnd,
-  children,
-}: {
-  pointId: string;
-  disabled: boolean;
-  onDragStart: (_pointId: string) => void;
-  onDragEnd: (_pointId: string) => void;
-  children: (_icon: ReactNode) => ReactNode;
-}) {
-  const dragControls = useDragControls();
-
-  const icon = (
-    <TimelinePointMarker>
-      <span
-        title="拖动排序"
-        aria-label="拖动排序"
-        role="button"
-        tabIndex={disabled ? -1 : 0}
-        className={cn(
-          "absolute inset-0 icon-[material-symbols--drag-indicator] touch-none text-base leading-none opacity-0 transition group-hover:opacity-100 hover:text-foreground focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-drag-border",
-          disabled
-            ? "cursor-not-allowed group-hover:opacity-30"
-            : "cursor-grab active:cursor-grabbing",
-        )}
-        onClick={(event) => event.stopPropagation()}
-        onPointerDown={(event) => {
-          if (disabled) {
-            return;
-          }
-
-          event.preventDefault();
-          event.stopPropagation();
-          dragControls.start(event);
-        }}
-      />
-    </TimelinePointMarker>
-  );
-
-  return (
-    <Reorder.Item
-      as="div"
-      value={pointId}
-      dragControls={dragControls}
-      dragListener={false}
-      layout="position"
-      className="relative list-none"
-      onDragStart={() => onDragStart(pointId)}
-      onDragEnd={() => onDragEnd(pointId)}
-    >
-      {children(icon)}
-    </Reorder.Item>
   );
 }
 

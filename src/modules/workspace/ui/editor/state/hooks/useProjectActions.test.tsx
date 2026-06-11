@@ -2,7 +2,8 @@ import { expect, mock, test } from "bun:test";
 import { ScopeProvider } from "bunshi/react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import type { AuxTreeNodeVM } from "@/modules/workspace/ui/editor/model/types";
+import { ORIGIN_TIMELINE_POINT_ID } from "@/modules/workspace/domain/constants";
+import type { AuxTreeNodeVM, TimelinePointVM } from "@/modules/workspace/ui/editor/model/types";
 
 import { ProjectScope } from "../scopes";
 import { useWorkspaceStoreApi, type WorkspaceStore } from "../molecules/workspaceStore";
@@ -45,6 +46,12 @@ function buildAuxMaps(nodes: AuxTreeNodeVM[], parentId: string | null = null) {
 function createWorkspaceState(input: {
   auxTree: AuxTreeNodeVM[];
   auxRootId?: string;
+  timelinePoints?: TimelinePointVM[];
+  timelineMoveMutate?: (_input: {
+    workspaceId: string;
+    pointId: string;
+    afterPointId: string;
+  }) => Promise<void>;
   moveMutate?: (_input: {
     workspaceId: string;
     timelinePointId: string;
@@ -85,9 +92,12 @@ function createWorkspaceState(input: {
       updateContent: { isPending: false, mutate: mock(async () => ({ id: "content_1" })) },
     },
     timeline: {
-      points: [],
+      points: input.timelinePoints ?? [],
       createTimeline: { isPending: false, mutate: mock(async () => ({ id: "point_new" })) },
-      moveTimeline: { isPending: false, mutate: mock(async () => undefined) },
+      moveTimeline: {
+        isPending: false,
+        mutate: input.timelineMoveMutate ?? mock(async () => undefined),
+      },
       deleteTimeline: { isPending: false, mutate: mock(async () => undefined) },
       updateTimeline: { isPending: false, mutate: mock(async () => undefined) },
     },
@@ -159,6 +169,20 @@ function renderActions(workspace: ProjectWorkspaceState): {
   }
 
   return { actions, store };
+}
+
+function createTimelinePoint(
+  overrides: Partial<TimelinePointVM> & Pick<TimelinePointVM, "id" | "label">,
+) {
+  const { id, label, ...rest } = overrides;
+  return {
+    id,
+    key: id,
+    label,
+    description: "",
+    isImplicitOrigin: false,
+    ...rest,
+  } satisfies TimelinePointVM;
 }
 
 test("handleAuxCreateSymlink creates a same-directory symlink with a unique generated name", async () => {
@@ -423,5 +447,58 @@ test("submitAuxSymlinkTargetRetarget keeps picker mode active and reports errors
   expect(store.getState().auxError).toEqual({
     message: "循环冲突",
     anchorId: "aux:row:source_link",
+  });
+});
+
+test("handleTimelineMove calls the timeline move RPC with the requested anchor", async () => {
+  const timelinePoints = [
+    createTimelinePoint({
+      id: ORIGIN_TIMELINE_POINT_ID,
+      label: "原点",
+      isImplicitOrigin: true,
+    }),
+    createTimelinePoint({ id: "point_a", label: "A" }),
+    createTimelinePoint({ id: "point_b", label: "B" }),
+    createTimelinePoint({ id: "point_c", label: "C" }),
+  ];
+  const workspace = createWorkspaceState({
+    auxTree: [],
+    timelinePoints,
+    timelineMoveMutate: mock(async () => undefined),
+  });
+  const { actions } = renderActions(workspace);
+  await actions.handleTimelineMove("point_c", ORIGIN_TIMELINE_POINT_ID);
+
+  expect(workspace.timeline.moveTimeline.mutate).toHaveBeenCalledWith({
+    workspaceId: "workspace_1",
+    pointId: "point_c",
+    afterPointId: ORIGIN_TIMELINE_POINT_ID,
+  });
+});
+
+test("handleTimelineMove reports timeline move failures on the dragged row anchor", async () => {
+  const timelinePoints = [
+    createTimelinePoint({
+      id: ORIGIN_TIMELINE_POINT_ID,
+      label: "原点",
+      isImplicitOrigin: true,
+    }),
+    createTimelinePoint({ id: "point_a", label: "A" }),
+    createTimelinePoint({ id: "point_b", label: "B" }),
+    createTimelinePoint({ id: "point_c", label: "C" }),
+  ];
+  const workspace = createWorkspaceState({
+    auxTree: [],
+    timelinePoints,
+    timelineMoveMutate: mock(async () => {
+      throw new Error("移动失败");
+    }),
+  });
+  const { actions, store } = renderActions(workspace);
+  await actions.handleTimelineMove("point_a", "point_b");
+
+  expect(store.getState().timelineError).toEqual({
+    message: "移动失败",
+    anchorId: "timeline:row:point_a",
   });
 });

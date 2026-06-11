@@ -26,11 +26,13 @@ test("TimelinePanel keeps native inline editing without custom row gesture hit a
       activeId={null}
       isBusy={false}
       onSelect={() => {}}
-      onReorder={() => {}}
+      onMove={() => {}}
       onDelete={() => {}}
       onRename={async () => true}
     />,
   );
 
   expect(html).not.toContain('data-inline-edit-hit-area="label"');
+  expect(html).not.toContain('aria-label="拖动排序"');
+  expect(html).not.toContain("drag-indicator");
 });

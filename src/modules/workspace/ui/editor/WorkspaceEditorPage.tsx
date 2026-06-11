@@ -508,7 +508,7 @@ function ProjectWorkspace({
                         isPending={timelinePending}
                         onSelect={actions.handleTimelineSelect}
                         onSetAnchor={actions.handleContentAnchorSet}
-                        onReorder={actions.handleTimelineReorder}
+                        onMove={actions.handleTimelineMove}
                         onDelete={actions.handleTimelineDelete}
                         onRename={actions.handleTimelineRename}
                       />
