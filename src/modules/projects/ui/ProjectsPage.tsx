@@ -117,12 +117,6 @@ export function ProjectsPage({ projectId = null }: { projectId?: string | null }
 
   const workspaceMap = new Map(workspaces.map((workspace) => [workspace.branchId, workspace]));
   const selectedWorkspace = selectedBranch ? (workspaceMap.get(selectedBranch.id) ?? null) : null;
-  const defaultWorkspace =
-    project?.defaultBranchId != null ? (workspaceMap.get(project.defaultBranchId) ?? null) : null;
-  const defaultBranch = project
-    ? (sortedBranches.find((item) => item.id === project.defaultBranchId) ?? null)
-    : null;
-
   const createProject = rpc.useMutation<"projects.create", ProjectMutationContext>(
     "projects.create",
     {
@@ -533,8 +527,6 @@ export function ProjectsPage({ projectId = null }: { projectId?: string | null }
                 branchesLoading={branchesQuery.isInitialLoading && sortedBranches.length === 0}
                 branchesError={branchesQuery.error?.message ?? null}
                 selectedBranch={selectedBranch}
-                defaultBranch={defaultBranch}
-                defaultWorkspace={defaultWorkspace}
                 detailName={detailName}
                 detailDescription={detailDescription}
                 detailError={detailError ?? updateProject.error?.message ?? null}
@@ -544,9 +536,6 @@ export function ProjectsPage({ projectId = null }: { projectId?: string | null }
                 onMetadataCommit={() => void commitProjectMetadata()}
                 onSelectBranch={rememberSelectedBranch}
                 onCreateBranch={openCreateBranchDialog}
-                onOpenWorkspace={(workspaceId) =>
-                  navigate(`/project/${project.id}/workspace/${workspaceId}`)
-                }
               />
             </ScopeProvider>
           ) : undefined
@@ -805,8 +794,6 @@ function ProjectWorkbenchSidebar({
   branchesLoading,
   branchesError,
   selectedBranch,
-  defaultBranch,
-  defaultWorkspace,
   detailName,
   detailDescription,
   detailError,
@@ -816,15 +803,12 @@ function ProjectWorkbenchSidebar({
   onMetadataCommit,
   onSelectBranch,
   onCreateBranch,
-  onOpenWorkspace,
 }: {
   project: ProjectRow;
   branches: BranchList;
   branchesLoading: boolean;
   branchesError: string | null;
   selectedBranch: BranchRow | null;
-  defaultBranch: BranchRow | null;
-  defaultWorkspace: WorkspaceRow | null;
   detailName: string;
   detailDescription: string;
   detailError: string | null;
@@ -834,7 +818,6 @@ function ProjectWorkbenchSidebar({
   onMetadataCommit: () => void;
   onSelectBranch: (_branchId: string | null) => void;
   onCreateBranch: () => void;
-  onOpenWorkspace: (_workspaceId: string) => void;
 }) {
   return (
     <AppSidebar>
@@ -876,13 +859,10 @@ function ProjectWorkbenchSidebar({
                 detailDescription={detailDescription}
                 detailError={detailError}
                 isSaving={isSaving}
-                defaultBranch={defaultBranch}
-                defaultWorkspace={defaultWorkspace}
                 branchCount={branches.length}
                 onNameChange={onNameChange}
                 onDescriptionChange={onDescriptionChange}
                 onMetadataCommit={onMetadataCommit}
-                onOpenWorkspace={onOpenWorkspace}
               />
             ),
           },
@@ -966,26 +946,20 @@ function ProjectMetaPanel({
   detailDescription,
   detailError,
   isSaving,
-  defaultBranch,
-  defaultWorkspace,
   branchCount,
   onNameChange,
   onDescriptionChange,
   onMetadataCommit,
-  onOpenWorkspace,
 }: {
   project: ProjectRow;
   detailName: string;
   detailDescription: string;
   detailError: string | null;
   isSaving: boolean;
-  defaultBranch: BranchRow | null;
-  defaultWorkspace: WorkspaceRow | null;
   branchCount: number;
   onNameChange: (_value: string) => void;
   onDescriptionChange: (_value: string) => void;
   onMetadataCommit: () => void;
-  onOpenWorkspace: (_workspaceId: string) => void;
 }) {
   return (
     <OverlayScrollbar className="h-full min-h-0 w-full">
@@ -1044,45 +1018,6 @@ function ProjectMetaPanel({
         </label>
 
         {detailError ? <InlineError message={detailError} /> : null}
-
-        <div className="rounded-md border border-border bg-editor-background p-3">
-          <div className="text-[11px] tracking-wide text-foreground-muted/70 uppercase">
-            Default Branch
-          </div>
-          <div className="mt-2">
-            {defaultBranch ? (
-              <>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-foreground">{defaultBranch.name}</span>
-                  <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-accent-foreground">
-                    默认
-                  </span>
-                </div>
-                <div className="mt-1 text-xs text-foreground-muted">
-                  {defaultBranch.headCommitId
-                    ? `HEAD ${shortId(defaultBranch.headCommitId)}`
-                    : "还没有提交历史"}
-                </div>
-                {defaultWorkspace ? (
-                  <button
-                    type="button"
-                    onClick={() => onOpenWorkspace(defaultWorkspace.id)}
-                    className={cn(primaryButton, "mt-3 w-full justify-center")}
-                  >
-                    <span className="icon-[material-symbols--edit] text-base" />
-                    打开默认分支工作区
-                  </button>
-                ) : (
-                  <div className="mt-3 rounded-md border border-dashed border-border bg-sidebar-background px-3 py-3 text-sm text-foreground-muted">
-                    默认分支当前没有对应 workspace。
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="text-sm text-foreground-muted">当前项目还没有默认分支。</div>
-            )}
-          </div>
-        </div>
 
         <div className="rounded-md border border-border bg-editor-background p-3">
           <div className="text-[11px] tracking-wide text-foreground-muted/70 uppercase">Stats</div>
