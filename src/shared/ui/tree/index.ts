@@ -8,3 +8,8 @@ export {
   SidebarListRow,
 } from "./SidebarListRow";
 export { TreeNodePanel, type TreeRowContext } from "./TreeNodePanel";
+export {
+  ROW_GESTURE_EXCLUDE_ATTRIBUTE,
+  ROW_GESTURE_HIT_AREA_ATTRIBUTE,
+  useRowPointerGesture,
+} from "./useRowPointerGesture";

@@ -1,19 +1,15 @@
 import { AnimatePresence, motion } from "motion/react";
-import {
-  type PointerEvent as ReactPointerEvent,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { AuxNodeIcon } from "@/modules/workspace/ui/editor/components/icons";
 import { InlineEditableText } from "@/shared/ui/InlineEditableText";
 import {
   ExpandToggle,
+  ROW_GESTURE_HIT_AREA_ATTRIBUTE,
   RowActionButton,
   SidebarListRow,
   TreeNodePanel,
+  useRowPointerGesture,
   type TreeRowContext,
 } from "@/shared/ui/tree";
 import { PanelPlaceholder } from "@/shared/ui/PanelPlaceholder";
@@ -29,8 +25,6 @@ import type { AuxTreeNodeVM } from "@/modules/workspace/ui/editor/model/types";
 import { cn } from "@/shared/lib/cn";
 
 const AUX_ROW_SELECTOR = "[data-row-id]";
-const DRAG_START_DISTANCE = 4;
-
 type AuxDropIndicatorTarget = { mode: "node"; nodeId: string } | { mode: "root" };
 
 type DropIndicatorRect = {
@@ -94,12 +88,6 @@ function AuxTreeNodeRow({
   symlinkTargetPicker: AuxSymlinkTargetPickerState;
 }) {
   const [isEditing, setIsEditing] = useState(false);
-  const pointerDragRef = useRef<{
-    pointerId: number;
-    startX: number;
-    startY: number;
-    dragging: boolean;
-  } | null>(null);
   const isDir = node.nodeType === "dir";
   const isDeleted = node.isDeleted;
   const canDrag = !isDeleted;
@@ -122,6 +110,7 @@ function AuxTreeNodeRow({
   const deleteAnchorId = actionAnchorId("aux", "delete", node.id);
   const restoreAnchorId = actionAnchorId("aux", "restore", node.id);
   const canRestore = showTimelineChanges && node.hasTimelineChange;
+  const labelHitAreaProps = { [ROW_GESTURE_HIT_AREA_ATTRIBUTE]: "label" } as const;
   const symlinkTargetPickerState: "source" | "selected-target" | "disabled-target" | undefined =
     isSymlinkTargetSource
       ? "source"
@@ -144,79 +133,35 @@ function AuxTreeNodeRow({
 
     symlinkTargetPicker.onPickTarget(node.id);
   };
-
-  const handleDragPointerDown = (event: ReactPointerEvent<HTMLElement>) => {
-    if (dragDisabled || event.button !== 0) {
-      return;
-    }
-
-    pointerDragRef.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      dragging: false,
-    };
-    event.currentTarget.setPointerCapture(event.pointerId);
-  };
-
-  const handleDragPointerMove = (event: ReactPointerEvent<HTMLElement>) => {
-    const dragState = pointerDragRef.current;
-    if (!dragState || dragState.pointerId !== event.pointerId) {
-      return;
-    }
-
-    const distance = Math.hypot(event.clientX - dragState.startX, event.clientY - dragState.startY);
-    if (!dragState.dragging) {
-      if (distance < DRAG_START_DISTANCE) {
-        return;
-      }
-
-      dragState.dragging = true;
-      onDragStart(node.id);
-    }
-
-    event.preventDefault();
-    onDragMove(node.id, { x: event.clientX, y: event.clientY });
-  };
-
-  const handleDragPointerEnd = (event: ReactPointerEvent<HTMLElement>) => {
-    const dragState = pointerDragRef.current;
-    if (!dragState || dragState.pointerId !== event.pointerId) {
-      return;
-    }
-
-    pointerDragRef.current = null;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-
-    if (dragState.dragging) {
-      event.preventDefault();
-      onDragEnd(node.id, { x: event.clientX, y: event.clientY });
-    }
-  };
-
-  const dragStartProps = canDrag
-    ? {
-        onPointerDown: handleDragPointerDown,
-        onPointerMove: handleDragPointerMove,
-        onPointerUp: handleDragPointerEnd,
-        onPointerCancel: handleDragPointerEnd,
-      }
-    : {};
+  const gesture = useRowPointerGesture({
+    scope: "aux",
+    rowId: node.id,
+    canStartDrag: !dragDisabled,
+    onClick: isSymlinkTargetPickerActive
+      ? handleTargetPickerSelect
+      : () => {
+          onSelect(node);
+          if (hasChildren && !isExpanded) {
+            onToggle(node.id);
+          }
+        },
+    onDoubleClickLabel: () => {},
+    onDragStart,
+    onDragMove,
+    onDragEnd,
+  });
 
   const icon = (
     <span
       className={`inline-flex shrink-0 touch-none items-center ${contentStateClass}`}
       data-drag-handle={dragHandleId}
-      {...dragStartProps}
     >
       <AuxNodeIcon nodeType={isDir ? (isExpanded ? "dir-open" : "dir") : node.nodeType} />
     </span>
   );
 
   const label = (
-    <span className={`min-w-0 flex-1 touch-none ${contentStateClass}`} {...dragStartProps}>
+    <span className={`min-w-0 flex-1 ${contentStateClass}`} {...labelHitAreaProps}>
       <InlineEditableText
         value={node.name}
         disabled={isBusy || isDeleted || isSymlinkTargetPickerActive}
@@ -228,6 +173,9 @@ function AuxTreeNodeRow({
         onEditingChange={setIsEditing}
         onCommit={async (next) => onRename(node.id, next)}
         className="truncate"
+        displayClassName="select-none"
+        startEditingSignal={gesture.startEditingSignal}
+        nativeDoubleClickEnabled={false}
       />
     </span>
   );
@@ -257,16 +205,8 @@ function AuxTreeNodeRow({
     return (
       <SidebarListRow
         {...sharedProps}
-        onClick={
-          isSymlinkTargetPickerActive
-            ? handleTargetPickerSelect
-            : () => {
-                onSelect(node);
-                if (hasChildren && !isExpanded) {
-                  onToggle(node.id);
-                }
-              }
-        }
+        onClick={gesture.handleClick}
+        onPointerDown={gesture.handlePointerDown}
         leading={
           <ExpandToggle
             hasChildren={hasChildren}
@@ -330,7 +270,8 @@ function AuxTreeNodeRow({
   return (
     <SidebarListRow
       {...sharedProps}
-      onClick={isSymlinkTargetPickerActive ? handleTargetPickerSelect : () => onSelect(node)}
+      onClick={gesture.handleClick}
+      onPointerDown={gesture.handlePointerDown}
       leading={<ExpandToggle hasChildren={false} expanded={false} />}
       icon={icon}
       label={label}

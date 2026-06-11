@@ -102,6 +102,7 @@ test("AuxTreePanel exposes drag handles for non-deleted entries only", () => {
 
   expect(html).toContain('data-drag-handle="dir_1"');
   expect(html).toContain('data-drag-handle="file_1"');
+  expect(html).toContain('data-inline-edit-hit-area="label"');
   expect(html).not.toContain('data-drag-handle="deleted_1"');
 });
 

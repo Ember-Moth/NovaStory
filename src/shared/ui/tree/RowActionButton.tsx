@@ -15,6 +15,7 @@ export function RowActionButton({
     <button
       type="button"
       data-action-anchor={anchorId}
+      data-no-row-gesture
       onClick={(event) => {
         event.stopPropagation();
         onClick();

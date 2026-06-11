@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { motion } from "motion/react";
 
 import { cn } from "@/shared/lib/cn";
@@ -27,6 +27,7 @@ export function SidebarListRow({
   dataRowId,
   dataSymlinkTargetPickerState,
   layout,
+  onPointerDown,
 }: {
   depth?: number;
   isActive: boolean;
@@ -43,6 +44,7 @@ export function SidebarListRow({
   dataRowId?: string;
   dataSymlinkTargetPickerState?: "source" | "selected-target" | "disabled-target";
   layout?: boolean | "position";
+  onPointerDown?: (_event: ReactPointerEvent<HTMLDivElement>) => void;
 }) {
   const stateClass = isActive ? ROW_ACTIVE : ROW_INACTIVE;
   const hasHoverSlot = trailing != null || actions != null;
@@ -60,6 +62,7 @@ export function SidebarListRow({
       animate={{ paddingLeft: rowPaddingLeft(depth) }}
       transition={{ duration: 0.14, ease: "easeOut" }}
       onClick={onClick}
+      onPointerDown={onPointerDown}
       layout={layout}
     >
       {leading}

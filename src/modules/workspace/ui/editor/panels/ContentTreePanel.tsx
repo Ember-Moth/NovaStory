@@ -1,20 +1,16 @@
 import { AnimatePresence, motion } from "motion/react";
-import {
-  type PointerEvent as ReactPointerEvent,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { ContentNodeIcon } from "@/modules/workspace/ui/editor/components/icons";
 import { InlineEditableText } from "@/shared/ui/InlineEditableText";
 import {
   ExpandToggle,
+  ROW_GESTURE_HIT_AREA_ATTRIBUTE,
   RowActionButton,
   SidebarListRow,
   TreeNodePanel,
   rowPaddingLeft,
+  useRowPointerGesture,
   type TreeRowContext,
 } from "@/shared/ui/tree";
 import { PanelPlaceholder } from "@/shared/ui/PanelPlaceholder";
@@ -30,8 +26,6 @@ import type { ContentTreeNodeVM } from "@/modules/workspace/ui/editor/model/type
 import { cn } from "@/shared/lib/cn";
 
 const CONTENT_ROW_SELECTOR = "[data-row-id]";
-const DRAG_START_DISTANCE = 4;
-
 type ContentDropIntent = ContentMoveIntent;
 type ContentBoundaryIntent = ContentMoveIntent & {
   position: Exclude<ContentDropPosition, "inside">;
@@ -119,75 +113,27 @@ function ContentTreeNodeRow({
   canCreate: boolean;
 }) {
   const [isEditing, setIsEditing] = useState(false);
-  const pointerDragRef = useRef<{
-    pointerId: number;
-    startX: number;
-    startY: number;
-    dragging: boolean;
-  } | null>(null);
   const hasBody = node.body.trim().length > 0;
   const rowAnchorId = actionAnchorId("content", "row", node.id);
   const addChildAnchorId = actionAnchorId("content", "add-child", node.id);
   const deleteAnchorId = actionAnchorId("content", "delete", node.id);
   const dragDisabled = isDragDisabled || isEditing;
-
-  const handleDragPointerDown = (event: ReactPointerEvent<HTMLElement>) => {
-    if (dragDisabled || event.button !== 0) {
-      return;
-    }
-
-    pointerDragRef.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      dragging: false,
-    };
-    event.currentTarget.setPointerCapture(event.pointerId);
-  };
-
-  const handleDragPointerMove = (event: ReactPointerEvent<HTMLElement>) => {
-    const dragState = pointerDragRef.current;
-    if (!dragState || dragState.pointerId !== event.pointerId) {
-      return;
-    }
-
-    const distance = Math.hypot(event.clientX - dragState.startX, event.clientY - dragState.startY);
-    if (!dragState.dragging) {
-      if (distance < DRAG_START_DISTANCE) {
-        return;
+  const labelHitAreaProps = { [ROW_GESTURE_HIT_AREA_ATTRIBUTE]: "label" } as const;
+  const gesture = useRowPointerGesture({
+    scope: "content",
+    rowId: node.id,
+    canStartDrag: !dragDisabled,
+    onClick: () => {
+      onSelect(node);
+      if (hasChildren && !isExpanded) {
+        onToggle(node.id);
       }
-
-      dragState.dragging = true;
-      onDragStart(node.id);
-    }
-
-    event.preventDefault();
-    onDragMove(node.id, { x: event.clientX, y: event.clientY });
-  };
-
-  const handleDragPointerEnd = (event: ReactPointerEvent<HTMLElement>) => {
-    const dragState = pointerDragRef.current;
-    if (!dragState || dragState.pointerId !== event.pointerId) {
-      return;
-    }
-
-    pointerDragRef.current = null;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-
-    if (dragState.dragging) {
-      event.preventDefault();
-      onDragEnd(node.id, { x: event.clientX, y: event.clientY });
-    }
-  };
-
-  const dragStartProps = {
-    onPointerDown: handleDragPointerDown,
-    onPointerMove: handleDragPointerMove,
-    onPointerUp: handleDragPointerEnd,
-    onPointerCancel: handleDragPointerEnd,
-  };
+    },
+    onDoubleClickLabel: () => {},
+    onDragStart,
+    onDragMove,
+    onDragEnd,
+  });
 
   return (
     <SidebarListRow
@@ -202,12 +148,8 @@ function ContentTreeNodeRow({
         "relative list-none",
         isDragging ? "pointer-events-none z-10 opacity-75 shadow-sm" : "",
       )}
-      onClick={() => {
-        onSelect(node);
-        if (hasChildren && !isExpanded) {
-          onToggle(node.id);
-        }
-      }}
+      onClick={gesture.handleClick}
+      onPointerDown={gesture.handlePointerDown}
       leading={
         <ExpandToggle
           hasChildren={hasChildren}
@@ -216,12 +158,15 @@ function ContentTreeNodeRow({
         />
       }
       icon={
-        <span className="grid size-4 shrink-0 touch-none place-items-center" {...dragStartProps}>
+        <span
+          className="grid size-4 shrink-0 touch-none place-items-center"
+          data-drag-handle={node.id}
+        >
           <ContentNodeIcon hasBody={hasBody} hasChildren={hasChildren} />
         </span>
       }
       label={
-        <span className="min-w-0 flex-1 touch-none" {...dragStartProps}>
+        <span className="min-w-0 flex-1" {...labelHitAreaProps}>
           <InlineEditableText
             value={node.title}
             disabled={isBusy}
@@ -231,6 +176,9 @@ function ContentTreeNodeRow({
             onCommit={async (next) => onRename(node.id, next || null)}
             placeholder="未命名节点"
             className="truncate"
+            displayClassName="select-none"
+            startEditingSignal={gesture.startEditingSignal}
+            nativeDoubleClickEnabled={false}
           />
         </span>
       }

@@ -14,6 +14,7 @@ export function ExpandToggle({
   return (
     <button
       type="button"
+      data-no-row-gesture
       className={`w-4 shrink-0 text-base ${
         expanded
           ? "icon-[material-symbols--keyboard-arrow-down]"

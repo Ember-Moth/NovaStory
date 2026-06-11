@@ -140,6 +140,7 @@ export function InlineEditInput({
   return (
     <input
       ref={inputRef}
+      data-no-row-gesture
       {...inputProps}
       className={className ?? INPUT_CLASS_NAME}
       placeholder={placeholder}
@@ -155,8 +156,11 @@ export function InlineEditableText({
   allowEmpty = false,
   placeholder,
   className,
+  displayClassName,
   onEditStart,
   onEditingChange,
+  startEditingSignal,
+  nativeDoubleClickEnabled = true,
 }: {
   value: string;
   onCommit: (_next: string) => Promise<boolean>;
@@ -165,8 +169,11 @@ export function InlineEditableText({
   allowEmpty?: boolean;
   placeholder?: string;
   className?: string;
+  displayClassName?: string;
   onEditStart?: () => void;
   onEditingChange?: (_editing: boolean) => void;
+  startEditingSignal?: number;
+  nativeDoubleClickEnabled?: boolean;
 }) {
   const { isEditing, startEditing, inputRef, inputProps } = useInlineEdit({
     value,
@@ -177,6 +184,21 @@ export function InlineEditableText({
     onEditStart,
     onEditingChange,
   });
+
+  const previousStartEditingSignalRef = useRef(startEditingSignal);
+
+  useEffect(() => {
+    if (
+      startEditingSignal == null ||
+      previousStartEditingSignalRef.current === startEditingSignal
+    ) {
+      previousStartEditingSignalRef.current = startEditingSignal;
+      return;
+    }
+
+    previousStartEditingSignalRef.current = startEditingSignal;
+    startEditing();
+  }, [startEditing, startEditingSignal]);
 
   if (isEditing) {
     return (
@@ -191,8 +213,12 @@ export function InlineEditableText({
 
   return (
     <span
-      className={cn(DISPLAY_CLASS_NAME, className)}
+      className={cn(DISPLAY_CLASS_NAME, className, displayClassName)}
       onDoubleClick={(event) => {
+        if (!nativeDoubleClickEnabled) {
+          return;
+        }
+
         if (!editable || disabled) {
           return;
         }
