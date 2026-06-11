@@ -43,6 +43,7 @@ import type {
   AiResolvedModelView,
   ProjectAssistantStreamEvent,
   ProjectAssistantContextSnapshot,
+  ProjectAssistantToolName,
 } from "@/modules/ai/domain/types";
 import { assertRpcFound } from "@/rpc/errors";
 import { rpcTags, type RpcTagList } from "@/rpc/tags";
@@ -108,6 +109,7 @@ interface SendProjectAssistantMessageInput {
   threadId: string;
   text: string;
   context?: ProjectAssistantContextSnapshot | null;
+  activeTools?: ProjectAssistantToolName[] | null;
 }
 
 interface RetryProjectAssistantMessageInput {
@@ -115,6 +117,7 @@ interface RetryProjectAssistantMessageInput {
   threadId: string;
   triggerNodeId: string;
   context?: ProjectAssistantContextSnapshot | null;
+  activeTools?: ProjectAssistantToolName[] | null;
 }
 
 interface EditProjectAssistantMessageInput {
@@ -123,6 +126,7 @@ interface EditProjectAssistantMessageInput {
   nodeId: string;
   text: string;
   context?: ProjectAssistantContextSnapshot | null;
+  activeTools?: ProjectAssistantToolName[] | null;
 }
 
 type RpcMutationCtx = MutationCtx<RpcTagList>;
@@ -751,13 +755,14 @@ export const sendProjectAssistantMessage = mutation<
   SendProjectAssistantMessageInput,
   ProjectAssistantSendResult,
   RpcTagList
->(async ({ projectId, threadId, text, context }, ctx) => {
+>(async ({ projectId, threadId, text, context, activeTools }, ctx) => {
   try {
     const result = await getProjectAssistantService().sendProjectAssistantMessage({
       projectId,
       threadId,
       text,
       context,
+      activeTools,
     });
     invalidateProjectAiState(ctx, projectId, {
       threadId: result.thread.id,
@@ -777,12 +782,13 @@ export const sendProjectAssistantMessageStream = stream<
   ProjectAssistantSendResult,
   RpcTagList
 >({
-  handler: async ({ projectId, threadId, text, context }, ctx) => {
+  handler: async ({ projectId, threadId, text, context, activeTools }, ctx) => {
     const execution = getProjectAssistantService().sendProjectAssistantMessageStream({
       projectId,
       threadId,
       text,
       context,
+      activeTools,
     });
     const unsubscribe = execution.subscribe((event) => {
       ctx.emit(event);
@@ -819,13 +825,14 @@ export const retryProjectAssistantMessage = mutation<
   RetryProjectAssistantMessageInput,
   ProjectAssistantRetryResult,
   RpcTagList
->(async ({ projectId, threadId, triggerNodeId, context }, ctx) => {
+>(async ({ projectId, threadId, triggerNodeId, context, activeTools }, ctx) => {
   try {
     const result = await getProjectAssistantService().retryProjectAssistantMessage({
       projectId,
       threadId,
       triggerNodeId,
       context,
+      activeTools,
     });
     invalidateProjectAiState(ctx, projectId, {
       threadId: result.thread.id,
@@ -845,12 +852,13 @@ export const retryProjectAssistantMessageStream = stream<
   ProjectAssistantRetryResult,
   RpcTagList
 >({
-  handler: async ({ projectId, threadId, triggerNodeId, context }, ctx) => {
+  handler: async ({ projectId, threadId, triggerNodeId, context, activeTools }, ctx) => {
     const execution = getProjectAssistantService().retryProjectAssistantMessageStream({
       projectId,
       threadId,
       triggerNodeId,
       context,
+      activeTools,
     });
     const unsubscribe = execution.subscribe((event) => {
       ctx.emit(event);
@@ -887,7 +895,7 @@ export const editProjectAssistantMessage = mutation<
   EditProjectAssistantMessageInput,
   ProjectAssistantEditResult,
   RpcTagList
->(async ({ projectId, threadId, nodeId, text, context }, ctx) => {
+>(async ({ projectId, threadId, nodeId, text, context, activeTools }, ctx) => {
   try {
     const result = await getProjectAssistantService().editProjectAssistantMessage({
       projectId,
@@ -895,6 +903,7 @@ export const editProjectAssistantMessage = mutation<
       nodeId,
       text,
       context,
+      activeTools,
     });
     invalidateProjectAiState(ctx, projectId, {
       threadId: result.thread.id,
@@ -914,13 +923,14 @@ export const editProjectAssistantMessageStream = stream<
   ProjectAssistantEditResult,
   RpcTagList
 >({
-  handler: async ({ projectId, threadId, nodeId, text, context }, ctx) => {
+  handler: async ({ projectId, threadId, nodeId, text, context, activeTools }, ctx) => {
     const execution = getProjectAssistantService().editProjectAssistantMessageStream({
       projectId,
       threadId,
       nodeId,
       text,
       context,
+      activeTools,
     });
     const unsubscribe = execution.subscribe((event) => {
       ctx.emit(event);

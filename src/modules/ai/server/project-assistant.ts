@@ -46,6 +46,11 @@ import type {
   ProjectAssistantContextSnapshot,
   ProjectAssistantStreamEvent,
   ProjectAssistantStreamToolStatus,
+  ProjectAssistantToolName,
+} from "@/modules/ai/domain/types";
+import {
+  PROJECT_ASSISTANT_READ_ONLY_TOOL_NAMES,
+  PROJECT_ASSISTANT_TOOL_NAMES,
 } from "@/modules/ai/domain/types";
 import { listResolvedModelsForConnection } from "@/modules/ai/domain/catalog";
 import {
@@ -54,7 +59,7 @@ import {
 } from "@/modules/config/domain/ai-assistant-model-selection";
 import { invariant } from "@/shared/lib/domain";
 
-import { createAssistantReadOnlyTools } from "./assistant-tools";
+import { createAssistantTools } from "./assistant-tools";
 import { createLanguageModelForConnection } from "./provider-factories";
 
 export interface ProjectAssistantStateView extends AgentThreadStateView {}
@@ -94,7 +99,9 @@ const PROJECT_ASSISTANT_SYSTEM_PROMPT = [
   "你是一个小说写作助手。",
   "回答要直接、具体、可执行，优先帮助作者推进写作。",
   "默认优先结合当前编辑上下文理解问题。",
-  "如果当前信息不足，可以读取当前项目中的只读上下文工具。",
+  "仅在当前请求实际启用了工具且确有必要时才调用工具。",
+  "如果当前信息不足，可以读取当前项目中的上下文工具。",
+  "写入工具只在用户明确要求修改项目内容时使用。",
   "严禁编造未实际读取到的项目数据。",
   "最终只输出给作者看的纯文本答复，不要暴露结构化协议或 JSON。",
 ].join("\n");
@@ -113,7 +120,7 @@ interface StreamAssistantTextInput {
   connection: AiConnectionRow;
   modelId: string;
   system: string | null;
-  toolMode: "none" | "auto-read-only";
+  activeTools: readonly ProjectAssistantToolName[];
   context: ProjectAssistantContextSnapshot | null;
   messages: ModelMessage[];
   providerOptions?: StreamProviderOptions;
@@ -217,7 +224,7 @@ interface PreparedProjectAssistantRun<TResult> {
   transportSystem: string | null;
   selection: AssistantModelSelection;
   context: ProjectAssistantContextSnapshot | null;
-  toolMode: "none" | "auto-read-only";
+  activeTools: ProjectAssistantToolName[];
   initialResult: TResult;
   runStartedEvent: ProjectAssistantStreamEvent;
   buildFinalResult: (_input: {
@@ -237,7 +244,7 @@ function defaultStreamAssistantText({
   connection,
   modelId,
   system,
-  toolMode,
+  activeTools,
   context,
   messages,
   providerOptions,
@@ -245,10 +252,11 @@ function defaultStreamAssistantText({
   const model = createLanguageModelForConnection({ connection, modelId });
   const preparedMessagesByStep: ModelMessage[][] = [];
   const tools =
-    toolMode === "auto-read-only"
-      ? createAssistantReadOnlyTools({
+    activeTools.length > 0
+      ? createAssistantTools({
           projectId,
           context,
+          activeTools,
         })
       : undefined;
   const result = streamText({
@@ -256,7 +264,7 @@ function defaultStreamAssistantText({
     messages,
     ...(system == null ? {} : { system }),
     ...(providerOptions == null ? {} : { providerOptions }),
-    tools,
+    ...(tools == null ? {} : { tools: tools as any }),
     stopWhen: stepCountIs(5),
     prepareStep: ({ messages: stepMessages, stepNumber }) => {
       preparedMessagesByStep[stepNumber] = stepMessages;
@@ -387,6 +395,33 @@ function normalizeOptionalString(value: string | null | undefined) {
   return normalized ? normalized : null;
 }
 
+function normalizeProjectAssistantActiveTools(
+  activeTools: readonly ProjectAssistantToolName[] | null | undefined,
+) {
+  if (activeTools == null) {
+    return null;
+  }
+
+  const knownToolNames = new Set<string>(PROJECT_ASSISTANT_TOOL_NAMES);
+  const seen = new Set<ProjectAssistantToolName>();
+  const normalized: ProjectAssistantToolName[] = [];
+
+  for (const value of activeTools) {
+    invariant(
+      typeof value === "string" && knownToolNames.has(value),
+      `未知工具：${String(value)}。`,
+    );
+    const toolName = value as ProjectAssistantToolName;
+    if (seen.has(toolName)) {
+      continue;
+    }
+    seen.add(toolName);
+    normalized.push(toolName);
+  }
+
+  return normalized;
+}
+
 function normalizeAssistantContextSnapshot(
   context: ProjectAssistantContextSnapshot | null | undefined,
 ): ProjectAssistantContextSnapshot | null {
@@ -420,20 +455,30 @@ function buildContextSection(context: ProjectAssistantContextSnapshot | null) {
 }
 
 function buildProjectAssistantSystemPrompt({
-  toolMode,
   context,
 }: {
-  toolMode: "none" | "auto-read-only";
   context: ProjectAssistantContextSnapshot | null;
 }) {
-  const modeInstruction =
-    toolMode === "auto-read-only"
-      ? "本轮允许使用只读工具读取正文、时间线和辅助资料。先使用当前编辑上下文；只有在信息不足时再调用工具。"
-      : "本轮不提供工具调用能力，只能基于当前编辑上下文与已有消息回答。";
+  return [PROJECT_ASSISTANT_SYSTEM_PROMPT, buildContextSection(context)].join("\n\n");
+}
 
-  return [PROJECT_ASSISTANT_SYSTEM_PROMPT, modeInstruction, buildContextSection(context)].join(
-    "\n\n",
-  );
+function resolveProjectAssistantActiveTools({
+  selection,
+  activeTools,
+}: {
+  selection: AssistantModelSelection;
+  activeTools?: readonly ProjectAssistantToolName[] | null;
+}) {
+  const normalizedActiveTools =
+    normalizeProjectAssistantActiveTools(activeTools) ??
+    (selection.resolvedModel.supportsToolUse ? [...PROJECT_ASSISTANT_READ_ONLY_TOOL_NAMES] : []);
+  if (normalizedActiveTools.length > 0) {
+    invariant(
+      selection.resolvedModel.supportsToolUse,
+      "当前模型不支持工具调用，无法启用请求级工具。",
+    );
+  }
+  return normalizedActiveTools;
 }
 
 function normalizeError(error: unknown) {
@@ -915,7 +960,7 @@ async function executeProjectAssistantRun<TResult>({
     connection: prepared.selection.connection,
     modelId: prepared.selection.resolvedModel.modelId,
     system: prepared.transportSystem,
-    toolMode: prepared.toolMode,
+    activeTools: prepared.activeTools,
     context: prepared.context,
     messages: prepared.messages,
     providerOptions: prepared.providerOptions,
@@ -1193,17 +1238,22 @@ function buildSendRun({
   threadId,
   text,
   context,
+  activeTools,
   readStoredSelection,
 }: {
   projectId: string;
   threadId: string;
   text: string;
   context?: ProjectAssistantContextSnapshot | null;
+  activeTools?: readonly ProjectAssistantToolName[] | null;
   readStoredSelection: () => AiAssistantModelSelection | null;
 }): PreparedProjectAssistantRun<ProjectAssistantSendResult> {
   const selection = resolveProjectAssistantModelSelection(readStoredSelection);
   const normalizedContext = normalizeAssistantContextSnapshot(context);
-  const toolMode = selection.resolvedModel.supportsToolUse ? "auto-read-only" : "none";
+  const resolvedActiveTools = resolveProjectAssistantActiveTools({
+    selection,
+    activeTools,
+  });
   const threadView = getThreadView(threadId);
   const thread = threadView.thread;
   invariant(thread, "未找到当前会话。");
@@ -1234,7 +1284,6 @@ function buildSendRun({
   });
 
   const system = buildProjectAssistantSystemPrompt({
-    toolMode,
     context: normalizedContext,
   });
   const request = resolveAssistantRequest({
@@ -1255,7 +1304,7 @@ function buildSendRun({
     transportSystem: request.transportSystem,
     selection,
     context: normalizedContext,
-    toolMode,
+    activeTools: resolvedActiveTools,
     initialResult: {
       thread: getThreadView(thread.id).thread!,
       userNode,
@@ -1285,17 +1334,22 @@ function buildRetryRun({
   threadId,
   triggerNodeId,
   context,
+  activeTools,
   readStoredSelection,
 }: {
   projectId: string;
   threadId: string;
   triggerNodeId: string;
   context?: ProjectAssistantContextSnapshot | null;
+  activeTools?: readonly ProjectAssistantToolName[] | null;
   readStoredSelection: () => AiAssistantModelSelection | null;
 }): PreparedProjectAssistantRun<ProjectAssistantRetryResult> {
   const selection = resolveProjectAssistantModelSelection(readStoredSelection);
   const normalizedContext = normalizeAssistantContextSnapshot(context);
-  const toolMode = selection.resolvedModel.supportsToolUse ? "auto-read-only" : "none";
+  const resolvedActiveTools = resolveProjectAssistantActiveTools({
+    selection,
+    activeTools,
+  });
   const threadView = getThreadView(threadId);
   const thread = threadView.thread;
   invariant(thread, "未找到当前会话。");
@@ -1324,7 +1378,6 @@ function buildRetryRun({
   });
 
   const system = buildProjectAssistantSystemPrompt({
-    toolMode,
     context: normalizedContext,
   });
   const request = resolveAssistantRequest({
@@ -1345,7 +1398,7 @@ function buildRetryRun({
     transportSystem: request.transportSystem,
     selection,
     context: normalizedContext,
-    toolMode,
+    activeTools: resolvedActiveTools,
     initialResult: {
       thread: getThreadView(thread.id).thread!,
       assistantNode: null,
@@ -1373,6 +1426,7 @@ function buildEditRun({
   nodeId,
   text,
   context,
+  activeTools,
   readStoredSelection,
 }: {
   projectId: string;
@@ -1380,11 +1434,15 @@ function buildEditRun({
   nodeId: string;
   text: string;
   context?: ProjectAssistantContextSnapshot | null;
+  activeTools?: readonly ProjectAssistantToolName[] | null;
   readStoredSelection: () => AiAssistantModelSelection | null;
 }): PreparedProjectAssistantRun<ProjectAssistantEditResult> {
   const selection = resolveProjectAssistantModelSelection(readStoredSelection);
   const normalizedContext = normalizeAssistantContextSnapshot(context);
-  const toolMode = selection.resolvedModel.supportsToolUse ? "auto-read-only" : "none";
+  const resolvedActiveTools = resolveProjectAssistantActiveTools({
+    selection,
+    activeTools,
+  });
   const threadView = getThreadView(threadId);
   const thread = threadView.thread;
   invariant(thread, "未找到当前会话。");
@@ -1414,7 +1472,6 @@ function buildEditRun({
   });
 
   const system = buildProjectAssistantSystemPrompt({
-    toolMode,
     context: normalizedContext,
   });
   const request = resolveAssistantRequest({
@@ -1435,7 +1492,7 @@ function buildEditRun({
     transportSystem: request.transportSystem,
     selection,
     context: normalizedContext,
-    toolMode,
+    activeTools: resolvedActiveTools,
     initialResult: {
       thread: getThreadView(thread.id).thread!,
       replacementNode,
@@ -1548,11 +1605,13 @@ export function createProjectAssistantService(
       threadId,
       text,
       context,
+      activeTools,
     }: {
       projectId: string;
       threadId: string;
       text: string;
       context?: ProjectAssistantContextSnapshot | null;
+      activeTools?: readonly ProjectAssistantToolName[] | null;
     }) {
       return startExecution(
         buildSendRun({
@@ -1560,6 +1619,7 @@ export function createProjectAssistantService(
           threadId,
           text,
           context,
+          activeTools,
           readStoredSelection,
         }),
       );
@@ -1570,11 +1630,13 @@ export function createProjectAssistantService(
       threadId,
       triggerNodeId,
       context,
+      activeTools,
     }: {
       projectId: string;
       threadId: string;
       triggerNodeId: string;
       context?: ProjectAssistantContextSnapshot | null;
+      activeTools?: readonly ProjectAssistantToolName[] | null;
     }) {
       return startExecution(
         buildRetryRun({
@@ -1582,6 +1644,7 @@ export function createProjectAssistantService(
           threadId,
           triggerNodeId,
           context,
+          activeTools,
           readStoredSelection,
         }),
       );
@@ -1593,12 +1656,14 @@ export function createProjectAssistantService(
       nodeId,
       text,
       context,
+      activeTools,
     }: {
       projectId: string;
       threadId: string;
       nodeId: string;
       text: string;
       context?: ProjectAssistantContextSnapshot | null;
+      activeTools?: readonly ProjectAssistantToolName[] | null;
     }) {
       return startExecution(
         buildEditRun({
@@ -1607,6 +1672,7 @@ export function createProjectAssistantService(
           nodeId,
           text,
           context,
+          activeTools,
           readStoredSelection,
         }),
       );
@@ -1617,6 +1683,7 @@ export function createProjectAssistantService(
       threadId: string;
       text: string;
       context?: ProjectAssistantContextSnapshot | null;
+      activeTools?: readonly ProjectAssistantToolName[] | null;
     }): Promise<ProjectAssistantSendResult> {
       return this.sendProjectAssistantMessageStream(args).finalResult;
     },
@@ -1626,6 +1693,7 @@ export function createProjectAssistantService(
       threadId: string;
       triggerNodeId: string;
       context?: ProjectAssistantContextSnapshot | null;
+      activeTools?: readonly ProjectAssistantToolName[] | null;
     }): Promise<ProjectAssistantRetryResult> {
       return this.retryProjectAssistantMessageStream(args).finalResult;
     },
@@ -1636,6 +1704,7 @@ export function createProjectAssistantService(
       nodeId: string;
       text: string;
       context?: ProjectAssistantContextSnapshot | null;
+      activeTools?: readonly ProjectAssistantToolName[] | null;
     }): Promise<ProjectAssistantEditResult> {
       return this.editProjectAssistantMessageStream(args).finalResult;
     },

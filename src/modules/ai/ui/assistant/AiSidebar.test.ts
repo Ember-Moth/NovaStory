@@ -3,6 +3,8 @@ import { expect, test } from "bun:test";
 import { getMessagesViewportSessionKey, shouldAnimateMessageMount } from "./AiSidebar";
 import {
   applyStreamEvent,
+  buildProjectAssistantRetryActiveTools,
+  buildProjectAssistantSendActiveTools,
   buildSessionRows,
   createStreamOverlay,
   resolveExpectedActiveThreadAfterArchiveToggle,
@@ -201,4 +203,33 @@ test("shouldAnimateMessageMount skips enter animation for streamed assistant mes
 test("getMessagesViewportSessionKey falls back for empty thread selection", () => {
   expect(getMessagesViewportSessionKey("thread_a")).toBe("thread_a");
   expect(getMessagesViewportSessionKey(null)).toBe("__empty-thread__");
+});
+
+test("buildProjectAssistantSendActiveTools adds aux write tools only when explicitly enabled", () => {
+  expect(buildProjectAssistantSendActiveTools({ allowAuxWrites: false })).toEqual([
+    "read_current_writing_context",
+    "read_content_subtree",
+    "list_timeline_points",
+    "list_aux_dir",
+    "read_aux_path",
+  ]);
+  expect(buildProjectAssistantSendActiveTools({ allowAuxWrites: true })).toEqual([
+    "read_current_writing_context",
+    "read_content_subtree",
+    "list_timeline_points",
+    "list_aux_dir",
+    "read_aux_path",
+    "mkdir_aux_dir",
+    "write_aux_file",
+  ]);
+});
+
+test("buildProjectAssistantRetryActiveTools stays read-only", () => {
+  expect(buildProjectAssistantRetryActiveTools()).toEqual([
+    "read_current_writing_context",
+    "read_content_subtree",
+    "list_timeline_points",
+    "list_aux_dir",
+    "read_aux_path",
+  ]);
 });

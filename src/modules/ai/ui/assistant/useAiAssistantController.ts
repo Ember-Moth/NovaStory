@@ -5,6 +5,11 @@ import type {
   AgentThreadView,
   ProjectAssistantContextSnapshot,
   ProjectAssistantStreamEvent,
+  ProjectAssistantToolName,
+} from "@/modules/ai/domain/types";
+import {
+  PROJECT_ASSISTANT_AUX_WRITE_TOOL_NAMES,
+  PROJECT_ASSISTANT_READ_ONLY_TOOL_NAMES,
 } from "@/modules/ai/domain/types";
 import { rpc } from "@/rpc/client";
 
@@ -166,6 +171,20 @@ export function createStreamOverlay({
     errorMessage: null,
     blocks: [],
   };
+}
+
+export function buildProjectAssistantSendActiveTools({
+  allowAuxWrites,
+}: {
+  allowAuxWrites: boolean;
+}): ProjectAssistantToolName[] {
+  return allowAuxWrites
+    ? [...PROJECT_ASSISTANT_READ_ONLY_TOOL_NAMES, ...PROJECT_ASSISTANT_AUX_WRITE_TOOL_NAMES]
+    : [...PROJECT_ASSISTANT_READ_ONLY_TOOL_NAMES];
+}
+
+export function buildProjectAssistantRetryActiveTools(): ProjectAssistantToolName[] {
+  return [...PROJECT_ASSISTANT_READ_ONLY_TOOL_NAMES];
 }
 
 function updateStreamToolTrace(
@@ -409,9 +428,11 @@ export function useAiAssistantController(
   const [composerError, setComposerError] = useState<string | null>(null);
   const [activeStream, setActiveStream] = useState<AssistantStreamOverlay | null>(null);
   const [includeContext, setIncludeContext] = useState(true);
+  const [allowAuxWritesForNextSend, setAllowAuxWritesForNextSend] = useState(false);
 
   const storedSelectionQuery = rpc.useQuery("config.getAiAssistantModelSelection");
   const assistantOverviewQuery = rpc.useQuery("ai.getProjectAssistantState", { projectId });
+  const connectionModelsQuery = rpc.useQuery("ai.listEnabledConnectionModels");
   const saveSelection = rpc.useMutation("config.setAiAssistantModelSelection", {
     onSuccess: (selection) => {
       rpc.setQueryData("config.getAiAssistantModelSelection", undefined, selection);
@@ -461,6 +482,11 @@ export function useAiAssistantController(
   const retryableRun = selectRetryableRun(assistantState);
   const pendingRun = selectPendingRun(assistantState);
   const runSummaries = assistantState.runSummaries;
+  const selectedResolvedModel =
+    connectionModelsQuery.data
+      ?.find((group) => group.connection.id === selectedConnectionId)
+      ?.models.find((model) => model.id === selectedModelId) ?? null;
+  const selectedModelSupportsToolUse = selectedResolvedModel?.supportsToolUse ?? false;
   const isGenerating = sendMessageStream.isStreaming || retryMessageStream.isStreaming;
   const isThreadMutating =
     createThread.isPending ||
@@ -567,6 +593,11 @@ export function useAiAssistantController(
       }
 
       const text = draft.trim();
+      const activeTools = selectedModelSupportsToolUse
+        ? buildProjectAssistantSendActiveTools({
+            allowAuxWrites: allowAuxWritesForNextSend,
+          })
+        : null;
       setComposerError(null);
       setPendingAction({ kind: "send", text });
       setActiveStream(
@@ -586,6 +617,7 @@ export function useAiAssistantController(
             threadId: activeThreadId,
             text,
             context: includeContext ? contextSnapshot : null,
+            activeTools,
           },
           {
             onEvent: (event) => {
@@ -622,6 +654,7 @@ export function useAiAssistantController(
         );
         void assistantOverviewQuery.refetch();
       } finally {
+        setAllowAuxWritesForNextSend(false);
         if (clearPendingAction) {
           setPendingAction(null);
         }
@@ -629,6 +662,7 @@ export function useAiAssistantController(
     },
     [
       activeThreadId,
+      allowAuxWritesForNextSend,
       assistantOverviewQuery,
       canSubmit,
       contextSnapshot,
@@ -636,6 +670,7 @@ export function useAiAssistantController(
       includeContext,
       projectId,
       sendMessageStream,
+      selectedModelSupportsToolUse,
     ],
   );
 
@@ -662,6 +697,9 @@ export function useAiAssistantController(
             threadId: activeThreadId,
             triggerNodeId,
             context: includeContext ? contextSnapshot : null,
+            activeTools: selectedModelSupportsToolUse
+              ? buildProjectAssistantRetryActiveTools()
+              : null,
           },
           {
             onEvent: (event) => {
@@ -706,6 +744,7 @@ export function useAiAssistantController(
       includeContext,
       projectId,
       retryMessageStream,
+      selectedModelSupportsToolUse,
     ],
   );
 
@@ -844,6 +883,7 @@ export function useAiAssistantController(
     handleSelectionChange,
     handleSelectionCommit,
     handleSubmit,
+    allowAuxWritesForNextSend,
     includeContext,
     isBusy,
     isGenerating,
@@ -857,10 +897,12 @@ export function useAiAssistantController(
     retryableRun,
     runSummaries,
     selectedConnectionId,
+    selectedModelSupportsToolUse,
     selectedModelId,
     selectionHydrated,
     sessionOverlayState,
     sessionRows,
+    setAllowAuxWritesForNextSend,
     setDraft,
     setIncludeContext,
     showArchivedThreads,

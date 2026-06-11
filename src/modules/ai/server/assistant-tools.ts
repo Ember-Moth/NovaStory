@@ -1,14 +1,21 @@
+import { basename, dirname } from "node:path/posix";
+
 import { jsonSchema, tool } from "ai";
 
-import type { ProjectAssistantContextSnapshot } from "@/modules/ai/domain/types";
+import type {
+  ProjectAssistantContextSnapshot,
+  ProjectAssistantToolName,
+} from "@/modules/ai/domain/types";
 import {
   composeWritingContext,
   exportContentSubtree,
   getDefaultWorkspace,
   listAuxDirAt,
   listTimelinePoints,
+  mkdirAt,
   ORIGIN_TIMELINE_POINT_ID,
   readAuxByPathAt,
+  writeFileAt,
 } from "@/modules/workspace/domain";
 import type {
   ExportedContentNode,
@@ -17,6 +24,7 @@ import type {
   TimelinePointView,
   WritingContext,
 } from "@/modules/workspace/domain/types";
+import { invariant } from "@/shared/lib/domain";
 
 type AssistantToolSuccess<T> = {
   ok: true;
@@ -194,6 +202,42 @@ function resolveActiveAuxPath(context: ProjectAssistantContextSnapshot | null | 
   return context?.activeAuxPath ?? null;
 }
 
+function normalizeAuxPath(path: string, actionLabel: string) {
+  const normalized = path.trim();
+  invariant(normalized.length > 0, `${actionLabel}时路径不能为空。`);
+  invariant(normalized.startsWith("/"), `${actionLabel}只支持以 / 开头的绝对路径。`);
+  const segments = normalized.split("/").filter(Boolean);
+  invariant(segments.length > 0, `${actionLabel}不能作用于辅助资料根目录。`);
+  return `/${segments.join("/")}`;
+}
+
+function splitAuxPath(path: string, actionLabel: string) {
+  const normalizedPath = normalizeAuxPath(path, actionLabel);
+  return {
+    normalizedPath,
+    parentPath: dirname(normalizedPath),
+    name: basename(normalizedPath),
+  };
+}
+
+function resolveParentDirId(input: {
+  workspaceId: string;
+  timelinePointId: string;
+  auxRootId: string | null;
+  parentPath: string;
+  actionLabel: string;
+}) {
+  if (input.parentPath === "/") {
+    invariant(input.auxRootId, "当前工作区没有辅助资料根目录。");
+    return input.auxRootId;
+  }
+
+  const parentNode = readAuxByPathAt(input.workspaceId, input.timelinePointId, input.parentPath);
+  invariant(parentNode, `${input.actionLabel}失败：父目录不存在或在当前时间点不可见。`);
+  invariant(parentNode.nodeType === "dir", `${input.actionLabel}失败：父路径不是辅助资料目录。`);
+  return parentNode.id;
+}
+
 function failure(error: unknown): AssistantToolError {
   return {
     ok: false,
@@ -209,14 +253,14 @@ function withEnvelope<T>(execute: () => AssistantToolSuccess<T>): AssistantToolE
   }
 }
 
-export function createAssistantReadOnlyTools({
+function buildAssistantToolRegistry({
   projectId,
   context,
 }: {
   projectId: string;
   context: ProjectAssistantContextSnapshot | null;
 }) {
-  return {
+  const registry = {
     read_current_writing_context: tool({
       description:
         "读取当前正文节点的写作上下文，包括当前正文节点、其锚定时间点，以及该时间点下可见的辅助资料快照。",
@@ -395,7 +439,152 @@ export function createAssistantReadOnlyTools({
         });
       },
     }),
-  };
+    mkdir_aux_dir: tool({
+      description: "在当前时间点下创建一个辅助资料目录。只会创建目标路径的最后一级目录。",
+      inputSchema: jsonSchema<{ path: string }>({
+        type: "object",
+        required: ["path"],
+        properties: {
+          path: {
+            type: "string",
+            description: "要创建的辅助资料目录绝对路径，例如 /设定/角色。",
+          },
+        },
+      }),
+      execute: async ({ path }) => {
+        const workspace = getWorkspaceForProject(projectId);
+        if (!workspace) {
+          return failure(new Error("当前项目没有默认工作区。"));
+        }
+
+        return withEnvelope(() => {
+          const timelinePointId = resolveTimelinePointId(context);
+          const { normalizedPath, parentPath, name } = splitAuxPath(path, "创建辅助资料目录");
+          const existing = readAuxByPathAt(workspace.id, timelinePointId, normalizedPath);
+          invariant(existing == null, "创建辅助资料目录失败：目标路径已存在。");
+
+          const parentDirId = resolveParentDirId({
+            workspaceId: workspace.id,
+            timelinePointId,
+            auxRootId: workspace.auxRootId,
+            parentPath,
+            actionLabel: "创建辅助资料目录",
+          });
+          const node = mkdirAt({
+            workspaceId: workspace.id,
+            timelinePointId,
+            parentDirId,
+            name,
+          });
+
+          return {
+            ok: true,
+            truncated: false,
+            data: {
+              action: "created",
+              path: normalizedPath,
+              nodeId: node.id,
+            },
+          };
+        });
+      },
+    }),
+    write_aux_file: tool({
+      description:
+        "在当前时间点下创建或覆盖一个辅助资料文件。若文件已存在则整文件覆盖；若不存在则创建。",
+      inputSchema: jsonSchema<{ path: string; content: string }>({
+        type: "object",
+        required: ["path", "content"],
+        properties: {
+          path: {
+            type: "string",
+            description: "要写入的辅助资料文件绝对路径，例如 /设定/角色/主角.md。",
+          },
+          content: {
+            type: "string",
+            description: "要写入文件的完整内容。",
+          },
+        },
+      }),
+      execute: async ({ path, content }) => {
+        const workspace = getWorkspaceForProject(projectId);
+        if (!workspace) {
+          return failure(new Error("当前项目没有默认工作区。"));
+        }
+
+        return withEnvelope(() => {
+          const timelinePointId = resolveTimelinePointId(context);
+          const { normalizedPath, parentPath, name } = splitAuxPath(path, "写入辅助资料文件");
+          const existing = readAuxByPathAt(workspace.id, timelinePointId, normalizedPath);
+
+          if (existing) {
+            invariant(existing.nodeType === "file", "写入辅助资料文件失败：目标路径不是文件。");
+            const node = writeFileAt({
+              workspaceId: workspace.id,
+              timelinePointId,
+              nodeId: existing.id,
+              content,
+            });
+            return {
+              ok: true,
+              truncated: false,
+              data: {
+                action: "updated",
+                path: normalizedPath,
+                nodeId: node.id,
+              },
+            };
+          }
+
+          const parentDirId = resolveParentDirId({
+            workspaceId: workspace.id,
+            timelinePointId,
+            auxRootId: workspace.auxRootId,
+            parentPath,
+            actionLabel: "写入辅助资料文件",
+          });
+          const node = writeFileAt({
+            workspaceId: workspace.id,
+            timelinePointId,
+            parentDirId,
+            name,
+            content,
+          });
+
+          return {
+            ok: true,
+            truncated: false,
+            data: {
+              action: "created",
+              path: normalizedPath,
+              nodeId: node.id,
+            },
+          };
+        });
+      },
+    }),
+  } satisfies Record<ProjectAssistantToolName, unknown>;
+
+  return registry;
 }
 
-export type AssistantReadOnlyToolSet = ReturnType<typeof createAssistantReadOnlyTools>;
+export function createAssistantTools({
+  projectId,
+  context,
+  activeTools,
+}: {
+  projectId: string;
+  context: ProjectAssistantContextSnapshot | null;
+  activeTools: readonly ProjectAssistantToolName[];
+}): Partial<Record<ProjectAssistantToolName, unknown>> {
+  const registry = buildAssistantToolRegistry({ projectId, context });
+  const tools: Partial<Record<ProjectAssistantToolName, unknown>> = {};
+
+  for (const toolName of activeTools) {
+    tools[toolName] = registry[toolName];
+  }
+
+  return tools;
+}
+
+export type AssistantToolSet = ReturnType<typeof createAssistantTools>;

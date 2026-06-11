@@ -558,6 +558,305 @@ test("sendProjectAssistantMessage only materializes per-step response deltas int
   expect(trace.events.filter((event) => event.eventKind === "node-materialized")).toHaveLength(5);
 });
 
+test("sendProjectAssistantMessage uses read-only tools by default and can opt into aux write tools", async () => {
+  seedProject("assistant_active_tools");
+  const seeded = seedCustomConnection({
+    connectionId: "conn_active_tools",
+    modelId: "story-model",
+    modelRowId: "cmodel_active_tools",
+    supportsToolUse: true,
+  });
+  const capturedActiveTools: Array<readonly string[]> = [];
+  const service = createProjectAssistantService({
+    readStoredSelection: () => seeded.selection,
+    streamAssistantText: ((input: { activeTools: readonly string[] }) => {
+      capturedActiveTools.push(input.activeTools);
+      return createMockStream({
+        chunks: [
+          { type: "start-step", stepNumber: 0 },
+          { type: "text-delta", stepNumber: 0, delta: "收到。" },
+          {
+            type: "finish-step",
+            stepNumber: 0,
+            finishReason: "stop",
+            usage: { totalTokens: 5 },
+          },
+        ],
+        text: "收到。",
+        usage: { totalTokens: 5 },
+        finishReason: "stop",
+        steps: [
+          {
+            stepNumber: 0,
+            preparedMessages: [],
+            model: { provider: "openai", modelId: "story-model" },
+            finishReason: "stop",
+            rawFinishReason: "stop",
+            usage: { totalTokens: 5 },
+            request: { body: { prompt: "ok" } },
+            response: {
+              body: { id: `resp_${capturedActiveTools.length}` },
+              messages: [
+                {
+                  role: "assistant",
+                  content: [{ type: "text", text: "收到。" }],
+                },
+              ],
+            },
+            providerMetadata: {},
+            toolCalls: [],
+            toolResults: [],
+          },
+        ],
+      })();
+    }) as any,
+  });
+  const thread = service.createProjectAssistantThread("assistant_active_tools");
+
+  await service.sendProjectAssistantMessage({
+    projectId: "assistant_active_tools",
+    threadId: thread.id,
+    text: "先默认发送",
+  });
+  await service.sendProjectAssistantMessage({
+    projectId: "assistant_active_tools",
+    threadId: thread.id,
+    text: "允许你写辅助资料",
+    activeTools: [
+      "read_current_writing_context",
+      "read_content_subtree",
+      "list_timeline_points",
+      "list_aux_dir",
+      "read_aux_path",
+      "mkdir_aux_dir",
+      "write_aux_file",
+    ],
+  });
+
+  expect(capturedActiveTools).toEqual([
+    [
+      "read_current_writing_context",
+      "read_content_subtree",
+      "list_timeline_points",
+      "list_aux_dir",
+      "read_aux_path",
+    ],
+    [
+      "read_current_writing_context",
+      "read_content_subtree",
+      "list_timeline_points",
+      "list_aux_dir",
+      "read_aux_path",
+      "mkdir_aux_dir",
+      "write_aux_file",
+    ],
+  ]);
+});
+
+test("sendProjectAssistantMessage rejects explicit tools when the model does not support tool use", async () => {
+  seedProject("assistant_tool_guard");
+  const seeded = seedCustomConnection({
+    connectionId: "conn_tool_guard",
+    modelId: "story-model",
+    modelRowId: "cmodel_tool_guard",
+    supportsToolUse: false,
+  });
+  let streamCalls = 0;
+  const service = createProjectAssistantService({
+    readStoredSelection: () => seeded.selection,
+    streamAssistantText: (() => {
+      streamCalls += 1;
+      throw new Error("stream should not run");
+    }) as any,
+  });
+  const thread = service.createProjectAssistantThread("assistant_tool_guard");
+
+  await expect(
+    service.sendProjectAssistantMessage({
+      projectId: "assistant_tool_guard",
+      threadId: thread.id,
+      text: "读一下上下文",
+      activeTools: ["read_aux_path"],
+    }),
+  ).rejects.toThrow("当前模型不支持工具调用，无法启用请求级工具。");
+  expect(streamCalls).toBe(0);
+});
+
+test("sendProjectAssistantMessage records tool input and output artifacts for explicit aux write tools", async () => {
+  seedProject("assistant_write_tool_trace");
+  const seeded = seedCustomConnection({
+    connectionId: "conn_write_tool_trace",
+    modelId: "story-model",
+    modelRowId: "cmodel_write_tool_trace",
+    supportsToolUse: true,
+  });
+  const service = createProjectAssistantService({
+    readStoredSelection: () => seeded.selection,
+    streamAssistantText: createMockStream({
+      chunks: [
+        { type: "start-step", stepNumber: 0 },
+        { type: "text-delta", stepNumber: 0, delta: "我来记一条人物资料。" },
+        {
+          type: "tool-call",
+          stepNumber: 0,
+          toolCall: {
+            toolCallId: "tool_write_1",
+            toolName: "write_aux_file",
+            input: { path: "/设定/角色.md", content: "主角：林舟" },
+          },
+        },
+        {
+          type: "tool-result",
+          stepNumber: 0,
+          toolResult: {
+            toolCallId: "tool_write_1",
+            toolName: "write_aux_file",
+            output: {
+              ok: true,
+              data: {
+                action: "created",
+                path: "/设定/角色.md",
+                nodeId: "aux_written",
+              },
+            },
+          },
+        },
+        {
+          type: "finish-step",
+          stepNumber: 0,
+          finishReason: "tool-calls",
+          usage: { totalTokens: 8 },
+        },
+        { type: "start-step", stepNumber: 1 },
+        { type: "text-delta", stepNumber: 1, delta: "人物资料已经写好了。" },
+        {
+          type: "finish-step",
+          stepNumber: 1,
+          finishReason: "stop",
+          usage: { totalTokens: 9 },
+        },
+      ],
+      text: "人物资料已经写好了。",
+      usage: { totalTokens: 17 },
+      finishReason: "stop",
+      steps: [
+        {
+          stepNumber: 0,
+          preparedMessages: [{ role: "user", content: [{ type: "text", text: "保存人物资料" }] }],
+          model: { provider: "openai", modelId: "story-model" },
+          finishReason: "tool-calls",
+          rawFinishReason: "tool_calls",
+          usage: { totalTokens: 8 },
+          request: { body: { step: 0 } },
+          response: {
+            body: { id: "resp_write_0" },
+            messages: [
+              {
+                role: "assistant",
+                content: [
+                  { type: "text", text: "我来记一条人物资料。" },
+                  {
+                    type: "tool-call",
+                    toolCallId: "tool_write_1",
+                    toolName: "write_aux_file",
+                    input: { path: "/设定/角色.md", content: "主角：林舟" },
+                  },
+                ],
+              },
+              {
+                role: "tool",
+                content: [
+                  {
+                    type: "tool-result",
+                    toolCallId: "tool_write_1",
+                    toolName: "write_aux_file",
+                    output: {
+                      type: "json",
+                      value: {
+                        ok: true,
+                        data: {
+                          action: "created",
+                          path: "/设定/角色.md",
+                          nodeId: "aux_written",
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+          providerMetadata: {},
+          toolCalls: [
+            {
+              toolCallId: "tool_write_1",
+              toolName: "write_aux_file",
+              input: { path: "/设定/角色.md", content: "主角：林舟" },
+            },
+          ],
+          toolResults: [
+            {
+              toolCallId: "tool_write_1",
+              toolName: "write_aux_file",
+              output: {
+                ok: true,
+                data: {
+                  action: "created",
+                  path: "/设定/角色.md",
+                  nodeId: "aux_written",
+                },
+              },
+            },
+          ],
+        },
+        {
+          stepNumber: 1,
+          preparedMessages: [{ role: "user", content: [{ type: "text", text: "保存人物资料" }] }],
+          model: { provider: "openai", modelId: "story-model" },
+          finishReason: "stop",
+          rawFinishReason: "stop",
+          usage: { totalTokens: 9 },
+          request: { body: { step: 1 } },
+          response: {
+            body: { id: "resp_write_1" },
+            messages: [
+              {
+                role: "assistant",
+                content: [{ type: "text", text: "人物资料已经写好了。" }],
+              },
+            ],
+          },
+          providerMetadata: {},
+          toolCalls: [],
+          toolResults: [],
+        },
+      ],
+    }) as any,
+  });
+  const thread = service.createProjectAssistantThread("assistant_write_tool_trace");
+
+  const result = await service.sendProjectAssistantMessage({
+    projectId: "assistant_write_tool_trace",
+    threadId: thread.id,
+    text: "保存人物资料",
+    activeTools: [
+      "read_current_writing_context",
+      "read_content_subtree",
+      "list_timeline_points",
+      "list_aux_dir",
+      "read_aux_path",
+      "mkdir_aux_dir",
+      "write_aux_file",
+    ],
+  });
+  const trace = service.getRunTrace(result.run.id);
+
+  expect(trace.artifacts.map((artifact) => artifact.artifactKind)).toContain("tool-input");
+  expect(trace.artifacts.map((artifact) => artifact.artifactKind)).toContain("tool-output");
+  expect(trace.events.some((event) => event.eventKind === "tool-call-started")).toBe(true);
+  expect(trace.events.some((event) => event.eventKind === "tool-call-finished")).toBe(true);
+});
+
 test("sendProjectAssistantMessageStream keeps running after subscribers detach", async () => {
   seedProject("assistant_background");
   const seeded = seedCustomConnection({

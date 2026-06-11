@@ -71,6 +71,23 @@ export type AiSelectionSnapshotOrigin = "catalog" | "custom";
 export type AgentToolTraceStatus = "success" | "error";
 export type ProjectAssistantStreamToolStatus = AgentToolTraceStatus;
 
+export const PROJECT_ASSISTANT_READ_ONLY_TOOL_NAMES = [
+  "read_current_writing_context",
+  "read_content_subtree",
+  "list_timeline_points",
+  "list_aux_dir",
+  "read_aux_path",
+] as const;
+
+export const PROJECT_ASSISTANT_AUX_WRITE_TOOL_NAMES = ["mkdir_aux_dir", "write_aux_file"] as const;
+
+export const PROJECT_ASSISTANT_TOOL_NAMES = [
+  ...PROJECT_ASSISTANT_READ_ONLY_TOOL_NAMES,
+  ...PROJECT_ASSISTANT_AUX_WRITE_TOOL_NAMES,
+] as const;
+
+export type ProjectAssistantToolName = (typeof PROJECT_ASSISTANT_TOOL_NAMES)[number];
+
 export interface ProjectAssistantContextSnapshot {
   workspaceId: string | null;
   activeContentNodeId: string | null;
