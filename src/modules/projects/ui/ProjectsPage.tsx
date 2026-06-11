@@ -83,6 +83,7 @@ export function ProjectsPage({ projectId = null }: { projectId?: string | null }
   const [forkCommit, setForkCommit] = useState<CommitRow | null>(null);
   const [commitMessage, setCommitMessage] = useState("");
   const [commitError, setCommitError] = useState<string | null>(null);
+  const [discardError, setDiscardError] = useState<string | null>(null);
 
   const projectsQuery = rpc.useQuery("projects.list", projectId ? skipToken : undefined, {
     refetchOnWindowFocus: true,
@@ -207,6 +208,7 @@ export function ProjectsPage({ projectId = null }: { projectId?: string | null }
   const createBranchWithWorkspace = rpc.useMutation("branches.createWithWorkspace");
   const deleteBranch = rpc.useMutation("branches.delete");
   const createCommit = rpc.useMutation("commits.create");
+  const checkoutCommit = rpc.useMutation("commits.checkout");
 
   const projectList = [...(projectsQuery.data ?? [])].sort((a, b) => b.updatedAt - a.updatedAt);
 
@@ -459,6 +461,28 @@ export function ProjectsPage({ projectId = null }: { projectId?: string | null }
     }
   };
 
+  const handleDiscardChanges = async () => {
+    if (!selectedBranch || !selectedWorkspace || !selectedBranch.headCommitId) {
+      return;
+    }
+
+    if (!confirm("确认撤回全部未提交修改吗？工作区将恢复到当前 HEAD 状态，此操作不可撤销。")) {
+      return;
+    }
+
+    try {
+      setDiscardError(null);
+      await checkoutCommit.mutate({
+        workspaceId: selectedWorkspace.id,
+        commitId: selectedBranch.headCommitId,
+      });
+    } catch (mutationError) {
+      setDiscardError(
+        mutationError instanceof Error ? mutationError.message : "撤回修改失败，请稍后重试。",
+      );
+    }
+  };
+
   const handleCommit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!selectedBranch || !selectedWorkspace) {
@@ -597,9 +621,11 @@ export function ProjectsPage({ projectId = null }: { projectId?: string | null }
               workingTreeStatusQuery.isInitialLoading && workingTreeStatus == null
             }
             workingTreeStatusError={workingTreeStatusQuery.error?.message ?? null}
+            discardError={discardError ?? checkoutCommit.error?.message ?? null}
             commitMessage={commitMessage}
             commitError={commitError ?? createCommit.error?.message ?? null}
             isCommitting={createCommit.isPending}
+            isDiscardingChanges={checkoutCommit.isPending}
             isSettingDefault={setDefaultBranch.isPending}
             isDeletingBranch={deleteBranch.isPending}
             onClose={() => navigate("/")}
@@ -613,6 +639,7 @@ export function ProjectsPage({ projectId = null }: { projectId?: string | null }
             onOpenFork={openForkDialog}
             onCommitMessageChange={setCommitMessage}
             onSubmitCommit={(event) => void handleCommit(event)}
+            onDiscardChanges={() => void handleDiscardChanges()}
           />
         ) : (
           <FullPageMessage
@@ -1040,9 +1067,11 @@ function ProjectWorkbenchMain({
   workingTreeStatus,
   workingTreeStatusLoading,
   workingTreeStatusError,
+  discardError,
   commitMessage,
   commitError,
   isCommitting,
+  isDiscardingChanges,
   isSettingDefault,
   isDeletingBranch,
   onClose,
@@ -1052,6 +1081,7 @@ function ProjectWorkbenchMain({
   onOpenFork,
   onCommitMessageChange,
   onSubmitCommit,
+  onDiscardChanges,
 }: {
   project: ProjectRow;
   selectedBranch: BranchRow | null;
@@ -1062,9 +1092,11 @@ function ProjectWorkbenchMain({
   workingTreeStatus: WorkingTreeStatus | null;
   workingTreeStatusLoading: boolean;
   workingTreeStatusError: string | null;
+  discardError: string | null;
   commitMessage: string;
   commitError: string | null;
   isCommitting: boolean;
+  isDiscardingChanges: boolean;
   isSettingDefault: boolean;
   isDeletingBranch: boolean;
   onClose: () => void;
@@ -1074,6 +1106,7 @@ function ProjectWorkbenchMain({
   onOpenFork: (_commit: CommitRow) => void;
   onCommitMessageChange: (_value: string) => void;
   onSubmitCommit: (_event: FormEvent<HTMLFormElement>) => void;
+  onDiscardChanges: () => void;
 }) {
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -1100,9 +1133,11 @@ function ProjectWorkbenchMain({
           workingTreeStatus={workingTreeStatus}
           workingTreeStatusLoading={workingTreeStatusLoading}
           workingTreeStatusError={workingTreeStatusError}
+          discardError={discardError}
           commitMessage={commitMessage}
           commitError={commitError}
           isCommitting={isCommitting}
+          isDiscardingChanges={isDiscardingChanges}
           isSettingDefault={isSettingDefault}
           isDeletingBranch={isDeletingBranch}
           onOpenWorkspace={onOpenWorkspace}
@@ -1111,6 +1146,7 @@ function ProjectWorkbenchMain({
           onOpenFork={onOpenFork}
           onCommitMessageChange={onCommitMessageChange}
           onSubmitCommit={onSubmitCommit}
+          onDiscardChanges={onDiscardChanges}
         />
       </div>
     </div>
@@ -1127,9 +1163,11 @@ function BranchDetailPanel({
   workingTreeStatus,
   workingTreeStatusLoading,
   workingTreeStatusError,
+  discardError,
   commitMessage,
   commitError,
   isCommitting,
+  isDiscardingChanges,
   isSettingDefault,
   isDeletingBranch,
   onOpenWorkspace,
@@ -1138,6 +1176,7 @@ function BranchDetailPanel({
   onOpenFork,
   onCommitMessageChange,
   onSubmitCommit,
+  onDiscardChanges,
 }: {
   project: ProjectRow;
   selectedBranch: BranchRow | null;
@@ -1148,9 +1187,11 @@ function BranchDetailPanel({
   workingTreeStatus: WorkingTreeStatus | null;
   workingTreeStatusLoading: boolean;
   workingTreeStatusError: string | null;
+  discardError: string | null;
   commitMessage: string;
   commitError: string | null;
   isCommitting: boolean;
+  isDiscardingChanges: boolean;
   isSettingDefault: boolean;
   isDeletingBranch: boolean;
   onOpenWorkspace: (_workspaceId: string) => void;
@@ -1159,6 +1200,7 @@ function BranchDetailPanel({
   onOpenFork: (_commit: CommitRow) => void;
   onCommitMessageChange: (_value: string) => void;
   onSubmitCommit: (_event: FormEvent<HTMLFormElement>) => void;
+  onDiscardChanges: () => void;
 }) {
   if (!selectedBranch) {
     return (
@@ -1174,7 +1216,12 @@ function BranchDetailPanel({
   const workspaceMissing = selectedWorkspace == null;
   const commitDisabledByCleanTree =
     workingTreeStatus?.headCommitId != null && workingTreeStatus.hasChanges === false;
-  const commitDisabled = workspaceMissing || isCommitting || commitDisabledByCleanTree;
+  const canDiscardChanges =
+    !workspaceMissing &&
+    workingTreeStatus?.headCommitId != null &&
+    workingTreeStatus.hasChanges === true;
+  const commitDisabled =
+    workspaceMissing || isCommitting || isDiscardingChanges || commitDisabledByCleanTree;
 
   return (
     <div className="mx-auto grid min-h-full w-full max-w-6xl gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]">
@@ -1317,6 +1364,10 @@ function BranchDetailPanel({
             status={workingTreeStatus}
             loading={workingTreeStatusLoading}
             error={workingTreeStatusError}
+            discardError={discardError}
+            canDiscardChanges={canDiscardChanges}
+            isDiscardingChanges={isDiscardingChanges}
+            onDiscardChanges={onDiscardChanges}
           />
         ) : null}
 
@@ -1434,22 +1485,52 @@ function WorkingTreeStatusPanel({
   status,
   loading,
   error,
+  discardError,
+  canDiscardChanges,
+  isDiscardingChanges,
+  onDiscardChanges,
 }: {
   status: WorkingTreeStatus | null;
   loading: boolean;
   error: string | null;
+  discardError: string | null;
+  canDiscardChanges: boolean;
+  isDiscardingChanges: boolean;
+  onDiscardChanges: () => void;
 }) {
   return (
-    <section className="mt-4 rounded-lg border border-border bg-editor-background p-4">
+    <section className="relative mt-4 rounded-lg border border-border bg-editor-background p-4">
+      {canDiscardChanges ? (
+        <button
+          type="button"
+          onClick={onDiscardChanges}
+          disabled={isDiscardingChanges}
+          className={cn(
+            secondaryButton,
+            "absolute top-4 right-4 text-accent-foreground hover:bg-red-500/10 hover:text-red-200",
+          )}
+        >
+          <span
+            className={cn(
+              "text-base",
+              isDiscardingChanges
+                ? "icon-[material-symbols--sync] animate-spin"
+                : "icon-[material-symbols--undo]",
+            )}
+          />
+          撤回全部修改
+        </button>
+      ) : null}
+
       <div className="flex items-center gap-2">
         <span className="icon-[material-symbols--difference] text-base text-accent-foreground" />
         <h4 className="text-sm font-semibold text-foreground">未提交变更</h4>
       </div>
 
-      <div className="mt-3">
-        {error ? (
-          <InlineError message={error} />
-        ) : loading ? (
+      <div className="mt-3 space-y-3">
+        {error ? <InlineError message={error} /> : null}
+        {discardError ? <InlineError message={discardError} /> : null}
+        {loading ? (
           <LoadingBlock label="正在对比工作区与 HEAD..." />
         ) : status == null ? null : status.headCommitId == null ? (
           <p className="text-sm text-foreground-muted">尚无提交，可创建首次提交。</p>
