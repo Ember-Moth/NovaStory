@@ -138,6 +138,7 @@ function TimelinePointRow({
       group={!!showSetAnchor || showDelete}
       anchorId={rowAnchorId}
       dataRowId={point.id}
+      multiline={!!point.description}
       className={cn(
         point.isImplicitOrigin ? "opacity-90" : "",
         isDragging ? "pointer-events-none z-10 opacity-75 shadow-sm" : "",
@@ -159,7 +160,11 @@ function TimelinePointRow({
           )}
         />
       }
-      trailing={point.description || undefined}
+      description={
+        point.description ? (
+          <span className="block truncate leading-4">{point.description}</span>
+        ) : undefined
+      }
       actions={
         showSetAnchor || showDelete ? (
           <>

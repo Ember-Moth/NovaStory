@@ -20,12 +20,14 @@ export function SidebarListRow({
   leading,
   icon,
   label,
+  description,
   trailing,
   actions,
   anchorId,
   dataNodeId,
   dataRowId,
   dataSymlinkTargetPickerState,
+  multiline = false,
   layout,
   onPointerDown,
 }: {
@@ -37,12 +39,14 @@ export function SidebarListRow({
   leading?: ReactNode;
   icon?: ReactNode;
   label: ReactNode;
+  description?: ReactNode;
   trailing?: ReactNode;
   actions?: ReactNode;
   anchorId?: string;
   dataNodeId?: string;
   dataRowId?: string;
   dataSymlinkTargetPickerState?: "source" | "selected-target" | "disabled-target";
+  multiline?: boolean;
   layout?: boolean | "position";
   onPointerDown?: (_event: ReactPointerEvent<HTMLDivElement>) => void;
 }) {
@@ -50,6 +54,13 @@ export function SidebarListRow({
   const hasHoverSlot = trailing != null || actions != null;
   const groupClass = group || hasHoverSlot ? "group" : "";
   const interactiveClass = onClick ? "cursor-pointer" : "";
+  const prefix =
+    leading || icon ? (
+      <div className="flex items-start gap-1">
+        {leading}
+        {icon}
+      </div>
+    ) : null;
 
   return (
     <motion.div
@@ -57,7 +68,16 @@ export function SidebarListRow({
       data-tree-node-id={dataNodeId}
       data-row-id={dataRowId}
       data-symlink-target-picker-state={dataSymlinkTargetPickerState}
-      className={cn(ROW_BASE, stateClass, groupClass, interactiveClass, className)}
+      className={cn(
+        ROW_BASE,
+        stateClass,
+        groupClass,
+        interactiveClass,
+        multiline
+          ? "grid h-auto min-h-10 grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto] items-start gap-x-1 py-1"
+          : "",
+        className,
+      )}
       initial={false}
       animate={{ paddingLeft: rowPaddingLeft(depth) }}
       transition={{ duration: 0.14, ease: "easeOut" }}
@@ -65,10 +85,31 @@ export function SidebarListRow({
       onPointerDown={onPointerDown}
       layout={layout}
     >
-      {leading}
-      {icon}
-      <div className="flex min-w-0 flex-1 items-center gap-1">{label}</div>
-      <RowHoverSlot badge={trailing} actions={actions} />
+      {multiline ? (
+        <>
+          {prefix ? (
+            <div className="col-start-1 row-start-1 mt-0.5 self-start">{prefix}</div>
+          ) : null}
+          <div className="col-start-2 row-start-1 min-w-0">
+            <div className="flex min-w-0 items-center gap-1">{label}</div>
+          </div>
+          <div className="col-start-3 row-start-1 mt-0.5 self-start">
+            <RowHoverSlot badge={trailing} actions={actions} />
+          </div>
+          {description ? (
+            <div className="col-[2/4] row-start-2 mt-0.5 min-w-0 text-[11px] leading-4 text-foreground-muted">
+              {description}
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <>
+          {leading}
+          {icon}
+          <div className="flex min-w-0 flex-1 items-center gap-1">{label}</div>
+          <RowHoverSlot badge={trailing} actions={actions} />
+        </>
+      )}
     </motion.div>
   );
 }
