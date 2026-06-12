@@ -4,9 +4,11 @@ import type { WorkspaceRefreshRequestedEvent } from "@/modules/ai/domain/types";
 import type { AuxTreeNodeVM } from "@/modules/workspace/ui/editor/model/types";
 
 import {
+  getAuxRefreshTargetTimelinePointId,
   shouldClearActiveAuxDraftForRefresh,
   shouldClearActiveContentDraftForRefresh,
   shouldHandleWorkspaceRefreshRequested,
+  shouldRefetchActiveAuxForRefresh,
 } from "./WorkspaceEditorPage";
 
 function createWorkspaceRefreshRequestedEvent(
@@ -106,6 +108,7 @@ test("shouldClearActiveAuxDraftForRefresh only clears the active aux file target
         auxNodeId: "aux_1",
       }),
       activeAuxNode: createAuxFileNode(),
+      activeTimelinePointId: "point_active",
     }),
   ).toBe(true);
   expect(
@@ -115,6 +118,7 @@ test("shouldClearActiveAuxDraftForRefresh only clears the active aux file target
         auxNodeId: "aux_2",
       }),
       activeAuxNode: createAuxFileNode(),
+      activeTimelinePointId: "point_active",
     }),
   ).toBe(false);
   expect(
@@ -124,6 +128,7 @@ test("shouldClearActiveAuxDraftForRefresh only clears the active aux file target
         auxNodeId: undefined,
       }),
       activeAuxNode: createAuxFileNode(),
+      activeTimelinePointId: "point_active",
     }),
   ).toBe(false);
   expect(
@@ -133,6 +138,96 @@ test("shouldClearActiveAuxDraftForRefresh only clears the active aux file target
         auxNodeId: "aux_1",
       }),
       activeAuxNode: createAuxFileNode({ nodeType: "dir" }),
+      activeTimelinePointId: "point_active",
+    }),
+  ).toBe(false);
+});
+
+test("shouldClearActiveAuxDraftForRefresh only clears matching timeline target", () => {
+  expect(
+    shouldClearActiveAuxDraftForRefresh({
+      event: createWorkspaceRefreshRequestedEvent({
+        areas: ["aux"],
+        auxNodeId: "aux_1",
+        timelinePointId: "point_active",
+      }),
+      activeAuxNode: createAuxFileNode(),
+      activeTimelinePointId: "point_active",
+    }),
+  ).toBe(true);
+  expect(
+    shouldClearActiveAuxDraftForRefresh({
+      event: createWorkspaceRefreshRequestedEvent({
+        areas: ["aux"],
+        auxNodeId: "aux_1",
+        timelinePointId: "point_other",
+      }),
+      activeAuxNode: createAuxFileNode(),
+      activeTimelinePointId: "point_active",
+    }),
+  ).toBe(false);
+});
+
+test("getAuxRefreshTargetTimelinePointId returns the aux refresh target when present", () => {
+  expect(
+    getAuxRefreshTargetTimelinePointId(
+      createWorkspaceRefreshRequestedEvent({
+        areas: ["aux"],
+        timelinePointId: "point_target",
+      }),
+    ),
+  ).toBe("point_target");
+  expect(
+    getAuxRefreshTargetTimelinePointId(
+      createWorkspaceRefreshRequestedEvent({
+        areas: ["content"],
+        timelinePointId: "point_target",
+      }),
+    ),
+  ).toBeNull();
+  expect(
+    getAuxRefreshTargetTimelinePointId(
+      createWorkspaceRefreshRequestedEvent({
+        areas: ["aux"],
+        timelinePointId: "",
+      }),
+    ),
+  ).toBeNull();
+});
+
+test("shouldRefetchActiveAuxForRefresh skips old aux query when refresh targets another timeline point", () => {
+  expect(
+    shouldRefetchActiveAuxForRefresh({
+      event: createWorkspaceRefreshRequestedEvent({
+        areas: ["aux"],
+        timelinePointId: "point_active",
+      }),
+      activeTimelinePointId: "point_active",
+    }),
+  ).toBe(true);
+  expect(
+    shouldRefetchActiveAuxForRefresh({
+      event: createWorkspaceRefreshRequestedEvent({
+        areas: ["aux"],
+        timelinePointId: "point_other",
+      }),
+      activeTimelinePointId: "point_active",
+    }),
+  ).toBe(false);
+  expect(
+    shouldRefetchActiveAuxForRefresh({
+      event: createWorkspaceRefreshRequestedEvent({
+        areas: ["aux"],
+      }),
+      activeTimelinePointId: "point_active",
+    }),
+  ).toBe(true);
+  expect(
+    shouldRefetchActiveAuxForRefresh({
+      event: createWorkspaceRefreshRequestedEvent({
+        areas: ["content"],
+      }),
+      activeTimelinePointId: "point_active",
     }),
   ).toBe(false);
 });

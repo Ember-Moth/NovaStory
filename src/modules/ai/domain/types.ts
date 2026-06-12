@@ -291,6 +291,7 @@ export interface WorkspaceRefreshRequestedEvent {
   areas: readonly WorkspaceRefreshArea[];
   contentNodeId?: string | null;
   auxNodeId?: string | null;
+  timelinePointId?: string | null;
 }
 
 export interface TimelineSelectionUpdatedEvent {

@@ -888,6 +888,7 @@ export const sendProjectAssistantMessageStream = stream<
           runId: result.run.id,
           candidateParentNodeId: result.userNode.id,
         });
+        invalidateAuxWorkspaceForRun(ctx, projectId, result.run.id);
       }
       return result;
     } finally {
@@ -959,6 +960,7 @@ export const retryProjectAssistantMessageStream = stream<
           runId: result.run.id,
           candidateParentNodeId: triggerNodeId,
         });
+        invalidateAuxWorkspaceForRun(ctx, projectId, result.run.id);
       }
       return result;
     } finally {
@@ -1032,6 +1034,7 @@ export const editProjectAssistantMessageStream = stream<
           runId: result.run.id,
           candidateParentNodeId: result.replacementNode.parentNodeId,
         });
+        invalidateAuxWorkspaceForRun(ctx, projectId, result.run.id);
       }
       return result;
     } finally {
@@ -1101,6 +1104,7 @@ export const continueProjectAssistantRunStream = stream<
           candidateParentNodeId: result.run.triggerNodeId,
         });
         ctx.invalidate(rpcTags.aiRunTrace(runId), rpcTags.aiChildRuns(runId));
+        invalidateAuxWorkspaceForRun(ctx, projectId, result.run.id);
       }
       return result;
     } finally {

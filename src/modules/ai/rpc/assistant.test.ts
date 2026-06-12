@@ -769,7 +769,7 @@ test("sendProjectAssistantMessageStream emits events and returns invalidate tags
     status: "running" as const,
     agentProfile: "project-assistant",
     selectionSnapshot: {},
-    contextSnapshot: null,
+    contextSnapshot: { workspaceId: "workspace_stream" },
     errorArtifactId: null,
     startedAt: 1,
     completedAt: null,
@@ -858,9 +858,32 @@ test("sendProjectAssistantMessageStream emits events and returns invalidate tags
     getThreadView: () => {
       throw new Error("unused");
     },
-    getRunTrace: () => {
-      throw new Error("unused");
-    },
+    getRunTrace: () => ({
+      run: finalResult.run,
+      steps: [],
+      artifacts: [
+        {
+          id: "artifact_stream_aux_write",
+          runId: "run_stream",
+          stepId: null,
+          artifactKind: "tool-output" as const,
+          content: {
+            toolName: "write_file",
+            output: {
+              ok: true,
+              data: {
+                action: "updated",
+                nodeId: "aux_stream",
+                timelinePointId: "point_stream",
+              },
+            },
+          },
+          createdAt: 2,
+        },
+      ],
+      events: [],
+      childRuns: [],
+    }),
     getNodeCandidates: () => {
       throw new Error("unused");
     },
@@ -955,6 +978,7 @@ test("sendProjectAssistantMessageStream emits events and returns invalidate tags
     rpcTags.aiNodeCandidates("node_user_stream"),
     rpcTags.aiRunTrace("run_stream"),
     rpcTags.aiChildRuns("run_stream"),
+    rpcTags.auxWorkspace("workspace_stream"),
   ]);
 });
 
@@ -1067,9 +1091,13 @@ test("continueProjectAssistantRunStream emits events and invalidates parent and 
     getThreadView: () => {
       throw new Error("unused");
     },
-    getRunTrace: () => {
-      throw new Error("unused");
-    },
+    getRunTrace: () => ({
+      run: finalResult.run,
+      steps: [],
+      artifacts: [],
+      events: [],
+      childRuns: [],
+    }),
     getNodeCandidates: () => {
       throw new Error("unused");
     },

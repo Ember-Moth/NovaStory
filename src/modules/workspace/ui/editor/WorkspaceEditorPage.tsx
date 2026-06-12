@@ -111,15 +111,50 @@ export function shouldClearActiveContentDraftForRefresh({
 export function shouldClearActiveAuxDraftForRefresh({
   event,
   activeAuxNode,
+  activeTimelinePointId,
 }: {
   event: WorkspaceRefreshRequestedEvent;
   activeAuxNode: AuxTreeNodeVM | null;
+  activeTimelinePointId: string | null;
 }) {
+  if (
+    typeof event.timelinePointId === "string" &&
+    event.timelinePointId.trim().length > 0 &&
+    event.timelinePointId !== activeTimelinePointId
+  ) {
+    return false;
+  }
+
   return (
     event.areas.includes("aux") &&
     activeAuxNode?.nodeType === "file" &&
     event.auxNodeId === activeAuxNode.id
   );
+}
+
+export function getAuxRefreshTargetTimelinePointId(event: WorkspaceRefreshRequestedEvent) {
+  if (!event.areas.includes("aux")) {
+    return null;
+  }
+
+  return typeof event.timelinePointId === "string" && event.timelinePointId.trim().length > 0
+    ? event.timelinePointId
+    : null;
+}
+
+export function shouldRefetchActiveAuxForRefresh({
+  event,
+  activeTimelinePointId,
+}: {
+  event: WorkspaceRefreshRequestedEvent;
+  activeTimelinePointId: string | null;
+}) {
+  if (!event.areas.includes("aux")) {
+    return false;
+  }
+
+  const targetTimelinePointId = getAuxRefreshTargetTimelinePointId(event);
+  return targetTimelinePointId == null || targetTimelinePointId === activeTimelinePointId;
 }
 
 export function WorkspaceEditorPage({
@@ -243,12 +278,23 @@ function ProjectWorkspace({
         return;
       }
 
+      const auxTargetTimelinePointId = getAuxRefreshTargetTimelinePointId(event);
+      if (auxTargetTimelinePointId && auxTargetTimelinePointId !== activeTimelinePointId) {
+        workspaceStore.getState().setActiveTimelinePointId(auxTargetTimelinePointId);
+      }
+
       if (shouldClearActiveContentDraftForRefresh({ event, activeContentNodeId })) {
         if (activeContentNodeId) {
           clearDraftStateForNode(workspaceStore, activeContentNodeId);
         }
       }
-      if (shouldClearActiveAuxDraftForRefresh({ event, activeAuxNode })) {
+      if (
+        shouldClearActiveAuxDraftForRefresh({
+          event,
+          activeAuxNode,
+          activeTimelinePointId,
+        })
+      ) {
         if (activeAuxNode?.nodeType === "file") {
           clearDraftStateForNode(workspaceStore, activeAuxNode.id);
         }
@@ -260,13 +306,14 @@ function ProjectWorkspace({
       if (event.areas.includes("timeline")) {
         void timelineQuery.refetch();
       }
-      if (event.areas.includes("aux")) {
+      if (shouldRefetchActiveAuxForRefresh({ event, activeTimelinePointId })) {
         void aux.query.refetch();
       }
     },
     [
       activeAuxNode,
       activeContentNodeId,
+      activeTimelinePointId,
       aux.query,
       contentQuery,
       timelineQuery,

@@ -635,6 +635,7 @@ test("sendProjectAssistantMessageStream emits workspace-refresh-requested for au
     workspaceId: workspace.id,
     areas: ["aux"],
     auxNodeId: "aux_stream",
+    timelinePointId: "timeline_written",
   });
 });
 

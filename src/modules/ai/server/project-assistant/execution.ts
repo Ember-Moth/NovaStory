@@ -164,9 +164,11 @@ function extractWorkspaceRefreshRequestedEventFromToolResult({
   }
   const record = data as Record<string, unknown>;
   const nodeId = Reflect.get(record, "nodeId");
+  const timelinePointId = Reflect.get(record, "timelinePointId");
   let areas: readonly WorkspaceRefreshArea[] | null = null;
   let contentNodeId: string | null | undefined;
   let auxNodeId: string | null | undefined;
+  let auxTimelinePointId: string | null | undefined;
 
   if (CONTENT_WRITE_TOOL_NAME_SET.has(toolName as string)) {
     areas = ["content"];
@@ -174,6 +176,10 @@ function extractWorkspaceRefreshRequestedEventFromToolResult({
   } else if (AUX_WRITE_TOOL_NAME_SET.has(toolName as string)) {
     areas = ["aux"];
     auxNodeId = typeof nodeId === "string" && nodeId.trim().length > 0 ? nodeId : null;
+    auxTimelinePointId =
+      typeof timelinePointId === "string" && timelinePointId.trim().length > 0
+        ? timelinePointId
+        : null;
   } else if (TIMELINE_WRITE_TOOL_NAME_SET.has(toolName as string)) {
     areas = toolName === TIMELINE_UPDATE_TOOL_NAME ? ["timeline"] : ["timeline", "aux"];
   } else {
@@ -186,6 +192,7 @@ function extractWorkspaceRefreshRequestedEventFromToolResult({
     areas,
     ...(contentNodeId === undefined ? {} : { contentNodeId }),
     ...(auxNodeId === undefined ? {} : { auxNodeId }),
+    ...(auxTimelinePointId === undefined ? {} : { timelinePointId: auxTimelinePointId }),
   };
 }
 
