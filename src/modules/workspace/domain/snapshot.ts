@@ -13,7 +13,6 @@ type ContentNodeRow = InferSelectModel<typeof schema.contentNodes>;
 
 interface ContentTreePayload {
   nodeId: string;
-  kind: string | null;
   title: string | null;
   anchorTimelinePointId: string | null;
   bodyBlobId: string | null;
@@ -67,7 +66,6 @@ function snapshotContentNode(
   );
   const payload: ContentTreePayload = {
     nodeId: node.id,
-    kind: node.kind,
     title: node.title,
     anchorTimelinePointId: node.anchorTimelinePointId,
     bodyBlobId: node.body == null ? null : putBlob(executor, node.body),
@@ -276,7 +274,6 @@ function restoreContentNode(
       parentId,
       nextSiblingId: null,
       anchorTimelinePointId: payload.anchorTimelinePointId,
-      kind: payload.kind,
       title: payload.title,
       body: payload.bodyBlobId == null ? null : getBlob(executor, payload.bodyBlobId),
       createdAt: timestamp,

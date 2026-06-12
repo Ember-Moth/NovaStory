@@ -33,7 +33,6 @@ test("creating a branch with workspace invalidates branches and workspaces", asy
   service.createContentNode({
     workspaceId: workspace.id,
     parentId: workspace.contentRootId!,
-    kind: "chapter",
     title: "Base",
   });
   const commit = service.createCommit({ branchId: workspace.branchId, message: "base" });
@@ -82,7 +81,6 @@ test("commit create invalidates history and branch tags", async () => {
   service.createContentNode({
     workspaceId: workspace.id,
     parentId: workspace.contentRootId!,
-    kind: "chapter",
     title: "One",
   });
 
@@ -106,7 +104,6 @@ test("commit checkout invalidates the workspace content views", async () => {
   service.createContentNode({
     workspaceId: workspace.id,
     parentId: workspace.contentRootId!,
-    kind: "chapter",
     title: "One",
   });
   const commit = service.createCommit({ branchId: workspace.branchId, message: "one" });
@@ -148,14 +145,12 @@ test("commit history returns the mainline newest first", async () => {
   service.createContentNode({
     workspaceId: workspace.id,
     parentId: workspace.contentRootId!,
-    kind: "chapter",
     title: "One",
   });
   const c1 = service.createCommit({ branchId: workspace.branchId, message: "one" });
   service.createContentNode({
     workspaceId: workspace.id,
     parentId: workspace.contentRootId!,
-    kind: "chapter",
     title: "Two",
   });
   const c2 = service.createCommit({ branchId: workspace.branchId, message: "two" });

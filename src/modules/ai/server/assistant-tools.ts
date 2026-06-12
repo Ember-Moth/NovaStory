@@ -712,7 +712,6 @@ function buildAssistantToolRegistry({
       inputSchema: jsonSchema<{
         parentId: string;
         afterSiblingId?: string;
-        kind?: string;
         title?: string;
         body?: string;
       }>({
@@ -727,10 +726,6 @@ function buildAssistantToolRegistry({
             type: "string",
             description: "插入到该兄弟节点之后。省略时新节点将成为父节点的第一个子节点。",
           },
-          kind: {
-            type: "string",
-            description: "章节类型，例如 chapter、scene。省略时为 null。",
-          },
           title: {
             type: "string",
             description: "章节标题。",
@@ -741,7 +736,7 @@ function buildAssistantToolRegistry({
           },
         },
       }),
-      execute: async ({ parentId, afterSiblingId, kind, title, body }) => {
+      execute: async ({ parentId, afterSiblingId, title, body }) => {
         const workspace = getWorkspaceForProject(projectId);
         if (!workspace) {
           return failure(new Error("当前项目没有默认工作区。"));
@@ -752,7 +747,6 @@ function buildAssistantToolRegistry({
             workspaceId: workspace.id,
             parentId,
             afterSiblingId: afterSiblingId ?? undefined,
-            kind: kind ?? undefined,
             title: title ?? undefined,
             body: body ?? undefined,
           });
@@ -773,7 +767,6 @@ function buildAssistantToolRegistry({
       description: "更新正文节点的标题、正文、类型或锚定时间点。省略的字段不做修改。",
       inputSchema: jsonSchema<{
         nodeId: string;
-        kind?: string;
         title?: string;
         body?: string;
         anchorPointId?: string;
@@ -784,10 +777,6 @@ function buildAssistantToolRegistry({
           nodeId: {
             type: "string",
             description: "要更新的正文节点 ID。",
-          },
-          kind: {
-            type: "string",
-            description: "新的章节类型，传 null 可清除。",
           },
           title: {
             type: "string",
@@ -803,7 +792,7 @@ function buildAssistantToolRegistry({
           },
         },
       }),
-      execute: async ({ nodeId, kind, title, body, anchorPointId }) => {
+      execute: async ({ nodeId, title, body, anchorPointId }) => {
         const workspace = getWorkspaceForProject(projectId);
         if (!workspace) {
           return failure(new Error("当前项目没有默认工作区。"));
@@ -813,7 +802,6 @@ function buildAssistantToolRegistry({
           const node = updateContentNode({
             workspaceId: workspace.id,
             nodeId,
-            kind: kind === undefined ? undefined : (kind ?? null),
             title: title === undefined ? undefined : (title ?? null),
             body: body === undefined ? undefined : (body ?? null),
             anchorPointId: anchorPointId ?? undefined,

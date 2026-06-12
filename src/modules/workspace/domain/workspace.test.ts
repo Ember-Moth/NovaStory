@@ -33,26 +33,22 @@ test("content export preserves sibling order and nesting", () => {
   const chapter1 = service.createContentNode({
     workspaceId: workspace.id,
     parentId: rootId,
-    kind: "chapter",
     title: "Chapter 1",
   });
   const chapter2 = service.createContentNode({
     workspaceId: workspace.id,
     parentId: rootId,
     afterSiblingId: chapter1.id,
-    kind: "chapter",
     title: "Chapter 2",
   });
   service.createContentNode({
     workspaceId: workspace.id,
     parentId: rootId,
-    kind: "chapter",
     title: "Prologue",
   });
   service.createContentNode({
     workspaceId: workspace.id,
     parentId: chapter1.id,
-    kind: "scene",
     title: "Scene 1",
     body: "Opening scene",
   });
@@ -97,7 +93,6 @@ test("aux overlay resolves by timeline point and composeWritingContext follows a
     workspaceId: workspace.id,
     parentId: contentRootId,
     anchorPointId: point.id,
-    kind: "scene",
     title: "Arrival",
   });
 
@@ -731,20 +726,17 @@ test("content node deletion removes subtree and preserves sibling order", () => 
   const chapter1 = service.createContentNode({
     workspaceId: workspace.id,
     parentId: rootId,
-    kind: "chapter",
     title: "Chapter 1",
   });
   service.createContentNode({
     workspaceId: workspace.id,
     parentId: rootId,
     afterSiblingId: chapter1.id,
-    kind: "chapter",
     title: "Chapter 2",
   });
   service.createContentNode({
     workspaceId: workspace.id,
     parentId: chapter1.id,
-    kind: "scene",
     title: "Scene 1",
   });
 
@@ -761,21 +753,18 @@ test("deleting a middle content sibling rewires next sibling without violating u
   const chapter1 = service.createContentNode({
     workspaceId: workspace.id,
     parentId: rootId,
-    kind: "chapter",
     title: "Chapter 1",
   });
   const chapter2 = service.createContentNode({
     workspaceId: workspace.id,
     parentId: rootId,
     afterSiblingId: chapter1.id,
-    kind: "chapter",
     title: "Chapter 2",
   });
   service.createContentNode({
     workspaceId: workspace.id,
     parentId: rootId,
     afterSiblingId: chapter2.id,
-    kind: "chapter",
     title: "Chapter 3",
   });
 
@@ -881,7 +870,6 @@ test("content node anchor point can be updated", () => {
     workspaceId: workspace.id,
     parentId: contentRootId,
     anchorPointId: pointA.id,
-    kind: "scene",
     title: "Scene",
   });
 
@@ -909,7 +897,6 @@ test("timeline point deletion is blocked when content still anchors to it", () =
     workspaceId: workspace.id,
     parentId: contentRootId,
     anchorPointId: point.id,
-    kind: "scene",
     title: "Guarded",
   });
 

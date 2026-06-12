@@ -29,7 +29,6 @@ test("committed workspace with no edits reports hasChanges false", () => {
   service.createContentNode({
     workspaceId: workspace.id,
     parentId: workspace.contentRootId!,
-    kind: "chapter",
     title: "Chapter 1",
     body: "Once",
   });
@@ -49,7 +48,6 @@ test("content, timeline and aux edits appear in the diff summary", () => {
   const chapter = service.createContentNode({
     workspaceId: workspace.id,
     parentId: workspace.contentRootId!,
-    kind: "chapter",
     title: "Chapter 1",
     body: "Once",
   });
@@ -114,7 +112,6 @@ test("reverting workspace to head clears the diff summary", () => {
   const chapter = service.createContentNode({
     workspaceId: workspace.id,
     parentId: workspace.contentRootId!,
-    kind: "chapter",
     title: "Chapter 1",
     body: "Once",
   });

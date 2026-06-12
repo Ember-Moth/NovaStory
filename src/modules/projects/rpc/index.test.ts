@@ -55,7 +55,6 @@ test("setDefaultBranch invalidates project list and detail tags", async () => {
   workspaceService.createContentNode({
     workspaceId: workspace.id,
     parentId: workspace.contentRootId!,
-    kind: "chapter",
     title: "Base",
   });
   const baseCommit = workspaceService.createCommit({

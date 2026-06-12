@@ -217,7 +217,6 @@ export const contentNodes = sqliteTable(
     parentId: text("parent_id"),
     nextSiblingId: text("next_sibling_id"),
     anchorTimelinePointId: text("anchor_timeline_point_id"),
-    kind: text("kind"),
     title: text("title"),
     body: text("body"),
     ...timestampColumns,

@@ -24,7 +24,6 @@ export function createContentNode(input: {
   parentId: string;
   afterSiblingId?: string | null;
   anchorPointId?: TimelinePointRef;
-  kind?: string | null;
   title?: string | null;
   body?: string | null;
 }) {
@@ -49,7 +48,6 @@ export function createContentNode(input: {
           parentId: input.parentId,
           nextSiblingId: null,
           anchorTimelinePointId,
-          kind: input.kind ?? null,
           title: input.title ?? null,
           body: input.body ?? null,
           createdAt: timestamp,
@@ -75,7 +73,6 @@ export function createContentNode(input: {
           parentId: input.parentId,
           nextSiblingId: head?.id ?? null,
           anchorTimelinePointId,
-          kind: input.kind ?? null,
           title: input.title ?? null,
           body: input.body ?? null,
           createdAt: timestamp,
@@ -184,7 +181,6 @@ export function updateContentNode(input: {
   workspaceId: string;
   nodeId: string;
   anchorPointId?: TimelinePointRef;
-  kind?: string | null;
   title?: string | null;
   body?: string | null;
 }) {
@@ -199,7 +195,6 @@ export function updateContentNode(input: {
     tx.update(schema.contentNodes)
       .set({
         anchorTimelinePointId,
-        kind: input.kind === undefined ? node.kind : input.kind,
         title: input.title === undefined ? node.title : input.title,
         body: input.body === undefined ? node.body : input.body,
         updatedAt: now(),

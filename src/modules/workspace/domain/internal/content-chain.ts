@@ -131,7 +131,6 @@ export function exportContentNode(
   return {
     id: node.id,
     anchorTimelinePointId: pointIdOrOrigin(node.anchorTimelinePointId),
-    kind: node.kind,
     title: node.title,
     body: node.body,
     children: orderContentChildren(listContentChildren(executor, workspaceId, node.id)).map(

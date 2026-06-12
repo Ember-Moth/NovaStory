@@ -20,7 +20,6 @@ export interface TimelinePointView {
 export interface ExportedContentNode {
   id: string;
   anchorTimelinePointId: string | typeof ORIGIN_TIMELINE_POINT_ID;
-  kind: string | null;
   title: string | null;
   body: string | null;
   children: ExportedContentNode[];

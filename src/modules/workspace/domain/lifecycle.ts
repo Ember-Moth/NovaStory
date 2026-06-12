@@ -24,7 +24,6 @@ function seedWorkspaceRoots(executor: DatabaseExecutor, workspaceId: string, tim
       parentId: null,
       nextSiblingId: null,
       anchorTimelinePointId: null,
-      kind: "_root",
       title: null,
       body: null,
       createdAt: timestamp,

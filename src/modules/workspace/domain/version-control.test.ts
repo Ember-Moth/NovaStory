@@ -43,7 +43,6 @@ test("commit then checkout round-trips content, timeline and aux state", () => {
   const chapter = service.createContentNode({
     workspaceId: workspace.id,
     parentId: rootId,
-    kind: "chapter",
     title: "Chapter 1",
     body: "Once upon a time",
     anchorPointId: point.id,
@@ -51,7 +50,6 @@ test("commit then checkout round-trips content, timeline and aux state", () => {
   service.createContentNode({
     workspaceId: workspace.id,
     parentId: chapter.id,
-    kind: "scene",
     title: "Scene 1",
     body: "Opening",
   });
@@ -100,7 +98,6 @@ test("identical content across commits shares blobs and tree objects", () => {
   service.createContentNode({
     workspaceId: workspace.id,
     parentId: workspace.contentRootId!,
-    kind: "chapter",
     title: "Dup",
     body: "shared body text",
   });
@@ -120,7 +117,6 @@ test("branch off a commit shares the same head and forked metadata", () => {
   service.createContentNode({
     workspaceId: workspace.id,
     parentId: workspace.contentRootId!,
-    kind: "chapter",
     title: "Base",
     body: "base",
   });
@@ -167,7 +163,6 @@ test("merge metadata records multiple parents without merging", () => {
   service.createContentNode({
     workspaceId: workspace.id,
     parentId: workspace.contentRootId!,
-    kind: "chapter",
     title: "A",
   });
   const base = service.createCommit({ branchId: workspace.branchId, message: "base" });
@@ -201,14 +196,12 @@ test("listCommits walks the mainline history newest first", () => {
   service.createContentNode({
     workspaceId: workspace.id,
     parentId: workspace.contentRootId!,
-    kind: "chapter",
     title: "One",
   });
   const c1 = service.createCommit({ branchId: workspace.branchId, message: "one" });
   service.createContentNode({
     workspaceId: workspace.id,
     parentId: workspace.contentRootId!,
-    kind: "chapter",
     title: "Two",
   });
   const c2 = service.createCommit({ branchId: workspace.branchId, message: "two" });

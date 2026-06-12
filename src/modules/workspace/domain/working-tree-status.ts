@@ -9,7 +9,6 @@ import type { WorkingTreeAreaSummary, WorkingTreeChangeItem, WorkingTreeStatus }
 
 interface ContentTreePayload {
   nodeId: string;
-  kind: string | null;
   title: string | null;
   anchorTimelinePointId: string | null;
   bodyBlobId: string | null;
@@ -53,7 +52,6 @@ interface RootTreePayload {
 
 interface FlatContentNode {
   nodeId: string;
-  kind: string | null;
   title: string | null;
   anchorTimelinePointId: string | null;
   bodyBlobId: string | null;
@@ -98,7 +96,6 @@ function flattenContentTree(
     });
     result.set(payload.nodeId, {
       nodeId: payload.nodeId,
-      kind: payload.kind,
       title: payload.title,
       anchorTimelinePointId: payload.anchorTimelinePointId,
       bodyBlobId: payload.bodyBlobId,
@@ -115,7 +112,6 @@ function flattenContentTree(
 
 function contentFingerprint(node: FlatContentNode): string {
   return JSON.stringify({
-    kind: node.kind,
     title: node.title,
     anchor: node.anchorTimelinePointId,
     body: node.bodyBlobId,
@@ -124,7 +120,7 @@ function contentFingerprint(node: FlatContentNode): string {
 }
 
 function contentLabel(node: FlatContentNode): string {
-  return node.title ?? node.kind ?? node.nodeId;
+  return node.title ?? node.nodeId;
 }
 
 function diffContentTrees(
