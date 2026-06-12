@@ -1,2 +1,2 @@
-export { createAssistantTools } from "./assistant-tools/index.ts";
-export type { AssistantToolSet } from "./assistant-tools/index.ts";
+export { createAssistantTools } from "./assistant-tools/registry";
+export type { AssistantToolSet } from "./assistant-tools/registry";

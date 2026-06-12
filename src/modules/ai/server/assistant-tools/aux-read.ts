@@ -1,17 +1,14 @@
-import { tool } from "ai";
+import { jsonSchema, tool } from "ai";
 
 import { listAuxTreeAt, readAuxByPathAt } from "@/modules/workspace/domain";
 
-import type { ToolBuildContext, AuxReadToolName } from "./_shared";
-import {
-  failure,
-  getWorkspaceForProject,
-  jsonSchema,
-  resolveCurrentTimelinePointId,
-  resolveActiveAuxPath,
-  sanitizeAuxNode,
-  withEnvelope,
-} from "./_shared";
+import type { ToolBuildContext } from "./context";
+import { failure, withEnvelope } from "./envelope";
+import { sanitizeAuxNode } from "./limits";
+import { resolveActiveAuxPath } from "./selection";
+import { resolveCurrentTimelinePointId } from "./timeline-helpers";
+import type { AuxReadToolName } from "./tool-names";
+import { getWorkspaceForProject } from "./workspace";
 
 const REFERENCE_OVERLAY_READ_SEMANTICS =
   "参考资料按当前时间点形成叠加视图：原点放置全局初始设定，自定义时间点会继承更早时间点仍可见的目录、文件和链接。若需要改到别的时间点，请先调用 set_current_timeline。";

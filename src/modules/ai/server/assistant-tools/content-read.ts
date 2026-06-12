@@ -1,15 +1,12 @@
-import { tool } from "ai";
+import { jsonSchema, tool } from "ai";
 
 import { exportContentSubtree } from "@/modules/workspace/domain";
 
-import type { ToolBuildContext, ContentReadToolName } from "./_shared";
-import {
-  failure,
-  getWorkspaceForProject,
-  jsonSchema,
-  limitContentSubtree,
-  withEnvelope,
-} from "./_shared";
+import type { ToolBuildContext } from "./context";
+import { failure, withEnvelope } from "./envelope";
+import { limitContentSubtree } from "./limits";
+import type { ContentReadToolName } from "./tool-names";
+import { getWorkspaceForProject } from "./workspace";
 
 export function buildContentReadTools({ projectId }: ToolBuildContext) {
   return {

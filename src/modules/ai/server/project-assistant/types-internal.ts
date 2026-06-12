@@ -13,7 +13,7 @@ import type {
 } from "@/modules/ai/domain/types";
 import type { AiAssistantModelSelection } from "@/modules/config/domain/ai-assistant-model-selection";
 
-import type { ToolRuntimeContext } from "../assistant-tools/_shared";
+import type { ToolRuntimeContext } from "../assistant-tools/context";
 
 export interface AssistantModelSelection {
   storedSelection: AiAssistantModelSelection;

@@ -1,4 +1,4 @@
-import { tool } from "ai";
+import { jsonSchema, tool } from "ai";
 
 import {
   createContentNode,
@@ -7,8 +7,10 @@ import {
   updateContentNode,
 } from "@/modules/workspace/domain";
 
-import type { ToolBuildContext, ContentWriteToolName } from "./_shared";
-import { failure, getWorkspaceForProject, jsonSchema, withEnvelope } from "./_shared";
+import type { ToolBuildContext } from "./context";
+import { failure, withEnvelope } from "./envelope";
+import type { ContentWriteToolName } from "./tool-names";
+import { getWorkspaceForProject } from "./workspace";
 
 export function buildContentWriteTools({ projectId }: ToolBuildContext) {
   return {

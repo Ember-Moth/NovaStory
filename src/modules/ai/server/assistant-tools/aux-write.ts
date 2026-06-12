@@ -1,4 +1,4 @@
-import { tool } from "ai";
+import { jsonSchema, tool } from "ai";
 
 import {
   deleteAuxNodeAt,
@@ -10,19 +10,14 @@ import {
   retargetAuxSymlinkAt,
   writeFileAt,
 } from "@/modules/workspace/domain";
-
-import type { ToolBuildContext, AuxWriteToolName } from "./_shared";
-import {
-  failure,
-  getWorkspaceForProject,
-  jsonSchema,
-  resolveCurrentTimelinePointId,
-  resolveAuxNodeByPathOrThrow,
-  resolveParentDirId,
-  splitAuxPath,
-  withEnvelope,
-} from "./_shared";
 import { invariant } from "@/shared/lib/domain";
+
+import { resolveAuxNodeByPathOrThrow, resolveParentDirId, splitAuxPath } from "./aux-path";
+import type { ToolBuildContext } from "./context";
+import { failure, withEnvelope } from "./envelope";
+import { resolveCurrentTimelinePointId } from "./timeline-helpers";
+import type { AuxWriteToolName } from "./tool-names";
+import { getWorkspaceForProject } from "./workspace";
 
 const REFERENCE_OVERLAY_WRITE_SEMANTICS =
   "参考资料写入始终作用于当前时间点，并只在该时间点写入新的覆盖层状态，不会回写更早时间点。若需要切换到其他时间点，请先调用 set_current_timeline。";

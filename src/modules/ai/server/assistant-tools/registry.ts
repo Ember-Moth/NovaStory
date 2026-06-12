@@ -4,7 +4,7 @@ import { buildAuxReadTools } from "./aux-read";
 import { buildAuxWriteTools } from "./aux-write";
 import { buildContentReadTools } from "./content-read";
 import { buildContentWriteTools } from "./content-write";
-import type { ToolBuildContext } from "./_shared";
+import type { ToolBuildContext } from "./context";
 import { buildTimelineTools } from "./timeline";
 import { buildWritingContextTools } from "./writing-context";
 

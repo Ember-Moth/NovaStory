@@ -1,4 +1,4 @@
-import { tool } from "ai";
+import { jsonSchema, tool } from "ai";
 
 import {
   createTimelinePoints,
@@ -8,25 +8,22 @@ import {
   moveTimelinePoint,
   summarizeAuxTimelineChangesAt,
   updateTimelinePoint,
+  ORIGIN_TIMELINE_POINT_ID,
 } from "@/modules/workspace/domain";
+import { invariant } from "@/shared/lib/domain";
 
-import type { ToolBuildContext, TimelineToolName } from "./_shared";
+import type { ToolBuildContext } from "./context";
+import { failure, withEnvelope } from "./envelope";
+import { limitItems, limitTimelinePoints, TIMELINE_AUX_CHANGE_LIMIT } from "./limits";
 import {
-  failure,
-  getWorkspaceForProject,
   getTimelineLabelById,
-  limitItems,
-  TIMELINE_AUX_CHANGE_LIMIT,
-  jsonSchema,
-  limitTimelinePoints,
   resolveCurrentTimelinePointId,
   resolveSelectableTimelinePoint,
   resolveTimelinePointIdOrLabel,
   updateRuntimeTimelineSelection,
-  withEnvelope,
-} from "./_shared";
-import { invariant } from "@/shared/lib/domain";
-import { ORIGIN_TIMELINE_POINT_ID } from "@/modules/workspace/domain";
+} from "./timeline-helpers";
+import type { TimelineToolName } from "./tool-names";
+import { getWorkspaceForProject } from "./workspace";
 
 export function buildTimelineTools({ projectId, runtimeContext }: ToolBuildContext) {
   return {

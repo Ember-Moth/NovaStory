@@ -23,7 +23,7 @@ import {
 } from "@/modules/config/domain/ai-assistant-model-selection";
 import { invariant } from "@/shared/lib/domain";
 
-import type { ToolRuntimeContext } from "../assistant-tools/_shared";
+import type { ToolRuntimeContext } from "../assistant-tools/context";
 import type { AssistantModelSelection, StreamProviderOptions } from "./types-internal";
 
 export const PROJECT_ASSISTANT_SYSTEM_PROMPT_ID = "writing-assistant-v3";

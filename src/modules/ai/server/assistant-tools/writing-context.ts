@@ -1,21 +1,20 @@
-import { tool } from "ai";
+import { jsonSchema, tool } from "ai";
 
 import { composeWritingContext } from "@/modules/workspace/domain";
 import type { WritingContext } from "@/modules/workspace/domain/types";
 
-import type { ToolBuildContext, WritingContextToolName } from "./_shared";
+import type { ToolBuildContext } from "./context";
+import { failure, withEnvelope } from "./envelope";
+import type { AssistantToolSuccess } from "./envelope";
 import {
   CONTENT_SUBTREE_NODE_LIMIT,
   WRITING_CONTEXT_AUX_LIMIT,
-  failure,
-  getWorkspaceForProject,
-  jsonSchema,
   limitAuxNodes,
   limitContentNode,
-  resolveActiveContentNodeId,
-  withEnvelope,
-} from "./_shared";
-import type { AssistantToolSuccess } from "./_shared";
+} from "./limits";
+import { resolveActiveContentNodeId } from "./selection";
+import type { WritingContextToolName } from "./tool-names";
+import { getWorkspaceForProject } from "./workspace";
 
 export function buildWritingContextTools({ projectId, runtimeContext }: ToolBuildContext) {
   return {
