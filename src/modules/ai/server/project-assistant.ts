@@ -258,20 +258,15 @@ function defaultStreamAssistantText({
 }: StreamAssistantTextInput): StreamAssistantTextResult {
   const model = createLanguageModelForConnection({ connection, modelId });
   const preparedMessagesByStep: ModelMessage[][] = [];
-  const tools =
-    activeTools.length > 0
-      ? createAssistantTools({
-          projectId,
-          context,
-          activeTools,
-        })
-      : undefined;
+  const tools = createAssistantTools({ projectId, context });
   const result = streamText({
     model,
     messages,
     ...(system == null ? {} : { system }),
     ...(providerOptions == null ? {} : { providerOptions }),
-    ...(tools == null ? {} : { tools: tools as any }),
+    ...(activeTools.length > 0
+      ? { tools, activeTools: [...activeTools] as ProjectAssistantToolName[] }
+      : {}),
     stopWhen: stepCountIs(5),
     prepareStep: ({ messages: stepMessages, stepNumber }) => {
       preparedMessagesByStep[stepNumber] = stepMessages;

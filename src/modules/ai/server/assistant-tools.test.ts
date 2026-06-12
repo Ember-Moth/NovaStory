@@ -7,6 +7,7 @@ setupMockDatabase();
 const { db, schema } = await import("@/db");
 const workspaceDomain = await import("@/modules/workspace/domain");
 const { createAssistantTools } = await import("./assistant-tools");
+const { PROJECT_ASSISTANT_TOOL_NAMES } = await import("@/modules/ai/domain/types");
 
 function seedProject(projectId: string) {
   db.insert(schema.projects)
@@ -26,23 +27,18 @@ async function executeTool<TArgs, TResult>(toolDefinition: unknown, args: TArgs)
   return await execute!(args);
 }
 
-test("createAssistantTools only exposes the allowlisted tools", () => {
+test("createAssistantTools always exposes the full tool set", () => {
   seedProject("assistant_tools_filter");
 
   const tools = createAssistantTools({
     projectId: "assistant_tools_filter",
     context: null,
-    activeTools: ["read_aux_path", "move_aux_node", "create_aux_symlink"],
   });
 
-  expect(Object.keys(tools).sort()).toEqual([
-    "create_aux_symlink",
-    "move_aux_node",
-    "read_aux_path",
-  ]);
-  expect(tools.read_current_writing_context).toBeUndefined();
-  expect(tools.mkdir_aux_dir).toBeUndefined();
-  expect(tools.write_aux_file).toBeUndefined();
+  expect(Object.keys(tools).sort()).toEqual([...PROJECT_ASSISTANT_TOOL_NAMES].sort());
+  expect(tools.read_current_writing_context).toBeDefined();
+  expect(tools.mkdir_aux_dir).toBeDefined();
+  expect(tools.write_aux_file).toBeDefined();
 });
 
 test("mkdir_aux_dir creates a directory at the current timeline point", async () => {
@@ -50,7 +46,6 @@ test("mkdir_aux_dir creates a directory at the current timeline point", async ()
   const tools = createAssistantTools({
     projectId: "assistant_tools_mkdir",
     context: null,
-    activeTools: ["mkdir_aux_dir"],
   });
 
   const result = await executeTool(tools.mkdir_aux_dir!, { path: "/设定" });
@@ -80,7 +75,6 @@ test("write_aux_file creates a new file when the target path does not exist", as
   const tools = createAssistantTools({
     projectId: "assistant_tools_write_create",
     context: null,
-    activeTools: ["write_aux_file"],
   });
 
   const result = await executeTool(tools.write_aux_file!, {
@@ -123,7 +117,6 @@ test("write_aux_file overwrites an existing file", async () => {
   const tools = createAssistantTools({
     projectId: "assistant_tools_write_update",
     context: null,
-    activeTools: ["write_aux_file"],
   });
 
   const result = await executeTool(tools.write_aux_file!, {
@@ -153,7 +146,6 @@ test("write_aux_file returns an error when the parent directory does not exist",
   const tools = createAssistantTools({
     projectId: "assistant_tools_write_missing_parent",
     context: null,
-    activeTools: ["write_aux_file"],
   });
 
   const result = await executeTool(tools.write_aux_file!, {
@@ -178,7 +170,6 @@ test("write_aux_file returns an error when the target path is a directory", asyn
   const tools = createAssistantTools({
     projectId: "assistant_tools_write_dir_guard",
     context: null,
-    activeTools: ["write_aux_file"],
   });
 
   const result = await executeTool(tools.write_aux_file!, {
@@ -210,7 +201,6 @@ test("move_aux_node renames a file in the same directory", async () => {
   const tools = createAssistantTools({
     projectId: "assistant_tools_move_rename",
     context: null,
-    activeTools: ["move_aux_node"],
   });
 
   const result = await executeTool(tools.move_aux_node!, {
@@ -268,7 +258,6 @@ test("move_aux_node moves a file across directories", async () => {
   const tools = createAssistantTools({
     projectId: "assistant_tools_move_cross_dir",
     context: null,
-    activeTools: ["move_aux_node"],
   });
 
   const result = await executeTool(tools.move_aux_node!, {
@@ -317,7 +306,6 @@ test("move_aux_node moves a directory", async () => {
   const tools = createAssistantTools({
     projectId: "assistant_tools_move_dir",
     context: null,
-    activeTools: ["move_aux_node"],
   });
 
   const result = await executeTool(tools.move_aux_node!, {
@@ -368,7 +356,6 @@ test("move_aux_node returns an error when the target path already exists", async
   const tools = createAssistantTools({
     projectId: "assistant_tools_move_conflict",
     context: null,
-    activeTools: ["move_aux_node"],
   });
 
   const result = await executeTool(tools.move_aux_node!, {
@@ -400,7 +387,6 @@ test("move_aux_node returns an error when the target parent directory does not e
   const tools = createAssistantTools({
     projectId: "assistant_tools_move_missing_parent",
     context: null,
-    activeTools: ["move_aux_node"],
   });
 
   const result = await executeTool(tools.move_aux_node!, {
@@ -431,7 +417,6 @@ test("move_aux_node rejects moving a directory into its own subtree", async () =
   const tools = createAssistantTools({
     projectId: "assistant_tools_move_into_child",
     context: null,
-    activeTools: ["move_aux_node"],
   });
 
   const result = await executeTool(tools.move_aux_node!, {
@@ -483,7 +468,6 @@ test("move_aux_node respects the active timeline point from context", async () =
       activeTimelinePointId: timelinePoint.id,
       activeTimelineLabel: timelinePoint.label,
     },
-    activeTools: ["move_aux_node"],
   });
 
   await executeTool(tools.move_aux_node!, {
@@ -527,7 +511,6 @@ test("create_aux_symlink creates a symlink to a file", async () => {
   const tools = createAssistantTools({
     projectId: "assistant_tools_symlink_file",
     context: null,
-    activeTools: ["create_aux_symlink"],
   });
 
   const result = await executeTool(tools.create_aux_symlink!, {
@@ -574,7 +557,6 @@ test("create_aux_symlink creates a symlink to a directory", async () => {
   const tools = createAssistantTools({
     projectId: "assistant_tools_symlink_dir",
     context: null,
-    activeTools: ["create_aux_symlink"],
   });
 
   const result = await executeTool(tools.create_aux_symlink!, {
@@ -617,7 +599,6 @@ test("create_aux_symlink returns an error when the target does not exist", async
   const tools = createAssistantTools({
     projectId: "assistant_tools_symlink_missing_target",
     context: null,
-    activeTools: ["create_aux_symlink"],
   });
 
   const result = await executeTool(tools.create_aux_symlink!, {
@@ -662,7 +643,6 @@ test("create_aux_symlink returns an error when the destination path already exis
   const tools = createAssistantTools({
     projectId: "assistant_tools_symlink_conflict",
     context: null,
-    activeTools: ["create_aux_symlink"],
   });
 
   const result = await executeTool(tools.create_aux_symlink!, {
@@ -695,7 +675,6 @@ test("aux write tools respect the active timeline point from context", async () 
       activeTimelinePointId: timelinePoint.id,
       activeTimelineLabel: timelinePoint.label,
     },
-    activeTools: ["mkdir_aux_dir"],
   });
 
   await executeTool(tools.mkdir_aux_dir!, { path: "/草稿" });
