@@ -394,6 +394,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
             timelinePointId: resolvedTimelinePointId,
             path: normalizedPath,
             actionLabel: "重定向辅助资料符号链接",
+            followSymlinks: false,
           });
           invariant(
             symlinkNode.nodeType === "symlink",

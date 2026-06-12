@@ -1220,6 +1220,68 @@ test("create_symlink suggests retarget_symlink when the destination is an existi
   expect(sceneDir.id).toBeTruthy();
 });
 
+test("retarget_symlink resolves the source path without following the symlink", async () => {
+  const workspace = seedProject("assistant_tools_symlink_retarget_source");
+  const outlineDir = workspaceDomain.mkdirAt({
+    workspaceId: workspace.id,
+    timelinePointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: workspace.auxRootId!,
+    name: "大纲",
+  });
+  const oldTarget = workspaceDomain.writeFileAt({
+    workspaceId: workspace.id,
+    timelinePointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: outlineDir.id,
+    name: "序幕大纲.md",
+    content: "序幕",
+  });
+  const newTarget = workspaceDomain.writeFileAt({
+    workspaceId: workspace.id,
+    timelinePointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: outlineDir.id,
+    name: "第一幕大纲.md",
+    content: "第一幕",
+  });
+  const symlink = workspaceDomain.linkAt({
+    workspaceId: workspace.id,
+    timelinePointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: workspace.auxRootId!,
+    name: "当前大纲",
+    targetNodeId: oldTarget.id,
+  });
+  const tools = createAssistantTools({
+    projectId: "assistant_tools_symlink_retarget_source",
+    runtimeContext: createRuntimeContext(),
+  });
+
+  const result = await executeTool(tools.retarget_symlink!, {
+    path: "/当前大纲",
+    newTargetPath: "/大纲/第一幕大纲.md",
+  });
+
+  expect(result).toMatchObject({
+    ok: true,
+    data: {
+      action: "retargeted",
+      path: "/当前大纲",
+      newTargetPath: "/大纲/第一幕大纲.md",
+      nodeId: symlink.id,
+    },
+  });
+  expect(
+    workspaceDomain.readAuxByPathAt(
+      workspace.id,
+      workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+      "/当前大纲",
+    )?.id,
+  ).toBe(newTarget.id);
+  expect(
+    workspaceDomain
+      .exportAuxSnapshotTree(workspace.id, workspaceDomain.ORIGIN_TIMELINE_POINT_ID)
+      .nodes.find((node) => node.id === symlink.id)?.symlinkTargetPath,
+  ).toBe("/大纲/第一幕大纲.md");
+});
+
 test("aux write tools respect the active timeline point from context", async () => {
   const workspace = seedProject("assistant_tools_timeline");
   const timelinePoint = workspaceDomain.createTimelinePoint({

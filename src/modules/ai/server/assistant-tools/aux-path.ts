@@ -44,8 +44,11 @@ export function resolveAuxNodeByPathOrThrow(input: {
   timelinePointId: string;
   path: string;
   actionLabel: string;
+  followSymlinks?: boolean;
 }) {
-  const node = readAuxByPathAt(input.workspaceId, input.timelinePointId, input.path);
+  const node = readAuxByPathAt(input.workspaceId, input.timelinePointId, input.path, {
+    followSymlinks: input.followSymlinks,
+  });
   invariant(node, `${input.actionLabel}失败：目标路径不存在或在当前时间点不可见。`);
   return node;
 }

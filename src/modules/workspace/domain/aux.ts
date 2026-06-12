@@ -537,12 +537,22 @@ export function readAuxByIdAt(workspaceId: string, pointId: TimelinePointRef, no
   return readAuxByIdAtInternal(db, workspace, timelinePointId, nodeId);
 }
 
-export function readAuxByPathAt(workspaceId: string, pointId: TimelinePointRef, path: string) {
+export function readAuxByPathAt(
+  workspaceId: string,
+  pointId: TimelinePointRef,
+  path: string,
+  options: { followSymlinks?: boolean } = {},
+) {
   const workspace = getWorkspaceOrThrow(db, workspaceId);
   const auxRootId = assertAuxRoot(workspace);
   const timelinePointId = validateTimelinePointRef(db, workspace.id, pointId);
   const snapshot = buildReachableAuxSnapshot(db, workspace, timelinePointId);
-  const nodeId = resolveAuxNodeIdFromPath(snapshot, auxRootId, path);
+  const nodeId = resolveAuxNodeIdFromPath(
+    snapshot,
+    auxRootId,
+    path,
+    options.followSymlinks ?? true,
+  );
   return nodeId ? (snapshot.get(nodeId) ?? null) : null;
 }
 
