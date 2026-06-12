@@ -60,6 +60,210 @@ test("createAssistantTools always exposes the full tool set", () => {
   expect(tools.write_file).toBeDefined();
 });
 
+test("list_files returns a recursive tree by default and does not recurse into symlinks", async () => {
+  const workspace = seedProject("assistant_tools_list_tree_default");
+  const settingsDir = workspaceDomain.mkdirAt({
+    workspaceId: workspace.id,
+    timelinePointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: workspace.auxRootId!,
+    name: "设定",
+  });
+  const worldDir = workspaceDomain.mkdirAt({
+    workspaceId: workspace.id,
+    timelinePointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: settingsDir.id,
+    name: "世界观",
+  });
+  workspaceDomain.writeFileAt({
+    workspaceId: workspace.id,
+    timelinePointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: settingsDir.id,
+    name: "角色.md",
+    content: "角色",
+  });
+  workspaceDomain.writeFileAt({
+    workspaceId: workspace.id,
+    timelinePointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: worldDir.id,
+    name: "阵营.md",
+    content: "阵营",
+  });
+  workspaceDomain.writeFileAt({
+    workspaceId: workspace.id,
+    timelinePointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: worldDir.id,
+    name: "王都.md",
+    content: "王都",
+  });
+  const indexDir = workspaceDomain.mkdirAt({
+    workspaceId: workspace.id,
+    timelinePointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: workspace.auxRootId!,
+    name: "索引",
+  });
+  workspaceDomain.linkAt({
+    workspaceId: workspace.id,
+    timelinePointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: indexDir.id,
+    name: "设定入口",
+    targetNodeId: settingsDir.id,
+  });
+  const tools = createAssistantTools({
+    projectId: "assistant_tools_list_tree_default",
+    runtimeContext: createRuntimeContext(),
+  });
+
+  const result = await executeTool(tools.list_files!, {});
+
+  expect(result).toEqual({
+    ok: true,
+    truncated: true,
+    data: {
+      path: "/",
+      depth: 2,
+      entries: [
+        {
+          id: indexDir.id,
+          nodeType: "dir",
+          name: "索引",
+          path: "/索引",
+          parentAuxNodeId: workspace.auxRootId,
+          content: null,
+          symlinkTargetAuxNodeId: null,
+          symlinkTargetPath: null,
+          timelinePointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+          hiddenChildrenCount: 0,
+          children: [
+            {
+              id: expect.any(String),
+              nodeType: "symlink",
+              name: "设定入口",
+              path: "/索引/设定入口",
+              parentAuxNodeId: indexDir.id,
+              content: null,
+              symlinkTargetAuxNodeId: settingsDir.id,
+              symlinkTargetPath: "/设定",
+              timelinePointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+              hiddenChildrenCount: 0,
+              children: [],
+            },
+          ],
+        },
+        {
+          id: settingsDir.id,
+          nodeType: "dir",
+          name: "设定",
+          path: "/设定",
+          parentAuxNodeId: workspace.auxRootId,
+          content: null,
+          symlinkTargetAuxNodeId: null,
+          symlinkTargetPath: null,
+          timelinePointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+          hiddenChildrenCount: 0,
+          children: [
+            {
+              id: worldDir.id,
+              nodeType: "dir",
+              name: "世界观",
+              path: "/设定/世界观",
+              parentAuxNodeId: settingsDir.id,
+              content: null,
+              symlinkTargetAuxNodeId: null,
+              symlinkTargetPath: null,
+              timelinePointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+              hiddenChildrenCount: 2,
+              children: [],
+            },
+            {
+              id: expect.any(String),
+              nodeType: "file",
+              name: "角色.md",
+              path: "/设定/角色.md",
+              parentAuxNodeId: settingsDir.id,
+              content: "角色",
+              symlinkTargetAuxNodeId: null,
+              symlinkTargetPath: null,
+              timelinePointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+              hiddenChildrenCount: 0,
+              children: [],
+            },
+          ],
+        },
+      ],
+    },
+  });
+});
+
+test("list_files accepts a deeper depth for nested directories", async () => {
+  const workspace = seedProject("assistant_tools_list_tree_deep");
+  const settingsDir = workspaceDomain.mkdirAt({
+    workspaceId: workspace.id,
+    timelinePointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: workspace.auxRootId!,
+    name: "设定",
+  });
+  const worldDir = workspaceDomain.mkdirAt({
+    workspaceId: workspace.id,
+    timelinePointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: settingsDir.id,
+    name: "世界观",
+  });
+  workspaceDomain.writeFileAt({
+    workspaceId: workspace.id,
+    timelinePointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+    parentDirId: worldDir.id,
+    name: "王都.md",
+    content: "王都",
+  });
+  const tools = createAssistantTools({
+    projectId: "assistant_tools_list_tree_deep",
+    runtimeContext: createRuntimeContext(),
+  });
+
+  const result = await executeTool(tools.list_files!, {
+    path: "/设定",
+    depth: 3,
+  });
+
+  expect(result).toEqual({
+    ok: true,
+    truncated: false,
+    data: {
+      path: "/设定",
+      depth: 3,
+      entries: [
+        {
+          id: worldDir.id,
+          nodeType: "dir",
+          name: "世界观",
+          path: "/设定/世界观",
+          parentAuxNodeId: settingsDir.id,
+          content: null,
+          symlinkTargetAuxNodeId: null,
+          symlinkTargetPath: null,
+          timelinePointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+          hiddenChildrenCount: 0,
+          children: [
+            {
+              id: expect.any(String),
+              nodeType: "file",
+              name: "王都.md",
+              path: "/设定/世界观/王都.md",
+              parentAuxNodeId: worldDir.id,
+              content: "王都",
+              symlinkTargetAuxNodeId: null,
+              symlinkTargetPath: null,
+              timelinePointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+              hiddenChildrenCount: 0,
+              children: [],
+            },
+          ],
+        },
+      ],
+    },
+  });
+});
+
 test("create_dir creates a directory at the current timeline point", async () => {
   const workspace = seedProject("assistant_tools_mkdir");
   const tools = createAssistantTools({

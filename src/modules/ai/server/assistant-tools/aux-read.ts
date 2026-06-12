@@ -1,14 +1,12 @@
 import { tool } from "ai";
 
-import { listAuxDirAt, readAuxByPathAt } from "@/modules/workspace/domain";
+import { listAuxTreeAt, readAuxByPathAt } from "@/modules/workspace/domain";
 
 import type { ToolBuildContext, AuxReadToolName } from "./_shared";
 import {
-  AUX_DIR_ENTRY_LIMIT,
   failure,
   getWorkspaceForProject,
   jsonSchema,
-  limitAuxNodes,
   resolveCurrentTimelinePointId,
   resolveActiveAuxPath,
   sanitizeAuxNode,
@@ -21,17 +19,22 @@ const REFERENCE_OVERLAY_READ_SEMANTICS =
 export function buildAuxReadTools({ projectId, runtimeContext }: ToolBuildContext) {
   return {
     list_files: tool({
-      description: `${REFERENCE_OVERLAY_READ_SEMANTICS} 列出当前时间点可见的参考资料目录。用于先查看有哪些设定/素材文件；省略 path 时读取参考资料根目录 /。`,
-      inputSchema: jsonSchema<{ path?: string }>({
+      description: `${REFERENCE_OVERLAY_READ_SEMANTICS} 以文件树形式列出当前时间点可见的参考资料目录。默认递归 2 层；可传更大的 depth 查看更深层。符号链接只显示自身，不继续递归。省略 path 时读取参考资料根目录 /。`,
+      inputSchema: jsonSchema<{ path?: string; depth?: number }>({
         type: "object",
         properties: {
           path: {
             type: "string",
             description: "参考资料目录绝对路径。省略时读取根目录 /。",
           },
+          depth: {
+            type: "integer",
+            minimum: 1,
+            description: "递归展开层数，默认 2。depth=1 只列当前目录直接子项。",
+          },
         },
       }),
-      execute: async ({ path }) => {
+      execute: async ({ path, depth }) => {
         const workspace = getWorkspaceForProject(projectId);
         if (!workspace) {
           return failure(new Error("当前项目没有默认工作区。"));
@@ -39,25 +42,25 @@ export function buildAuxReadTools({ projectId, runtimeContext }: ToolBuildContex
 
         return withEnvelope(() => {
           const resolvedTimelinePointId = resolveCurrentTimelinePointId(runtimeContext);
-          const dirNodes = listAuxDirAt(workspace.id, resolvedTimelinePointId, {
-            dirId: path ? undefined : (workspace.auxRootId ?? undefined),
-            path: path ?? undefined,
-          });
-          const limited = limitAuxNodes(dirNodes, AUX_DIR_ENTRY_LIMIT);
+          const tree = listAuxTreeAt(
+            workspace.id,
+            resolvedTimelinePointId,
+            {
+              dirId: path ? undefined : (workspace.auxRootId ?? undefined),
+              path: path ?? undefined,
+            },
+            {
+              depth,
+            },
+          );
 
           return {
             ok: true,
-            truncated: limited.truncated,
+            truncated: tree.truncated,
             data: {
               path: path ?? "/",
-              entries: limited.nodes.map((node) => ({
-                id: node.id,
-                nodeType: node.nodeType,
-                name: node.name,
-                path: node.path,
-                parentAuxNodeId: node.parentAuxNodeId,
-                timelinePointId: node.timelinePointId,
-              })),
+              depth: Math.max(1, Math.trunc(depth ?? 2)),
+              entries: tree.nodes,
             },
           };
         });

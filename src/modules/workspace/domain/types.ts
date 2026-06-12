@@ -67,6 +67,12 @@ export interface ResolvedAuxNode {
   path: string;
 }
 
+export interface AuxDirListTreeNode extends ResolvedAuxNode {
+  symlinkTargetPath: string | null;
+  children: AuxDirListTreeNode[];
+  hiddenChildrenCount: number;
+}
+
 export interface WritingContext {
   contentNode: ExportedContentNode;
   timelinePointId: string | typeof ORIGIN_TIMELINE_POINT_ID;

@@ -27,7 +27,7 @@ import {
 } from "./internal/aux-snapshot";
 import { createId, invariant, now } from "@/shared/lib/domain";
 import { pointIdOrOrigin, validateTimelinePointRef } from "./internal/timeline-point";
-import type { ExportedAuxSnapshotTree, TimelinePointRef } from "./types";
+import type { AuxDirListTreeNode, ExportedAuxSnapshotTree, TimelinePointRef } from "./types";
 
 export function mkdirAt(input: {
   workspaceId: string;
@@ -420,6 +420,90 @@ export function listAuxDirAt(
   invariant(dir.nodeType === "dir" || dir.nodeType === "root", "目标辅助信息不是文件夹。");
 
   return listChildrenFromSnapshot(snapshot, dir.id);
+}
+
+function buildAuxDirTreeFromSnapshot(
+  snapshot: ReturnType<typeof buildReachableAuxSnapshot>,
+  parentId: string,
+  remainingDepth: number,
+): { nodes: AuxDirListTreeNode[]; truncated: boolean } {
+  let truncated = false;
+
+  const nodes = listChildrenFromSnapshot(snapshot, parentId).map((node) => {
+    const symlinkTargetPath = node.symlinkTargetAuxNodeId
+      ? (snapshot.get(node.symlinkTargetAuxNodeId)?.path ?? null)
+      : null;
+
+    if ((node.nodeType === "dir" || node.nodeType === "root") && remainingDepth > 1) {
+      const childTree = buildAuxDirTreeFromSnapshot(snapshot, node.id, remainingDepth - 1);
+      if (childTree.truncated) {
+        truncated = true;
+      }
+      return {
+        id: node.id,
+        nodeType: node.nodeType,
+        parentAuxNodeId: node.parentAuxNodeId,
+        name: node.name,
+        content: node.content,
+        symlinkTargetAuxNodeId: node.symlinkTargetAuxNodeId,
+        timelinePointId: node.timelinePointId,
+        path: node.path,
+        symlinkTargetPath,
+        children: childTree.nodes,
+        hiddenChildrenCount: 0,
+      } satisfies AuxDirListTreeNode;
+    }
+
+    const hiddenChildrenCount =
+      node.nodeType === "dir" || node.nodeType === "root"
+        ? listChildrenFromSnapshot(snapshot, node.id).length
+        : 0;
+    if (hiddenChildrenCount > 0) {
+      truncated = true;
+    }
+
+    return {
+      id: node.id,
+      nodeType: node.nodeType,
+      parentAuxNodeId: node.parentAuxNodeId,
+      name: node.name,
+      content: node.content,
+      symlinkTargetAuxNodeId: node.symlinkTargetAuxNodeId,
+      timelinePointId: node.timelinePointId,
+      path: node.path,
+      symlinkTargetPath,
+      children: [],
+      hiddenChildrenCount,
+    } satisfies AuxDirListTreeNode;
+  });
+
+  return {
+    nodes,
+    truncated,
+  };
+}
+
+export function listAuxTreeAt(
+  workspaceId: string,
+  pointId: TimelinePointRef,
+  target: { dirId?: string; path?: string },
+  options: { depth?: number } = {},
+) {
+  const workspace = getWorkspaceOrThrow(db, workspaceId);
+  const auxRootId = assertAuxRoot(workspace);
+  const timelinePointId = validateTimelinePointRef(db, workspace.id, pointId);
+  const snapshot = buildReachableAuxSnapshot(db, workspace, timelinePointId);
+
+  const dirId = target.path
+    ? (resolveAuxNodeIdFromPath(snapshot, auxRootId, target.path) ?? undefined)
+    : target.dirId;
+  invariant(dirId, "必须指定要读取的辅助信息文件夹。");
+  const dir = snapshot.get(dirId);
+  invariant(dir, "辅助信息文件夹不存在或在当前时间点不可见。");
+  invariant(dir.nodeType === "dir" || dir.nodeType === "root", "目标辅助信息不是文件夹。");
+
+  const depth = Math.max(1, Math.trunc(options.depth ?? 2));
+  return buildAuxDirTreeFromSnapshot(snapshot, dir.id, depth);
 }
 
 export function listAuxChangesAt(workspaceId: string, pointId: TimelinePointRef) {
