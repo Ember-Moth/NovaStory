@@ -23,6 +23,7 @@ export function SidebarListRow({
   description,
   trailing,
   actions,
+  isEditing = false,
   anchorId,
   dataNodeId,
   dataRowId,
@@ -42,6 +43,7 @@ export function SidebarListRow({
   description?: ReactNode;
   trailing?: ReactNode;
   actions?: ReactNode;
+  isEditing?: boolean;
   anchorId?: string;
   dataNodeId?: string;
   dataRowId?: string;
@@ -94,7 +96,7 @@ export function SidebarListRow({
             <div className="flex min-w-0 items-center gap-1">{label}</div>
           </div>
           <div className="col-start-3 row-start-1 row-end-3 mt-0.5 self-start">
-            <RowHoverSlot badge={trailing} actions={actions} />
+            <RowHoverSlot badge={trailing} actions={actions} isEditing={isEditing} />
           </div>
           {description ? (
             <div className="col-[2/4] row-start-2 min-w-0 text-[11px] leading-4 text-foreground-muted">
@@ -107,26 +109,34 @@ export function SidebarListRow({
           {leading}
           {icon}
           <div className="flex min-w-0 flex-1 items-center gap-1">{label}</div>
-          <RowHoverSlot badge={trailing} actions={actions} />
+          <RowHoverSlot badge={trailing} actions={actions} isEditing={isEditing} />
         </>
       )}
     </motion.div>
   );
 }
 
-function RowHoverSlot({ actions, badge }: { actions?: ReactNode; badge?: ReactNode }) {
+function RowHoverSlot({
+  actions,
+  badge,
+  isEditing,
+}: {
+  actions?: ReactNode;
+  badge?: ReactNode;
+  isEditing: boolean;
+}) {
   if (!actions && !badge) {
     return null;
   }
 
   return (
     <div className="grid h-5 shrink-0 items-center">
-      {actions ? (
+      {actions && !isEditing ? (
         <div className="pointer-events-none col-start-1 row-start-1 flex w-0 items-center justify-end gap-1 justify-self-end overflow-visible opacity-0 transition-all duration-200 interpolate-size group-hover:pointer-events-auto group-hover:w-auto group-hover:opacity-100">
           {actions}
         </div>
       ) : null}
-      {badge ? (
+      {badge && !isEditing ? (
         <span
           className={cn(
             "col-start-1 row-start-1 max-w-20 self-center justify-self-end truncate text-[10px] leading-none text-accent-foreground opacity-70 transition",

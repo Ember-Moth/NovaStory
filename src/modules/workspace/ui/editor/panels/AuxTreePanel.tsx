@@ -186,6 +186,7 @@ function AuxTreeNodeRow({
     dataNodeId: node.id,
     depth,
     isActive,
+    isEditing,
     group: !isSymlinkTargetPickerActive,
     anchorId: rowAnchorId,
     dataSymlinkTargetPickerState: symlinkTargetPickerState,

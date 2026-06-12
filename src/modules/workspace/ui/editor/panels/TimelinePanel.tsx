@@ -135,6 +135,7 @@ function TimelinePointRow({
       layout="position"
       depth={0}
       isActive={isActive}
+      isEditing={isEditing}
       group={!!showSetAnchor || showDelete}
       anchorId={rowAnchorId}
       dataRowId={point.id}

@@ -142,6 +142,7 @@ function ContentTreeNodeRow({
       dataNodeId={node.id}
       depth={depth}
       isActive={isActive}
+      isEditing={isEditing}
       group
       anchorId={rowAnchorId}
       className={cn(
