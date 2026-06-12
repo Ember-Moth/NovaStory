@@ -137,6 +137,42 @@ test("branch off a commit shares the same head and forked metadata", () => {
   expect(exported.nodes[0]?.body).toBe("base");
 });
 
+test("branch workspaces restore aux layers with globally unique layer ids", () => {
+  const workspace = seedProject("proj_branch_aux_layer_ids");
+  const rootId = workspace.auxRootId!;
+  const notesFile = service.writeFileAt({
+    workspaceId: workspace.id,
+    parentDirId: rootId,
+    name: "notes.md",
+    content: "origin",
+  });
+  const point = service.createTimelinePoint({
+    workspaceId: workspace.id,
+    label: "Point",
+  });
+  service.writeFileAt({
+    workspaceId: workspace.id,
+    timelinePointId: point.id,
+    nodeId: notesFile.id,
+    content: "point",
+  });
+  const commit = service.createCommit({ branchId: workspace.branchId, message: "base" });
+
+  const firstFeature = service.createBranchWorkspace({
+    projectId: "proj_branch_aux_layer_ids",
+    name: "feature-one",
+    fromCommitId: commit.id,
+  });
+  const secondFeature = service.createBranchWorkspace({
+    projectId: "proj_branch_aux_layer_ids",
+    name: "feature-two",
+    fromCommitId: commit.id,
+  });
+
+  expect(service.readAuxByPathAt(firstFeature.id, point.id, "/notes.md")?.content).toBe("point");
+  expect(service.readAuxByPathAt(secondFeature.id, point.id, "/notes.md")?.content).toBe("point");
+});
+
 test("branch workspace timeline deletion only checks anchors in that workspace", () => {
   const workspace = seedProject("proj_branch_timeline_delete");
   const point = service.createTimelinePoint({

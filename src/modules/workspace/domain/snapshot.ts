@@ -7,7 +7,7 @@ import { getContentNodeOrThrow, getWorkspaceOrThrow } from "./internal/access";
 import { listContentChildren, orderContentChildren } from "./internal/content-chain";
 import { getBlob, getTreeObject, putBlob, putTreeObject } from "./internal/object-store";
 import { listTimelineRows, orderTimelineRows } from "./internal/timeline-chain";
-import { invariant, now } from "@/shared/lib/domain";
+import { createId, invariant, now } from "@/shared/lib/domain";
 
 type ContentNodeRow = InferSelectModel<typeof schema.contentNodes>;
 
@@ -231,7 +231,7 @@ function restoreAux(
       executor
         .insert(schema.auxNodeLayers)
         .values({
-          id: `aux_layer_${node.auxNodeId}_${layer.timelinePointId ?? "origin"}`,
+          id: createId("aux_layer"),
           workspaceId,
           timelinePointId: layer.timelinePointId,
           auxNodeId: node.auxNodeId,
