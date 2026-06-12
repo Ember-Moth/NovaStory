@@ -64,6 +64,7 @@ type _ExtraneousInPartition = Exclude<_AllDomainToolNames, ProjectAssistantToolN
 const _partitionCheck: _MissingFromPartition | _ExtraneousInPartition = undefined!;
 import {
   getDefaultWorkspace,
+  listTimelinePoints,
   ORIGIN_TIMELINE_POINT_ID,
   readAuxByPathAt,
 } from "@/modules/workspace/domain";
@@ -230,6 +231,32 @@ export function resolveTimelinePointId(
   context: ProjectAssistantContextSnapshot | null | undefined,
 ) {
   return context?.activeTimelinePointId ?? ORIGIN_TIMELINE_POINT_ID;
+}
+
+/**
+ * Resolve a timeline point ID from tool input.
+ *
+ * - If `inputTimelinePointId` is provided and equals `"origin"`, returns the origin ID.
+ * - If `inputTimelinePointId` is provided as a real ID, validates it exists on the workspace
+ *   and returns it.
+ * - If `inputTimelinePointId` is omitted/undefined, falls back to the context's active
+ *   timeline point (or origin if none is set).
+ */
+export function resolveTimelinePointIdFromInput(
+  workspaceId: string,
+  context: ProjectAssistantContextSnapshot | null | undefined,
+  inputTimelinePointId: string | undefined,
+): string {
+  if (inputTimelinePointId === undefined) {
+    return resolveTimelinePointId(context);
+  }
+  if (inputTimelinePointId === "origin") {
+    return ORIGIN_TIMELINE_POINT_ID;
+  }
+  const points = listTimelinePoints(workspaceId);
+  const found = points.find((p) => p.id === inputTimelinePointId);
+  invariant(found, "指定的时间点不存在。");
+  return inputTimelinePointId;
 }
 
 export function resolveActiveContentNodeId(
