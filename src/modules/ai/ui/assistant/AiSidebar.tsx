@@ -256,7 +256,7 @@ export function AiSidebar({
                     !controller.selectedModelId ||
                     !controller.selectedConnectionId ||
                     controller.activeThreadId == null ||
-                    controller.isBusy
+                    controller.isThreadBusy
                   }
                   rows={3}
                   className="field-sizing-content w-full resize-none border-none bg-transparent px-2.5 pt-2 text-[13px] leading-5 text-editor-foreground outline-none placeholder:text-foreground-muted/70 disabled:cursor-not-allowed disabled:opacity-70"
