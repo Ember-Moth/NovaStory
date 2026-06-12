@@ -6,7 +6,7 @@ import type {
   ProjectAssistantContextSnapshot,
   ProjectAssistantStreamEvent,
   ProjectAssistantToolName,
-  WorkspaceMutationEvent,
+  WorkspaceRefreshRequestedEvent,
 } from "@/modules/ai/domain/types";
 import {
   PROJECT_ASSISTANT_WRITE_TOOL_NAMES,
@@ -419,7 +419,7 @@ function patchAssistantOverviewState({
 export function useAiAssistantController(
   projectId: string,
   contextSnapshot: ProjectAssistantContextSnapshot,
-  onWorkspaceMutation?: (_event: WorkspaceMutationEvent) => void,
+  onWorkspaceRefreshRequested?: (_event: WorkspaceRefreshRequestedEvent) => void,
 ) {
   const [selectedConnectionId, setSelectedConnectionId] = useState("");
   const [selectedModelId, setSelectedModelId] = useState("");
@@ -632,8 +632,8 @@ export function useAiAssistantController(
           },
           {
             onEvent: (event) => {
-              if (event.type === "workspace-mutated") {
-                onWorkspaceMutation?.(event);
+              if (event.type === "workspace-refresh-requested") {
+                onWorkspaceRefreshRequested?.(event);
               }
               setActiveStream((current) =>
                 current == null ? current : applyStreamEvent(current, event),
@@ -683,7 +683,7 @@ export function useAiAssistantController(
       contextSnapshot,
       draft,
       includeContext,
-      onWorkspaceMutation,
+      onWorkspaceRefreshRequested,
       projectId,
       sendMessageStream,
       selectedModelSupportsToolUse,
@@ -719,8 +719,8 @@ export function useAiAssistantController(
           },
           {
             onEvent: (event) => {
-              if (event.type === "workspace-mutated") {
-                onWorkspaceMutation?.(event);
+              if (event.type === "workspace-refresh-requested") {
+                onWorkspaceRefreshRequested?.(event);
               }
               setActiveStream((current) =>
                 current == null ? current : applyStreamEvent(current, event),
@@ -765,7 +765,7 @@ export function useAiAssistantController(
       projectId,
       retryMessageStream,
       selectedModelSupportsToolUse,
-      onWorkspaceMutation,
+      onWorkspaceRefreshRequested,
     ],
   );
 
@@ -794,8 +794,8 @@ export function useAiAssistantController(
           },
           {
             onEvent: (event) => {
-              if (event.type === "workspace-mutated") {
-                onWorkspaceMutation?.(event);
+              if (event.type === "workspace-refresh-requested") {
+                onWorkspaceRefreshRequested?.(event);
               }
               setActiveStream((current) =>
                 current == null ? current : applyStreamEvent(current, event),
@@ -832,7 +832,13 @@ export function useAiAssistantController(
         setPendingAction(null);
       }
     },
-    [activeThreadId, assistantOverviewQuery, continueRunStream, onWorkspaceMutation, projectId],
+    [
+      activeThreadId,
+      assistantOverviewQuery,
+      continueRunStream,
+      onWorkspaceRefreshRequested,
+      projectId,
+    ],
   );
 
   const handleCreateThread = useCallback(async () => {

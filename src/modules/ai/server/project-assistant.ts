@@ -57,15 +57,15 @@ import {
 } from "@/modules/ai/domain/types";
 import type {
   ProjectAssistantWriteToolName,
-  WorkspaceMutationAction,
-  WorkspaceMutationEvent,
+  WorkspaceRefreshArea,
+  WorkspaceRefreshRequestedEvent,
 } from "@/modules/ai/domain/types";
 import { listResolvedModelsForConnection } from "@/modules/ai/domain/catalog";
 import {
   getAiAssistantModelSelection,
   type AiAssistantModelSelection,
 } from "@/modules/config/domain/ai-assistant-model-selection";
-import { getDefaultWorkspace, ORIGIN_TIMELINE_POINT_ID } from "@/modules/workspace/domain";
+import { getDefaultWorkspace } from "@/modules/workspace/domain";
 import { invariant } from "@/shared/lib/domain";
 
 import { createAssistantTools } from "./assistant-tools";
@@ -828,15 +828,30 @@ const CONTENT_WRITE_TOOL_NAME_SET = new Set<string>([
   "delete_manuscript_node",
 ]);
 
-function extractWorkspaceMutationEventFromToolResult({
+const AUX_WRITE_TOOL_NAME_SET = new Set<string>([
+  "create_reference_overlay_dir",
+  "write_reference_overlay_file",
+  "move_reference_overlay_node",
+  "delete_reference_overlay_node",
+  "create_reference_overlay_link",
+  "retarget_reference_overlay_link",
+]);
+
+const TIMELINE_UPDATE_TOOL_NAME = "update_story_timeline_point";
+const TIMELINE_WRITE_TOOL_NAME_SET = new Set<string>([
+  "create_story_timeline_point",
+  TIMELINE_UPDATE_TOOL_NAME,
+  "move_story_timeline_point",
+  "delete_story_timeline_point",
+]);
+
+function extractWorkspaceRefreshRequestedEventFromToolResult({
   projectId,
-  context,
   toolResult,
 }: {
   projectId: string;
-  context: ProjectAssistantContextSnapshot | null;
   toolResult: Record<string, unknown>;
-}): WorkspaceMutationEvent | null {
+}): WorkspaceRefreshRequestedEvent | null {
   const toolName = Reflect.get(toolResult, "toolName");
   if (!isWriteToolName(toolName)) {
     return null;
@@ -860,50 +875,30 @@ function extractWorkspaceMutationEventFromToolResult({
   if (!data || typeof data !== "object") {
     return null;
   }
+  const record = data as Record<string, unknown>;
+  const nodeId = Reflect.get(record, "nodeId");
+  let areas: readonly WorkspaceRefreshArea[] | null = null;
+  let contentNodeId: string | null | undefined;
+  let auxNodeId: string | null | undefined;
 
-  const action = Reflect.get(data as Record<string, unknown>, "action");
-  const nodeId = Reflect.get(data as Record<string, unknown>, "nodeId");
-  const path = Reflect.get(data as Record<string, unknown>, "path");
-  const previousPath = Reflect.get(data as Record<string, unknown>, "previousPath");
-  const targetPath = Reflect.get(data as Record<string, unknown>, "targetPath");
-  const dataTimelinePointId = Reflect.get(data as Record<string, unknown>, "timelinePointId");
-
-  const isContent = CONTENT_WRITE_TOOL_NAME_SET.has(toolName as string);
-  const area = isContent ? "content" : "aux";
-
-  if (isContent) {
-    if (
-      action !== "created" &&
-      action !== "updated" &&
-      action !== "moved" &&
-      action !== "deleted"
-    ) {
-      return null;
-    }
+  if (CONTENT_WRITE_TOOL_NAME_SET.has(toolName as string)) {
+    areas = ["content"];
+    contentNodeId = typeof nodeId === "string" && nodeId.trim().length > 0 ? nodeId : null;
+  } else if (AUX_WRITE_TOOL_NAME_SET.has(toolName as string)) {
+    areas = ["aux"];
+    auxNodeId = typeof nodeId === "string" && nodeId.trim().length > 0 ? nodeId : null;
+  } else if (TIMELINE_WRITE_TOOL_NAME_SET.has(toolName as string)) {
+    areas = toolName === TIMELINE_UPDATE_TOOL_NAME ? ["timeline"] : ["timeline", "aux"];
   } else {
-    if (
-      (action !== "created" && action !== "updated" && action !== "moved") ||
-      typeof path !== "string"
-    ) {
-      return null;
-    }
+    return null;
   }
 
   return {
-    type: "workspace-mutated",
+    type: "workspace-refresh-requested",
     workspaceId: workspace.id,
-    area,
-    timelinePointId:
-      typeof dataTimelinePointId === "string" && dataTimelinePointId.trim().length > 0
-        ? dataTimelinePointId
-        : (context?.activeTimelinePointId ?? ORIGIN_TIMELINE_POINT_ID),
-    toolName,
-    action: action as WorkspaceMutationAction,
-    path: typeof path === "string" ? path : undefined,
-    nodeId: typeof nodeId === "string" && nodeId.trim().length > 0 ? nodeId : null,
-    previousPath:
-      typeof previousPath === "string" && previousPath.trim().length > 0 ? previousPath : null,
-    targetPath: typeof targetPath === "string" && targetPath.trim().length > 0 ? targetPath : null,
+    areas,
+    ...(contentNodeId === undefined ? {} : { contentNodeId }),
+    ...(auxNodeId === undefined ? {} : { auxNodeId }),
   };
 }
 
@@ -1359,13 +1354,12 @@ async function executeProjectAssistantRun<TResult>({
           output: Reflect.get(chunk.toolResult, "output") ?? null,
           status: getToolStatus(chunk.toolResult),
         });
-        const workspaceMutationEvent = extractWorkspaceMutationEventFromToolResult({
+        const workspaceRefreshRequestedEvent = extractWorkspaceRefreshRequestedEventFromToolResult({
           projectId: prepared.projectId,
-          context: prepared.context,
           toolResult: chunk.toolResult,
         });
-        if (workspaceMutationEvent) {
-          relay.emit(workspaceMutationEvent);
+        if (workspaceRefreshRequestedEvent) {
+          relay.emit(workspaceRefreshRequestedEvent);
         }
         continue;
       }

@@ -1076,13 +1076,13 @@ test("sendProjectAssistantMessage records tool input and output artifacts for ex
   expect(trace.events.some((event) => event.eventKind === "tool-call-finished")).toBe(true);
 });
 
-test("sendProjectAssistantMessageStream emits workspace-mutated after a successful write tool", async () => {
-  seedProject("assistant_workspace_mutation_stream");
-  const workspace = createDefaultWorkspace("assistant_workspace_mutation_stream");
+test("sendProjectAssistantMessageStream emits workspace-refresh-requested for content writes", async () => {
+  seedProject("assistant_workspace_refresh_content");
+  const workspace = createDefaultWorkspace("assistant_workspace_refresh_content");
   const seeded = seedCustomConnection({
-    connectionId: "conn_workspace_mutation_stream",
+    connectionId: "conn_workspace_refresh_content",
     modelId: "story-model",
-    modelRowId: "cmodel_workspace_mutation_stream",
+    modelRowId: "cmodel_workspace_refresh_content",
     supportsToolUse: true,
   });
   const service = createProjectAssistantService({
@@ -1094,7 +1094,93 @@ test("sendProjectAssistantMessageStream emits workspace-mutated after a successf
           type: "tool-result",
           stepNumber: 0,
           toolResult: {
-            toolCallId: "tool_write_stream",
+            toolCallId: "tool_content_stream",
+            toolName: "update_manuscript_node",
+            output: {
+              ok: true,
+              data: {
+                action: "updated",
+                nodeId: "content_stream",
+              },
+            },
+          },
+        },
+        { type: "finish-step", stepNumber: 0, finishReason: "stop", usage: { totalTokens: 2 } },
+      ],
+      text: "",
+      usage: { totalTokens: 2 },
+      finishReason: "stop",
+      steps: [
+        {
+          stepNumber: 0,
+          preparedMessages: [],
+          model: { provider: "openai", modelId: "story-model" },
+          finishReason: "stop",
+          rawFinishReason: "stop",
+          usage: { totalTokens: 2 },
+          request: { body: { step: 0 } },
+          response: { body: { id: "resp_workspace_refresh_content" }, messages: [] },
+          providerMetadata: {},
+          toolCalls: [],
+          toolResults: [
+            {
+              toolCallId: "tool_content_stream",
+              toolName: "update_manuscript_node",
+              output: {
+                ok: true,
+                data: {
+                  action: "updated",
+                  nodeId: "content_stream",
+                },
+              },
+            },
+          ],
+        },
+      ],
+    }) as any,
+  });
+  const thread = service.createProjectAssistantThread("assistant_workspace_refresh_content");
+  const emitted: Array<Record<string, unknown>> = [];
+
+  const handle = service.sendProjectAssistantMessageStream({
+    projectId: "assistant_workspace_refresh_content",
+    threadId: thread.id,
+    text: "更新正文",
+    activeTools: ["update_manuscript_node"],
+  });
+  handle.subscribe((event) => {
+    emitted.push(event as Record<string, unknown>);
+  });
+
+  await handle.finalResult;
+
+  expect(emitted.find((event) => event.type === "workspace-refresh-requested")).toMatchObject({
+    type: "workspace-refresh-requested",
+    workspaceId: workspace.id,
+    areas: ["content"],
+    contentNodeId: "content_stream",
+  });
+});
+
+test("sendProjectAssistantMessageStream emits workspace-refresh-requested for aux writes", async () => {
+  seedProject("assistant_workspace_refresh_aux");
+  const workspace = createDefaultWorkspace("assistant_workspace_refresh_aux");
+  const seeded = seedCustomConnection({
+    connectionId: "conn_workspace_refresh_aux",
+    modelId: "story-model",
+    modelRowId: "cmodel_workspace_refresh_aux",
+    supportsToolUse: true,
+  });
+  const service = createProjectAssistantService({
+    readStoredSelection: () => seeded.selection,
+    streamAssistantText: createMockStream({
+      chunks: [
+        { type: "start-step", stepNumber: 0 },
+        {
+          type: "tool-result",
+          stepNumber: 0,
+          toolResult: {
+            toolCallId: "tool_aux_stream",
             toolName: "write_reference_overlay_file",
             output: {
               ok: true,
@@ -1107,12 +1193,7 @@ test("sendProjectAssistantMessageStream emits workspace-mutated after a successf
             },
           },
         },
-        {
-          type: "finish-step",
-          stepNumber: 0,
-          finishReason: "stop",
-          usage: { totalTokens: 3 },
-        },
+        { type: "finish-step", stepNumber: 0, finishReason: "stop", usage: { totalTokens: 3 } },
       ],
       text: "",
       usage: { totalTokens: 3 },
@@ -1126,12 +1207,12 @@ test("sendProjectAssistantMessageStream emits workspace-mutated after a successf
           rawFinishReason: "stop",
           usage: { totalTokens: 3 },
           request: { body: { step: 0 } },
-          response: { body: { id: "resp_workspace_mutation_stream" }, messages: [] },
+          response: { body: { id: "resp_workspace_refresh_aux" }, messages: [] },
           providerMetadata: {},
           toolCalls: [],
           toolResults: [
             {
-              toolCallId: "tool_write_stream",
+              toolCallId: "tool_aux_stream",
               toolName: "write_reference_overlay_file",
               output: {
                 ok: true,
@@ -1148,24 +1229,14 @@ test("sendProjectAssistantMessageStream emits workspace-mutated after a successf
       ],
     }) as any,
   });
-  const thread = service.createProjectAssistantThread("assistant_workspace_mutation_stream");
+  const thread = service.createProjectAssistantThread("assistant_workspace_refresh_aux");
   const emitted: Array<Record<string, unknown>> = [];
 
   const handle = service.sendProjectAssistantMessageStream({
-    projectId: "assistant_workspace_mutation_stream",
+    projectId: "assistant_workspace_refresh_aux",
     threadId: thread.id,
     text: "写入辅助资料",
-    activeTools: [
-      "get_writing_context",
-      "get_manuscript_subtree",
-      "list_story_timeline_points",
-      "list_reference_overlay_dir",
-      "read_reference_overlay_path",
-      "create_reference_overlay_dir",
-      "write_reference_overlay_file",
-      "move_reference_overlay_node",
-      "create_reference_overlay_link",
-    ],
+    activeTools: ["write_reference_overlay_file"],
   });
   handle.subscribe((event) => {
     emitted.push(event as Record<string, unknown>);
@@ -1173,27 +1244,21 @@ test("sendProjectAssistantMessageStream emits workspace-mutated after a successf
 
   await handle.finalResult;
 
-  expect(emitted.find((event) => event.type === "workspace-mutated")).toMatchObject({
-    type: "workspace-mutated",
+  expect(emitted.find((event) => event.type === "workspace-refresh-requested")).toMatchObject({
+    type: "workspace-refresh-requested",
     workspaceId: workspace.id,
-    area: "aux",
-    timelinePointId: "timeline_written",
-    toolName: "write_reference_overlay_file",
-    action: "created",
-    path: "/设定/角色.md",
-    nodeId: "aux_stream",
-    previousPath: null,
-    targetPath: null,
+    areas: ["aux"],
+    auxNodeId: "aux_stream",
   });
 });
 
-test("sendProjectAssistantMessageStream emits workspace-mutated for create_reference_overlay_dir", async () => {
-  seedProject("assistant_workspace_mutation_mkdir");
-  const workspace = createDefaultWorkspace("assistant_workspace_mutation_mkdir");
+test("sendProjectAssistantMessageStream emits workspace-refresh-requested for timeline create move delete", async () => {
+  seedProject("assistant_workspace_refresh_timeline_multi");
+  const workspace = createDefaultWorkspace("assistant_workspace_refresh_timeline_multi");
   const seeded = seedCustomConnection({
-    connectionId: "conn_workspace_mutation_mkdir",
+    connectionId: "conn_workspace_refresh_timeline_multi",
     modelId: "story-model",
-    modelRowId: "cmodel_workspace_mutation_mkdir",
+    modelRowId: "cmodel_workspace_refresh_timeline_multi",
     supportsToolUse: true,
   });
   const service = createProjectAssistantService({
@@ -1205,24 +1270,117 @@ test("sendProjectAssistantMessageStream emits workspace-mutated for create_refer
           type: "tool-result",
           stepNumber: 0,
           toolResult: {
-            toolCallId: "tool_mkdir_stream",
-            toolName: "create_reference_overlay_dir",
-            output: {
-              ok: true,
-              data: {
-                action: "created",
-                path: "/设定",
-                nodeId: "aux_dir_stream",
-              },
-            },
+            toolCallId: "tool_timeline_create",
+            toolName: "create_story_timeline_point",
+            output: { ok: true, data: { action: "created", pointId: "point_created" } },
           },
         },
         {
-          type: "finish-step",
+          type: "tool-result",
           stepNumber: 0,
-          finishReason: "stop",
-          usage: { totalTokens: 2 },
+          toolResult: {
+            toolCallId: "tool_timeline_move",
+            toolName: "move_story_timeline_point",
+            output: { ok: true, data: { action: "moved", pointId: "point_moved" } },
+          },
         },
+        {
+          type: "tool-result",
+          stepNumber: 0,
+          toolResult: {
+            toolCallId: "tool_timeline_delete",
+            toolName: "delete_story_timeline_point",
+            output: { ok: true, data: { action: "deleted", pointId: "point_deleted" } },
+          },
+        },
+        { type: "finish-step", stepNumber: 0, finishReason: "stop", usage: { totalTokens: 4 } },
+      ],
+      text: "",
+      usage: { totalTokens: 4 },
+      finishReason: "stop",
+      steps: [
+        {
+          stepNumber: 0,
+          preparedMessages: [],
+          model: { provider: "openai", modelId: "story-model" },
+          finishReason: "stop",
+          rawFinishReason: "stop",
+          usage: { totalTokens: 4 },
+          request: { body: { step: 0 } },
+          response: { body: { id: "resp_workspace_refresh_timeline_multi" }, messages: [] },
+          providerMetadata: {},
+          toolCalls: [],
+          toolResults: [
+            {
+              toolCallId: "tool_timeline_create",
+              toolName: "create_story_timeline_point",
+              output: { ok: true, data: { action: "created", pointId: "point_created" } },
+            },
+            {
+              toolCallId: "tool_timeline_move",
+              toolName: "move_story_timeline_point",
+              output: { ok: true, data: { action: "moved", pointId: "point_moved" } },
+            },
+            {
+              toolCallId: "tool_timeline_delete",
+              toolName: "delete_story_timeline_point",
+              output: { ok: true, data: { action: "deleted", pointId: "point_deleted" } },
+            },
+          ],
+        },
+      ],
+    }) as any,
+  });
+  const thread = service.createProjectAssistantThread("assistant_workspace_refresh_timeline_multi");
+  const emitted: Array<Record<string, unknown>> = [];
+
+  const handle = service.sendProjectAssistantMessageStream({
+    projectId: "assistant_workspace_refresh_timeline_multi",
+    threadId: thread.id,
+    text: "调整时间线",
+    activeTools: [
+      "create_story_timeline_point",
+      "move_story_timeline_point",
+      "delete_story_timeline_point",
+    ],
+  });
+  handle.subscribe((event) => {
+    emitted.push(event as Record<string, unknown>);
+  });
+
+  await handle.finalResult;
+
+  expect(emitted.filter((event) => event.type === "workspace-refresh-requested")).toContainEqual({
+    type: "workspace-refresh-requested",
+    workspaceId: workspace.id,
+    areas: ["timeline", "aux"],
+  });
+});
+
+test("sendProjectAssistantMessageStream emits workspace-refresh-requested for timeline update", async () => {
+  seedProject("assistant_workspace_refresh_timeline_update");
+  const workspace = createDefaultWorkspace("assistant_workspace_refresh_timeline_update");
+  const seeded = seedCustomConnection({
+    connectionId: "conn_workspace_refresh_timeline_update",
+    modelId: "story-model",
+    modelRowId: "cmodel_workspace_refresh_timeline_update",
+    supportsToolUse: true,
+  });
+  const service = createProjectAssistantService({
+    readStoredSelection: () => seeded.selection,
+    streamAssistantText: createMockStream({
+      chunks: [
+        { type: "start-step", stepNumber: 0 },
+        {
+          type: "tool-result",
+          stepNumber: 0,
+          toolResult: {
+            toolCallId: "tool_timeline_update",
+            toolName: "update_story_timeline_point",
+            output: { ok: true, data: { action: "updated", pointId: "point_updated" } },
+          },
+        },
+        { type: "finish-step", stepNumber: 0, finishReason: "stop", usage: { totalTokens: 2 } },
       ],
       text: "",
       usage: { totalTokens: 2 },
@@ -1236,45 +1394,30 @@ test("sendProjectAssistantMessageStream emits workspace-mutated for create_refer
           rawFinishReason: "stop",
           usage: { totalTokens: 2 },
           request: { body: { step: 0 } },
-          response: { body: { id: "resp_workspace_mutation_mkdir" }, messages: [] },
+          response: { body: { id: "resp_workspace_refresh_timeline_update" }, messages: [] },
           providerMetadata: {},
           toolCalls: [],
           toolResults: [
             {
-              toolCallId: "tool_mkdir_stream",
-              toolName: "create_reference_overlay_dir",
-              output: {
-                ok: true,
-                data: {
-                  action: "created",
-                  path: "/设定",
-                  nodeId: "aux_dir_stream",
-                },
-              },
+              toolCallId: "tool_timeline_update",
+              toolName: "update_story_timeline_point",
+              output: { ok: true, data: { action: "updated", pointId: "point_updated" } },
             },
           ],
         },
       ],
     }) as any,
   });
-  const thread = service.createProjectAssistantThread("assistant_workspace_mutation_mkdir");
+  const thread = service.createProjectAssistantThread(
+    "assistant_workspace_refresh_timeline_update",
+  );
   const emitted: Array<Record<string, unknown>> = [];
 
   const handle = service.sendProjectAssistantMessageStream({
-    projectId: "assistant_workspace_mutation_mkdir",
+    projectId: "assistant_workspace_refresh_timeline_update",
     threadId: thread.id,
-    text: "创建辅助资料目录",
-    activeTools: [
-      "get_writing_context",
-      "get_manuscript_subtree",
-      "list_story_timeline_points",
-      "list_reference_overlay_dir",
-      "read_reference_overlay_path",
-      "create_reference_overlay_dir",
-      "write_reference_overlay_file",
-      "move_reference_overlay_node",
-      "create_reference_overlay_link",
-    ],
+    text: "更新时间点",
+    activeTools: ["update_story_timeline_point"],
   });
   handle.subscribe((event) => {
     emitted.push(event as Record<string, unknown>);
@@ -1282,243 +1425,14 @@ test("sendProjectAssistantMessageStream emits workspace-mutated for create_refer
 
   await handle.finalResult;
 
-  expect(emitted.find((event) => event.type === "workspace-mutated")).toMatchObject({
-    type: "workspace-mutated",
+  expect(emitted.find((event) => event.type === "workspace-refresh-requested")).toMatchObject({
+    type: "workspace-refresh-requested",
     workspaceId: workspace.id,
-    area: "aux",
-    timelinePointId: "origin",
-    toolName: "create_reference_overlay_dir",
-    action: "created",
-    path: "/设定",
-    nodeId: "aux_dir_stream",
-    previousPath: null,
-    targetPath: null,
+    areas: ["timeline"],
   });
 });
 
-test("sendProjectAssistantMessageStream emits workspace-mutated for move_reference_overlay_node", async () => {
-  seedProject("assistant_workspace_mutation_move");
-  const workspace = createDefaultWorkspace("assistant_workspace_mutation_move");
-  const seeded = seedCustomConnection({
-    connectionId: "conn_workspace_mutation_move",
-    modelId: "story-model",
-    modelRowId: "cmodel_workspace_mutation_move",
-    supportsToolUse: true,
-  });
-  const service = createProjectAssistantService({
-    readStoredSelection: () => seeded.selection,
-    streamAssistantText: createMockStream({
-      chunks: [
-        { type: "start-step", stepNumber: 0 },
-        {
-          type: "tool-result",
-          stepNumber: 0,
-          toolResult: {
-            toolCallId: "tool_move_stream",
-            toolName: "move_reference_overlay_node",
-            output: {
-              ok: true,
-              data: {
-                action: "moved",
-                path: "/资料库/主角.md",
-                previousPath: "/设定/角色.md",
-                nodeId: "aux_move_stream",
-              },
-            },
-          },
-        },
-        {
-          type: "finish-step",
-          stepNumber: 0,
-          finishReason: "stop",
-          usage: { totalTokens: 2 },
-        },
-      ],
-      text: "",
-      usage: { totalTokens: 2 },
-      finishReason: "stop",
-      steps: [
-        {
-          stepNumber: 0,
-          preparedMessages: [],
-          model: { provider: "openai", modelId: "story-model" },
-          finishReason: "stop",
-          rawFinishReason: "stop",
-          usage: { totalTokens: 2 },
-          request: { body: { step: 0 } },
-          response: { body: { id: "resp_workspace_mutation_move" }, messages: [] },
-          providerMetadata: {},
-          toolCalls: [],
-          toolResults: [
-            {
-              toolCallId: "tool_move_stream",
-              toolName: "move_reference_overlay_node",
-              output: {
-                ok: true,
-                data: {
-                  action: "moved",
-                  path: "/资料库/主角.md",
-                  previousPath: "/设定/角色.md",
-                  nodeId: "aux_move_stream",
-                },
-              },
-            },
-          ],
-        },
-      ],
-    }) as any,
-  });
-  const thread = service.createProjectAssistantThread("assistant_workspace_mutation_move");
-  const emitted: Array<Record<string, unknown>> = [];
-
-  const handle = service.sendProjectAssistantMessageStream({
-    projectId: "assistant_workspace_mutation_move",
-    threadId: thread.id,
-    text: "移动辅助资料",
-    activeTools: [
-      "get_writing_context",
-      "get_manuscript_subtree",
-      "list_story_timeline_points",
-      "list_reference_overlay_dir",
-      "read_reference_overlay_path",
-      "create_reference_overlay_dir",
-      "write_reference_overlay_file",
-      "move_reference_overlay_node",
-      "create_reference_overlay_link",
-    ],
-  });
-  handle.subscribe((event) => {
-    emitted.push(event as Record<string, unknown>);
-  });
-
-  await handle.finalResult;
-
-  expect(emitted).toContainEqual({
-    type: "workspace-mutated",
-    workspaceId: workspace.id,
-    area: "aux",
-    timelinePointId: "origin",
-    toolName: "move_reference_overlay_node",
-    action: "moved",
-    path: "/资料库/主角.md",
-    previousPath: "/设定/角色.md",
-    nodeId: "aux_move_stream",
-    targetPath: null,
-  });
-});
-
-test("sendProjectAssistantMessageStream emits workspace-mutated for create_reference_overlay_link", async () => {
-  seedProject("assistant_workspace_mutation_symlink");
-  const workspace = createDefaultWorkspace("assistant_workspace_mutation_symlink");
-  const seeded = seedCustomConnection({
-    connectionId: "conn_workspace_mutation_symlink",
-    modelId: "story-model",
-    modelRowId: "cmodel_workspace_mutation_symlink",
-    supportsToolUse: true,
-  });
-  const service = createProjectAssistantService({
-    readStoredSelection: () => seeded.selection,
-    streamAssistantText: createMockStream({
-      chunks: [
-        { type: "start-step", stepNumber: 0 },
-        {
-          type: "tool-result",
-          stepNumber: 0,
-          toolResult: {
-            toolCallId: "tool_link_stream",
-            toolName: "create_reference_overlay_link",
-            output: {
-              ok: true,
-              data: {
-                action: "created",
-                path: "/索引/角色.md",
-                targetPath: "/设定/角色.md",
-                nodeId: "aux_link_stream",
-              },
-            },
-          },
-        },
-        {
-          type: "finish-step",
-          stepNumber: 0,
-          finishReason: "stop",
-          usage: { totalTokens: 2 },
-        },
-      ],
-      text: "",
-      usage: { totalTokens: 2 },
-      finishReason: "stop",
-      steps: [
-        {
-          stepNumber: 0,
-          preparedMessages: [],
-          model: { provider: "openai", modelId: "story-model" },
-          finishReason: "stop",
-          rawFinishReason: "stop",
-          usage: { totalTokens: 2 },
-          request: { body: { step: 0 } },
-          response: { body: { id: "resp_workspace_mutation_symlink" }, messages: [] },
-          providerMetadata: {},
-          toolCalls: [],
-          toolResults: [
-            {
-              toolCallId: "tool_link_stream",
-              toolName: "create_reference_overlay_link",
-              output: {
-                ok: true,
-                data: {
-                  action: "created",
-                  path: "/索引/角色.md",
-                  targetPath: "/设定/角色.md",
-                  nodeId: "aux_link_stream",
-                },
-              },
-            },
-          ],
-        },
-      ],
-    }) as any,
-  });
-  const thread = service.createProjectAssistantThread("assistant_workspace_mutation_symlink");
-  const emitted: Array<Record<string, unknown>> = [];
-
-  const handle = service.sendProjectAssistantMessageStream({
-    projectId: "assistant_workspace_mutation_symlink",
-    threadId: thread.id,
-    text: "创建辅助资料链接",
-    activeTools: [
-      "get_writing_context",
-      "get_manuscript_subtree",
-      "list_story_timeline_points",
-      "list_reference_overlay_dir",
-      "read_reference_overlay_path",
-      "create_reference_overlay_dir",
-      "write_reference_overlay_file",
-      "move_reference_overlay_node",
-      "create_reference_overlay_link",
-    ],
-  });
-  handle.subscribe((event) => {
-    emitted.push(event as Record<string, unknown>);
-  });
-
-  await handle.finalResult;
-
-  expect(emitted).toContainEqual({
-    type: "workspace-mutated",
-    workspaceId: workspace.id,
-    area: "aux",
-    timelinePointId: "origin",
-    toolName: "create_reference_overlay_link",
-    action: "created",
-    path: "/索引/角色.md",
-    targetPath: "/设定/角色.md",
-    nodeId: "aux_link_stream",
-    previousPath: null,
-  });
-});
-
-test("sendProjectAssistantMessageStream does not emit workspace-mutated for non-write or failed tool results", async () => {
+test("sendProjectAssistantMessageStream does not emit workspace-refresh-requested for non-write or failed tool results", async () => {
   seedProject("assistant_workspace_mutation_filtered");
   const seeded = seedCustomConnection({
     connectionId: "conn_workspace_mutation_filtered",
@@ -1648,7 +1562,7 @@ test("sendProjectAssistantMessageStream does not emit workspace-mutated for non-
 
   await handle.finalResult;
 
-  expect(emitted.some((event) => event.type === "workspace-mutated")).toBe(false);
+  expect(emitted.some((event) => event.type === "workspace-refresh-requested")).toBe(false);
 });
 
 test("sendProjectAssistantMessageStream keeps running after subscribers detach", async () => {

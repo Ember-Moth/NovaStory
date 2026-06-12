@@ -4,7 +4,7 @@ import { useCallback, useMemo } from "react";
 import { AppShell, AppSidebar } from "@/app/shell/AppShell";
 import type {
   ProjectAssistantContextSnapshot,
-  WorkspaceMutationEvent,
+  WorkspaceRefreshRequestedEvent,
 } from "@/modules/ai/domain/types";
 import { ActionErrorBubble } from "@/modules/workspace/ui/editor/components/ActionErrorBubble";
 import { AiSidebar } from "@/modules/ai/ui/assistant/AiSidebar";
@@ -45,79 +45,80 @@ const AUX_CANCEL_RETARGET_ANCHOR = actionAnchorId("aux", "cancel-retarget");
 const TIMELINE_ADD_ANCHOR = actionAnchorId("timeline", "add");
 const PAGE_ERROR_ANCHOR = actionAnchorId("sidebar", "page-error");
 
-export function shouldRefetchAuxForWorkspaceMutation({
+function clearDraftStateForNode(
+  workspaceStore: ReturnType<typeof useWorkspaceStoreApi>,
+  nodeId: string,
+) {
+  workspaceStore.getState().setDrafts((previous) => {
+    if (!(nodeId in previous)) {
+      return previous;
+    }
+    const next = { ...previous };
+    delete next[nodeId];
+    return next;
+  });
+  workspaceStore.getState().setCommittedBodies((previous) => {
+    if (!(nodeId in previous)) {
+      return previous;
+    }
+    const next = { ...previous };
+    delete next[nodeId];
+    return next;
+  });
+  workspaceStore.getState().setPendingSaveCounts((previous) => {
+    if (!(nodeId in previous)) {
+      return previous;
+    }
+    const next = { ...previous };
+    delete next[nodeId];
+    return next;
+  });
+  workspaceStore.getState().setSaveErrors((previous) => {
+    if (!(nodeId in previous)) {
+      return previous;
+    }
+    const next = { ...previous };
+    delete next[nodeId];
+    return next;
+  });
+}
+
+export function shouldHandleWorkspaceRefreshRequested({
   event,
   workspaceId,
-  activeTimelinePointId,
 }: {
-  event: WorkspaceMutationEvent;
+  event: WorkspaceRefreshRequestedEvent;
   workspaceId: string | null | undefined;
-  activeTimelinePointId: string | null;
+}) {
+  return workspaceId != null && event.workspaceId === workspaceId;
+}
+
+export function shouldClearActiveContentDraftForRefresh({
+  event,
+  activeContentNodeId,
+}: {
+  event: WorkspaceRefreshRequestedEvent;
+  activeContentNodeId: string | null;
 }) {
   return (
-    event.area === "aux" &&
-    workspaceId != null &&
-    event.workspaceId === workspaceId &&
-    activeTimelinePointId != null &&
-    event.timelinePointId === activeTimelinePointId
+    event.areas.includes("content") &&
+    activeContentNodeId != null &&
+    event.contentNodeId === activeContentNodeId
   );
 }
 
-export function isActiveAuxFileMutationTarget({
+export function shouldClearActiveAuxDraftForRefresh({
   event,
   activeAuxNode,
 }: {
-  event: WorkspaceMutationEvent;
+  event: WorkspaceRefreshRequestedEvent;
   activeAuxNode: AuxTreeNodeVM | null;
 }) {
-  if (activeAuxNode?.nodeType !== "file") {
-    return false;
-  }
-
-  if (event.nodeId && event.nodeId === activeAuxNode.id) {
-    return true;
-  }
-
-  return activeAuxNode.path === event.path;
-}
-
-export function handleAuxWorkspaceMutationForEditor({
-  event,
-  workspaceId,
-  activeTimelinePointId,
-  activeAuxNode,
-  refetchAux,
-  clearActiveAuxDraftState,
-}: {
-  event: WorkspaceMutationEvent;
-  workspaceId: string | null | undefined;
-  activeTimelinePointId: string | null;
-  activeAuxNode: AuxTreeNodeVM | null;
-  refetchAux: () => void;
-  clearActiveAuxDraftState: (_nodeId: string) => void;
-}) {
-  if (
-    !shouldRefetchAuxForWorkspaceMutation({
-      event,
-      workspaceId,
-      activeTimelinePointId,
-    })
-  ) {
-    return false;
-  }
-
-  if (
-    isActiveAuxFileMutationTarget({
-      event,
-      activeAuxNode,
-    }) &&
-    activeAuxNode?.nodeType === "file"
-  ) {
-    clearActiveAuxDraftState(activeAuxNode.id);
-  }
-
-  refetchAux();
-  return true;
+  return (
+    event.areas.includes("aux") &&
+    activeAuxNode?.nodeType === "file" &&
+    event.auxNodeId === activeAuxNode.id
+  );
 }
 
 export function WorkspaceEditorPage({
@@ -243,103 +244,39 @@ function ProjectWorkspace({
       workspaceId,
     ],
   );
-  const handleAssistantWorkspaceMutation = useCallback(
-    (event: WorkspaceMutationEvent) => {
-      if (event.area === "content") {
-        if (
-          workspaceId != null &&
-          event.workspaceId === workspaceId &&
-          activeTimelinePointId != null &&
-          event.timelinePointId === activeTimelinePointId
-        ) {
-          void contentQuery.refetch();
-          if (event.nodeId && activeContentNodeId === event.nodeId) {
-            workspaceStore.getState().setDrafts((previous) => {
-              if (!(activeContentNodeId in previous)) {
-                return previous;
-              }
-              const next = { ...previous };
-              delete next[activeContentNodeId];
-              return next;
-            });
-            workspaceStore.getState().setCommittedBodies((previous) => {
-              if (!(activeContentNodeId in previous)) {
-                return previous;
-              }
-              const next = { ...previous };
-              delete next[activeContentNodeId];
-              return next;
-            });
-            workspaceStore.getState().setPendingSaveCounts((previous) => {
-              if (!(activeContentNodeId in previous)) {
-                return previous;
-              }
-              const next = { ...previous };
-              delete next[activeContentNodeId];
-              return next;
-            });
-            workspaceStore.getState().setSaveErrors((previous) => {
-              if (!(activeContentNodeId in previous)) {
-                return previous;
-              }
-              const next = { ...previous };
-              delete next[activeContentNodeId];
-              return next;
-            });
-          }
-        }
+  const handleAssistantWorkspaceRefreshRequested = useCallback(
+    (event: WorkspaceRefreshRequestedEvent) => {
+      if (!shouldHandleWorkspaceRefreshRequested({ event, workspaceId })) {
         return;
       }
-      handleAuxWorkspaceMutationForEditor({
-        event,
-        workspaceId,
-        activeTimelinePointId,
-        activeAuxNode,
-        refetchAux: () => {
-          void aux.query.refetch();
-        },
-        clearActiveAuxDraftState: (activeNodeId) => {
-          workspaceStore.getState().setDrafts((previous) => {
-            if (!(activeNodeId in previous)) {
-              return previous;
-            }
-            const next = { ...previous };
-            delete next[activeNodeId];
-            return next;
-          });
-          workspaceStore.getState().setCommittedBodies((previous) => {
-            if (!(activeNodeId in previous)) {
-              return previous;
-            }
-            const next = { ...previous };
-            delete next[activeNodeId];
-            return next;
-          });
-          workspaceStore.getState().setPendingSaveCounts((previous) => {
-            if (!(activeNodeId in previous)) {
-              return previous;
-            }
-            const next = { ...previous };
-            delete next[activeNodeId];
-            return next;
-          });
-          workspaceStore.getState().setSaveErrors((previous) => {
-            if (!(activeNodeId in previous)) {
-              return previous;
-            }
-            const next = { ...previous };
-            delete next[activeNodeId];
-            return next;
-          });
-        },
-      });
+
+      if (shouldClearActiveContentDraftForRefresh({ event, activeContentNodeId })) {
+        if (activeContentNodeId) {
+          clearDraftStateForNode(workspaceStore, activeContentNodeId);
+        }
+      }
+      if (shouldClearActiveAuxDraftForRefresh({ event, activeAuxNode })) {
+        if (activeAuxNode?.nodeType === "file") {
+          clearDraftStateForNode(workspaceStore, activeAuxNode.id);
+        }
+      }
+
+      if (event.areas.includes("content")) {
+        void contentQuery.refetch();
+      }
+      if (event.areas.includes("timeline")) {
+        void timelineQuery.refetch();
+      }
+      if (event.areas.includes("aux")) {
+        void aux.query.refetch();
+      }
     },
     [
       activeAuxNode,
       activeContentNodeId,
-      activeTimelinePointId,
       aux.query,
       contentQuery,
+      timelineQuery,
       workspaceId,
       workspaceStore,
     ],
@@ -592,7 +529,7 @@ function ProjectWorkspace({
           <AiSidebar
             projectId={projectId}
             contextSnapshot={assistantContext}
-            onWorkspaceMutation={handleAssistantWorkspaceMutation}
+            onWorkspaceRefreshRequested={handleAssistantWorkspaceRefreshRequested}
           />
         </div>
       </AppShell>

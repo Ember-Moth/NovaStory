@@ -112,8 +112,7 @@ export const PROJECT_ASSISTANT_MAX_STEPS = 20;
 
 export type ProjectAssistantToolName = (typeof PROJECT_ASSISTANT_TOOL_NAMES)[number];
 export type ProjectAssistantWriteToolName = (typeof PROJECT_ASSISTANT_WRITE_TOOL_NAMES)[number];
-export type WorkspaceMutationArea = "aux" | "content";
-export type WorkspaceMutationAction = "created" | "updated" | "moved" | "deleted" | "retargeted";
+export type WorkspaceRefreshArea = "content" | "aux" | "timeline";
 
 export interface ProjectAssistantContextSnapshot {
   workspaceId: string | null;
@@ -284,17 +283,12 @@ export interface AgentRunSummaryView {
   continuedByRunId?: string | null;
 }
 
-export interface WorkspaceMutationEvent {
-  type: "workspace-mutated";
+export interface WorkspaceRefreshRequestedEvent {
+  type: "workspace-refresh-requested";
   workspaceId: string;
-  area: WorkspaceMutationArea;
-  timelinePointId: string;
-  toolName: ProjectAssistantWriteToolName;
-  action: WorkspaceMutationAction;
-  path?: string | null;
-  nodeId: string | null;
-  previousPath?: string | null;
-  targetPath?: string | null;
+  areas: readonly WorkspaceRefreshArea[];
+  contentNodeId?: string | null;
+  auxNodeId?: string | null;
 }
 
 export type ProjectAssistantStreamEvent =
@@ -350,7 +344,7 @@ export type ProjectAssistantStreamEvent =
       finishReason: string | undefined;
       usage: unknown;
     }
-  | WorkspaceMutationEvent;
+  | WorkspaceRefreshRequestedEvent;
 
 export interface AgentRunStepView {
   id: string;
