@@ -856,6 +856,14 @@ export function useAiAssistantController(
     [activeThreadId, archiveThread, unarchivedThreads],
   );
 
+  const handleAbort = useCallback(() => {
+    if (sendMessageStream.isStreaming) {
+      sendMessageStream.abort();
+    } else if (retryMessageStream.isStreaming) {
+      retryMessageStream.abort();
+    }
+  }, [sendMessageStream, retryMessageStream]);
+
   const handleSelectCandidate = useCallback(
     async (tipNodeId: string) => {
       const threadId = assistantState.thread?.id;
@@ -897,6 +905,7 @@ export function useAiAssistantController(
     handleSelectionChange,
     handleSelectionCommit,
     handleSubmit,
+    handleAbort,
     allowWritesForNextSend,
     includeContext,
     isBusy,

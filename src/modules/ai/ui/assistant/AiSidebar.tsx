@@ -278,25 +278,37 @@ export function AiSidebar({
                     onSelectionChange={controller.handleSelectionChange}
                     onSelectionCommit={controller.handleSelectionCommit}
                   />
-                  <button
-                    type="submit"
-                    disabled={!controller.canSubmit}
-                    title={controller.canSubmit ? "发送" : "当前无法发送"}
-                    aria-label="发送"
-                    className={`flex size-7 shrink-0 items-center justify-center rounded-md transition disabled:cursor-not-allowed ${
-                      controller.canSubmit
-                        ? "bg-accent-foreground text-sidebar-background hover:brightness-110"
-                        : "text-foreground-muted hover:bg-list-hover-background"
-                    }`}
-                  >
-                    <span
-                      className={`text-base ${
-                        controller.isBusy
-                          ? "icon-[material-symbols--progress-activity] animate-spin"
-                          : "icon-[material-symbols--arrow-upward]"
+                  {controller.isGenerating ? (
+                    <button
+                      type="button"
+                      onClick={controller.handleAbort}
+                      title="终止生成"
+                      aria-label="终止生成"
+                      className="bg-destructive flex size-7 shrink-0 items-center justify-center rounded-md text-white transition hover:brightness-110"
+                    >
+                      <span className="icon-[material-symbols--stop] text-base" />
+                    </button>
+                  ) : (
+                    <button
+                      type="submit"
+                      disabled={!controller.canSubmit}
+                      title={controller.canSubmit ? "发送" : "当前无法发送"}
+                      aria-label="发送"
+                      className={`flex size-7 shrink-0 items-center justify-center rounded-md transition disabled:cursor-not-allowed ${
+                        controller.canSubmit
+                          ? "bg-accent-foreground text-sidebar-background hover:brightness-110"
+                          : "text-foreground-muted hover:bg-list-hover-background"
                       }`}
-                    />
-                  </button>
+                    >
+                      <span
+                        className={`text-base ${
+                          controller.isBusy
+                            ? "icon-[material-symbols--progress-activity] animate-spin"
+                            : "icon-[material-symbols--arrow-upward]"
+                        }`}
+                      />
+                    </button>
+                  )}
                 </div>
               </div>
 
