@@ -80,10 +80,16 @@ export const PROJECT_ASSISTANT_READ_ONLY_TOOL_NAMES = [
 ] as const;
 
 export const PROJECT_ASSISTANT_WRITE_TOOL_NAMES = [
+  "create_content_node",
+  "update_content_node",
+  "move_content_node",
+  "delete_content_node",
   "mkdir_aux_dir",
   "write_aux_file",
   "move_aux_node",
+  "delete_aux_node",
   "create_aux_symlink",
+  "retarget_aux_symlink",
 ] as const;
 
 export const PROJECT_ASSISTANT_TOOL_NAMES = [
@@ -93,8 +99,8 @@ export const PROJECT_ASSISTANT_TOOL_NAMES = [
 
 export type ProjectAssistantToolName = (typeof PROJECT_ASSISTANT_TOOL_NAMES)[number];
 export type ProjectAssistantWriteToolName = (typeof PROJECT_ASSISTANT_WRITE_TOOL_NAMES)[number];
-export type WorkspaceMutationArea = "aux";
-export type WorkspaceMutationAction = "created" | "updated" | "moved";
+export type WorkspaceMutationArea = "aux" | "content";
+export type WorkspaceMutationAction = "created" | "updated" | "moved" | "deleted" | "retargeted";
 
 export interface ProjectAssistantContextSnapshot {
   workspaceId: string | null;
