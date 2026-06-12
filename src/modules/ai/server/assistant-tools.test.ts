@@ -123,7 +123,6 @@ test("createAssistantTools always exposes the full tool set", () => {
   });
 
   expect(Object.keys(tools).sort()).toEqual([...PROJECT_ASSISTANT_TOOL_NAMES].sort());
-  expect(tools.get_writing_context).toBeDefined();
   expect(tools.list_manuscript_nodes).toBeDefined();
   expect(tools.read_manuscript_node).toBeDefined();
   expect("get_manuscript_subtree" in tools).toBe(false);

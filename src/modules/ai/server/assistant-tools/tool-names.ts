@@ -1,6 +1,5 @@
 import type { ProjectAssistantToolName } from "@/modules/ai/domain/types";
 
-export const WRITING_CONTEXT_TOOL_NAMES = ["get_writing_context"] as const;
 export const CONTENT_READ_TOOL_NAMES = ["list_manuscript_nodes", "read_manuscript_node"] as const;
 export const CONTENT_WRITE_TOOL_NAMES = [
   "create_manuscript_node",
@@ -27,7 +26,6 @@ export const AUX_WRITE_TOOL_NAMES = [
   "retarget_symlink",
 ] as const;
 
-export type WritingContextToolName = (typeof WRITING_CONTEXT_TOOL_NAMES)[number];
 export type ContentReadToolName = (typeof CONTENT_READ_TOOL_NAMES)[number];
 export type ContentWriteToolName = (typeof CONTENT_WRITE_TOOL_NAMES)[number];
 export type TimelineToolName = (typeof TIMELINE_TOOL_NAMES)[number];
@@ -35,7 +33,6 @@ export type AuxReadToolName = (typeof AUX_READ_TOOL_NAMES)[number];
 export type AuxWriteToolName = (typeof AUX_WRITE_TOOL_NAMES)[number];
 
 type AllAssistantToolNames =
-  | WritingContextToolName
   | ContentReadToolName
   | ContentWriteToolName
   | TimelineToolName

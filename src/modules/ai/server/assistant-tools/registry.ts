@@ -6,7 +6,6 @@ import { buildContentReadTools } from "./content-read";
 import { buildContentWriteTools } from "./content-write";
 import type { ToolBuildContext } from "./context";
 import { buildTimelineTools } from "./timeline";
-import { buildWritingContextTools } from "./writing-context";
 
 export function createAssistantTools({
   projectId,
@@ -18,7 +17,6 @@ export function createAssistantTools({
   const ctx: ToolBuildContext = { projectId, runtimeContext };
 
   return {
-    ...buildWritingContextTools(ctx),
     ...buildContentReadTools(ctx),
     ...buildContentWriteTools(ctx),
     ...buildTimelineTools(ctx),

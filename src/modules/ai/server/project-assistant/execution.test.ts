@@ -27,7 +27,7 @@ test("sendProjectAssistantMessage only materializes per-step response deltas int
           {
             type: "tool-call" as const,
             toolCallId: "tool_call_context",
-            toolName: "get_writing_context",
+            toolName: "read_manuscript_node",
             input: {},
           },
         ],
@@ -38,7 +38,7 @@ test("sendProjectAssistantMessage only materializes per-step response deltas int
           {
             type: "tool-result" as const,
             toolCallId: "tool_call_context",
-            toolName: "get_writing_context",
+            toolName: "read_manuscript_node",
             output: {
               type: "json" as const,
               value: {
@@ -96,7 +96,7 @@ test("sendProjectAssistantMessage only materializes per-step response deltas int
             stepNumber: 0,
             toolCall: {
               toolCallId: "tool_call_context",
-              toolName: "get_writing_context",
+              toolName: "read_manuscript_node",
               input: {},
             },
           };
@@ -105,7 +105,7 @@ test("sendProjectAssistantMessage only materializes per-step response deltas int
             stepNumber: 0,
             toolResult: {
               toolCallId: "tool_call_context",
-              toolName: "get_writing_context",
+              toolName: "read_manuscript_node",
               output: {
                 ok: true,
               },
@@ -174,14 +174,14 @@ test("sendProjectAssistantMessage only materializes per-step response deltas int
             toolCalls: [
               {
                 toolCallId: "tool_call_context",
-                toolName: "get_writing_context",
+                toolName: "read_manuscript_node",
                 input: {},
               },
             ],
             toolResults: [
               {
                 toolCallId: "tool_call_context",
-                toolName: "get_writing_context",
+                toolName: "read_manuscript_node",
                 output: {
                   ok: true,
                 },
@@ -443,7 +443,6 @@ test("sendProjectAssistantMessage records tool input and output artifacts for ex
     threadId: thread.id,
     text: "保存人物资料",
     activeTools: [
-      "get_writing_context",
       "list_manuscript_nodes",
       "read_manuscript_node",
       "list_story_timeline_points",
@@ -1027,7 +1026,6 @@ test("sendProjectAssistantMessageStream does not emit workspace-refresh-requeste
     threadId: thread.id,
     text: "测试刷新事件",
     activeTools: [
-      "get_writing_context",
       "list_manuscript_nodes",
       "read_manuscript_node",
       "list_story_timeline_points",

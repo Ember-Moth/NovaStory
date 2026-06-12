@@ -213,7 +213,6 @@ test("sendProjectAssistantMessage uses read-only tools by default and can opt in
     threadId: thread.id,
     text: "允许你写辅助资料",
     activeTools: [
-      "get_writing_context",
       "list_manuscript_nodes",
       "read_manuscript_node",
       "list_story_timeline_points",
@@ -228,7 +227,6 @@ test("sendProjectAssistantMessage uses read-only tools by default and can opt in
 
   expect(capturedActiveTools).toEqual([
     [
-      "get_writing_context",
       "list_manuscript_nodes",
       "read_manuscript_node",
       "list_story_timeline_points",
@@ -238,7 +236,6 @@ test("sendProjectAssistantMessage uses read-only tools by default and can opt in
       "read_file",
     ],
     [
-      "get_writing_context",
       "list_manuscript_nodes",
       "read_manuscript_node",
       "list_story_timeline_points",
