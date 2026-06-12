@@ -45,6 +45,7 @@ export const ai = {
   editProjectAssistantMessageStream: aiHandlers.editProjectAssistantMessageStream,
   continueProjectAssistantRun: aiHandlers.continueProjectAssistantRun,
   continueProjectAssistantRunStream: aiHandlers.continueProjectAssistantRunStream,
+  cancelProjectAssistantRun: aiHandlers.cancelProjectAssistantRun,
 };
 
 export const config = {

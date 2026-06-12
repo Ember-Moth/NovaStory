@@ -2317,6 +2317,21 @@ export function markRunFailed(runId: string, errorArtifactId?: string | null) {
   });
 }
 
+export function markRunCancelled(runId: string) {
+  return db.transaction((tx) => {
+    const run = getRunOrThrow(tx, runId);
+    tx.update(schema.agentRuns)
+      .set({
+        status: "cancelled",
+        completedAt: now(),
+        updatedAt: now(),
+      })
+      .where(eq(schema.agentRuns.id, run.id))
+      .run();
+    return mapRunRow(getRunOrThrow(tx, run.id));
+  });
+}
+
 export function getRunTrace(runId: string): AgentRunTraceView {
   const run = getRunOrThrow(db, runId);
   const steps = db

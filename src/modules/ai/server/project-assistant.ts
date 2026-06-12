@@ -24,6 +24,7 @@ import {
   hasPendingRun,
   listChildRuns,
   listThreads,
+  markRunCancelled,
   markRunFailed,
   markRunSucceeded,
   markThreadNodePartsDone,
@@ -140,6 +141,7 @@ interface StreamAssistantTextInput {
   context: ProjectAssistantContextSnapshot | null;
   messages: ModelMessage[];
   providerOptions?: StreamProviderOptions;
+  abortSignal?: AbortSignal;
 }
 
 interface GeneratedAssistantStep {
@@ -255,6 +257,11 @@ interface ProjectAssistantRunHandle<TResult> {
   subscribe: (_listener: (_event: ProjectAssistantStreamEvent) => void) => () => void;
 }
 
+interface ActiveExecutionHandle {
+  relay: BufferedEventRelay<unknown>;
+  abortController: AbortController;
+}
+
 function defaultStreamAssistantText({
   projectId,
   connection,
@@ -264,6 +271,7 @@ function defaultStreamAssistantText({
   context,
   messages,
   providerOptions,
+  abortSignal,
 }: StreamAssistantTextInput): StreamAssistantTextResult {
   const model = createLanguageModelForConnection({ connection, modelId });
   const preparedMessagesByStep: ModelMessage[][] = [];
@@ -273,6 +281,7 @@ function defaultStreamAssistantText({
     messages,
     ...(system == null ? {} : { system }),
     ...(providerOptions == null ? {} : { providerOptions }),
+    ...(abortSignal == null ? {} : { abortSignal }),
     ...(activeTools.length > 0
       ? { tools, activeTools: [...activeTools] as ProjectAssistantToolName[] }
       : {}),
@@ -1123,10 +1132,12 @@ async function executeProjectAssistantRun<TResult>({
   prepared,
   streamAssistantText,
   relay,
+  abortSignal,
 }: {
   prepared: PreparedProjectAssistantRun<TResult>;
   streamAssistantText: (_input: StreamAssistantTextInput) => StreamAssistantTextResult;
   relay: BufferedEventRelay<TResult>;
+  abortSignal: AbortSignal;
 }) {
   let currentParentId = prepared.run.baseTipNodeId;
   let currentAssistantNode: AgentThreadNodeView | null = null;
@@ -1144,6 +1155,7 @@ async function executeProjectAssistantRun<TResult>({
     context: prepared.context,
     messages: prepared.messages,
     providerOptions: prepared.providerOptions,
+    abortSignal,
   });
 
   try {
@@ -1402,6 +1414,18 @@ async function executeProjectAssistantRun<TResult>({
       lastAssistantNode,
     });
   } catch (error) {
+    if (abortSignal.aborted) {
+      if (currentAssistantNode) {
+        currentAssistantNode = markThreadNodePartsDone(currentAssistantNode.id);
+        lastAssistantNode = currentAssistantNode;
+      }
+      const cancelledRun = markRunCancelled(prepared.run.id);
+      return prepared.buildFinalResult({
+        run: cancelledRun,
+        lastAssistantNode,
+      });
+    }
+
     const errorArtifact = createArtifact({
       runId: prepared.run.id,
       artifactKind: "error",
@@ -1832,7 +1856,7 @@ export function createProjectAssistantService(
 ) {
   const streamAssistantTextImpl = dependencies.streamAssistantText ?? defaultStreamAssistantText;
   const readStoredSelection = dependencies.readStoredSelection ?? getAiAssistantModelSelection;
-  const activeExecutions = new Map<string, BufferedEventRelay<unknown>>();
+  const activeExecutions = new Map<string, ActiveExecutionHandle>();
 
   function startExecution<TResult>(prepared: PreparedProjectAssistantRun<TResult>) {
     let resolveFinal!: (_value: TResult) => void;
@@ -1842,12 +1866,17 @@ export function createProjectAssistantService(
       rejectFinal = reject;
     });
     const relay = new BufferedEventRelay(prepared.initialResult, finalResult);
-    activeExecutions.set(prepared.run.id, relay as BufferedEventRelay<unknown>);
+    const abortController = new AbortController();
+    activeExecutions.set(prepared.run.id, {
+      relay: relay as BufferedEventRelay<unknown>,
+      abortController,
+    });
     relay.emit(prepared.runStartedEvent);
     void executeProjectAssistantRun({
       prepared,
       streamAssistantText: streamAssistantTextImpl,
       relay,
+      abortSignal: abortController.signal,
     })
       .then(resolveFinal, rejectFinal)
       .finally(() => {
@@ -2004,6 +2033,36 @@ export function createProjectAssistantService(
           runId,
         }),
       );
+    },
+
+    cancelProjectAssistantRun({
+      projectId,
+      threadId,
+      runId,
+    }: {
+      projectId: string;
+      threadId: string;
+      runId: string;
+    }) {
+      const threadView = getThreadView(threadId);
+      const thread = threadView.thread;
+      invariant(thread, "未找到当前会话。");
+      invariant(thread.projectId === projectId, "AI 会话不属于当前项目。");
+
+      const trace = getRunTrace(runId);
+      invariant(trace.run.threadId === thread.id, "run 不属于当前会话。");
+      invariant(
+        trace.run.status === "running" || trace.run.status === "queued",
+        "run 当前不可取消。",
+      );
+
+      const activeExecution = activeExecutions.get(runId);
+      invariant(activeExecution, "run 当前没有活动执行。");
+      activeExecution.abortController.abort(new Error("run cancelled"));
+
+      return {
+        runId,
+      };
     },
 
     async sendProjectAssistantMessage(args: {

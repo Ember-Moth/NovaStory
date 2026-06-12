@@ -1170,3 +1170,89 @@ test("continueProjectAssistantRunStream emits events and invalidates parent and 
     ]),
   );
 });
+
+test("cancelProjectAssistantRun invalidates thread and run state", async () => {
+  let received: unknown = null;
+  useService({
+    getProjectAssistantState: () => {
+      throw new Error("unused");
+    },
+    createProjectAssistantThread: () => {
+      throw new Error("unused");
+    },
+    setProjectAssistantActiveThread: () => {
+      throw new Error("unused");
+    },
+    renameProjectAssistantThread: () => {
+      throw new Error("unused");
+    },
+    archiveProjectAssistantThread: () => {
+      throw new Error("unused");
+    },
+    getThreadView: () => {
+      throw new Error("unused");
+    },
+    getRunTrace: () => {
+      throw new Error("unused");
+    },
+    getNodeCandidates: () => {
+      throw new Error("unused");
+    },
+    getChildRuns: () => {
+      throw new Error("unused");
+    },
+    selectThreadTip: () => {
+      throw new Error("unused");
+    },
+    sendProjectAssistantMessage: async () => {
+      throw new Error("unused");
+    },
+    sendProjectAssistantMessageStream: () => {
+      throw new Error("unused");
+    },
+    retryProjectAssistantMessage: async () => {
+      throw new Error("unused");
+    },
+    retryProjectAssistantMessageStream: () => {
+      throw new Error("unused");
+    },
+    editProjectAssistantMessage: async () => {
+      throw new Error("unused");
+    },
+    editProjectAssistantMessageStream: () => {
+      throw new Error("unused");
+    },
+    continueProjectAssistantRun: async () => {
+      throw new Error("unused");
+    },
+    continueProjectAssistantRunStream: () => {
+      throw new Error("unused");
+    },
+    cancelProjectAssistantRun: (input: unknown) => {
+      received = input;
+      return { runId: "run_cancel_rpc" };
+    },
+  } as unknown as ProjectAssistantService);
+
+  const result = await handlers.cancelProjectAssistantRun.handler(
+    {
+      projectId: "rpc_assistant_cancel",
+      threadId: "thread_cancel_rpc",
+      runId: "run_cancel_rpc",
+    },
+    requestCtx,
+  );
+
+  expect(received).toEqual({
+    projectId: "rpc_assistant_cancel",
+    threadId: "thread_cancel_rpc",
+    runId: "run_cancel_rpc",
+  });
+  expect(result.invalidate).toEqual([
+    rpcTags.aiProjectAssistantOverview("rpc_assistant_cancel"),
+    rpcTags.aiProjectThreads("rpc_assistant_cancel"),
+    rpcTags.aiThreadView("thread_cancel_rpc"),
+    rpcTags.aiRunTrace("run_cancel_rpc"),
+    rpcTags.aiChildRuns("run_cancel_rpc"),
+  ]);
+});

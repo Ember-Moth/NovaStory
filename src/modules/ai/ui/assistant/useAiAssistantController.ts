@@ -450,6 +450,7 @@ export function useAiAssistantController(
   const renameThread = rpc.useMutation("ai.renameProjectAssistantThread");
   const archiveThread = rpc.useMutation("ai.archiveProjectAssistantThread");
   const selectThreadTip = rpc.useMutation("ai.selectThreadTip");
+  const cancelRun = rpc.useMutation("ai.cancelProjectAssistantRun");
   const sendMessageStream = rpc.useStreamMutation("ai.sendProjectAssistantMessageStream");
   const retryMessageStream = rpc.useStreamMutation("ai.retryProjectAssistantMessageStream");
   const continueRunStream = rpc.useStreamMutation("ai.continueProjectAssistantRunStream");
@@ -649,6 +650,7 @@ export function useAiAssistantController(
       } catch (error) {
         setDraft(text);
         if (error instanceof Error && error.name === "RpcStreamAborted") {
+          void assistantOverviewQuery.refetch();
           setActiveStream(null);
           return;
         }
@@ -734,6 +736,7 @@ export function useAiAssistantController(
         setActiveStream(null);
       } catch (error) {
         if (error instanceof Error && error.name === "RpcStreamAborted") {
+          void assistantOverviewQuery.refetch();
           setActiveStream(null);
           return;
         }
@@ -808,6 +811,7 @@ export function useAiAssistantController(
         setActiveStream(null);
       } catch (error) {
         if (error instanceof Error && error.name === "RpcStreamAborted") {
+          void assistantOverviewQuery.refetch();
           setActiveStream(null);
           return;
         }
@@ -925,15 +929,46 @@ export function useAiAssistantController(
     [activeThreadId, archiveThread, unarchivedThreads],
   );
 
-  const handleAbort = useCallback(() => {
-    if (sendMessageStream.isStreaming) {
-      sendMessageStream.abort();
-    } else if (retryMessageStream.isStreaming) {
-      retryMessageStream.abort();
-    } else if (continueRunStream.isStreaming) {
-      continueRunStream.abort();
+  const handleAbort = useCallback(async () => {
+    const activeRunId = activeStream?.runId ?? pendingRun?.id ?? null;
+    if (!activeThreadId || !activeRunId) {
+      if (sendMessageStream.isStreaming) {
+        sendMessageStream.abort();
+      } else if (retryMessageStream.isStreaming) {
+        retryMessageStream.abort();
+      } else if (continueRunStream.isStreaming) {
+        continueRunStream.abort();
+      }
+      return;
     }
-  }, [continueRunStream, sendMessageStream, retryMessageStream]);
+
+    try {
+      await cancelRun.mutate({
+        projectId,
+        threadId: activeThreadId,
+        runId: activeRunId,
+      });
+    } finally {
+      if (sendMessageStream.isStreaming) {
+        sendMessageStream.abort();
+      } else if (retryMessageStream.isStreaming) {
+        retryMessageStream.abort();
+      } else if (continueRunStream.isStreaming) {
+        continueRunStream.abort();
+      }
+      void assistantOverviewQuery.refetch();
+    }
+  }, [
+    activeStream?.runId,
+    activeThreadId,
+    assistantOverviewQuery,
+    cancelRun,
+    continueRunStream,
+    pendingRun?.id,
+    projectId,
+    retryMessageStream,
+    sendMessageStream,
+  ]);
 
   const handleSelectCandidate = useCallback(
     async (tipNodeId: string) => {

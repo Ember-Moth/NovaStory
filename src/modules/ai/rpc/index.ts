@@ -138,6 +138,12 @@ interface ContinueProjectAssistantRunInput {
   runId: string;
 }
 
+interface CancelProjectAssistantRunInput {
+  projectId: string;
+  threadId: string;
+  runId: string;
+}
+
 type RpcMutationCtx = MutationCtx<RpcTagList>;
 
 function invalidateConnection(ctx: RpcMutationCtx, connectionId: string) {
@@ -1101,6 +1107,23 @@ export const continueProjectAssistantRunStream = stream<
       unsubscribe();
     }
   },
+});
+
+export const cancelProjectAssistantRun = mutation<
+  CancelProjectAssistantRunInput,
+  { runId: string },
+  RpcTagList
+>(async ({ projectId, threadId, runId }, ctx) => {
+  const result = getProjectAssistantService().cancelProjectAssistantRun({
+    projectId,
+    threadId,
+    runId,
+  });
+  invalidateProjectAiState(ctx, projectId, {
+    threadId,
+    runId,
+  });
+  return result;
 });
 
 // Warm the local catalog snapshot whenever the AI surface is touched.

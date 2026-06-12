@@ -40,6 +40,16 @@ function createMockStream({
   });
 }
 
+function createDeferred<T>() {
+  let resolve!: (_value: T | PromiseLike<T>) => void;
+  let reject!: (_reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 function seedProject(projectId: string) {
   db.insert(schema.projects)
     .values({
@@ -1784,6 +1794,114 @@ test("sendProjectAssistantMessageStream relays step lifecycle events while strea
     stepIndex: 0,
     usage: { totalTokens: 13 },
   });
+});
+
+test("cancelProjectAssistantRun aborts the active backend run and marks it cancelled", async () => {
+  seedProject("assistant_cancel");
+  const seeded = seedCustomConnection({
+    connectionId: "conn_cancel",
+    modelId: "story-model",
+    modelRowId: "cmodel_cancel",
+    supportsToolUse: true,
+  });
+  const releaseSecondStep = createDeferred<void>();
+  let aborted = false;
+  const service = createProjectAssistantService({
+    readStoredSelection: () => seeded.selection,
+    streamAssistantText: ((input: { abortSignal?: AbortSignal }) => ({
+      chunks: (async function* () {
+        yield { type: "start-step", stepNumber: 0 };
+        yield { type: "text-delta", stepNumber: 0, delta: "先执行。" };
+        yield {
+          type: "finish-step",
+          stepNumber: 0,
+          finishReason: "tool-calls",
+          usage: { totalTokens: 2 },
+        };
+        await Promise.race([
+          releaseSecondStep.promise,
+          new Promise<void>((resolve) => {
+            input.abortSignal?.addEventListener(
+              "abort",
+              () => {
+                aborted = true;
+                resolve();
+              },
+              { once: true },
+            );
+          }),
+        ]);
+        if (input.abortSignal?.aborted) {
+          throw input.abortSignal.reason ?? new Error("aborted");
+        }
+        yield { type: "start-step", stepNumber: 1 };
+        yield { type: "text-delta", stepNumber: 1, delta: "这一步不该出现。" };
+        yield {
+          type: "finish-step",
+          stepNumber: 1,
+          finishReason: "stop",
+          usage: { totalTokens: 3 },
+        };
+      })(),
+      text: Promise.resolve("cancelled"),
+      finishReason: Promise.resolve("stop"),
+      usage: Promise.resolve({ totalTokens: 5 }),
+      steps: Promise.resolve([
+        {
+          stepNumber: 0,
+          preparedMessages: [],
+          model: { provider: "openai", modelId: "story-model" },
+          finishReason: "tool-calls",
+          rawFinishReason: "tool_calls",
+          usage: { totalTokens: 2 },
+          request: { body: { step: 0 } },
+          response: {
+            body: { id: "resp_cancel_0" },
+            messages: [
+              {
+                role: "assistant",
+                content: [{ type: "text", text: "先执行。" }],
+              },
+            ],
+          },
+          providerMetadata: {},
+          toolCalls: [],
+          toolResults: [],
+        },
+      ]),
+    })) as any,
+  });
+  const thread = service.createProjectAssistantThread("assistant_cancel");
+  const handle = service.sendProjectAssistantMessageStream({
+    projectId: "assistant_cancel",
+    threadId: thread.id,
+    text: "开始后我会取消",
+    activeTools: ["read_reference_overlay_path"],
+  });
+
+  const started = createDeferred<void>();
+  handle.subscribe((event) => {
+    if (event.type === "step-finished" && event.stepIndex === 0) {
+      started.resolve();
+    }
+  });
+  await started.promise;
+
+  const runId = handle.initialResult.run.id;
+  const cancelResult = service.cancelProjectAssistantRun({
+    projectId: "assistant_cancel",
+    threadId: thread.id,
+    runId,
+  });
+  const result = await handle.finalResult;
+
+  expect(cancelResult).toEqual({ runId });
+  expect(aborted).toBe(true);
+  expect(result.run.status).toBe("cancelled");
+  expect(result.state.latestRuns[0]?.status).toBe("cancelled");
+  expect(
+    result.state.activePath.some((node) => node.summaryText?.includes("这一步不该出现。")),
+  ).toBe(false);
 });
 
 test("follow-up send after tool results reuses sanitized history messages", async () => {
