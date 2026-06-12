@@ -46,7 +46,7 @@ export function AiSidebar({
   const [shouldStickToBottom, setShouldStickToBottom] = useState(true);
   const streamedAssistantMessageIdsRef = useRef<Set<string>>(new Set());
   const pendingSendSummary =
-    controller.activeStream?.kind === "send"
+    controller.activeStream?.kind === "send" || controller.activeStream?.kind === "continue"
       ? buildStreamRunSummary(controller.activeStream)
       : null;
   const messagesViewportSessionKey = getMessagesViewportSessionKey(controller.activeThreadId);
@@ -705,6 +705,14 @@ function AiSidebarMessagesContent({
                           ? () => void controller.handleRetry(retryTriggerNodeId)
                           : undefined
                       }
+                      needsContinuation={summary.needsContinuation}
+                      isContinuing={summary.needsContinuation && controller.isContinuing}
+                      onContinue={
+                        summary.needsContinuation
+                          ? () => void controller.handleContinueRun(summary.runId)
+                          : undefined
+                      }
+                      continuedByRunId={summary.continuedByRunId}
                       expanded={expandedRunSummaryKeys.has(key)}
                       onToggle={() => toggleRunSummary(key)}
                     />
@@ -717,23 +725,27 @@ function AiSidebarMessagesContent({
       </AnimatePresence>
 
       <AnimatePresence initial={false}>
-        {controller.pendingAction?.kind === "send" ? (
+        {controller.pendingAction?.kind === "send" ||
+        controller.pendingAction?.kind === "continue" ? (
           <motion.div
-            key="pending-send"
+            key={controller.pendingAction.kind === "send" ? "pending-send" : "pending-continue"}
             className="flex flex-col gap-1.5"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
           >
-            <div className="flex justify-end">
-              <div className="max-w-[88%] rounded-lg bg-accent-foreground px-3 py-2 text-[13px] leading-5 whitespace-pre-wrap text-sidebar-background">
-                {controller.pendingAction.text}
+            {controller.pendingAction.kind === "send" ? (
+              <div className="flex justify-end">
+                <div className="max-w-[88%] rounded-lg bg-accent-foreground px-3 py-2 text-[13px] leading-5 whitespace-pre-wrap text-sidebar-background">
+                  {controller.pendingAction.text}
+                </div>
               </div>
-            </div>
-            {controller.activeStream?.kind === "send"
+            ) : null}
+            {controller.activeStream?.kind === "send" ||
+            controller.activeStream?.kind === "continue"
               ? controller.activeStream.blocks.map((block, blockIndex) => (
                   <motion.div
-                    key={`send-stream-block:${block.assistantNodeId}:${blockIndex}`}
+                    key={`${controller.activeStream?.kind}-stream-block:${block.assistantNodeId}:${blockIndex}`}
                     className="flex flex-col gap-1.5"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -743,7 +755,7 @@ function AiSidebarMessagesContent({
                       entry.kind === "text" ? (
                         block.assistantText.trim().length > 0 ? (
                           <div
-                            key={`send-stream:${block.assistantNodeId}:text`}
+                            key={`${controller.activeStream?.kind}-stream:${block.assistantNodeId}:text`}
                             className="text-foreground"
                           >
                             <AiMarkdown
@@ -755,14 +767,16 @@ function AiSidebarMessagesContent({
                         ) : null
                       ) : (
                         <ReasoningTraceCard
-                          key={`send-stream:${block.assistantNodeId}:${entry.id}`}
+                          key={`${controller.activeStream?.kind}-stream:${block.assistantNodeId}:${entry.id}`}
                           reasoningText={getReasoningTraceText(block.reasoningTrace, entry.id)}
                           isStreaming
                           expanded={expandedReasoningKeys.has(
-                            `send-stream:${block.assistantNodeId}:${entry.id}`,
+                            `${controller.activeStream?.kind}-stream:${block.assistantNodeId}:${entry.id}`,
                           )}
                           onToggle={() =>
-                            toggleReasoning(`send-stream:${block.assistantNodeId}:${entry.id}`)
+                            toggleReasoning(
+                              `${controller.activeStream?.kind}-stream:${block.assistantNodeId}:${entry.id}`,
+                            )
                           }
                         />
                       ),
@@ -771,14 +785,14 @@ function AiSidebarMessagesContent({
                       <div className="flex flex-col gap-1">
                         {block.toolTrace.map((entry, entryIndex) => (
                           <ToolTraceCard
-                            key={`send-stream:${block.assistantNodeId}:${entry.toolCallId ?? entry.toolName}:${entryIndex}`}
+                            key={`${controller.activeStream?.kind}-stream:${block.assistantNodeId}:${entry.toolCallId ?? entry.toolName}:${entryIndex}`}
                             entry={entry}
                             expanded={expandedToolTraceKeys.has(
-                              `send-stream:${block.assistantNodeId}:${entry.toolCallId ?? entry.toolName}:${entryIndex}`,
+                              `${controller.activeStream?.kind}-stream:${block.assistantNodeId}:${entry.toolCallId ?? entry.toolName}:${entryIndex}`,
                             )}
                             onToggle={() =>
                               toggleToolTrace(
-                                `send-stream:${block.assistantNodeId}:${entry.toolCallId ?? entry.toolName}:${entryIndex}`,
+                                `${controller.activeStream?.kind}-stream:${block.assistantNodeId}:${entry.toolCallId ?? entry.toolName}:${entryIndex}`,
                               )
                             }
                           />

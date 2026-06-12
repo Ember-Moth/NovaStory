@@ -24,6 +24,10 @@ export type PendingAssistantAction =
   | {
       kind: "retry";
       triggerNodeId: string;
+    }
+  | {
+      kind: "continue";
+      runId: string;
     };
 
 export const EMPTY_ASSISTANT_STATE: AssistantState = {

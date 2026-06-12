@@ -52,6 +52,7 @@ import {
   PROJECT_ASSISTANT_READ_ONLY_TOOL_NAMES,
   PROJECT_ASSISTANT_WRITE_TOOL_NAMES,
   PROJECT_ASSISTANT_TOOL_NAMES,
+  PROJECT_ASSISTANT_MAX_STEPS,
 } from "@/modules/ai/domain/types";
 import type {
   ProjectAssistantWriteToolName,
@@ -91,6 +92,14 @@ export interface ProjectAssistantEditResult {
   replacementNode: AgentThreadNodeView;
   assistantNode: AgentThreadNodeView | null;
   run: AgentRunView;
+  state: AgentThreadStateView;
+}
+
+export interface ProjectAssistantContinueResult {
+  thread: AgentThreadView;
+  assistantNode: AgentThreadNodeView | null;
+  run: AgentRunView;
+  parentRun: AgentRunView;
   state: AgentThreadStateView;
 }
 
@@ -267,7 +276,7 @@ function defaultStreamAssistantText({
     ...(activeTools.length > 0
       ? { tools, activeTools: [...activeTools] as ProjectAssistantToolName[] }
       : {}),
-    stopWhen: stepCountIs(20),
+    stopWhen: stepCountIs(PROJECT_ASSISTANT_MAX_STEPS),
     prepareStep: ({ messages: stepMessages, stepNumber }) => {
       preparedMessagesByStep[stepNumber] = stepMessages;
       return undefined;
@@ -616,6 +625,69 @@ function resolveProjectAssistantModelSelection(
     connection,
     resolvedModel,
     snapshot: {
+      connectionId: connection.id,
+      catalogModelId: resolvedModel.catalogModelId,
+      customModelId: resolvedModel.customModelId,
+      connectionName: connection.name,
+      sdkPackage: connection.sdkPackage,
+      baseUrl: connection.baseUrl,
+      modelOrigin: resolvedModel.origin,
+      modelId: resolvedModel.modelId,
+      modelDisplayName: resolvedModel.displayName,
+      modelFamily: resolvedModel.family,
+      capabilities: {
+        supportsVision: resolvedModel.supportsVision,
+        supportsToolUse: resolvedModel.supportsToolUse,
+        supportsReasoning: resolvedModel.supportsReasoning,
+        supportsTemperature: resolvedModel.supportsTemperature,
+      },
+      pricing: {
+        inputPricePer1m: resolvedModel.inputPricePer1m,
+        outputPricePer1m: resolvedModel.outputPricePer1m,
+      },
+    },
+  };
+}
+
+function resolveProjectAssistantModelSelectionFromSnapshot(
+  snapshot: unknown,
+): AssistantModelSelection {
+  invariant(snapshot && typeof snapshot === "object", "原 run 缺少模型选择快照，无法继续。");
+  const snapshotRecord = snapshot as AiSelectionSnapshotInput;
+  const connectionId = normalizeOptionalString(snapshotRecord.connectionId);
+  const catalogModelId = normalizeOptionalString(snapshotRecord.catalogModelId);
+  const customModelId = normalizeOptionalString(snapshotRecord.customModelId);
+  invariant(connectionId, "原 run 缺少连接信息，无法继续。");
+
+  const connection = db.query.aiConnections
+    .findFirst({ where: eq(schema.aiConnections.id, connectionId) })
+    .sync();
+  invariant(connection, "原 run 使用的 AI 连接已不存在，无法继续。");
+  invariant(connection.isEnabled, "原 run 使用的 AI 连接已停用，无法继续。");
+
+  const resolvedModel = listResolvedModelsForConnection({
+    connectionId: connection.id,
+  }).find((model) => {
+    if (customModelId) {
+      return model.customModelId === customModelId;
+    }
+    if (catalogModelId) {
+      return model.catalogModelId === catalogModelId;
+    }
+    return model.modelId === normalizeOptionalString(snapshotRecord.modelId);
+  });
+  invariant(resolvedModel, "原 run 使用的 AI 模型已不存在，无法继续。");
+  invariant(resolvedModel.isEnabled, "原 run 使用的 AI 模型已停用，无法继续。");
+
+  return {
+    storedSelection: {
+      connectionId: connection.id,
+      modelId: resolvedModel.id,
+    },
+    connection,
+    resolvedModel,
+    snapshot: {
+      ...snapshotRecord,
       connectionId: connection.id,
       catalogModelId: resolvedModel.catalogModelId,
       customModelId: resolvedModel.customModelId,
@@ -1387,6 +1459,7 @@ function buildSendRun({
     agentProfile: PROJECT_ASSISTANT_AGENT_PROFILE,
     selectionSnapshot: selection.snapshot,
     contextSnapshot: normalizedContext,
+    activeTools: resolvedActiveTools,
   });
   appendRunEvent({
     runId: run.id,
@@ -1481,6 +1554,7 @@ function buildRetryRun({
     agentProfile: PROJECT_ASSISTANT_AGENT_PROFILE,
     selectionSnapshot: selection.snapshot,
     contextSnapshot: normalizedContext,
+    activeTools: resolvedActiveTools,
   });
   appendRunEvent({
     runId: run.id,
@@ -1575,6 +1649,7 @@ function buildEditRun({
     agentProfile: PROJECT_ASSISTANT_AGENT_PROFILE,
     selectionSnapshot: selection.snapshot,
     contextSnapshot: normalizedContext,
+    activeTools: resolvedActiveTools,
   });
   appendRunEvent({
     runId: run.id,
@@ -1624,6 +1699,125 @@ function buildEditRun({
       replacementNode,
       assistantNode: lastAssistantNode,
       run: completedRun,
+      state: getThreadView(thread.id),
+    }),
+  };
+}
+
+function runNeedsContinuation(trace: AgentRunTraceView) {
+  const lastStep = trace.steps.at(-1);
+  return (
+    trace.run.status === "succeeded" &&
+    trace.run.activeTools != null &&
+    trace.steps.length >= PROJECT_ASSISTANT_MAX_STEPS &&
+    lastStep?.finishReason === "tool-calls"
+  );
+}
+
+function buildContinueRun({
+  projectId,
+  threadId,
+  runId,
+}: {
+  projectId: string;
+  threadId: string;
+  runId: string;
+}): PreparedProjectAssistantRun<ProjectAssistantContinueResult> {
+  const threadView = getThreadView(threadId);
+  const thread = threadView.thread;
+  invariant(thread, "未找到当前会话。");
+  invariant(thread.projectId === projectId, "AI 会话不属于当前项目。");
+  invariant(thread.archivedAt == null, "不能继续已归档会话。");
+  assertNoPendingRunForThread(thread);
+
+  const parentTrace = getRunTrace(runId);
+  const parentRun = parentTrace.run;
+  invariant(parentRun.threadId === thread.id, "原 run 不属于当前会话。");
+  invariant(runNeedsContinuation(parentTrace), "这个 run 当前不需要继续。");
+  invariant(parentTrace.childRuns.length === 0, "这个 run 已经继续过。");
+
+  const activePathRunIds = new Set(
+    threadView.activePath.flatMap((node) => (node.createdByRunId ? [node.createdByRunId] : [])),
+  );
+  invariant(activePathRunIds.has(parentRun.id), "只能继续当前 active path 上的 run。");
+  const activeTipNodeId = thread.activeTipNodeId;
+  invariant(activeTipNodeId, "当前会话没有可继续的 active tip。");
+  const activeTip = threadView.activePath.at(-1);
+  invariant(activeTip?.id === activeTipNodeId, "当前 active tip 不在 active path 上。");
+  invariant(activeTip.createdByRunId === parentRun.id, "只能从原 run 的最后节点继续。");
+
+  const selection = resolveProjectAssistantModelSelectionFromSnapshot(parentRun.selectionSnapshot);
+  const activeTools = parentRun.activeTools ?? [];
+  invariant(
+    activeTools.length === 0 || selection.resolvedModel.supportsToolUse,
+    "原 run 使用了工具，但当前模型不支持工具调用，无法继续。",
+  );
+  const context = normalizeAssistantContextSnapshot(parentRun.contextSnapshot);
+  const system = buildProjectAssistantSystemPrompt({
+    context,
+  });
+  const request = resolveAssistantRequest({
+    threadId: thread.id,
+    triggerNodeId: activeTipNodeId,
+    system,
+    selection,
+  });
+  const run = createRun({
+    threadId: thread.id,
+    parentRunId: parentRun.id,
+    triggerNodeId: activeTipNodeId,
+    baseTipNodeId: activeTipNodeId,
+    runMode: "continue",
+    agentProfile: PROJECT_ASSISTANT_AGENT_PROFILE,
+    selectionSnapshot: selection.snapshot,
+    contextSnapshot: context,
+    activeTools,
+  });
+  appendRunEvent({
+    runId: parentRun.id,
+    eventKind: "child-run-started",
+    nodeId: activeTipNodeId,
+    relatedRunId: run.id,
+    summaryText: "继续达到轮次上限的 run",
+  });
+  appendRunEvent({
+    runId: run.id,
+    eventKind: "run-started",
+    nodeId: activeTipNodeId,
+    relatedRunId: parentRun.id,
+    summaryText: "继续达到轮次上限的 run",
+  });
+
+  return {
+    projectId,
+    thread,
+    run,
+    triggerNodeId: activeTipNodeId,
+    messages: request.messages,
+    providerOptions: request.providerOptions,
+    system,
+    transportSystem: request.transportSystem,
+    selection,
+    context,
+    activeTools,
+    initialResult: {
+      thread: getThreadView(thread.id).thread!,
+      assistantNode: null,
+      run,
+      parentRun,
+      state: getThreadView(thread.id),
+    },
+    runStartedEvent: {
+      type: "run-started",
+      run,
+      threadId: thread.id,
+      triggerNodeId: activeTipNodeId,
+    },
+    buildFinalResult: ({ run: completedRun, lastAssistantNode }) => ({
+      thread: getThreadView(thread.id).thread!,
+      assistantNode: lastAssistantNode,
+      run: completedRun,
+      parentRun,
       state: getThreadView(thread.id),
     }),
   };
@@ -1790,6 +1984,24 @@ export function createProjectAssistantService(
       );
     },
 
+    continueProjectAssistantRunStream({
+      projectId,
+      threadId,
+      runId,
+    }: {
+      projectId: string;
+      threadId: string;
+      runId: string;
+    }) {
+      return startExecution(
+        buildContinueRun({
+          projectId,
+          threadId,
+          runId,
+        }),
+      );
+    },
+
     async sendProjectAssistantMessage(args: {
       projectId: string;
       threadId: string;
@@ -1819,6 +2031,14 @@ export function createProjectAssistantService(
       activeTools?: readonly ProjectAssistantToolName[] | null;
     }): Promise<ProjectAssistantEditResult> {
       return this.editProjectAssistantMessageStream(args).finalResult;
+    },
+
+    async continueProjectAssistantRun(args: {
+      projectId: string;
+      threadId: string;
+      runId: string;
+    }): Promise<ProjectAssistantContinueResult> {
+      return this.continueProjectAssistantRunStream(args).finalResult;
     },
   };
 }

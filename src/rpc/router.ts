@@ -43,6 +43,8 @@ export const ai = {
   retryProjectAssistantMessageStream: aiHandlers.retryProjectAssistantMessageStream,
   editProjectAssistantMessage: aiHandlers.editProjectAssistantMessage,
   editProjectAssistantMessageStream: aiHandlers.editProjectAssistantMessageStream,
+  continueProjectAssistantRun: aiHandlers.continueProjectAssistantRun,
+  continueProjectAssistantRunStream: aiHandlers.continueProjectAssistantRunStream,
 };
 
 export const config = {

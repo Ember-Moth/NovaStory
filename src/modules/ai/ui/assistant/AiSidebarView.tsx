@@ -606,6 +606,10 @@ export function RunSummaryRow({
   canRetry,
   isRetrying,
   onRetry,
+  needsContinuation,
+  isContinuing,
+  onContinue,
+  continuedByRunId,
   expanded,
   onToggle,
 }: {
@@ -617,29 +621,42 @@ export function RunSummaryRow({
   canRetry?: boolean;
   isRetrying?: boolean;
   onRetry?: () => void;
+  needsContinuation?: boolean;
+  isContinuing?: boolean;
+  onContinue?: () => void;
+  continuedByRunId?: string | null;
   expanded?: boolean;
   onToggle?: () => void;
 }) {
   const isRunning = status === "running" || status === "queued";
   const isFailed = status === "failed";
+  const isContinuationPaused = needsContinuation === true;
   const canExpand = isFailed && typeof errorMessage === "string" && errorMessage.trim().length > 0;
-  const toneClassName = isFailed
+  const toneClassName = isContinuationPaused
     ? "border-accent-foreground/30 bg-accent-foreground/5 text-accent-foreground"
-    : "border-border bg-editor-background text-foreground-muted";
+    : isFailed
+      ? "border-accent-foreground/30 bg-accent-foreground/5 text-accent-foreground"
+      : "border-border bg-editor-background text-foreground-muted";
   const statusIcon = isRunning
     ? "icon-[material-symbols--progress-activity] animate-spin text-accent-foreground"
-    : isFailed
-      ? "icon-[material-symbols--warning]"
-      : status === "cancelled"
-        ? "icon-[material-symbols--block]"
-        : "icon-[material-symbols--check-circle]";
+    : isContinuationPaused
+      ? "icon-[material-symbols--pause-circle]"
+      : isFailed
+        ? "icon-[material-symbols--warning]"
+        : status === "cancelled"
+          ? "icon-[material-symbols--block]"
+          : "icon-[material-symbols--check-circle]";
   const label = isRunning
     ? "正在生成回复..."
-    : isFailed
-      ? "生成失败"
-      : status === "cancelled"
-        ? "已取消"
-        : "生成完成";
+    : isContinuationPaused
+      ? "已到轮次上限"
+      : isFailed
+        ? "生成失败"
+        : status === "cancelled"
+          ? "已取消"
+          : continuedByRunId
+            ? "已继续"
+            : "生成完成";
   const metrics = [
     durationMs != null ? formatDuration(durationMs) : null,
     stepCount > 0 ? `${stepCount} 步` : null,
@@ -693,6 +710,25 @@ export function RunSummaryRow({
                   : "icon-[material-symbols--refresh]"
               }
             />
+          </button>
+        ) : null}
+        {needsContinuation && onContinue ? (
+          <button
+            type="button"
+            onClick={onContinue}
+            disabled={isContinuing}
+            className="inline-flex h-6 shrink-0 items-center gap-1 rounded px-1.5 text-[11px] transition hover:bg-current/10 disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label={isContinuing ? "继续中" : "继续"}
+            title={isContinuing ? "继续中" : "继续"}
+          >
+            <span
+              className={
+                isContinuing
+                  ? "icon-[material-symbols--progress-activity] animate-spin"
+                  : "icon-[material-symbols--play-arrow]"
+              }
+            />
+            <span>继续</span>
           </button>
         ) : null}
       </div>

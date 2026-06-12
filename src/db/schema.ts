@@ -493,6 +493,7 @@ export const agentRuns = sqliteTable(
     agentProfile: text("agent_profile").notNull(),
     selectionSnapshotJson: text("selection_snapshot_json").notNull().default("{}"),
     contextSnapshotJson: text("context_snapshot_json"),
+    activeToolsJson: text("active_tools_json"),
     errorArtifactId: text("error_artifact_id").references((): any => agentArtifacts.id, {
       onDelete: "set null",
     }),
@@ -505,7 +506,7 @@ export const agentRuns = sqliteTable(
   (table) => [
     check(
       "agent_runs_mode_valid",
-      sql`${table.runMode} IN ('send', 'retry', 'regenerate', 'edit_regenerate', 'subagent')`,
+      sql`${table.runMode} IN ('send', 'retry', 'regenerate', 'edit_regenerate', 'continue', 'subagent')`,
     ),
     check(
       "agent_runs_status_valid",

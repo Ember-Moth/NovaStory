@@ -14,6 +14,7 @@ import {
 import {
   getProjectAssistantService,
   type ProjectAssistantEditResult,
+  type ProjectAssistantContinueResult,
   type ProjectAssistantOverview,
   type ProjectAssistantRetryResult,
   type ProjectAssistantSendResult,
@@ -129,6 +130,12 @@ interface EditProjectAssistantMessageInput {
   text: string;
   context?: ProjectAssistantContextSnapshot | null;
   activeTools?: ProjectAssistantToolName[] | null;
+}
+
+interface ContinueProjectAssistantRunInput {
+  projectId: string;
+  threadId: string;
+  runId: string;
 }
 
 type RpcMutationCtx = MutationCtx<RpcTagList>;
@@ -1019,6 +1026,75 @@ export const editProjectAssistantMessageStream = stream<
           runId: result.run.id,
           candidateParentNodeId: result.replacementNode.parentNodeId,
         });
+      }
+      return result;
+    } finally {
+      unsubscribe();
+    }
+  },
+});
+
+export const continueProjectAssistantRun = mutation<
+  ContinueProjectAssistantRunInput,
+  ProjectAssistantContinueResult,
+  RpcTagList
+>(async ({ projectId, threadId, runId }, ctx) => {
+  try {
+    const result = await getProjectAssistantService().continueProjectAssistantRun({
+      projectId,
+      threadId,
+      runId,
+    });
+    invalidateProjectAiState(ctx, projectId, {
+      threadId: result.thread.id,
+      runId: result.run.id,
+      candidateParentNodeId: result.run.triggerNodeId,
+    });
+    ctx.invalidate(rpcTags.aiRunTrace(runId), rpcTags.aiChildRuns(runId));
+    invalidateAuxWorkspaceForRun(ctx, projectId, result.run.id);
+    return result;
+  } catch (error) {
+    invalidateProjectAiState(ctx, projectId, { threadId, runId });
+    throw error;
+  }
+});
+
+export const continueProjectAssistantRunStream = stream<
+  ContinueProjectAssistantRunInput,
+  ProjectAssistantStreamEvent,
+  ProjectAssistantContinueResult,
+  RpcTagList
+>({
+  handler: async ({ projectId, threadId, runId }, ctx) => {
+    const execution = getProjectAssistantService().continueProjectAssistantRunStream({
+      projectId,
+      threadId,
+      runId,
+    });
+    const unsubscribe = execution.subscribe((event) => {
+      ctx.emit(event);
+    });
+    try {
+      const result = await Promise.race([
+        execution.finalResult,
+        (async () => {
+          await new Promise<void>((resolve) => {
+            if (ctx.signal.aborted) {
+              resolve();
+              return;
+            }
+            ctx.signal.addEventListener("abort", () => resolve(), { once: true });
+          });
+          return execution.initialResult;
+        })(),
+      ]);
+      if (!ctx.signal.aborted) {
+        invalidateProjectAiState(ctx, projectId, {
+          threadId: result.thread.id,
+          runId: result.run.id,
+          candidateParentNodeId: result.run.triggerNodeId,
+        });
+        ctx.invalidate(rpcTags.aiRunTrace(runId), rpcTags.aiChildRuns(runId));
       }
       return result;
     } finally {

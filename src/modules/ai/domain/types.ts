@@ -41,8 +41,15 @@ export type AgentThreadNodePartKind =
   | "step-start";
 export type AgentVisibility = "public" | "hidden" | "internal";
 export type AgentPartState = "streaming" | "done";
-export type AgentRunMode = "send" | "retry" | "regenerate" | "edit_regenerate" | "subagent";
+export type AgentRunMode =
+  | "send"
+  | "retry"
+  | "regenerate"
+  | "edit_regenerate"
+  | "continue"
+  | "subagent";
 export type AgentRunStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
+export type AgentContinuationReason = "step-limit";
 export type AgentRunEventKind =
   | "run-started"
   | "step-started"
@@ -96,6 +103,8 @@ export const PROJECT_ASSISTANT_TOOL_NAMES = [
   ...PROJECT_ASSISTANT_READ_ONLY_TOOL_NAMES,
   ...PROJECT_ASSISTANT_WRITE_TOOL_NAMES,
 ] as const;
+
+export const PROJECT_ASSISTANT_MAX_STEPS = 20;
 
 export type ProjectAssistantToolName = (typeof PROJECT_ASSISTANT_TOOL_NAMES)[number];
 export type ProjectAssistantWriteToolName = (typeof PROJECT_ASSISTANT_WRITE_TOOL_NAMES)[number];
@@ -249,6 +258,7 @@ export interface AgentRunView {
   agentProfile: string;
   selectionSnapshot: unknown;
   contextSnapshot: ProjectAssistantContextSnapshot | null;
+  activeTools?: ProjectAssistantToolName[] | null;
   errorArtifactId: string | null;
   startedAt: number;
   completedAt: number | null;
@@ -265,6 +275,9 @@ export interface AgentRunSummaryView {
   totalTokens: number | null;
   durationMs: number | null;
   errorMessage: string | null;
+  needsContinuation?: boolean;
+  continuationReason?: AgentContinuationReason | null;
+  continuedByRunId?: string | null;
 }
 
 export interface WorkspaceMutationEvent {

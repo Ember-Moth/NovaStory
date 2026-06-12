@@ -957,3 +957,213 @@ test("sendProjectAssistantMessageStream emits events and returns invalidate tags
     rpcTags.aiChildRuns("run_stream"),
   ]);
 });
+
+test("continueProjectAssistantRunStream emits events and invalidates parent and child runs", async () => {
+  const parentRun = {
+    id: "run_parent_continue",
+    threadId: "thread_continue_stream",
+    parentRunId: null,
+    parentEventId: null,
+    triggerNodeId: "node_assistant_parent",
+    baseTipNodeId: "node_assistant_parent",
+    runMode: "send" as const,
+    status: "succeeded" as const,
+    agentProfile: "project-assistant",
+    selectionSnapshot: {},
+    contextSnapshot: null,
+    activeTools: ["read_aux_path"],
+    errorArtifactId: null,
+    startedAt: 1,
+    completedAt: 2,
+    createdAt: 1,
+    updatedAt: 2,
+  };
+  const run = {
+    id: "run_continue_stream",
+    threadId: "thread_continue_stream",
+    parentRunId: parentRun.id,
+    parentEventId: null,
+    triggerNodeId: "node_assistant_parent",
+    baseTipNodeId: "node_assistant_parent",
+    runMode: "continue" as const,
+    status: "running" as const,
+    agentProfile: "project-assistant",
+    selectionSnapshot: {},
+    contextSnapshot: null,
+    activeTools: ["read_aux_path"],
+    errorArtifactId: null,
+    startedAt: 3,
+    completedAt: null,
+    createdAt: 3,
+    updatedAt: 3,
+  };
+  const finalResult = {
+    thread: {
+      id: "thread_continue_stream",
+      projectId: "rpc_assistant_continue_stream",
+      agentProfile: "project-assistant",
+      title: "主会话",
+      activeTipNodeId: "node_assistant_continue",
+      archivedAt: null,
+      createdAt: 1,
+      updatedAt: 4,
+    },
+    assistantNode: {
+      id: "node_assistant_continue",
+      threadId: "thread_continue_stream",
+      parentNodeId: "node_assistant_parent",
+      role: "assistant" as const,
+      createdByRunId: "run_continue_stream",
+      sourceStepId: null,
+      sourceKind: "model_response" as const,
+      summaryText: "continued",
+      message: {
+        role: "assistant" as const,
+        content: [{ type: "text" as const, text: "continued" }],
+      },
+      parts: [],
+      createdAt: 4,
+    },
+    run: {
+      ...run,
+      status: "succeeded" as const,
+      completedAt: 4,
+      updatedAt: 4,
+    },
+    parentRun,
+    state: {
+      thread: null,
+      activePath: [],
+      candidateGroups: [],
+      latestRuns: [],
+      runSummaries: [],
+    },
+  };
+
+  useService({
+    getProjectAssistantState: () => ({
+      activeThreadId: null,
+      threads: [],
+      state: {
+        thread: null,
+        activePath: [],
+        candidateGroups: [],
+        latestRuns: [],
+        runSummaries: [],
+      },
+    }),
+    createProjectAssistantThread: () => {
+      throw new Error("unused");
+    },
+    setProjectAssistantActiveThread: () => {
+      throw new Error("unused");
+    },
+    renameProjectAssistantThread: () => {
+      throw new Error("unused");
+    },
+    archiveProjectAssistantThread: () => {
+      throw new Error("unused");
+    },
+    getThreadView: () => {
+      throw new Error("unused");
+    },
+    getRunTrace: () => {
+      throw new Error("unused");
+    },
+    getNodeCandidates: () => {
+      throw new Error("unused");
+    },
+    getChildRuns: () => {
+      throw new Error("unused");
+    },
+    selectThreadTip: () => {
+      throw new Error("unused");
+    },
+    sendProjectAssistantMessage: async () => {
+      throw new Error("unused");
+    },
+    sendProjectAssistantMessageStream: () => {
+      throw new Error("unused");
+    },
+    retryProjectAssistantMessage: async () => {
+      throw new Error("unused");
+    },
+    retryProjectAssistantMessageStream: () => {
+      throw new Error("unused");
+    },
+    editProjectAssistantMessage: async () => {
+      throw new Error("unused");
+    },
+    editProjectAssistantMessageStream: () => {
+      throw new Error("unused");
+    },
+    continueProjectAssistantRun: async () => {
+      throw new Error("unused");
+    },
+    continueProjectAssistantRunStream: () => ({
+      initialResult: {
+        ...finalResult,
+        run,
+        assistantNode: null,
+      },
+      finalResult: Promise.resolve(finalResult),
+      subscribe: (listener: (_event: unknown) => void) => {
+        listener({
+          type: "run-started",
+          run,
+          threadId: "thread_continue_stream",
+          triggerNodeId: "node_assistant_parent",
+        });
+        listener({
+          type: "assistant-text-delta",
+          nodeId: "node_assistant_continue",
+          delta: "continued",
+          accumulatedText: "continued",
+        });
+        return () => {
+          return;
+        };
+      },
+    }),
+  } as unknown as ProjectAssistantService);
+
+  const emitted: unknown[] = [];
+  const execution = await handlers.continueProjectAssistantRunStream.handler(
+    {
+      projectId: "rpc_assistant_continue_stream",
+      threadId: "thread_continue_stream",
+      runId: parentRun.id,
+    },
+    streamRequestCtx,
+    {
+      emit(event) {
+        emitted.push(event);
+      },
+    },
+  );
+
+  expect(execution.result.run.runMode).toBe("continue");
+  expect(execution.result.run.parentRunId).toBe(parentRun.id);
+  expect(emitted).toEqual([
+    {
+      type: "run-started",
+      run,
+      threadId: "thread_continue_stream",
+      triggerNodeId: "node_assistant_parent",
+    },
+    {
+      type: "assistant-text-delta",
+      nodeId: "node_assistant_continue",
+      delta: "continued",
+      accumulatedText: "continued",
+    },
+  ]);
+  expect(execution.invalidate).toEqual(
+    expect.arrayContaining([
+      rpcTags.aiThreadView("thread_continue_stream"),
+      rpcTags.aiRunTrace("run_continue_stream"),
+      rpcTags.aiRunTrace(parentRun.id),
+      rpcTags.aiChildRuns(parentRun.id),
+    ]),
+  );
+});

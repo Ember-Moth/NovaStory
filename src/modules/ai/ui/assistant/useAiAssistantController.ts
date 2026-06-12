@@ -42,7 +42,7 @@ export type SessionListRow =
     };
 
 export interface AssistantStreamOverlay {
-  kind: "send" | "retry";
+  kind: "send" | "retry" | "continue";
   threadId: string;
   triggerNodeId: string | null;
   runId: string | null;
@@ -156,7 +156,7 @@ export function createStreamOverlay({
   threadId,
   triggerNodeId,
 }: {
-  kind: "send" | "retry";
+  kind: "send" | "retry" | "continue";
   threadId: string;
   triggerNodeId: string | null;
 }): AssistantStreamOverlay {
@@ -452,6 +452,7 @@ export function useAiAssistantController(
   const selectThreadTip = rpc.useMutation("ai.selectThreadTip");
   const sendMessageStream = rpc.useStreamMutation("ai.sendProjectAssistantMessageStream");
   const retryMessageStream = rpc.useStreamMutation("ai.retryProjectAssistantMessageStream");
+  const continueRunStream = rpc.useStreamMutation("ai.continueProjectAssistantRunStream");
 
   const isLoadingSelection = !selectionHydrated;
   const overview = assistantOverviewQuery.data ?? {
@@ -493,7 +494,10 @@ export function useAiAssistantController(
       ?.find((group) => group.connection.id === selectedConnectionId)
       ?.models.find((model) => model.id === selectedModelId) ?? null;
   const selectedModelSupportsToolUse = selectedResolvedModel?.supportsToolUse ?? false;
-  const isGenerating = sendMessageStream.isStreaming || retryMessageStream.isStreaming;
+  const isGenerating =
+    sendMessageStream.isStreaming ||
+    retryMessageStream.isStreaming ||
+    continueRunStream.isStreaming;
   const isThreadMutating =
     createThread.isPending ||
     setActiveThread.isPending ||
@@ -762,6 +766,71 @@ export function useAiAssistantController(
     ],
   );
 
+  const handleContinueRun = useCallback(
+    async (runId: string) => {
+      if (!activeThreadId) {
+        return;
+      }
+
+      setComposerError(null);
+      setPendingAction({ kind: "continue", runId });
+      setActiveStream(
+        createStreamOverlay({
+          kind: "continue",
+          threadId: activeThreadId,
+          triggerNodeId: null,
+        }),
+      );
+
+      try {
+        const result = await continueRunStream.startAsync(
+          {
+            projectId,
+            threadId: activeThreadId,
+            runId,
+          },
+          {
+            onEvent: (event) => {
+              if (event.type === "workspace-mutated") {
+                onWorkspaceMutation?.(event);
+              }
+              setActiveStream((current) =>
+                current == null ? current : applyStreamEvent(current, event),
+              );
+            },
+          },
+        );
+        patchAssistantOverviewState({
+          projectId,
+          thread: result.thread,
+          state: result.state,
+        });
+        setActiveStream(null);
+      } catch (error) {
+        if (error instanceof Error && error.name === "RpcStreamAborted") {
+          setActiveStream(null);
+          return;
+        }
+        const message = error instanceof Error ? error.message : "继续生成失败。";
+        setComposerError(message);
+        setActiveStream((current) =>
+          current == null
+            ? current
+            : {
+                ...current,
+                status: "failed",
+                completedAt: Date.now(),
+                errorMessage: message || getRunErrorMessage(),
+              },
+        );
+        void assistantOverviewQuery.refetch();
+      } finally {
+        setPendingAction(null);
+      }
+    },
+    [activeThreadId, assistantOverviewQuery, continueRunStream, onWorkspaceMutation, projectId],
+  );
+
   const handleCreateThread = useCallback(async () => {
     setComposerError(null);
     setEditingThread(null);
@@ -861,8 +930,10 @@ export function useAiAssistantController(
       sendMessageStream.abort();
     } else if (retryMessageStream.isStreaming) {
       retryMessageStream.abort();
+    } else if (continueRunStream.isStreaming) {
+      continueRunStream.abort();
     }
-  }, [sendMessageStream, retryMessageStream]);
+  }, [continueRunStream, sendMessageStream, retryMessageStream]);
 
   const handleSelectCandidate = useCallback(
     async (tipNodeId: string) => {
@@ -901,6 +972,7 @@ export function useAiAssistantController(
     handleRenameStart,
     handleRenameSubmit,
     handleRetry,
+    handleContinueRun,
     handleSelectCandidate,
     handleSelectionChange,
     handleSelectionCommit,
@@ -912,6 +984,7 @@ export function useAiAssistantController(
     isGenerating,
     isLoadingSelection,
     isRetrying: retryMessageStream.isStreaming,
+    isContinuing: continueRunStream.isStreaming,
     isThreadBusy,
     isThreadMutating,
     messages,

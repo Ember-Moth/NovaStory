@@ -4,6 +4,7 @@ import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { type DatabaseExecutor, db, schema } from "@/db";
 import { createId, invariant, now } from "@/shared/lib/domain";
 
+import { PROJECT_ASSISTANT_MAX_STEPS, PROJECT_ASSISTANT_TOOL_NAMES } from "./types";
 import type {
   AgentArtifactKind,
   AgentArtifactRow,
@@ -36,6 +37,7 @@ import type {
   AgentThreadView,
   AgentVisibility,
   ProjectAssistantContextSnapshot,
+  ProjectAssistantToolName,
 } from "./types";
 
 export const PROJECT_ASSISTANT_AGENT_PROFILE = "project-assistant";
@@ -67,6 +69,7 @@ interface CreateRunInput {
   agentProfile: string;
   selectionSnapshot?: unknown;
   contextSnapshot?: ProjectAssistantContextSnapshot | null;
+  activeTools?: readonly ProjectAssistantToolName[] | null;
 }
 
 interface CreateArtifactInput {
@@ -162,6 +165,7 @@ function assertRunMode(mode: string): asserts mode is AgentRunMode {
       mode === "retry" ||
       mode === "regenerate" ||
       mode === "edit_regenerate" ||
+      mode === "continue" ||
       mode === "subagent",
     "不支持的 run 模式。",
   );
@@ -979,12 +983,38 @@ function mapRunRow(row: AgentRunRow): AgentRunView {
     agentProfile: row.agentProfile,
     selectionSnapshot: JSON.parse(row.selectionSnapshotJson),
     contextSnapshot: parseStoredJson<ProjectAssistantContextSnapshot>(row.contextSnapshotJson),
+    activeTools: parseStoredActiveTools(row.activeToolsJson),
     errorArtifactId: row.errorArtifactId,
     startedAt: row.startedAt,
     completedAt: row.completedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
+}
+
+function parseStoredActiveTools(value: string | null): ProjectAssistantToolName[] | null {
+  const parsed = parseStoredJson<unknown>(value);
+  if (!Array.isArray(parsed)) {
+    return null;
+  }
+
+  const seen = new Set<ProjectAssistantToolName>();
+  const tools: ProjectAssistantToolName[] = [];
+  for (const entry of parsed) {
+    if (
+      typeof entry !== "string" ||
+      !(PROJECT_ASSISTANT_TOOL_NAMES as readonly string[]).includes(entry)
+    ) {
+      continue;
+    }
+    const toolName = entry as ProjectAssistantToolName;
+    if (seen.has(toolName)) {
+      continue;
+    }
+    seen.add(toolName);
+    tools.push(toolName);
+  }
+  return tools;
 }
 
 function mapRunStepRow(row: AgentRunStepRow): AgentRunStepView {
@@ -1559,11 +1589,17 @@ function buildRunSummaries(threadId: string, activePath: AgentThreadNodeView[]) 
       : [];
   const stepsByRunId = new Map<string, AgentRunStepRow[]>();
   const errorArtifactById = new Map(errorArtifacts.map((artifact) => [artifact.id, artifact]));
+  const continuedByRunId = new Map<string, string>();
 
   stepRows.forEach((row) => {
     const entries = stepsByRunId.get(row.runId) ?? [];
     entries.push(row);
     stepsByRunId.set(row.runId, entries);
+  });
+  relevantRuns.forEach((row) => {
+    if (row.parentRunId && row.runMode === "continue") {
+      continuedByRunId.set(row.parentRunId, row.id);
+    }
   });
 
   return relevantRuns
@@ -1586,6 +1622,14 @@ function buildRunSummaries(threadId: string, activePath: AgentThreadNodeView[]) 
       const errorArtifact = row.errorArtifactId
         ? (errorArtifactById.get(row.errorArtifactId) ?? null)
         : null;
+      const lastStep = stepEntries.at(-1);
+      const continuationReason =
+        row.status === "succeeded" &&
+        row.activeTools != null &&
+        stepEntries.length >= PROJECT_ASSISTANT_MAX_STEPS &&
+        lastStep?.finishReason === "tool-calls"
+          ? "step-limit"
+          : null;
 
       return [
         {
@@ -1601,6 +1645,9 @@ function buildRunSummaries(threadId: string, activePath: AgentThreadNodeView[]) 
               : null,
           errorMessage:
             row.status === "failed" ? (errorArtifact?.summaryText ?? "AI 回复失败。") : null,
+          needsContinuation: continuationReason != null && !continuedByRunId.has(row.id),
+          continuationReason,
+          continuedByRunId: continuedByRunId.get(row.id) ?? null,
         } satisfies AgentRunSummaryView,
       ];
     })
@@ -1752,6 +1799,7 @@ export function createRun(input: CreateRunInput) {
         agentProfile: input.agentProfile,
         selectionSnapshotJson: serializeRequiredJson(input.selectionSnapshot ?? {}, "run 选择快照"),
         contextSnapshotJson: serializeOptionalJson(input.contextSnapshot),
+        activeToolsJson: serializeOptionalJson(input.activeTools),
         errorArtifactId: null,
         startedAt: timestamp,
         completedAt: null,

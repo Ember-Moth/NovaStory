@@ -1,6 +1,10 @@
 import { expect, test } from "bun:test";
 import { modelMessageSchema, type ModelMessage } from "ai";
 
+import {
+  PROJECT_ASSISTANT_MAX_STEPS,
+  type ProjectAssistantToolName,
+} from "@/modules/ai/domain/types";
 import { setupMockDatabase } from "@/test/mock-db";
 
 setupMockDatabase();
@@ -89,6 +93,51 @@ function seedCustomConnection({
       modelId: `custom:${modelRowId}`,
     },
   };
+}
+
+function createStepLimitMockStream({
+  modelId,
+  finalFinishReason = "tool-calls",
+}: {
+  modelId: string;
+  finalFinishReason?: string;
+}) {
+  return createMockStream({
+    chunks: Array.from({ length: PROJECT_ASSISTANT_MAX_STEPS }, (_, index) => [
+      { type: "start-step", stepNumber: index },
+      { type: "text-delta", stepNumber: index, delta: `step ${index}` },
+      {
+        type: "finish-step",
+        stepNumber: index,
+        finishReason: index === PROJECT_ASSISTANT_MAX_STEPS - 1 ? finalFinishReason : "tool-calls",
+        usage: { totalTokens: 1 },
+      },
+    ]).flat(),
+    text: "step limited",
+    usage: { totalTokens: PROJECT_ASSISTANT_MAX_STEPS },
+    finishReason: finalFinishReason,
+    steps: Array.from({ length: PROJECT_ASSISTANT_MAX_STEPS }, (_, index) => ({
+      stepNumber: index,
+      preparedMessages: [],
+      model: { provider: "openai", modelId },
+      finishReason: index === PROJECT_ASSISTANT_MAX_STEPS - 1 ? finalFinishReason : "tool-calls",
+      rawFinishReason: index === PROJECT_ASSISTANT_MAX_STEPS - 1 ? finalFinishReason : "tool_calls",
+      usage: { totalTokens: 1 },
+      request: { body: { step: index } },
+      response: {
+        body: { id: `resp_limit_${index}` },
+        messages: [
+          {
+            role: "assistant",
+            content: [{ type: "text", text: `step ${index}` }],
+          },
+        ],
+      },
+      providerMetadata: {},
+      toolCalls: [],
+      toolResults: [],
+    })),
+  });
 }
 
 function seedOpenAiConnection({
@@ -656,6 +705,156 @@ test("sendProjectAssistantMessage uses read-only tools by default and can opt in
       "create_aux_symlink",
     ],
   ]);
+});
+
+test("step-limited tool runs are marked continueable without failing", async () => {
+  seedProject("assistant_step_limit");
+  const seeded = seedCustomConnection({
+    connectionId: "conn_step_limit",
+    modelId: "story-model",
+    modelRowId: "cmodel_step_limit",
+    supportsToolUse: true,
+  });
+  const service = createProjectAssistantService({
+    readStoredSelection: () => seeded.selection,
+    streamAssistantText: createStepLimitMockStream({
+      modelId: "story-model",
+      finalFinishReason: "tool-calls",
+    }) as any,
+  });
+  const thread = service.createProjectAssistantThread("assistant_step_limit");
+
+  const result = await service.sendProjectAssistantMessage({
+    projectId: "assistant_step_limit",
+    threadId: thread.id,
+    text: "连续读取资料",
+    activeTools: ["read_aux_path"],
+  });
+  const summary = result.state.runSummaries.find((entry) => entry.runId === result.run.id);
+
+  expect(result.run.status).toBe("succeeded");
+  expect(result.run.activeTools).toEqual(["read_aux_path"]);
+  expect(summary).toMatchObject({
+    status: "succeeded",
+    stepCount: PROJECT_ASSISTANT_MAX_STEPS,
+    needsContinuation: true,
+    continuationReason: "step-limit",
+    continuedByRunId: null,
+  });
+});
+
+test("step-limited runs ending with stop are not continueable", async () => {
+  seedProject("assistant_step_limit_stop");
+  const seeded = seedCustomConnection({
+    connectionId: "conn_step_limit_stop",
+    modelId: "story-model",
+    modelRowId: "cmodel_step_limit_stop",
+    supportsToolUse: true,
+  });
+  const service = createProjectAssistantService({
+    readStoredSelection: () => seeded.selection,
+    streamAssistantText: createStepLimitMockStream({
+      modelId: "story-model",
+      finalFinishReason: "stop",
+    }) as any,
+  });
+  const thread = service.createProjectAssistantThread("assistant_step_limit_stop");
+
+  const result = await service.sendProjectAssistantMessage({
+    projectId: "assistant_step_limit_stop",
+    threadId: thread.id,
+    text: "刚好二十步后完成",
+    activeTools: ["read_aux_path"],
+  });
+  const summary = result.state.runSummaries.find((entry) => entry.runId === result.run.id);
+
+  expect(summary?.needsContinuation).toBe(false);
+  expect(summary?.continuationReason).toBeNull();
+});
+
+test("continueProjectAssistantRun creates a child run and inherits original active tools", async () => {
+  seedProject("assistant_continue");
+  const seeded = seedCustomConnection({
+    connectionId: "conn_continue",
+    modelId: "story-model",
+    modelRowId: "cmodel_continue",
+    supportsToolUse: true,
+  });
+  const capturedActiveTools: ProjectAssistantToolName[][] = [];
+  const service = createProjectAssistantService({
+    readStoredSelection: () => seeded.selection,
+    streamAssistantText: ((input: { activeTools: ProjectAssistantToolName[] }) => {
+      capturedActiveTools.push([...input.activeTools]);
+      if (capturedActiveTools.length === 1) {
+        return createStepLimitMockStream({
+          modelId: "story-model",
+          finalFinishReason: "tool-calls",
+        })();
+      }
+      return createMockStream({
+        chunks: [
+          { type: "start-step", stepNumber: 0 },
+          { type: "text-delta", stepNumber: 0, delta: "继续完成。" },
+          {
+            type: "finish-step",
+            stepNumber: 0,
+            finishReason: "stop",
+            usage: { totalTokens: 3 },
+          },
+        ],
+        text: "继续完成。",
+        usage: { totalTokens: 3 },
+        finishReason: "stop",
+        steps: [
+          {
+            stepNumber: 0,
+            preparedMessages: [],
+            model: { provider: "openai", modelId: "story-model" },
+            finishReason: "stop",
+            rawFinishReason: "stop",
+            usage: { totalTokens: 3 },
+            request: { body: { step: 0 } },
+            response: {
+              body: { id: "resp_continue" },
+              messages: [
+                {
+                  role: "assistant",
+                  content: [{ type: "text", text: "继续完成。" }],
+                },
+              ],
+            },
+            providerMetadata: {},
+            toolCalls: [],
+            toolResults: [],
+          },
+        ],
+      })();
+    }) as any,
+  });
+  const thread = service.createProjectAssistantThread("assistant_continue");
+
+  const first = await service.sendProjectAssistantMessage({
+    projectId: "assistant_continue",
+    threadId: thread.id,
+    text: "继续读取",
+    activeTools: ["read_aux_path", "write_aux_file"],
+  });
+  const continued = await service.continueProjectAssistantRun({
+    projectId: "assistant_continue",
+    threadId: thread.id,
+    runId: first.run.id,
+  });
+  const parentSummary = continued.state.runSummaries.find((entry) => entry.runId === first.run.id);
+
+  expect(continued.run.runMode).toBe("continue");
+  expect(continued.run.parentRunId).toBe(first.run.id);
+  expect(continued.run.activeTools).toEqual(["read_aux_path", "write_aux_file"]);
+  expect(capturedActiveTools).toEqual([
+    ["read_aux_path", "write_aux_file"],
+    ["read_aux_path", "write_aux_file"],
+  ]);
+  expect(parentSummary?.needsContinuation).toBe(false);
+  expect(parentSummary?.continuedByRunId).toBe(continued.run.id);
 });
 
 test("sendProjectAssistantMessage rejects explicit tools when the model does not support tool use", async () => {
