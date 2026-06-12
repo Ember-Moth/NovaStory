@@ -336,6 +336,7 @@ export function buildTimelineTools({ projectId, runtimeContext }: ToolBuildConte
             data: {
               action: "moved" as const,
               pointId: point.id,
+              label: point.label,
             },
           };
         });
@@ -374,6 +375,7 @@ export function buildTimelineTools({ projectId, runtimeContext }: ToolBuildConte
             timelinePointIdOrLabel: pointId,
           });
           invariant(resolvedPointId !== ORIGIN_TIMELINE_POINT_ID, "无法删除原点时间点。");
+          const label = getTimelineLabelById(workspace.id, resolvedPointId);
           deleteTimelinePoint(workspace.id, resolvedPointId, {
             purgeAuxLayers: purgeAuxLayers ?? undefined,
           });
@@ -384,6 +386,7 @@ export function buildTimelineTools({ projectId, runtimeContext }: ToolBuildConte
             data: {
               action: "deleted" as const,
               pointId: resolvedPointId,
+              label,
             },
           };
         });

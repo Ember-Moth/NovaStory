@@ -159,6 +159,44 @@ test("buildAssistantToolTraceSummary prefers returned manuscript titles", () => 
   ).toBe("移动正文 雨夜重逢");
 });
 
+test("buildAssistantToolTraceSummary prefers returned timeline labels", () => {
+  expect(
+    buildAssistantToolTraceSummary({
+      toolName: "set_current_timeline",
+      requestPayload: {
+        timelinePointId: "timeline_123",
+      },
+      responsePayload: {
+        ok: true,
+        data: {
+          action: "selected",
+          timelinePointId: "timeline_123",
+          timelineLabel: "第二幕",
+        },
+      },
+      status: "success",
+    }),
+  ).toBe("切换时间点 第二幕");
+
+  expect(
+    buildAssistantToolTraceSummary({
+      toolName: "move_story_timeline_point",
+      requestPayload: {
+        pointId: "timeline_123",
+      },
+      responsePayload: {
+        ok: true,
+        data: {
+          action: "moved",
+          pointId: "timeline_123",
+          label: "第二幕",
+        },
+      },
+      status: "success",
+    }),
+  ).toBe("移动时间点 第二幕");
+});
+
 test("getAssistantToolTrace marks tool failures from tool result payloads", () => {
   expect(
     getAssistantToolTrace(

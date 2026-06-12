@@ -1806,6 +1806,7 @@ test("move_story_timeline_point accepts pointId and afterPointId as timeline lab
     data: {
       action: "moved",
       pointId: expect.any(String),
+      label: "第二章",
     },
   });
   expect(workspaceDomain.listTimelinePoints(workspace.id).map((point) => point.label)).toEqual([
@@ -1860,6 +1861,7 @@ test("delete_story_timeline_point accepts pointId as timeline label", async () =
     data: {
       action: "deleted",
       pointId: expect.any(String),
+      label: "序幕",
     },
   });
   expect(workspaceDomain.listTimelinePoints(workspace.id).map((point) => point.label)).toEqual([

@@ -237,6 +237,25 @@ function getToolResponseTitle(payload: unknown) {
   return getRecordString(getToolResponseData(payload), "title");
 }
 
+function getToolResponseTimelineLabel(payload: unknown) {
+  const data = getToolResponseData(payload);
+  return getRecordString(data, "timelineLabel") ?? getRecordString(data, "label");
+}
+
+function getToolResponsePointCount(payload: unknown) {
+  const points = getRecordField(getToolResponseData(payload), "points");
+  return Array.isArray(points) ? points.length : null;
+}
+
+function getFirstToolResponsePointLabel(payload: unknown) {
+  const points = getRecordField(getToolResponseData(payload), "points");
+  if (!Array.isArray(points) || points.length !== 1) {
+    return null;
+  }
+
+  return getRecordString(points[0], "label");
+}
+
 export function buildAssistantToolTraceSummary({
   toolName,
   requestPayload,
@@ -250,6 +269,7 @@ export function buildAssistantToolTraceSummary({
 }) {
   const fallback = status === "error" ? `${toolName} 执行失败` : `调用 ${toolName}`;
   const responseTitle = getToolResponseTitle(responsePayload);
+  const responseTimelineLabel = getToolResponseTimelineLabel(responsePayload);
 
   switch (toolName) {
     case "list_files":
@@ -312,36 +332,41 @@ export function buildAssistantToolTraceSummary({
       return "查看故事时间线";
     case "list_current_timeline_aux_changes":
       return `查看时间点辅助变更 ${formatToolTarget(
-        getRecordString(requestPayload, "timelinePointId"),
+        responseTimelineLabel ?? getRecordString(requestPayload, "timelinePointId"),
         "当前",
       )}`;
     case "set_current_timeline":
       return `切换时间点 ${formatToolTarget(
-        getRecordString(requestPayload, "timelinePointId"),
+        responseTimelineLabel ?? getRecordString(requestPayload, "timelinePointId"),
         "",
       )}`.trim();
     case "create_story_timeline_points": {
-      const label = getFirstTimelinePointLabel(requestPayload);
+      const label =
+        getFirstToolResponsePointLabel(responsePayload) ??
+        getFirstTimelinePointLabel(requestPayload);
       if (label != null) {
         return `创建时间点 ${formatToolTarget(label, "")}`;
       }
 
-      const count = getTimelinePointCount(requestPayload);
+      const count =
+        getToolResponsePointCount(responsePayload) ?? getTimelinePointCount(requestPayload);
       return count == null ? "创建时间点" : `创建时间点 ${count} 个`;
     }
     case "update_story_timeline_point":
       return `更新时间点 ${formatToolTarget(
-        getRecordString(requestPayload, "label") ?? getRecordString(requestPayload, "pointId"),
+        responseTimelineLabel ??
+          getRecordString(requestPayload, "label") ??
+          getRecordString(requestPayload, "pointId"),
         "",
       )}`.trim();
     case "move_story_timeline_point":
       return `移动时间点 ${formatToolTarget(
-        getRecordString(requestPayload, "pointId"),
+        responseTimelineLabel ?? getRecordString(requestPayload, "pointId"),
         "",
       )}`.trim();
     case "delete_story_timeline_point":
       return `删除时间点 ${formatToolTarget(
-        getRecordString(requestPayload, "pointId"),
+        responseTimelineLabel ?? getRecordString(requestPayload, "pointId"),
         "",
       )}`.trim();
     default:
