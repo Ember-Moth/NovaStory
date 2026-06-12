@@ -30,14 +30,17 @@ export const TIMELINE_TOOL_NAMES = [
   "move_story_timeline_point",
   "delete_story_timeline_point",
 ] as const;
-export const AUX_READ_TOOL_NAMES = ["list_reference_dir", "read_reference_path"] as const;
+export const AUX_READ_TOOL_NAMES = [
+  "list_reference_overlay_dir",
+  "read_reference_overlay_path",
+] as const;
 export const AUX_WRITE_TOOL_NAMES = [
-  "create_reference_dir",
-  "write_reference_file",
-  "move_reference_node",
-  "delete_reference_node",
-  "create_reference_link",
-  "retarget_reference_link",
+  "create_reference_overlay_dir",
+  "write_reference_overlay_file",
+  "move_reference_overlay_node",
+  "delete_reference_overlay_node",
+  "create_reference_overlay_link",
+  "retarget_reference_overlay_link",
 ] as const;
 
 export type WritingContextToolName = (typeof WRITING_CONTEXT_TOOL_NAMES)[number];

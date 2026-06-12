@@ -225,12 +225,15 @@ test("sendProjectAssistantMessage invalidates overview, thread view, candidates,
       projectId: "rpc_assistant_send",
       threadId: "thread_send",
       text: "Hello",
-      activeTools: ["read_reference_path", "write_reference_file"],
+      activeTools: ["read_reference_overlay_path", "write_reference_overlay_file"],
     },
     requestCtx,
   );
 
-  expect(receivedActiveTools).toEqual(["read_reference_path", "write_reference_file"]);
+  expect(receivedActiveTools).toEqual([
+    "read_reference_overlay_path",
+    "write_reference_overlay_file",
+  ]);
   expect(result.invalidate).toEqual([
     rpcTags.aiProjectAssistantOverview("rpc_assistant_send"),
     rpcTags.aiProjectThreads("rpc_assistant_send"),
@@ -307,7 +310,7 @@ test("sendProjectAssistantMessage additionally invalidates aux workspace when th
           visibility: "internal" as const,
           mimeType: null,
           content: {
-            toolName: "write_reference_file",
+            toolName: "write_reference_overlay_file",
             output: {
               ok: true,
               data: {
@@ -419,7 +422,7 @@ test("sendProjectAssistantMessage additionally invalidates aux workspace when th
   ]);
 });
 
-test("sendProjectAssistantMessage additionally invalidates aux workspace for move_reference_node", async () => {
+test("sendProjectAssistantMessage additionally invalidates aux workspace for move_reference_overlay_node", async () => {
   useService({
     getProjectAssistantState: () => ({
       activeThreadId: null,
@@ -485,7 +488,7 @@ test("sendProjectAssistantMessage additionally invalidates aux workspace for mov
           visibility: "internal" as const,
           mimeType: null,
           content: {
-            toolName: "move_reference_node",
+            toolName: "move_reference_overlay_node",
             output: {
               ok: true,
               data: {
@@ -590,7 +593,7 @@ test("sendProjectAssistantMessage additionally invalidates aux workspace for mov
   expect(result.invalidate).toContainEqual(rpcTags.auxWorkspace("workspace_move"));
 });
 
-test("sendProjectAssistantMessage does not invalidate aux workspace for failed move_reference_node output", async () => {
+test("sendProjectAssistantMessage does not invalidate aux workspace for failed move_reference_overlay_node output", async () => {
   useService({
     getProjectAssistantState: () => ({
       activeThreadId: null,
@@ -656,7 +659,7 @@ test("sendProjectAssistantMessage does not invalidate aux workspace for failed m
           visibility: "internal" as const,
           mimeType: null,
           content: {
-            toolName: "move_reference_node",
+            toolName: "move_reference_overlay_node",
             output: {
               ok: false,
               error: "移动失败",
@@ -922,7 +925,7 @@ test("sendProjectAssistantMessageStream emits events and returns invalidate tags
       projectId: "rpc_assistant_stream",
       threadId: "thread_stream",
       text: "Hello",
-      activeTools: ["read_reference_path"],
+      activeTools: ["read_reference_overlay_path"],
     },
     streamRequestCtx,
     {
@@ -932,7 +935,7 @@ test("sendProjectAssistantMessageStream emits events and returns invalidate tags
     },
   );
 
-  expect(receivedActiveTools).toEqual(["read_reference_path"]);
+  expect(receivedActiveTools).toEqual(["read_reference_overlay_path"]);
   expect(emitted).toEqual([
     {
       type: "run-started",
@@ -971,7 +974,7 @@ test("continueProjectAssistantRunStream emits events and invalidates parent and 
     agentProfile: "project-assistant",
     selectionSnapshot: {},
     contextSnapshot: null,
-    activeTools: ["read_reference_path"],
+    activeTools: ["read_reference_overlay_path"],
     errorArtifactId: null,
     startedAt: 1,
     completedAt: 2,
@@ -990,7 +993,7 @@ test("continueProjectAssistantRunStream emits events and invalidates parent and 
     agentProfile: "project-assistant",
     selectionSnapshot: {},
     contextSnapshot: null,
-    activeTools: ["read_reference_path"],
+    activeTools: ["read_reference_overlay_path"],
     errorArtifactId: null,
     startedAt: 3,
     completedAt: null,

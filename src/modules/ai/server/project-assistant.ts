@@ -857,6 +857,7 @@ function extractWorkspaceMutationEventFromToolResult({
   const path = Reflect.get(data as Record<string, unknown>, "path");
   const previousPath = Reflect.get(data as Record<string, unknown>, "previousPath");
   const targetPath = Reflect.get(data as Record<string, unknown>, "targetPath");
+  const dataTimelinePointId = Reflect.get(data as Record<string, unknown>, "timelinePointId");
 
   const isContent = CONTENT_WRITE_TOOL_NAME_SET.has(toolName as string);
   const area = isContent ? "content" : "aux";
@@ -883,7 +884,10 @@ function extractWorkspaceMutationEventFromToolResult({
     type: "workspace-mutated",
     workspaceId: workspace.id,
     area,
-    timelinePointId: context?.activeTimelinePointId ?? ORIGIN_TIMELINE_POINT_ID,
+    timelinePointId:
+      typeof dataTimelinePointId === "string" && dataTimelinePointId.trim().length > 0
+        ? dataTimelinePointId
+        : (context?.activeTimelinePointId ?? ORIGIN_TIMELINE_POINT_ID),
     toolName,
     action: action as WorkspaceMutationAction,
     path: typeof path === "string" ? path : undefined,

@@ -82,8 +82,8 @@ export const PROJECT_ASSISTANT_READ_ONLY_TOOL_NAMES = [
   "get_writing_context",
   "get_manuscript_subtree",
   "list_story_timeline_points",
-  "list_reference_dir",
-  "read_reference_path",
+  "list_reference_overlay_dir",
+  "read_reference_overlay_path",
 ] as const;
 
 export const PROJECT_ASSISTANT_WRITE_TOOL_NAMES = [
@@ -95,12 +95,12 @@ export const PROJECT_ASSISTANT_WRITE_TOOL_NAMES = [
   "update_story_timeline_point",
   "move_story_timeline_point",
   "delete_story_timeline_point",
-  "create_reference_dir",
-  "write_reference_file",
-  "move_reference_node",
-  "delete_reference_node",
-  "create_reference_link",
-  "retarget_reference_link",
+  "create_reference_overlay_dir",
+  "write_reference_overlay_file",
+  "move_reference_overlay_node",
+  "delete_reference_overlay_node",
+  "create_reference_overlay_link",
+  "retarget_reference_overlay_link",
 ] as const;
 
 export const PROJECT_ASSISTANT_TOOL_NAMES = [

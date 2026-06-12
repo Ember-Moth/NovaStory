@@ -226,7 +226,7 @@ test("project assistant send tools include writes by default", () => {
     buildProjectAssistantSendActiveTools({
       allowWrites: DEFAULT_ALLOW_WRITES_FOR_NEXT_SEND,
     }),
-  ).toContain("write_reference_file");
+  ).toContain("write_reference_overlay_file");
 });
 
 test("buildProjectAssistantRetryActiveTools stays read-only", () => {
