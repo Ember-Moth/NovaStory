@@ -10,7 +10,6 @@ export type AuxNodeType = AuxNodeRow["nodeType"];
 
 export interface TimelinePointView {
   id: string | typeof ORIGIN_TIMELINE_POINT_ID;
-  key: string;
   label: string;
   description: string | null;
   prevPointId: string | typeof ORIGIN_TIMELINE_POINT_ID | null;

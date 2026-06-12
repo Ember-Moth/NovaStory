@@ -1,6 +1,5 @@
 import { useCallback, useState } from "react";
 
-import { createTimelineKey } from "@/shared/lib/domain";
 import {
   actionAnchorId,
   clearActionError,
@@ -1025,7 +1024,6 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         const point = await createTimeline.mutate({
           workspaceId,
           afterPointId: activeTimelinePointId,
-          key: createTimelineKey(),
           label: `新时间点 ${newIndex}`,
           description: "",
         });

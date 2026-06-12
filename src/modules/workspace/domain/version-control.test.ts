@@ -37,7 +37,6 @@ test("commit then checkout round-trips content, timeline and aux state", () => {
 
   const point = service.createTimelinePoint({
     workspaceId: workspace.id,
-    key: "tp_intro",
     label: "Intro",
   });
   const chapter = service.createContentNode({

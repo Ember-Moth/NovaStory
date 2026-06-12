@@ -875,7 +875,6 @@ test("continueProjectAssistantRun inherits the updated timeline context snapshot
   const timelinePoint = workspaceDomain.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
-    key: "now",
     label: "现在",
   });
   const seeded = seedCustomConnection({

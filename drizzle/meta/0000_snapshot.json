@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "75c5bf86-4642-4b84-aa2c-906463deed02",
+  "id": "1c8e52fd-62c6-4bed-bdb2-c9af1d860af0",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "agent_artifacts": {
@@ -659,6 +659,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "active_tools_json": {
+          "name": "active_tools_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "error_artifact_id": {
           "name": "error_artifact_id",
           "type": "text",
@@ -781,7 +788,7 @@
       "checkConstraints": {
         "agent_runs_mode_valid": {
           "name": "agent_runs_mode_valid",
-          "value": "\"agent_runs\".\"run_mode\" IN ('send', 'retry', 'regenerate', 'edit_regenerate', 'subagent')"
+          "value": "\"agent_runs\".\"run_mode\" IN ('send', 'retry', 'regenerate', 'edit_regenerate', 'continue', 'subagent')"
         },
         "agent_runs_status_valid": {
           "name": "agent_runs_status_valid",
@@ -2762,13 +2769,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "key": {
-          "name": "key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "label": {
           "name": "label",
           "type": "text",
@@ -2808,11 +2808,6 @@
         }
       },
       "indexes": {
-        "timeline_points_workspace_key_idx": {
-          "name": "timeline_points_workspace_key_idx",
-          "columns": ["workspace_id", "key"],
-          "isUnique": true
-        },
         "timeline_points_prev_point_idx": {
           "name": "timeline_points_prev_point_idx",
           "columns": ["workspace_id", "prev_point_id"],
@@ -2858,10 +2853,6 @@
       },
       "uniqueConstraints": {},
       "checkConstraints": {
-        "timeline_points_key_nonempty": {
-          "name": "timeline_points_key_nonempty",
-          "value": "length(\"timeline_points\".\"key\") > 0"
-        },
         "timeline_points_label_nonempty": {
           "name": "timeline_points_label_nonempty",
           "value": "length(\"timeline_points\".\"label\") > 0"

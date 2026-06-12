@@ -22,7 +22,6 @@ interface ContentTreePayload {
 interface TimelinePayload {
   points: Array<{
     id: string;
-    key: string;
     label: string;
     description: string | null;
   }>;
@@ -83,7 +82,6 @@ function snapshotTimeline(
   const payload: TimelinePayload = {
     points: ordered.map((row) => ({
       id: row.id,
-      key: row.key,
       label: row.label,
       description: row.description,
     })),
@@ -193,7 +191,6 @@ function restoreTimeline(
       .values({
         id: point.id,
         workspaceId,
-        key: point.key,
         label: point.label,
         description: point.description,
         prevPointId,

@@ -179,14 +179,12 @@ export const timelinePoints = sqliteTable(
     workspaceId: text("workspace_id")
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
-    key: text("key").notNull(),
     label: text("label").notNull(),
     description: text("description"),
     prevPointId: text("prev_point_id"),
     ...timestampColumns,
   },
   (table) => [
-    check("timeline_points_key_nonempty", sql`length(${table.key}) > 0`),
     check("timeline_points_label_nonempty", sql`length(${table.label}) > 0`),
     check(
       "timeline_points_prev_not_self",
@@ -198,7 +196,6 @@ export const timelinePoints = sqliteTable(
       foreignColumns: [table.workspaceId, table.id],
       name: "timeline_points_prev_same_workspace_fk",
     }),
-    uniqueIndex("timeline_points_workspace_key_idx").on(table.workspaceId, table.key),
     uniqueIndex("timeline_points_prev_point_idx").on(table.workspaceId, table.prevPointId),
     uniqueIndex("timeline_points_single_origin_successor_per_workspace_idx")
       .on(table.workspaceId)

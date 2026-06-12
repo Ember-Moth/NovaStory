@@ -178,7 +178,6 @@ test("write_file overlays inherited files without changing earlier timeline poin
   const timelinePoint = workspaceDomain.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
-    key: "draft",
     label: "Draft",
   });
   const tools = createAssistantTools({
@@ -531,7 +530,6 @@ test("move_path respects the active timeline point from context", async () => {
   const timelinePoint = workspaceDomain.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
-    key: "draft",
     label: "Draft",
   });
   const tools = createAssistantTools({
@@ -783,7 +781,6 @@ test("aux write tools respect the active timeline point from context", async () 
   const timelinePoint = workspaceDomain.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
-    key: "draft",
     label: "Draft",
   });
   const tools = createAssistantTools({
@@ -818,7 +815,6 @@ test("set_current_timeline updates runtime context for later file tools", async 
   const timelinePoint = workspaceDomain.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
-    key: "draft",
     label: "Draft",
   });
   const runtimeContext = createRuntimeContext({
@@ -866,7 +862,6 @@ test("set_current_timeline accepts origin", async () => {
   const timelinePoint = workspaceDomain.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
-    key: "draft",
     label: "Draft",
   });
   const runtimeContext = createRuntimeContext({
@@ -905,13 +900,11 @@ test("create_story_timeline_points accepts afterPointId as timeline label", asyn
   const prologue = workspaceDomain.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
-    key: "prologue",
     label: "序幕",
   });
   workspaceDomain.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: prologue.id,
-    key: "chapter-1",
     label: "第一章",
   });
   const tools = createAssistantTools({
@@ -920,7 +913,7 @@ test("create_story_timeline_points accepts afterPointId as timeline label", asyn
   });
 
   const result = await executeTool(tools.create_story_timeline_points!, {
-    points: [{ key: "turning-point", label: "转折" }],
+    points: [{ label: "转折" }],
     afterPointId: "序幕",
   });
 
@@ -928,7 +921,7 @@ test("create_story_timeline_points accepts afterPointId as timeline label", asyn
     ok: true,
     data: {
       action: "created_batch",
-      points: [{ key: "turning-point", label: "转折" }],
+      points: [{ label: "转折" }],
     },
   });
   expect(workspaceDomain.listTimelinePoints(workspace.id).map((point) => point.label)).toEqual([
@@ -944,13 +937,11 @@ test("create_story_timeline_points prefers exact id over matching label", async 
   const firstPoint = workspaceDomain.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
-    key: "alpha",
     label: "第一章",
   });
   workspaceDomain.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: firstPoint.id,
-    key: "beta",
     label: firstPoint.id,
   });
   const tools = createAssistantTools({
@@ -959,7 +950,7 @@ test("create_story_timeline_points prefers exact id over matching label", async 
   });
 
   await executeTool(tools.create_story_timeline_points!, {
-    points: [{ key: "gamma", label: "插入点" }],
+    points: [{ label: "插入点" }],
     afterPointId: firstPoint.id,
   });
 
@@ -976,7 +967,6 @@ test("create_story_timeline_points creates multiple points in one batch", async 
   workspaceDomain.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
-    key: "prologue",
     label: "序幕",
   });
   const tools = createAssistantTools({
@@ -986,11 +976,7 @@ test("create_story_timeline_points creates multiple points in one batch", async 
 
   const result = await executeTool(tools.create_story_timeline_points!, {
     afterPointId: "序幕",
-    points: [
-      { key: "chapter-1", label: "第一章" },
-      { key: "chapter-2", label: "第二章" },
-      { key: "chapter-3", label: "第三章" },
-    ],
+    points: [{ label: "第一章" }, { label: "第二章" }, { label: "第三章" }],
   });
 
   expect(result).toMatchObject({
@@ -998,9 +984,9 @@ test("create_story_timeline_points creates multiple points in one batch", async 
     data: {
       action: "created_batch",
       points: [
-        { key: "chapter-1", label: "第一章", pointId: expect.any(String) },
-        { key: "chapter-2", label: "第二章", pointId: expect.any(String) },
-        { key: "chapter-3", label: "第三章", pointId: expect.any(String) },
+        { label: "第一章", pointId: expect.any(String) },
+        { label: "第二章", pointId: expect.any(String) },
+        { label: "第三章", pointId: expect.any(String) },
       ],
     },
   });
@@ -1018,19 +1004,16 @@ test("move_story_timeline_point accepts pointId and afterPointId as timeline lab
   workspaceDomain.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
-    key: "prologue",
     label: "序幕",
   });
   workspaceDomain.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.listTimelinePoints(workspace.id)[1]!.id,
-    key: "chapter-1",
     label: "第一章",
   });
   workspaceDomain.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.listTimelinePoints(workspace.id)[2]!.id,
-    key: "chapter-2",
     label: "第二章",
   });
   const tools = createAssistantTools({
@@ -1081,13 +1064,11 @@ test("delete_story_timeline_point accepts pointId as timeline label", async () =
   workspaceDomain.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
-    key: "prologue",
     label: "序幕",
   });
   workspaceDomain.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.listTimelinePoints(workspace.id)[1]!.id,
-    key: "chapter-1",
     label: "第一章",
   });
   const tools = createAssistantTools({

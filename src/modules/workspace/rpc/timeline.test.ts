@@ -29,7 +29,6 @@ test("aux snapshot tree watches the active point snapshot key instead of workspa
   const point = service.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
-    key: "point_a",
     label: "Point A",
   });
 
@@ -52,7 +51,6 @@ test("timeline label updates do not invalidate aux snapshots", async () => {
   const point = service.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
-    key: "point_a",
     label: "Point A",
   });
 
@@ -73,13 +71,11 @@ test("deleting an unrelated later point only invalidates that point snapshot", a
   const pointA = service.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
-    key: "point_a",
     label: "Point A",
   });
   const pointB = service.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: pointA.id,
-    key: "point_b",
     label: "Point B",
   });
 
@@ -102,13 +98,11 @@ test("creating a later point only invalidates the new snapshot chain", async () 
   const pointA = service.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
-    key: "point_a",
     label: "Point A",
   });
   const pointB = service.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: pointA.id,
-    key: "point_b",
     label: "Point B",
   });
 
@@ -116,7 +110,6 @@ test("creating a later point only invalidates the new snapshot chain", async () 
     {
       workspaceId: workspace.id,
       afterPointId: pointB.id,
-      key: "point_c",
       label: "Point C",
     },
     requestCtx,

@@ -96,7 +96,6 @@ export function buildTimelineTools({ projectId, runtimeContext }: ToolBuildConte
         "在故事时间线上按顺序一次创建多个新时间点。用于批量新增剧情节拍；origin 是内置的全局初始设定原点，story 时间线从第一个自定义时间点开始。省略 afterPointId 时整体追加到故事时间线末尾。",
       inputSchema: jsonSchema<{
         points: Array<{
-          key: string;
           label: string;
           description?: string;
         }>;
@@ -112,12 +111,8 @@ export function buildTimelineTools({ projectId, runtimeContext }: ToolBuildConte
             items: {
               type: "object",
               additionalProperties: false,
-              required: ["key", "label"],
+              required: ["label"],
               properties: {
-                key: {
-                  type: "string",
-                  description: "时间点的唯一标识符，用于内部引用，需在当前时间线内唯一。",
-                },
                 label: {
                   type: "string",
                   description: "时间点的显示名称，如「序幕」「第一章」「转折」等。",
@@ -154,7 +149,6 @@ export function buildTimelineTools({ projectId, runtimeContext }: ToolBuildConte
             workspaceId: workspace.id,
             afterPointId: resolvedAfterPointId,
             points: points.map((point) => ({
-              key: point.key,
               label: point.label,
               description: point.description ?? undefined,
             })),
@@ -167,7 +161,6 @@ export function buildTimelineTools({ projectId, runtimeContext }: ToolBuildConte
               action: "created_batch" as const,
               points: createdPoints.map((point) => ({
                 pointId: point.id,
-                key: point.key,
                 label: point.label,
               })),
             },

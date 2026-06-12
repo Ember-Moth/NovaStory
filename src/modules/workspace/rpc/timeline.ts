@@ -32,7 +32,6 @@ export const create = mutation<
   {
     workspaceId: string;
     afterPointId?: string | typeof ORIGIN_TIMELINE_POINT_ID;
-    key: string;
     label: string;
     description?: string | null;
   },

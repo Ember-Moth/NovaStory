@@ -23,7 +23,6 @@ export function pointCondition(pointId: string | null) {
 export function originTimelinePoint(): TimelinePointView {
   return {
     id: ORIGIN_TIMELINE_POINT_ID,
-    key: ORIGIN_TIMELINE_POINT_ID,
     label: "Origin",
     description: "Implicit initial story state",
     prevPointId: null,

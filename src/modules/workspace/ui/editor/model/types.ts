@@ -8,7 +8,6 @@ export interface ContentTreeNodeVM {
 
 export interface TimelinePointVM {
   id: string;
-  key: string;
   label: string;
   description: string;
   isImplicitOrigin: boolean;
@@ -37,7 +36,6 @@ export interface RawContentTreeNode {
 
 export interface RawTimelinePoint {
   id: string;
-  key: string;
   label: string;
   description: string | null;
   isImplicitOrigin: boolean;

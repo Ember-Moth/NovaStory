@@ -74,7 +74,6 @@ export function buildTimelineState(points: RawTimelinePoint[]): TimelineState {
   for (const point of points) {
     const normalizedPoint: TimelinePointVM = {
       id: point.id,
-      key: point.key,
       label: point.isImplicitOrigin ? "原点" : point.label,
       description: point.isImplicitOrigin ? "故事初始状态" : (point.description ?? ""),
       isImplicitOrigin: point.isImplicitOrigin,

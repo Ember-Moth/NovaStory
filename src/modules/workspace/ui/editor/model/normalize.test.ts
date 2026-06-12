@@ -35,14 +35,12 @@ test("buildTimelineState normalizes labels and builds timeline lookup maps", () 
   const state = buildTimelineState([
     {
       id: "origin",
-      key: "origin",
       label: "Should not show",
       description: null,
       isImplicitOrigin: true,
     },
     {
       id: "point_a",
-      key: "point_a",
       label: "Point A",
       description: null,
       isImplicitOrigin: false,

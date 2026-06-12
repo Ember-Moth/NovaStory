@@ -36,7 +36,6 @@ test("uncommitted edits before first commit appear as additions", () => {
   });
   service.createTimelinePoint({
     workspaceId: workspace.id,
-    key: "tp_intro",
     label: "Intro",
   });
   const dir = service.mkdirAt({
@@ -92,7 +91,6 @@ test("content, timeline and aux edits appear in the diff summary", () => {
   });
   const introPoint = service.createTimelinePoint({
     workspaceId: workspace.id,
-    key: "tp_intro",
     label: "Intro",
   });
   const dir = service.mkdirAt({
@@ -116,7 +114,6 @@ test("content, timeline and aux edits appear in the diff summary", () => {
   });
   service.createTimelinePoint({
     workspaceId: workspace.id,
-    key: "tp_mid",
     label: "Middle",
   });
   service.deleteAuxNodeAt({ workspaceId: workspace.id, nodeId: dir.id });

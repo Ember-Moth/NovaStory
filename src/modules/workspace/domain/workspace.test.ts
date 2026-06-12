@@ -80,7 +80,6 @@ test("aux overlay resolves by timeline point and composeWritingContext follows a
   const point = service.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
-    key: "after_leave_home",
     label: "After leave home",
   });
   service.writeFileAt({
@@ -144,7 +143,6 @@ test("symlink keeps following the same aux node after rename and move", () => {
   const point = service.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
-    key: "after_move",
     label: "After move",
   });
   const villa = service.mkdirAt({
@@ -410,7 +408,6 @@ test("origin aux creation rejects names that would duplicate in descendant timel
   const point = service.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
-    key: "point_1",
     label: "Point 1",
   });
 
@@ -473,7 +470,6 @@ test("aux snapshot marks visible nodes with layers at the active timeline point"
   const point = service.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
-    key: "after_departure",
     label: "After departure",
   });
   service.writeFileAt({
@@ -528,7 +524,6 @@ test("aux snapshot exports deleted folders as deleted ghost subtrees", () => {
   const point = service.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
-    key: "after_delete_state",
     label: "After delete state",
   });
   service.deleteAuxNodeAt({
@@ -563,7 +558,6 @@ test("restoreAuxNodeAt removes the active timeline point aux layer", () => {
   const point = service.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
-    key: "after_notes",
     label: "After notes",
   });
   service.writeFileAt({
@@ -600,7 +594,6 @@ test("restoreAuxNodeAt restores deleted aux nodes by removing the tombstone laye
   const point = service.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
-    key: "after_delete_notes",
     label: "After delete notes",
   });
   service.deleteAuxNodeAt({
@@ -637,7 +630,6 @@ test("restoreAuxNodeAt rejects restore when it would reveal a renamed duplicate"
   const point = service.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
-    key: "after_rename_notes",
     label: "After rename notes",
   });
   service.moveAuxNodeAt({
@@ -684,7 +676,6 @@ test("restoreAuxNodeAt rejects restore when it would reveal a deleted duplicate"
   const point = service.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
-    key: "after_delete_duplicate_notes",
     label: "After delete duplicate notes",
   });
   service.deleteAuxNodeAt({
@@ -857,13 +848,11 @@ test("content node anchor point can be updated", () => {
   const pointA = service.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
-    key: "anchor_point_a",
     label: "Point A",
   });
   const pointB = service.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: pointA.id,
-    key: "anchor_point_b",
     label: "Point B",
   });
   const scene = service.createContentNode({
@@ -889,7 +878,6 @@ test("timeline point deletion is blocked when content still anchors to it", () =
   const point = service.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
-    key: "occupied_point",
     label: "Occupied point",
   });
 
@@ -925,7 +913,6 @@ test("listAuxChangesAt only returns layer changes at the requested timeline poin
   const point = service.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
-    key: "overlay_point",
     label: "Overlay point",
   });
   service.writeFileAt({
@@ -953,7 +940,6 @@ test("timeline point deletion is blocked when auxiliary layers exist without pur
   const point = service.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
-    key: "aux_point",
     label: "Aux point",
   });
 
@@ -975,7 +961,6 @@ test("timeline point deletion purges auxiliary layers when requested", () => {
   const point = service.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
-    key: "purge_point",
     label: "Purge point",
   });
 
@@ -1006,14 +991,12 @@ test("timeline point insertion at origin rewires the previous head", () => {
   const pointA = service.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
-    key: "point_a",
     label: "Point A",
   });
 
   const pointB = service.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
-    key: "point_b",
     label: "Point B",
   });
 
@@ -1030,18 +1013,13 @@ test("timeline point batch insertion preserves order without requiring intermedi
   const pointA = service.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
-    key: "point_a",
     label: "Point A",
   });
 
   const created = service.createTimelinePoints({
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
-    points: [
-      { key: "point_b", label: "Point B" },
-      { key: "point_c", label: "Point C" },
-      { key: "point_d", label: "Point D" },
-    ],
+    points: [{ label: "Point B" }, { label: "Point C" }, { label: "Point D" }],
   });
 
   const ordered = service.listTimelinePoints(workspace.id);
@@ -1060,25 +1038,21 @@ test("timeline point move rewires both source and target segments", () => {
   const pointA = service.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
-    key: "point_a",
     label: "Point A",
   });
   const pointB = service.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: pointA.id,
-    key: "point_b",
     label: "Point B",
   });
   const pointC = service.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: pointB.id,
-    key: "point_c",
     label: "Point C",
   });
   const pointD = service.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: pointC.id,
-    key: "point_d",
     label: "Point D",
   });
 
@@ -1245,7 +1219,6 @@ test("timeline point label can be updated", () => {
   const point = service.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
-    key: "before_update",
     label: "Before update",
   });
 

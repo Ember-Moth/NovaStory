@@ -18,7 +18,6 @@ interface ContentTreePayload {
 interface TimelinePayload {
   points: Array<{
     id: string;
-    key: string;
     label: string;
     description: string | null;
   }>;

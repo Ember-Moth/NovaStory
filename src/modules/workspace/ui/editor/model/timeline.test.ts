@@ -11,7 +11,6 @@ function createTimelinePoint(
   const { id, label, ...rest } = overrides;
   return {
     id,
-    key: id,
     label,
     description: "",
     isImplicitOrigin: false,

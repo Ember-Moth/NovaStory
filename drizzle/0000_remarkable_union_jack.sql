@@ -97,6 +97,7 @@ CREATE TABLE `agent_runs` (
 	`agent_profile` text NOT NULL,
 	`selection_snapshot_json` text DEFAULT '{}' NOT NULL,
 	`context_snapshot_json` text,
+	`active_tools_json` text,
 	`error_artifact_id` text,
 	`started_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
 	`completed_at` integer,
@@ -108,7 +109,7 @@ CREATE TABLE `agent_runs` (
 	FOREIGN KEY (`trigger_node_id`) REFERENCES `agent_thread_nodes`(`id`) ON UPDATE no action ON DELETE set null,
 	FOREIGN KEY (`base_tip_node_id`) REFERENCES `agent_thread_nodes`(`id`) ON UPDATE no action ON DELETE set null,
 	FOREIGN KEY (`error_artifact_id`) REFERENCES `agent_artifacts`(`id`) ON UPDATE no action ON DELETE set null,
-	CONSTRAINT "agent_runs_mode_valid" CHECK("agent_runs"."run_mode" IN ('send', 'retry', 'regenerate', 'edit_regenerate', 'subagent')),
+	CONSTRAINT "agent_runs_mode_valid" CHECK("agent_runs"."run_mode" IN ('send', 'retry', 'regenerate', 'edit_regenerate', 'continue', 'subagent')),
 	CONSTRAINT "agent_runs_status_valid" CHECK("agent_runs"."status" IN ('queued', 'running', 'succeeded', 'failed', 'cancelled')),
 	CONSTRAINT "agent_runs_profile_nonempty" CHECK(length("agent_runs"."agent_profile") > 0)
 );
@@ -428,7 +429,6 @@ CREATE INDEX `projects_default_branch_idx` ON `projects` (`default_branch_id`);-
 CREATE TABLE `timeline_points` (
 	`id` text NOT NULL,
 	`workspace_id` text NOT NULL,
-	`key` text NOT NULL,
 	`label` text NOT NULL,
 	`description` text,
 	`prev_point_id` text,
@@ -437,12 +437,10 @@ CREATE TABLE `timeline_points` (
 	PRIMARY KEY(`workspace_id`, `id`),
 	FOREIGN KEY (`workspace_id`) REFERENCES `workspaces`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`workspace_id`,`prev_point_id`) REFERENCES `timeline_points`(`workspace_id`,`id`) ON UPDATE no action ON DELETE no action,
-	CONSTRAINT "timeline_points_key_nonempty" CHECK(length("timeline_points"."key") > 0),
 	CONSTRAINT "timeline_points_label_nonempty" CHECK(length("timeline_points"."label") > 0),
 	CONSTRAINT "timeline_points_prev_not_self" CHECK("timeline_points"."prev_point_id" IS NULL OR "timeline_points"."prev_point_id" <> "timeline_points"."id")
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `timeline_points_workspace_key_idx` ON `timeline_points` (`workspace_id`,`key`);--> statement-breakpoint
 CREATE UNIQUE INDEX `timeline_points_prev_point_idx` ON `timeline_points` (`workspace_id`,`prev_point_id`);--> statement-breakpoint
 CREATE UNIQUE INDEX `timeline_points_single_origin_successor_per_workspace_idx` ON `timeline_points` (`workspace_id`) WHERE "timeline_points"."prev_point_id" IS NULL;--> statement-breakpoint
 CREATE INDEX `timeline_points_workspace_idx` ON `timeline_points` (`workspace_id`);--> statement-breakpoint

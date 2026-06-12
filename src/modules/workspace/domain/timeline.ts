@@ -47,7 +47,6 @@ export function listTimelinePoints(workspaceId: string): TimelinePointView[] {
     originTimelinePoint(),
     ...ordered.map((row) => ({
       id: row.id,
-      key: row.key,
       label: row.label,
       description: row.description,
       prevPointId: pointIdOrOrigin(row.prevPointId),
@@ -59,7 +58,6 @@ export function listTimelinePoints(workspaceId: string): TimelinePointView[] {
 export function createTimelinePoint(input: {
   workspaceId: string;
   afterPointId?: string | typeof ORIGIN_TIMELINE_POINT_ID;
-  key: string;
   label: string;
   description?: string | null;
 }) {
@@ -68,7 +66,6 @@ export function createTimelinePoint(input: {
     afterPointId: input.afterPointId,
     points: [
       {
-        key: input.key,
         label: input.label,
         description: input.description,
       },
@@ -80,7 +77,6 @@ export function createTimelinePoints(input: {
   workspaceId: string;
   afterPointId?: string | typeof ORIGIN_TIMELINE_POINT_ID;
   points: Array<{
-    key: string;
     label: string;
     description?: string | null;
   }>;
@@ -108,7 +104,6 @@ export function createTimelinePoints(input: {
         .values({
           id: pointId,
           workspaceId: workspace.id,
-          key: point.key,
           label: point.label,
           description: point.description ?? null,
           prevPointId,
