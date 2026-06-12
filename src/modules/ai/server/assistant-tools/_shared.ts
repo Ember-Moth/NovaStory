@@ -23,7 +23,13 @@ export const CONTENT_WRITE_TOOL_NAMES = [
   "move_content_node",
   "delete_content_node",
 ] as const;
-export const TIMELINE_TOOL_NAMES = ["list_timeline_points"] as const;
+export const TIMELINE_TOOL_NAMES = [
+  "list_timeline_points",
+  "create_timeline_point",
+  "update_timeline_point",
+  "move_timeline_point",
+  "delete_timeline_point",
+] as const;
 export const AUX_READ_TOOL_NAMES = ["list_aux_dir", "read_aux_path"] as const;
 export const AUX_WRITE_TOOL_NAMES = [
   "mkdir_aux_dir",
