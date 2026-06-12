@@ -37,7 +37,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
         properties: {
           path: {
             type: "string",
-            description: "要创建的参考资料目录绝对路径，例如 /设定/角色。",
+            description: "要创建的参考资料目录绝对路径，例如 /角色。",
           },
         },
       }),
@@ -88,7 +88,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
         properties: {
           path: {
             type: "string",
-            description: "要写入的参考资料文件绝对路径，例如 /设定/角色/主角.md。",
+            description: "要写入的参考资料文件绝对路径，例如 /角色/主角.md。",
           },
           content: {
             type: "string",
@@ -166,7 +166,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
         properties: {
           path: {
             type: "string",
-            description: "要移动的参考资料绝对路径，例如 /设定/角色.md。",
+            description: "要移动的参考资料绝对路径，例如 /角色.md。",
           },
           newPath: {
             type: "string",
@@ -243,7 +243,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
         properties: {
           path: {
             type: "string",
-            description: "要删除的参考资料绝对路径，例如 /设定/旧角色.md。",
+            description: "要删除的参考资料绝对路径，例如 /旧角色.md。",
           },
         },
       }),
