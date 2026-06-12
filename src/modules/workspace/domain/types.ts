@@ -67,10 +67,13 @@ export interface ResolvedAuxNode {
   path: string;
 }
 
-export interface AuxDirListTreeNode extends ResolvedAuxNode {
-  symlinkTargetPath: string | null;
+export interface AuxDirListTreeNode {
+  nodeType: AuxNodeType;
+  name: string | null;
+  path: string;
+  symlinkTargetPath?: string;
   children: AuxDirListTreeNode[];
-  hiddenChildrenCount: number;
+  hiddenChildrenCount?: number;
 }
 
 export interface WritingContext {

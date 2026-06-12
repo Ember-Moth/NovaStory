@@ -440,17 +440,11 @@ function buildAuxDirTreeFromSnapshot(
         truncated = true;
       }
       return {
-        id: node.id,
         nodeType: node.nodeType,
-        parentAuxNodeId: node.parentAuxNodeId,
         name: node.name,
-        content: node.content,
-        symlinkTargetAuxNodeId: node.symlinkTargetAuxNodeId,
-        timelinePointId: node.timelinePointId,
         path: node.path,
-        symlinkTargetPath,
         children: childTree.nodes,
-        hiddenChildrenCount: 0,
+        ...(symlinkTargetPath ? { symlinkTargetPath } : {}),
       } satisfies AuxDirListTreeNode;
     }
 
@@ -463,17 +457,12 @@ function buildAuxDirTreeFromSnapshot(
     }
 
     return {
-      id: node.id,
       nodeType: node.nodeType,
-      parentAuxNodeId: node.parentAuxNodeId,
       name: node.name,
-      content: node.content,
-      symlinkTargetAuxNodeId: node.symlinkTargetAuxNodeId,
-      timelinePointId: node.timelinePointId,
       path: node.path,
-      symlinkTargetPath,
       children: [],
-      hiddenChildrenCount,
+      ...(symlinkTargetPath ? { symlinkTargetPath } : {}),
+      ...(hiddenChildrenCount > 0 ? { hiddenChildrenCount } : {}),
     } satisfies AuxDirListTreeNode;
   });
 
