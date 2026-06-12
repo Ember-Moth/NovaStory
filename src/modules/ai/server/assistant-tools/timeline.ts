@@ -15,9 +15,12 @@ import {
   jsonSchema,
   limitTimelinePoints,
   resolveSelectableTimelinePoint,
+  resolveTimelinePointIdOrLabel,
   updateRuntimeTimelineSelection,
   withEnvelope,
 } from "./_shared";
+import { invariant } from "@/shared/lib/domain";
+import { ORIGIN_TIMELINE_POINT_ID } from "@/modules/workspace/domain";
 
 export function buildTimelineTools({ projectId, runtimeContext }: ToolBuildContext) {
   return {
@@ -126,12 +129,19 @@ export function buildTimelineTools({ projectId, runtimeContext }: ToolBuildConte
         }
 
         return withEnvelope(() => {
+          const resolvedAfterPointId =
+            afterPointId === undefined
+              ? undefined
+              : resolveTimelinePointIdOrLabel({
+                  workspaceId: workspace.id,
+                  timelinePointIdOrLabel: afterPointId,
+                });
           const point = createTimelinePoint({
             workspaceId: workspace.id,
             key,
             label,
             description: description ?? undefined,
-            afterPointId: afterPointId ?? undefined,
+            afterPointId: resolvedAfterPointId,
           });
 
           return {
@@ -210,12 +220,12 @@ export function buildTimelineTools({ projectId, runtimeContext }: ToolBuildConte
         properties: {
           pointId: {
             type: "string",
-            description: "要移动的时间点 ID。",
+            description: "要移动的时间点 ID 或名称。",
           },
           afterPointId: {
             type: "string",
             description:
-              '移动后该时间点将排在此时间点之后。省略则移动到故事时间线末尾。传入 "origin" 表示移动到全局初始设定原点之后，即故事时间线的最前端。',
+              '移动后该时间点将排在此时间点之后。可传时间点 ID 或名称。省略则移动到故事时间线末尾。传入 "origin" 表示移动到全局初始设定原点之后，即故事时间线的最前端。',
           },
         },
       }),
@@ -226,10 +236,22 @@ export function buildTimelineTools({ projectId, runtimeContext }: ToolBuildConte
         }
 
         return withEnvelope(() => {
+          const resolvedPointId = resolveTimelinePointIdOrLabel({
+            workspaceId: workspace.id,
+            timelinePointIdOrLabel: pointId,
+          });
+          invariant(resolvedPointId !== ORIGIN_TIMELINE_POINT_ID, "无法移动原点时间点。");
+          const resolvedAfterPointId =
+            afterPointId === undefined
+              ? undefined
+              : resolveTimelinePointIdOrLabel({
+                  workspaceId: workspace.id,
+                  timelinePointIdOrLabel: afterPointId,
+                });
           const point = moveTimelinePoint({
             workspaceId: workspace.id,
-            pointId,
-            afterPointId: afterPointId ?? undefined,
+            pointId: resolvedPointId,
+            afterPointId: resolvedAfterPointId,
           });
 
           return {
@@ -255,7 +277,7 @@ export function buildTimelineTools({ projectId, runtimeContext }: ToolBuildConte
         properties: {
           pointId: {
             type: "string",
-            description: "要删除的时间点 ID。不能删除 origin 原点（全局初始设定锚点）。",
+            description: "要删除的时间点 ID 或名称。不能删除 origin 原点（全局初始设定锚点）。",
           },
           purgeAuxLayers: {
             type: "boolean",
@@ -271,7 +293,12 @@ export function buildTimelineTools({ projectId, runtimeContext }: ToolBuildConte
         }
 
         return withEnvelope(() => {
-          deleteTimelinePoint(workspace.id, pointId, {
+          const resolvedPointId = resolveTimelinePointIdOrLabel({
+            workspaceId: workspace.id,
+            timelinePointIdOrLabel: pointId,
+          });
+          invariant(resolvedPointId !== ORIGIN_TIMELINE_POINT_ID, "无法删除原点时间点。");
+          deleteTimelinePoint(workspace.id, resolvedPointId, {
             purgeAuxLayers: purgeAuxLayers ?? undefined,
           });
 
@@ -280,7 +307,7 @@ export function buildTimelineTools({ projectId, runtimeContext }: ToolBuildConte
             truncated: false,
             data: {
               action: "deleted" as const,
-              pointId,
+              pointId: resolvedPointId,
             },
           };
         });

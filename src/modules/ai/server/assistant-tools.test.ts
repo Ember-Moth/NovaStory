@@ -899,3 +899,193 @@ test("set_current_timeline accepts origin", async () => {
     workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
   );
 });
+
+test("create_story_timeline_point accepts afterPointId as timeline label", async () => {
+  const workspace = seedProject("assistant_tools_create_timeline_after_label");
+  const prologue = workspaceDomain.createTimelinePoint({
+    workspaceId: workspace.id,
+    afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+    key: "prologue",
+    label: "序幕",
+  });
+  workspaceDomain.createTimelinePoint({
+    workspaceId: workspace.id,
+    afterPointId: prologue.id,
+    key: "chapter-1",
+    label: "第一章",
+  });
+  const tools = createAssistantTools({
+    projectId: "assistant_tools_create_timeline_after_label",
+    runtimeContext: createRuntimeContext(),
+  });
+
+  const result = await executeTool(tools.create_story_timeline_point!, {
+    key: "turning-point",
+    label: "转折",
+    afterPointId: "序幕",
+  });
+
+  expect(result).toMatchObject({
+    ok: true,
+    data: {
+      action: "created",
+      key: "turning-point",
+      label: "转折",
+    },
+  });
+  expect(workspaceDomain.listTimelinePoints(workspace.id).map((point) => point.label)).toEqual([
+    "Origin",
+    "序幕",
+    "转折",
+    "第一章",
+  ]);
+});
+
+test("create_story_timeline_point prefers exact id over matching label", async () => {
+  const workspace = seedProject("assistant_tools_create_timeline_after_id_priority");
+  const firstPoint = workspaceDomain.createTimelinePoint({
+    workspaceId: workspace.id,
+    afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+    key: "alpha",
+    label: "第一章",
+  });
+  workspaceDomain.createTimelinePoint({
+    workspaceId: workspace.id,
+    afterPointId: firstPoint.id,
+    key: "beta",
+    label: firstPoint.id,
+  });
+  const tools = createAssistantTools({
+    projectId: "assistant_tools_create_timeline_after_id_priority",
+    runtimeContext: createRuntimeContext(),
+  });
+
+  await executeTool(tools.create_story_timeline_point!, {
+    key: "gamma",
+    label: "插入点",
+    afterPointId: firstPoint.id,
+  });
+
+  expect(workspaceDomain.listTimelinePoints(workspace.id).map((point) => point.label)).toEqual([
+    "Origin",
+    "第一章",
+    "插入点",
+    firstPoint.id,
+  ]);
+});
+
+test("move_story_timeline_point accepts pointId and afterPointId as timeline labels", async () => {
+  const workspace = seedProject("assistant_tools_move_timeline_by_label");
+  workspaceDomain.createTimelinePoint({
+    workspaceId: workspace.id,
+    afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+    key: "prologue",
+    label: "序幕",
+  });
+  workspaceDomain.createTimelinePoint({
+    workspaceId: workspace.id,
+    afterPointId: workspaceDomain.listTimelinePoints(workspace.id)[1]!.id,
+    key: "chapter-1",
+    label: "第一章",
+  });
+  workspaceDomain.createTimelinePoint({
+    workspaceId: workspace.id,
+    afterPointId: workspaceDomain.listTimelinePoints(workspace.id)[2]!.id,
+    key: "chapter-2",
+    label: "第二章",
+  });
+  const tools = createAssistantTools({
+    projectId: "assistant_tools_move_timeline_by_label",
+    runtimeContext: createRuntimeContext(),
+  });
+
+  const result = await executeTool(tools.move_story_timeline_point!, {
+    pointId: "第二章",
+    afterPointId: "序幕",
+  });
+
+  expect(result).toMatchObject({
+    ok: true,
+    data: {
+      action: "moved",
+      pointId: expect.any(String),
+    },
+  });
+  expect(workspaceDomain.listTimelinePoints(workspace.id).map((point) => point.label)).toEqual([
+    "Origin",
+    "序幕",
+    "第二章",
+    "第一章",
+  ]);
+});
+
+test("move_story_timeline_point rejects origin by name", async () => {
+  const workspace = seedProject("assistant_tools_move_timeline_origin_guard");
+  const tools = createAssistantTools({
+    projectId: "assistant_tools_move_timeline_origin_guard",
+    runtimeContext: createRuntimeContext(),
+  });
+
+  const result = await executeTool(tools.move_story_timeline_point!, {
+    pointId: "origin",
+  });
+
+  expect(result).toEqual({
+    ok: false,
+    error: "无法移动原点时间点。",
+  });
+  expect(workspace.id).toBeTruthy();
+});
+
+test("delete_story_timeline_point accepts pointId as timeline label", async () => {
+  const workspace = seedProject("assistant_tools_delete_timeline_by_label");
+  workspaceDomain.createTimelinePoint({
+    workspaceId: workspace.id,
+    afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+    key: "prologue",
+    label: "序幕",
+  });
+  workspaceDomain.createTimelinePoint({
+    workspaceId: workspace.id,
+    afterPointId: workspaceDomain.listTimelinePoints(workspace.id)[1]!.id,
+    key: "chapter-1",
+    label: "第一章",
+  });
+  const tools = createAssistantTools({
+    projectId: "assistant_tools_delete_timeline_by_label",
+    runtimeContext: createRuntimeContext(),
+  });
+
+  const result = await executeTool(tools.delete_story_timeline_point!, {
+    pointId: "序幕",
+  });
+
+  expect(result).toMatchObject({
+    ok: true,
+    data: {
+      action: "deleted",
+      pointId: expect.any(String),
+    },
+  });
+  expect(workspaceDomain.listTimelinePoints(workspace.id).map((point) => point.label)).toEqual([
+    "Origin",
+    "第一章",
+  ]);
+});
+
+test("delete_story_timeline_point rejects origin by name", async () => {
+  seedProject("assistant_tools_delete_timeline_origin_guard");
+  const tools = createAssistantTools({
+    projectId: "assistant_tools_delete_timeline_origin_guard",
+    runtimeContext: createRuntimeContext(),
+  });
+
+  const result = await executeTool(tools.delete_story_timeline_point!, {
+    pointId: "origin",
+  });
+
+  expect(result).toEqual({
+    ok: false,
+    error: "无法删除原点时间点。",
+  });
+});

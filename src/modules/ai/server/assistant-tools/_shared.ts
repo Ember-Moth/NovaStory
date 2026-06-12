@@ -266,6 +266,25 @@ export function resolveSelectableTimelinePoint(input: {
   };
 }
 
+export function resolveTimelinePointIdOrLabel(input: {
+  workspaceId: string;
+  timelinePointIdOrLabel: string;
+}) {
+  if (input.timelinePointIdOrLabel === "origin") {
+    return ORIGIN_TIMELINE_POINT_ID;
+  }
+
+  const points = listTimelinePoints(input.workspaceId);
+  const foundById = points.find((point) => point.id === input.timelinePointIdOrLabel);
+  if (foundById) {
+    return foundById.id;
+  }
+
+  const foundByLabel = points.find((point) => point.label === input.timelinePointIdOrLabel);
+  invariant(foundByLabel, "指定的 afterPointId 不存在。");
+  return foundByLabel.id;
+}
+
 export function updateRuntimeTimelineSelection(input: {
   runtimeContext: ToolRuntimeContext;
   timelinePointId: string;
