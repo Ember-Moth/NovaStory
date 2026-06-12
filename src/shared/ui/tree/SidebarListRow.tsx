@@ -74,7 +74,7 @@ export function SidebarListRow({
         groupClass,
         interactiveClass,
         multiline
-          ? "grid h-auto min-h-10 grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto] items-start gap-x-1 py-1"
+          ? "grid h-auto grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto] items-start gap-x-1 py-1"
           : "",
         className,
       )}
@@ -93,11 +93,11 @@ export function SidebarListRow({
           <div className="col-start-2 row-start-1 min-w-0">
             <div className="flex min-w-0 items-center gap-1">{label}</div>
           </div>
-          <div className="col-start-3 row-start-1 mt-0.5 self-start">
+          <div className="col-start-3 row-start-1 row-end-3 mt-0.5 self-start">
             <RowHoverSlot badge={trailing} actions={actions} />
           </div>
           {description ? (
-            <div className="col-[2/4] row-start-2 mt-0.5 min-w-0 text-[11px] leading-4 text-foreground-muted">
+            <div className="col-[2/4] row-start-2 min-w-0 text-[11px] leading-4 text-foreground-muted">
               {description}
             </div>
           ) : null}

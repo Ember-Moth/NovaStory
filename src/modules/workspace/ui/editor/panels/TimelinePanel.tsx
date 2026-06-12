@@ -155,7 +155,7 @@ function TimelinePointRow({
           onEditingChange={setIsEditing}
           onCommit={(label) => onRename(point.id, label)}
           className={cn(
-            "min-w-0 flex-1 truncate leading-5.5",
+            "min-w-0 flex-1 truncate",
             isAnchored ? "font-bold text-accent-foreground" : "",
           )}
         />
