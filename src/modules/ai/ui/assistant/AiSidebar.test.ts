@@ -220,10 +220,16 @@ test("buildProjectAssistantSendActiveTools adds write tools only when writes are
     "list_timeline_points",
     "list_aux_dir",
     "read_aux_path",
+    "create_content_node",
+    "update_content_node",
+    "move_content_node",
+    "delete_content_node",
     "mkdir_aux_dir",
     "write_aux_file",
     "move_aux_node",
+    "delete_aux_node",
     "create_aux_symlink",
+    "retarget_aux_symlink",
   ]);
 });
 
