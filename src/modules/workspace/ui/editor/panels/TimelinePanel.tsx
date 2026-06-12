@@ -10,12 +10,7 @@ import type { TimelinePointVM } from "@/modules/workspace/ui/editor/model/types"
 import { cn } from "@/shared/lib/cn";
 import { InlineEditableText } from "@/shared/ui/InlineEditableText";
 import { RefreshOverlay } from "@/shared/ui/RefreshOverlay";
-import {
-  rowPaddingLeft,
-  RowActionButton,
-  SidebarListRow,
-  useRowPointerGesture,
-} from "@/shared/ui/tree";
+import { RowActionButton, SidebarListRow, useRowPointerGesture } from "@/shared/ui/tree";
 
 const TIMELINE_ROW_SELECTOR = "[data-row-id]";
 
@@ -280,7 +275,8 @@ export function TimelinePanel({
         ? anchorRect.bottom - panelRect.top
         : anchorRect.top - panelRect.top;
     const clampedTop = Math.min(Math.max(top, 1), Math.max(panelRect.height - 1, 1));
-    const left = Math.max(rowPaddingLeft(0) + 8, 8);
+    // 刚好为条目左侧图标的中心
+    const left = 13;
     const width = Math.max(panelRect.width - left, 24);
 
     setDropIndicatorRect({

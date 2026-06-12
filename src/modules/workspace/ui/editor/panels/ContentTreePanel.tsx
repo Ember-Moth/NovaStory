@@ -397,7 +397,8 @@ export function ContentTreePanel({
         ? anchorRect.top - panelRect.top
         : anchorRect.bottom - panelRect.top;
     const clampedTop = Math.min(Math.max(top, 1), Math.max(panelRect.height - 1, 1));
-    const left = Math.max(rowPaddingLeft(boundaryDrop.depth) + 8, 8);
+    // 刚好为条目左侧图标的中心
+    const left = rowPaddingLeft(boundaryDrop.depth) + 24;
     const width = Math.max(panelRect.width - left, 24);
 
     setDropIndicatorRect({
