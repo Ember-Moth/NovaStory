@@ -56,6 +56,7 @@ test("TimelinePanel renders point descriptions as a second line instead of trail
   );
 
   expect(html).toContain("主角第一次公开违抗命令");
-  expect(html).toContain("min-h-10");
+  expect(html).toContain("grid-rows-[auto_auto]");
+  expect(html).toContain("row-start-2");
   expect(html).not.toContain("max-w-20");
 });

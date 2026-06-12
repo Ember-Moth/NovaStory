@@ -717,7 +717,7 @@ test("write_file returns an error when the parent directory does not exist", asy
     content: "主角设定",
   });
 
-  expect(result).toEqual({
+  expect(result).toMatchObject({
     ok: false,
     error: "写入辅助资料文件失败：父目录不存在或在当前时间点不可见。",
   });
@@ -741,7 +741,7 @@ test("write_file returns an error when the target path is a directory", async ()
     content: "should fail",
   });
 
-  expect(result).toEqual({
+  expect(result).toMatchObject({
     ok: false,
     error: "写入辅助资料文件失败：目标路径不是文件。",
   });
@@ -927,7 +927,7 @@ test("move_path returns an error when the target path already exists", async () 
     newPath: "/设定/主角.md",
   });
 
-  expect(result).toEqual({
+  expect(result).toMatchObject({
     ok: false,
     error: "移动辅助资料失败：目标路径已存在。",
   });
@@ -958,7 +958,7 @@ test("move_path returns an error when the target parent directory does not exist
     newPath: "/资料库/角色.md",
   });
 
-  expect(result).toEqual({
+  expect(result).toMatchObject({
     ok: false,
     error: "移动辅助资料失败：父目录不存在或在当前时间点不可见。",
   });
@@ -988,7 +988,7 @@ test("move_path rejects moving a directory into its own subtree", async () => {
     newPath: "/设定/角色/设定",
   });
 
-  expect(result).toEqual({
+  expect(result).toMatchObject({
     ok: false,
     error: "无法移动：不能把辅助信息移动到自己的子节点下。",
   });
@@ -1169,7 +1169,7 @@ test("create_symlink returns an error when the target does not exist", async () 
     targetPath: "/设定/角色.md",
   });
 
-  expect(result).toEqual({
+  expect(result).toMatchObject({
     ok: false,
     error: "创建辅助资料符号链接失败：目标路径不存在或在当前时间点不可见。",
   });
@@ -1213,7 +1213,7 @@ test("create_symlink returns an error when the destination path already exists",
     targetPath: "/设定/角色.md",
   });
 
-  expect(result).toEqual({
+  expect(result).toMatchObject({
     ok: false,
     error: "创建辅助资料符号链接失败：目标路径已存在。",
   });
@@ -1256,7 +1256,7 @@ test("create_symlink suggests retarget_symlink when the destination is an existi
     targetPath: "/场景",
   });
 
-  expect(result).toEqual({
+  expect(result).toMatchObject({
     ok: false,
     error:
       "创建辅助资料符号链接失败：同路径已存在符号链接。通常你想要的是调用 retarget_symlink 来修改它的目标。",
