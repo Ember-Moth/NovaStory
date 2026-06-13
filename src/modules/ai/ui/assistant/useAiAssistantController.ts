@@ -1,4 +1,3 @@
-import type { FormEvent } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type {
@@ -29,6 +28,7 @@ import {
   selectRetryableRun,
   type PendingAssistantAction,
 } from "./assistantState";
+import type { AssistantComposerSubmitPayload } from "./AssistantComposer";
 
 export type SessionListRow =
   | {
@@ -611,14 +611,8 @@ export function useAiAssistantController(
     [handleSelectionChange, saveSelection],
   );
 
-  const handleSubmit = useCallback(
-    async (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      if (!canSubmit) {
-        return;
-      }
-
-      const text = draft.trim();
+  const sendAssistantMessage = useCallback(
+    async (text: string) => {
       const activeTools = selectedModelSupportsToolUse
         ? buildProjectAssistantSendActiveTools({
             allowWrites: allowWritesForNextSend,
@@ -706,14 +700,42 @@ export function useAiAssistantController(
       activeThreadId,
       allowWritesForNextSend,
       assistantOverviewQuery,
-      canSubmit,
       context,
       createThread,
-      draft,
       onWorkspaceRefreshRequested,
       projectId,
       sendMessageStream,
       selectedModelSupportsToolUse,
+    ],
+  );
+
+  const handleSubmit = useCallback(
+    (payload: AssistantComposerSubmitPayload) => {
+      const text = payload.text.trim();
+      if (
+        !selectionHydrated ||
+        selectedConnectionId.length === 0 ||
+        selectedModelId.length === 0 ||
+        isBusy ||
+        pendingRun != null
+      ) {
+        return false;
+      }
+
+      if (text.length === 0 && payload.mentions.length === 0) {
+        return false;
+      }
+
+      void sendAssistantMessage(text);
+      return true;
+    },
+    [
+      isBusy,
+      pendingRun,
+      selectedConnectionId,
+      selectedModelId,
+      selectionHydrated,
+      sendAssistantMessage,
     ],
   );
 

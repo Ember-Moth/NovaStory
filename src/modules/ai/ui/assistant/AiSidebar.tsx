@@ -16,6 +16,7 @@ import {
   RunSummaryRow,
   SessionStatusOverlay,
 } from "./AiSidebarView";
+import { AssistantComposer } from "./AssistantComposer";
 import { AiAssistantSheetLayout } from "./AiAssistantSheetLayout";
 import {
   getAssistantContentBlocks,
@@ -248,20 +249,16 @@ export function AiSidebar({
           </AiSidebarMessagesViewport>
         }
         composerPane={
-          <form className="shrink-0" aria-label="AI 对话输入" onSubmit={controller.handleSubmit}>
+          <form className="shrink-0" aria-label="AI 对话输入">
             <div className="space-y-2 p-2">
               <div className="overflow-hidden rounded-lg border border-border bg-editor-background focus-within:border-accent-foreground">
-                <textarea
-                  value={controller.draft}
-                  onChange={(event) => controller.setDraft(event.target.value)}
+                <AssistantComposer
                   disabled={
                     controller.isLoadingSelection ||
                     !controller.selectedModelId ||
                     !controller.selectedConnectionId ||
                     controller.isThreadBusy
                   }
-                  rows={3}
-                  className="field-sizing-content w-full resize-none border-none bg-transparent px-2.5 pt-2 text-[13px] leading-5 text-editor-foreground outline-none placeholder:text-foreground-muted/70 disabled:cursor-not-allowed disabled:opacity-70"
                   placeholder={
                     controller.isLoadingSelection
                       ? "加载模型选择中..."
@@ -269,6 +266,10 @@ export function AiSidebar({
                         ? "输入消息..."
                         : "选择可用模型后输入..."
                   }
+                  isBusy={controller.isBusy}
+                  initialValue={controller.draft}
+                  onTextChange={controller.setDraft}
+                  onSubmit={controller.handleSubmit}
                 />
                 <div className="flex min-w-0 items-center gap-2 px-1.5 pb-1.5">
                   <ModelPicker
