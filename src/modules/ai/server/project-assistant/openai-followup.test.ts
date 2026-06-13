@@ -4,11 +4,10 @@ import { modelMessageSchema, type ModelMessage } from "ai";
 import {
   createMockStream,
   createProjectAssistantService,
-  db,
   seedCustomConnection,
   seedOpenAiConnection,
   seedProject,
-  schema,
+  userConfig,
 } from "./test-helpers";
 
 test("follow-up send after tool results reuses sanitized history messages", async () => {
@@ -274,15 +273,16 @@ test("openai follow-up send uses previous response id and only sends incremental
     modelId: "gpt-5",
     modelRowId: "cmodel_openai_followup",
   });
-  db.insert(schema.globalPrompts)
-    .values({
-      id: "prompt_openai_followup",
-      name: "追问扩写",
-      description: null,
-      content: "请围绕上一轮方向继续扩写，保持语气克制。",
-      isEnabled: true,
-    })
-    .run();
+  const timestamp = Date.now();
+  userConfig.insertGlobalPromptToConfig({
+    id: "prompt_openai_followup",
+    name: "追问扩写",
+    description: null,
+    content: "请围绕上一轮方向继续扩写，保持语气克制。",
+    isEnabled: true,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
   let invocation = 0;
   const secondCallInput: {
     current: {

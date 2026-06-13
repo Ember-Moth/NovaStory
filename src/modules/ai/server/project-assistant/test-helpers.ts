@@ -8,6 +8,7 @@ export const logs = await import("@/modules/ai/domain/logs");
 export const { createDefaultWorkspace } = await import("@/modules/workspace/domain");
 export const workspaceDomain = await import("@/modules/workspace/domain");
 export const { createProjectAssistantService } = await import("./index");
+export const userConfig = await import("@/modules/ai/domain/user-config");
 
 export function createMockStream({
   chunks,
@@ -68,29 +69,37 @@ export function seedCustomConnection({
   apiKey?: string | null;
   supportsToolUse?: boolean;
 }) {
-  db.insert(schema.aiConnections)
-    .values({
-      id: connectionId,
-      kind: "custom",
-      name: "Primary Connection",
-      sdkPackage: "@ai-sdk/openai-compatible",
-      baseUrl: "https://example.test/v1",
-      apiKey,
-      configJson: "{}",
-      isEnabled: true,
-    })
-    .run();
-  db.insert(schema.aiConnectionCustomModels)
-    .values({
-      id: modelRowId,
-      connectionId,
-      modelId,
-      displayName: "Story Model",
-      supportsReasoning: true,
-      supportsToolUse,
-      isEnabled: true,
-    })
-    .run();
+  const timestamp = Date.now();
+  userConfig.insertAiConnectionToConfig({
+    id: connectionId,
+    kind: "custom",
+    name: "Primary Connection",
+    sdkPackage: "@ai-sdk/openai-compatible",
+    catalogProviderId: null,
+    baseUrl: "https://example.test/v1",
+    apiKey,
+    configJson: "{}",
+    isEnabled: true,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
+  userConfig.insertCustomModelToConfig({
+    id: modelRowId,
+    connectionId,
+    modelId,
+    displayName: "Story Model",
+    contextWindow: null,
+    maxOutputTokens: null,
+    supportsVision: false,
+    supportsReasoning: true,
+    supportsToolUse,
+    supportsTemperature: false,
+    inputPricePer1m: null,
+    outputPricePer1m: null,
+    isEnabled: true,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
 
   return {
     selection: {
@@ -160,29 +169,37 @@ export function seedOpenAiConnection({
   supportsReasoning?: boolean;
   supportsToolUse?: boolean;
 }) {
-  db.insert(schema.aiConnections)
-    .values({
-      id: connectionId,
-      kind: "custom",
-      name: "OpenAI Connection",
-      sdkPackage: "@ai-sdk/openai",
-      baseUrl: null,
-      apiKey,
-      configJson: "{}",
-      isEnabled: true,
-    })
-    .run();
-  db.insert(schema.aiConnectionCustomModels)
-    .values({
-      id: modelRowId,
-      connectionId,
-      modelId,
-      displayName: "Reasoning Model",
-      supportsReasoning,
-      supportsToolUse,
-      isEnabled: true,
-    })
-    .run();
+  const timestamp = Date.now();
+  userConfig.insertAiConnectionToConfig({
+    id: connectionId,
+    kind: "custom",
+    name: "OpenAI Connection",
+    sdkPackage: "@ai-sdk/openai",
+    catalogProviderId: null,
+    baseUrl: null,
+    apiKey,
+    configJson: "{}",
+    isEnabled: true,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
+  userConfig.insertCustomModelToConfig({
+    id: modelRowId,
+    connectionId,
+    modelId,
+    displayName: "Reasoning Model",
+    contextWindow: null,
+    maxOutputTokens: null,
+    supportsVision: false,
+    supportsReasoning,
+    supportsToolUse,
+    supportsTemperature: false,
+    inputPricePer1m: null,
+    outputPricePer1m: null,
+    isEnabled: true,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
 
   return {
     selection: {

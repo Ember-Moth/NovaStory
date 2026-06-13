@@ -1,5 +1,5 @@
 import { mutation, type MutationCtx, query, stream } from "@codehz/rpc/core";
-import { and, eq, type InferInsertModel } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import { db, schema } from "@/db";
 import {
@@ -41,6 +41,7 @@ import type {
   AiCatalogModelView,
   AiCatalogProviderView,
   AiCatalogStatusView,
+  AiConnectionCustomModelRow,
   AiConnectionRow,
   AiResolvedModelView,
   GlobalPromptRow,
@@ -49,14 +50,32 @@ import type {
   ProjectAssistantToolName,
 } from "@/modules/ai/domain/types";
 import { PROJECT_ASSISTANT_WRITE_TOOL_NAMES } from "@/modules/ai/domain/types";
+import {
+  deleteAiConnectionFromConfig,
+  deleteCatalogModelOverrideFromConfig,
+  deleteCustomModelFromConfig,
+  deleteGlobalPromptFromConfig,
+  findGlobalPromptByNameFromConfig,
+  getAiConnectionFromConfig,
+  getCustomModelFromConfig,
+  getGlobalPromptFromConfig,
+  insertAiConnectionToConfig,
+  insertCustomModelToConfig,
+  insertGlobalPromptToConfig,
+  listAiConnectionsFromConfig,
+  listGlobalPromptsFromConfig,
+  setCatalogModelOverrideInConfig,
+  updateAiConnectionInConfig,
+  updateCustomModelInConfig,
+  updateGlobalPromptInConfig,
+} from "@/modules/ai/domain/user-config";
 import { assertRpcFound } from "@/rpc/errors";
 import { rpcTags, type RpcTagList } from "@/rpc/tags";
 import { getDefaultWorkspace } from "@/modules/workspace/domain";
 
-type ConnectionInsert = InferInsertModel<typeof schema.aiConnections>;
-type CustomModelInsert = InferInsertModel<typeof schema.aiConnectionCustomModels>;
-type CustomModelRow = typeof schema.aiConnectionCustomModels.$inferSelect;
-type GlobalPromptInsert = InferInsertModel<typeof schema.globalPrompts>;
+type ConnectionInsert = AiConnectionRow;
+type CustomModelRow = AiConnectionCustomModelRow;
+type GlobalPromptInsert = GlobalPromptRow;
 
 interface CreateRegistryConnectionInput {
   kind: "registry";
@@ -92,7 +111,7 @@ type UpdateConnectionInput = {
 };
 
 type CustomModelMutationInput = Pick<
-  CustomModelInsert,
+  AiConnectionCustomModelRow,
   | "modelId"
   | "displayName"
   | "contextWindow"
@@ -275,14 +294,8 @@ function sanitizeDescription(description: string | null | undefined): string | n
 }
 
 function assertGlobalPromptNameAvailable(name: string, excludeId?: string) {
-  const existing = db.query.globalPrompts
-    .findFirst({ where: eq(schema.globalPrompts.name, name) })
-    .sync();
+  const existing = findGlobalPromptByNameFromConfig(name);
   invariant(!existing || existing.id === excludeId, "Prompt 名称已存在。");
-}
-
-function isGlobalPromptNameConflict(error: unknown) {
-  return error instanceof Error && error.message.includes("global_prompts.name");
 }
 
 function sanitizeBaseUrl(baseUrl: string | null | undefined): string | null {
@@ -480,7 +493,7 @@ export const listCatalogModels = query<
 
 export const listGlobalPrompts = query<void, GlobalPromptRow[], RpcTagList>({
   watch: () => [rpcTags.aiGlobalPrompts()],
-  handler: () => db.select().from(schema.globalPrompts).orderBy(schema.globalPrompts.name).all(),
+  handler: () => listGlobalPromptsFromConfig(),
 });
 
 export const createGlobalPrompt = mutation<CreateGlobalPromptInput, GlobalPromptRow, RpcTagList>({
@@ -500,26 +513,14 @@ export const createGlobalPrompt = mutation<CreateGlobalPromptInput, GlobalPrompt
       updatedAt: timestamp,
     };
 
-    try {
-      db.insert(schema.globalPrompts).values(values).run();
-    } catch (error) {
-      if (isGlobalPromptNameConflict(error)) {
-        throw new Error("Prompt 名称已存在。");
-      }
-      throw error;
-    }
-    return db.query.globalPrompts
-      .findFirst({ where: eq(schema.globalPrompts.id, values.id) })
-      .sync()!;
+    return insertGlobalPromptToConfig(values);
   },
 });
 
 export const updateGlobalPrompt = mutation<UpdateGlobalPromptInput, GlobalPromptRow, RpcTagList>({
   invalidate: () => [rpcTags.aiGlobalPrompts()],
   handler: (input) => {
-    const existing = db.query.globalPrompts
-      .findFirst({ where: eq(schema.globalPrompts.id, input.id) })
-      .sync();
+    const existing = getGlobalPromptFromConfig(input.id);
     assertRpcFound(existing, "未找到 Prompt。");
 
     const name = input.name != null ? sanitizeName(input.name) : existing.name;
@@ -536,42 +537,25 @@ export const updateGlobalPrompt = mutation<UpdateGlobalPromptInput, GlobalPrompt
       updatedAt: now(),
     };
 
-    try {
-      db.update(schema.globalPrompts)
-        .set(nextValues)
-        .where(eq(schema.globalPrompts.id, input.id))
-        .run();
-    } catch (error) {
-      if (isGlobalPromptNameConflict(error)) {
-        throw new Error("Prompt 名称已存在。");
-      }
-      throw error;
-    }
-    return db.query.globalPrompts
-      .findFirst({ where: eq(schema.globalPrompts.id, input.id) })
-      .sync()!;
+    const updated = updateGlobalPromptInConfig(input.id, nextValues);
+    assertRpcFound(updated, "未找到 Prompt。");
+    return updated;
   },
 });
 
 export const deleteGlobalPrompt = mutation<{ id: string }, { id: string }, RpcTagList>({
   invalidate: () => [rpcTags.aiGlobalPrompts()],
   handler: ({ id }) => {
-    const existing = db.query.globalPrompts
-      .findFirst({ where: eq(schema.globalPrompts.id, id) })
-      .sync();
+    const existing = getGlobalPromptFromConfig(id);
     assertRpcFound(existing, "未找到 Prompt。");
-    db.delete(schema.globalPrompts).where(eq(schema.globalPrompts.id, id)).run();
+    deleteGlobalPromptFromConfig(id);
     return { id };
   },
 });
 
 export const listConnections = query<void, AiConnectionRow[], RpcTagList>({
   watch: () => [rpcTags.aiConnections()],
-  handler: () =>
-    db.query.aiConnections
-      .findMany()
-      .sync()
-      .sort((a, b) => a.name.localeCompare(b.name)),
+  handler: () => listAiConnectionsFromConfig(),
 });
 
 export const listEnabledConnectionModels = query<
@@ -584,9 +568,7 @@ export const listEnabledConnectionModels = query<
     ...result.map(({ connection }) => rpcTags.aiConnectionModels(connection.id)),
   ],
   handler: () => {
-    const connections = db.query.aiConnections
-      .findMany()
-      .sync()
+    const connections = listAiConnectionsFromConfig()
       .filter((connection) => connection.isEnabled)
       .sort((a, b) => a.name.localeCompare(b.name));
 
@@ -601,18 +583,13 @@ export const createConnection = mutation<CreateConnectionInput, AiConnectionRow,
   invalidate: () => [rpcTags.aiConnections()],
   handler: (input) => {
     const values = buildConnectionInsert(input);
-    db.insert(schema.aiConnections).values(values).run();
-    return db.query.aiConnections
-      .findFirst({ where: eq(schema.aiConnections.id, values.id) })
-      .sync()!;
+    return insertAiConnectionToConfig(values);
   },
 });
 
 export const updateConnection = mutation<UpdateConnectionInput, AiConnectionRow, RpcTagList>(
   (input, ctx) => {
-    const existing = db.query.aiConnections
-      .findFirst({ where: eq(schema.aiConnections.id, input.id) })
-      .sync();
+    const existing = getAiConnectionFromConfig(input.id);
     assertRpcFound(existing, "未找到 AI 连接。");
 
     const timestamp = now();
@@ -668,19 +645,15 @@ export const updateConnection = mutation<UpdateConnectionInput, AiConnectionRow,
       nextValues.apiKey = nextApiKey;
     }
 
-    db.update(schema.aiConnections)
-      .set(nextValues)
-      .where(eq(schema.aiConnections.id, input.id))
-      .run();
+    const updated = updateAiConnectionInConfig(input.id, nextValues);
+    assertRpcFound(updated, "未找到 AI 连接。");
     invalidateConnectionsList(ctx, input.id);
-    return db.query.aiConnections
-      .findFirst({ where: eq(schema.aiConnections.id, input.id) })
-      .sync()!;
+    return updated;
   },
 );
 
 export const deleteConnection = mutation<{ id: string }, void, RpcTagList>(({ id }, ctx) => {
-  db.delete(schema.aiConnections).where(eq(schema.aiConnections.id, id)).run();
+  deleteAiConnectionFromConfig(id);
   invalidateConnectionsList(ctx, id);
 });
 
@@ -702,9 +675,7 @@ export const setCatalogModelEnabled = mutation<
   AiResolvedModelView[],
   RpcTagList
 >(({ connectionId, catalogModelId, enabled }, ctx) => {
-  const connection = db.query.aiConnections
-    .findFirst({ where: eq(schema.aiConnections.id, connectionId) })
-    .sync();
+  const connection = getAiConnectionFromConfig(connectionId);
   assertRpcFound(connection, "未找到 AI 连接。");
   invariant(connection.kind === "registry", "只有模型目录连接可以启用或停用目录模型。");
 
@@ -715,36 +686,17 @@ export const setCatalogModelEnabled = mutation<
   invariant(catalogModel.providerId === connection.catalogProviderId, "该目录模型不属于当前连接。");
 
   if (enabled) {
-    db.delete(schema.aiConnectionCatalogOverrides)
-      .where(
-        and(
-          eq(schema.aiConnectionCatalogOverrides.connectionId, connectionId),
-          eq(schema.aiConnectionCatalogOverrides.catalogModelId, catalogModelId),
-        ),
-      )
-      .run();
+    deleteCatalogModelOverrideFromConfig(connectionId, catalogModelId);
   } else {
     const timestamp = now();
-    db.insert(schema.aiConnectionCatalogOverrides)
-      .values({
-        id: createId("ovr"),
-        connectionId,
-        catalogModelId,
-        isEnabled: false,
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      })
-      .onConflictDoUpdate({
-        target: [
-          schema.aiConnectionCatalogOverrides.connectionId,
-          schema.aiConnectionCatalogOverrides.catalogModelId,
-        ],
-        set: {
-          isEnabled: false,
-          updatedAt: timestamp,
-        },
-      })
-      .run();
+    setCatalogModelOverrideInConfig({
+      id: createId("ovr"),
+      connectionId,
+      catalogModelId,
+      isEnabled: false,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    });
   }
 
   invalidateConnection(ctx, connectionId);
@@ -756,30 +708,23 @@ export const createCustomModel = mutation<
   CustomModelRow,
   RpcTagList
 >(({ connectionId, ...input }, ctx) => {
-  const connection = db.query.aiConnections
-    .findFirst({ where: eq(schema.aiConnections.id, connectionId) })
-    .sync();
+  const connection = getAiConnectionFromConfig(connectionId);
   assertRpcFound(connection, "未找到 AI 连接。");
 
   const values = normalizeCustomModelInput(input);
   assertConnectionSupportsCustomModel(connection, values.modelId);
 
   const timestamp = now();
-  const id = createId("cmodel");
-  db.insert(schema.aiConnectionCustomModels)
-    .values({
-      id,
-      connectionId,
-      ...values,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    })
-    .run();
+  const model = insertCustomModelToConfig({
+    id: createId("cmodel"),
+    connectionId,
+    ...values,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
 
   invalidateConnection(ctx, connectionId);
-  return db.query.aiConnectionCustomModels
-    .findFirst({ where: eq(schema.aiConnectionCustomModels.id, id) })
-    .sync()!;
+  return model;
 });
 
 export const updateCustomModel = mutation<
@@ -787,14 +732,10 @@ export const updateCustomModel = mutation<
   CustomModelRow,
   RpcTagList
 >(({ id, ...input }, ctx) => {
-  const existing = db.query.aiConnectionCustomModels
-    .findFirst({ where: eq(schema.aiConnectionCustomModels.id, id) })
-    .sync();
+  const existing = getCustomModelFromConfig(id);
   assertRpcFound(existing, "未找到自定义模型。");
 
-  const connection = db.query.aiConnections
-    .findFirst({ where: eq(schema.aiConnections.id, existing.connectionId) })
-    .sync();
+  const connection = getAiConnectionFromConfig(existing.connectionId);
   assertRpcFound(connection, "未找到 AI 连接。");
 
   const values = normalizeCustomModelInput({
@@ -814,25 +755,17 @@ export const updateCustomModel = mutation<
     assertConnectionSupportsCustomModel(connection, values.modelId);
   }
 
-  db.update(schema.aiConnectionCustomModels)
-    .set({ ...values, updatedAt: now() })
-    .where(eq(schema.aiConnectionCustomModels.id, id))
-    .run();
+  const updated = updateCustomModelInConfig(id, { ...values, updatedAt: now() });
+  assertRpcFound(updated, "未找到自定义模型。");
 
   invalidateConnection(ctx, existing.connectionId);
-  return db.query.aiConnectionCustomModels
-    .findFirst({ where: eq(schema.aiConnectionCustomModels.id, id) })
-    .sync()!;
+  return updated;
 });
 
 export const deleteCustomModel = mutation<{ id: string }, void, RpcTagList>(({ id }, ctx) => {
-  const model = db.query.aiConnectionCustomModels
-    .findFirst({ where: eq(schema.aiConnectionCustomModels.id, id) })
-    .sync();
+  const model = getCustomModelFromConfig(id);
   assertRpcFound(model, "未找到自定义模型。");
-  db.delete(schema.aiConnectionCustomModels)
-    .where(eq(schema.aiConnectionCustomModels.id, id))
-    .run();
+  deleteCustomModelFromConfig(id);
   invalidateConnection(ctx, model.connectionId);
 });
 

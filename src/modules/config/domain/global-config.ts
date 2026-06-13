@@ -1,6 +1,5 @@
-import { eq } from "drizzle-orm";
-
-import { db, schema } from "@/db";
+import { createJsonFileStore } from "@/shared/lib/json-file-store";
+import { getConfigFilePath } from "@/shared/lib/storage-paths";
 
 export interface GlobalConfigOption {
   key: string;
@@ -8,6 +7,15 @@ export interface GlobalConfigOption {
   createdAt: number;
   updatedAt: number;
 }
+
+interface GlobalConfigFile {
+  options: GlobalConfigOption[];
+}
+
+const globalConfigStore = createJsonFileStore<GlobalConfigFile>(
+  () => getConfigFilePath("global.json"),
+  () => ({ options: [] }),
+);
 
 function normalizeConfigKey(key: string): string {
   const normalized = key.trim();
@@ -29,11 +37,7 @@ export function getGlobalConfig<T>(key: string, fallback: T): T {
   const normalizedKey = key.trim();
   if (!normalizedKey) return fallback;
 
-  const row = db
-    .select({ valueJson: schema.globalConfigOptions.valueJson })
-    .from(schema.globalConfigOptions)
-    .where(eq(schema.globalConfigOptions.key, normalizedKey))
-    .get();
+  const row = globalConfigStore.read().options.find((option) => option.key === normalizedKey);
 
   if (!row) return fallback;
 
@@ -49,39 +53,37 @@ export function setGlobalConfig(key: string, value: unknown): void {
   const valueJson = stringifyGlobalConfigValue(value);
   const timestamp = Date.now();
 
-  db.insert(schema.globalConfigOptions)
-    .values({
-      key: normalizedKey,
-      valueJson,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    })
-    .onConflictDoUpdate({
-      target: schema.globalConfigOptions.key,
-      set: {
-        valueJson,
-        updatedAt: timestamp,
-      },
-    })
-    .run();
+  globalConfigStore.update((file) => {
+    const existing = file.options.find((option) => option.key === normalizedKey);
+    if (existing) {
+      return {
+        options: file.options.map((option) =>
+          option.key === normalizedKey ? { ...option, valueJson, updatedAt: timestamp } : option,
+        ),
+      };
+    }
+
+    return {
+      options: [
+        ...file.options,
+        {
+          key: normalizedKey,
+          valueJson,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        },
+      ],
+    };
+  });
 }
 
 export function deleteGlobalConfig(key: string): void {
   const normalizedKey = normalizeConfigKey(key);
-  db.delete(schema.globalConfigOptions)
-    .where(eq(schema.globalConfigOptions.key, normalizedKey))
-    .run();
+  globalConfigStore.update((file) => ({
+    options: file.options.filter((option) => option.key !== normalizedKey),
+  }));
 }
 
 export function listGlobalConfigOptions(): GlobalConfigOption[] {
-  return db
-    .select({
-      key: schema.globalConfigOptions.key,
-      valueJson: schema.globalConfigOptions.valueJson,
-      createdAt: schema.globalConfigOptions.createdAt,
-      updatedAt: schema.globalConfigOptions.updatedAt,
-    })
-    .from(schema.globalConfigOptions)
-    .orderBy(schema.globalConfigOptions.key)
-    .all();
+  return [...globalConfigStore.read().options].sort((a, b) => a.key.localeCompare(b.key));
 }

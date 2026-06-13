@@ -4,7 +4,8 @@ import { setupMockDatabase } from "@/test/mock-db";
 
 setupMockDatabase();
 
-const { db, schema } = await import("@/db");
+const { db } = await import("@/db");
+const userConfig = await import("./user-config");
 const {
   assertConnectionSupportsCustomModel,
   listCatalogProvidersView,
@@ -120,20 +121,19 @@ test("registry connections resolve active catalog models, apply overrides, and r
   await syncAiCatalogFromPayload(payloadV1);
 
   const timestamp = Date.now();
-  db.insert(schema.aiConnections)
-    .values({
-      id: "conn_openai",
-      kind: "registry",
-      name: "OpenAI Main",
-      sdkPackage: "@ai-sdk/openai",
-      catalogProviderId: "openai",
-      apiKey: "sk-test",
-      configJson: "{}",
-      isEnabled: true,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    })
-    .run();
+  userConfig.insertAiConnectionToConfig({
+    id: "conn_openai",
+    kind: "registry",
+    name: "OpenAI Main",
+    sdkPackage: "@ai-sdk/openai",
+    catalogProviderId: "openai",
+    baseUrl: null,
+    apiKey: "sk-test",
+    configJson: "{}",
+    isEnabled: true,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
 
   const initialModels = listResolvedModelsForConnection({
     connectionId: "conn_openai",
@@ -143,16 +143,14 @@ test("registry connections resolve active catalog models, apply overrides, and r
   expect(initialModels[0]?.origin).toBe("catalog");
   expect(initialModels[0]?.isEnabled).toBe(true);
 
-  db.insert(schema.aiConnectionCatalogOverrides)
-    .values({
-      id: "ovr_gpt4o",
-      connectionId: "conn_openai",
-      catalogModelId: "openai:gpt-4o",
-      isEnabled: false,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    })
-    .run();
+  userConfig.setCatalogModelOverrideInConfig({
+    id: "ovr_gpt4o",
+    connectionId: "conn_openai",
+    catalogModelId: "openai:gpt-4o",
+    isEnabled: false,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
 
   const overriddenModels = listResolvedModelsForConnection({
     connectionId: "conn_openai",
@@ -160,23 +158,26 @@ test("registry connections resolve active catalog models, apply overrides, and r
   });
   expect(overriddenModels[0]?.isEnabled).toBe(false);
 
-  const connection = db.query.aiConnections
-    .findFirst({ where: (fields, { eq }) => eq(fields.id, "conn_openai") })
-    .sync()!;
+  const connection = userConfig.getAiConnectionFromConfig("conn_openai")!;
   expect(() => assertConnectionSupportsCustomModel(connection, "gpt-4o")).toThrow();
 
-  db.insert(schema.aiConnectionCustomModels)
-    .values({
-      id: "cmodel_story",
-      connectionId: "conn_openai",
-      modelId: "story-specialist",
-      displayName: "Story Specialist",
-      supportsToolUse: true,
-      isEnabled: true,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    })
-    .run();
+  userConfig.insertCustomModelToConfig({
+    id: "cmodel_story",
+    connectionId: "conn_openai",
+    modelId: "story-specialist",
+    displayName: "Story Specialist",
+    contextWindow: null,
+    maxOutputTokens: null,
+    supportsVision: false,
+    supportsToolUse: true,
+    supportsReasoning: false,
+    supportsTemperature: false,
+    inputPricePer1m: null,
+    outputPricePer1m: null,
+    isEnabled: true,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
 
   const resolvedWithCustom = listResolvedModelsForConnection({
     connectionId: "conn_openai",

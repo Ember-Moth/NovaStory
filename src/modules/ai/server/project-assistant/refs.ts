@@ -1,11 +1,9 @@
-import { eq } from "drizzle-orm";
-
-import { db, schema } from "@/db";
 import type {
   AssistantInputRefDisplay,
   AssistantInputRefSnapshot,
   AssistantMentionInput,
 } from "@/modules/ai/domain/types";
+import { getGlobalPromptFromConfig } from "@/modules/ai/domain/user-config";
 import { createId, invariant } from "@/shared/lib/domain";
 
 export function resolveAssistantInputRefs(
@@ -22,11 +20,7 @@ export function resolveAssistantInputRefs(
     const targetId = mention.targetId.trim();
     invariant(targetId.length > 0, "Prompt 引用目标不能为空。");
 
-    const prompt = db.query.globalPrompts
-      .findFirst({
-        where: eq(schema.globalPrompts.id, targetId),
-      })
-      .sync();
+    const prompt = getGlobalPromptFromConfig(targetId);
     invariant(prompt, "引用的 Prompt 不存在。");
     invariant(prompt.isEnabled, "引用的 Prompt 已被禁用。");
 

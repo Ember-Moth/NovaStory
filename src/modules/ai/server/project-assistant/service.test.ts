@@ -1,5 +1,4 @@
 import { expect, test } from "bun:test";
-import { eq } from "drizzle-orm";
 
 import {
   PROJECT_ASSISTANT_MAX_STEPS,
@@ -12,13 +11,33 @@ import {
   createProjectAssistantService,
   createStepLimitMockStream,
   createDefaultWorkspace,
-  db,
   logs,
-  schema,
   seedCustomConnection,
   seedProject,
+  userConfig,
   workspaceDomain,
 } from "./test-helpers";
+
+function seedPrompt(input: {
+  id: string;
+  name: string;
+  description?: string | null;
+  content: string;
+  isEnabled?: boolean;
+  createdAt?: number;
+  updatedAt?: number;
+}) {
+  const timestamp = Date.now();
+  return userConfig.insertGlobalPromptToConfig({
+    id: input.id,
+    name: input.name,
+    description: input.description ?? null,
+    content: input.content,
+    isEnabled: input.isEnabled ?? true,
+    createdAt: input.createdAt ?? timestamp,
+    updatedAt: input.updatedAt ?? timestamp,
+  });
+}
 
 test("sendProjectAssistantMessage materializes user and assistant nodes and records a run", async () => {
   seedProject("assistant_send");
@@ -90,17 +109,15 @@ test("sendProjectAssistantMessage resolves global prompt mentions into run refs 
     modelId: "story-model",
     modelRowId: "cmodel_send_refs",
   });
-  db.insert(schema.globalPrompts)
-    .values({
-      id: "prompt_expand",
-      name: "章节扩写",
-      description: "扩写当前章节",
-      content: "请扩写正文，但不要改变视角。",
-      isEnabled: true,
-      createdAt: 100,
-      updatedAt: 200,
-    })
-    .run();
+  seedPrompt({
+    id: "prompt_expand",
+    name: "章节扩写",
+    description: "扩写当前章节",
+    content: "请扩写正文，但不要改变视角。",
+    isEnabled: true,
+    createdAt: 100,
+    updatedAt: 200,
+  });
   let capturedMessages: unknown[] = [];
   const service = createProjectAssistantService({
     readStoredSelection: () => seeded.selection,
@@ -209,15 +226,13 @@ test("sendProjectAssistantMessage rejects disabled global prompt mentions", asyn
     modelId: "story-model",
     modelRowId: "cmodel_send_disabled_refs",
   });
-  db.insert(schema.globalPrompts)
-    .values({
-      id: "prompt_disabled",
-      name: "已停用",
-      description: null,
-      content: "disabled content",
-      isEnabled: false,
-    })
-    .run();
+  seedPrompt({
+    id: "prompt_disabled",
+    name: "已停用",
+    description: null,
+    content: "disabled content",
+    isEnabled: false,
+  });
   const service = createProjectAssistantService({
     readStoredSelection: () => seeded.selection,
   });
@@ -315,16 +330,14 @@ test("retryProjectAssistantMessage reuses original prompt ref snapshots", async 
     modelId: "story-model",
     modelRowId: "cmodel_retry_refs",
   });
-  db.insert(schema.globalPrompts)
-    .values({
-      id: "prompt_retry_refs",
-      name: "重试引用",
-      description: null,
-      content: "旧版 Prompt 内容。",
-      isEnabled: true,
-      updatedAt: 100,
-    })
-    .run();
+  seedPrompt({
+    id: "prompt_retry_refs",
+    name: "重试引用",
+    description: null,
+    content: "旧版 Prompt 内容。",
+    isEnabled: true,
+    updatedAt: 100,
+  });
   const capturedMessages: unknown[][] = [];
   const service = createProjectAssistantService({
     readStoredSelection: () => seeded.selection,
@@ -380,14 +393,11 @@ test("retryProjectAssistantMessage reuses original prompt ref snapshots", async 
       },
     ],
   });
-  db.update(schema.globalPrompts)
-    .set({
-      name: "重试引用新版",
-      content: "新版 Prompt 内容。",
-      updatedAt: 200,
-    })
-    .where(eq(schema.globalPrompts.id, "prompt_retry_refs"))
-    .run();
+  userConfig.updateGlobalPromptInConfig("prompt_retry_refs", {
+    name: "重试引用新版",
+    content: "新版 Prompt 内容。",
+    updatedAt: 200,
+  });
   const retried = await service.retryProjectAssistantMessage({
     projectId: "assistant_retry_refs",
     threadId: thread.id,
@@ -818,16 +828,14 @@ test("continueProjectAssistantRun reuses parent prompt ref snapshots", async () 
     modelRowId: "cmodel_continue_refs",
     supportsToolUse: true,
   });
-  db.insert(schema.globalPrompts)
-    .values({
-      id: "prompt_continue_refs",
-      name: "继续引用",
-      description: null,
-      content: "继续旧版 Prompt 内容。",
-      isEnabled: true,
-      updatedAt: 100,
-    })
-    .run();
+  seedPrompt({
+    id: "prompt_continue_refs",
+    name: "继续引用",
+    description: null,
+    content: "继续旧版 Prompt 内容。",
+    isEnabled: true,
+    updatedAt: 100,
+  });
   const capturedMessages: unknown[][] = [];
   const service = createProjectAssistantService({
     readStoredSelection: () => seeded.selection,
@@ -890,14 +898,11 @@ test("continueProjectAssistantRun reuses parent prompt ref snapshots", async () 
     ],
     activeTools: ["read_file"],
   });
-  db.update(schema.globalPrompts)
-    .set({
-      name: "继续引用新版",
-      content: "继续新版 Prompt 内容。",
-      updatedAt: 200,
-    })
-    .where(eq(schema.globalPrompts.id, "prompt_continue_refs"))
-    .run();
+  userConfig.updateGlobalPromptInConfig("prompt_continue_refs", {
+    name: "继续引用新版",
+    content: "继续新版 Prompt 内容。",
+    updatedAt: 200,
+  });
   const continued = await service.continueProjectAssistantRun({
     projectId: "assistant_continue_refs",
     threadId: thread.id,
@@ -916,26 +921,22 @@ test("editProjectAssistantMessage resolves edited mentions into fresh prompt ref
     modelId: "story-model",
     modelRowId: "cmodel_edit_refs",
   });
-  db.insert(schema.globalPrompts)
-    .values([
-      {
-        id: "prompt_edit_old",
-        name: "旧 Prompt",
-        description: null,
-        content: "编辑前 Prompt 内容。",
-        isEnabled: true,
-        updatedAt: 100,
-      },
-      {
-        id: "prompt_edit_new",
-        name: "新 Prompt",
-        description: null,
-        content: "编辑后 Prompt 内容。",
-        isEnabled: true,
-        updatedAt: 200,
-      },
-    ])
-    .run();
+  seedPrompt({
+    id: "prompt_edit_old",
+    name: "旧 Prompt",
+    description: null,
+    content: "编辑前 Prompt 内容。",
+    isEnabled: true,
+    updatedAt: 100,
+  });
+  seedPrompt({
+    id: "prompt_edit_new",
+    name: "新 Prompt",
+    description: null,
+    content: "编辑后 Prompt 内容。",
+    isEnabled: true,
+    updatedAt: 200,
+  });
   const capturedMessages: unknown[][] = [];
   const service = createProjectAssistantService({
     readStoredSelection: () => seeded.selection,

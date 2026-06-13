@@ -1,7 +1,5 @@
 import type { ModelMessage } from "ai";
-import { eq } from "drizzle-orm";
 
-import { db, schema } from "@/db";
 import { getRunStepResponseBody, resolveThreadPath } from "@/modules/ai/domain/logs";
 import type {
   AgentRunTraceView,
@@ -18,6 +16,7 @@ import {
   PROJECT_ASSISTANT_TOOL_NAMES,
 } from "@/modules/ai/domain/types";
 import { listResolvedModelsForConnection } from "@/modules/ai/domain/catalog";
+import { getAiConnectionFromConfig } from "@/modules/ai/domain/user-config";
 import {
   getAiAssistantModelSelection,
   type AiAssistantModelSelection,
@@ -289,9 +288,7 @@ export function resolveProjectAssistantModelSelection(
   const storedSelection = readStoredSelection();
   invariant(storedSelection, "请先在 AI 助手里选择连接和模型。");
 
-  const connection = db.query.aiConnections
-    .findFirst({ where: eq(schema.aiConnections.id, storedSelection.connectionId) })
-    .sync();
+  const connection = getAiConnectionFromConfig(storedSelection.connectionId);
   invariant(connection, "未找到已选择的 AI 连接。");
   invariant(connection.isEnabled, "已选择的 AI 连接已被停用。");
 
@@ -340,9 +337,7 @@ export function resolveProjectAssistantModelSelectionFromSnapshot(
   const customModelId = normalizeOptionalString(snapshotRecord.customModelId);
   invariant(connectionId, "原 run 缺少连接信息，无法继续。");
 
-  const connection = db.query.aiConnections
-    .findFirst({ where: eq(schema.aiConnections.id, connectionId) })
-    .sync();
+  const connection = getAiConnectionFromConfig(connectionId);
   invariant(connection, "原 run 使用的 AI 连接已不存在，无法继续。");
   invariant(connection.isEnabled, "原 run 使用的 AI 连接已停用，无法继续。");
 

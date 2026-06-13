@@ -1,16 +1,9 @@
-import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
-export function getStorageRoot() {
-  return process.env.NOVEL_EVOLVER_DATA_DIR ?? join(import.meta.dir, "../../../../../data");
-}
+import { ensureProjectStorageRoot } from "@/shared/lib/storage-paths";
 
 export function ensureStorageRoot() {
-  const root = getStorageRoot();
-  mkdirSync(root, { recursive: true });
-  mkdirSync(join(root, "repos"), { recursive: true });
-  mkdirSync(join(root, "worktrees"), { recursive: true });
-  return root;
+  return ensureProjectStorageRoot();
 }
 
 export function getProjectRepoGitDir(projectId: string) {

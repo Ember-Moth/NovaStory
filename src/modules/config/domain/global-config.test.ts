@@ -1,11 +1,11 @@
 import { expect, test } from "bun:test";
-import { eq } from "drizzle-orm";
+import { writeFileSync } from "node:fs";
 
+import { getConfigFilePath } from "@/shared/lib/storage-paths";
 import { setupMockDatabase } from "@/test/mock-db";
 
 setupMockDatabase();
 
-const { db, schema } = await import("@/db");
 const { deleteGlobalConfig, getGlobalConfig, listGlobalConfigOptions, setGlobalConfig } =
   await import("./global-config");
 
@@ -41,12 +41,20 @@ test("getGlobalConfig returns fallback for missing and invalid values", () => {
   expect(getGlobalConfig("missing.option", "fallback")).toBe("fallback");
   expect(getGlobalConfig("   ", "fallback")).toBe("fallback");
 
-  db.insert(schema.globalConfigOptions)
-    .values({
-      key: "broken.option",
-      valueJson: "{not-json",
-    })
-    .run();
+  writeFileSync(
+    getConfigFilePath("global.json"),
+    JSON.stringify({
+      options: [
+        {
+          key: "broken.option",
+          valueJson: "{not-json",
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+    }),
+    "utf8",
+  );
 
   expect(getGlobalConfig("broken.option", { ok: false })).toEqual({ ok: false });
 });
@@ -66,11 +74,14 @@ test("empty keys throw for writes and deletes", () => {
 test("setGlobalConfig trims keys before storage", () => {
   setGlobalConfig("  trimmed.option  ", null);
 
-  const row = db
-    .select()
-    .from(schema.globalConfigOptions)
-    .where(eq(schema.globalConfigOptions.key, "trimmed.option"))
-    .get();
+  const row = listGlobalConfigOptions().find((option) => option.key === "trimmed.option");
 
   expect(row?.valueJson).toBe("null");
+});
+
+test("invalid global config file JSON throws without overwriting the file", () => {
+  writeFileSync(getConfigFilePath("global.json"), "{not-json", "utf8");
+
+  expect(() => listGlobalConfigOptions()).toThrow("不是有效 JSON");
+  expect(() => setGlobalConfig("after.invalid", true)).toThrow("不是有效 JSON");
 });

@@ -12,6 +12,11 @@ import type {
   AiConnectionRow,
   AiResolvedModelView,
 } from "@/modules/ai/domain/types";
+import {
+  getAiConnectionFromConfig,
+  listCatalogOverridesForConnectionFromConfig,
+  listCustomModelsForConnectionFromConfig,
+} from "@/modules/ai/domain/user-config";
 
 const AI_REGISTRY_STATE_ID = "models.dev";
 const AI_REGISTRY_URL = "https://models.dev/api.json";
@@ -223,9 +228,7 @@ export function listResolvedModelsForConnection({
   connectionId: string;
   includeDisabled?: boolean;
 }): AiResolvedModelView[] {
-  const connection = db.query.aiConnections
-    .findFirst({ where: eq(schema.aiConnections.id, connectionId) })
-    .sync();
+  const connection = getAiConnectionFromConfig(connectionId);
   invariant(connection, "未找到 AI 连接。");
 
   const resolved: AiResolvedModelView[] = [];
@@ -239,9 +242,7 @@ export function listResolvedModelsForConnection({
         ),
       })
       .sync();
-    const overrides = db.query.aiConnectionCatalogOverrides
-      .findMany({ where: eq(schema.aiConnectionCatalogOverrides.connectionId, connectionId) })
-      .sync();
+    const overrides = listCatalogOverridesForConnectionFromConfig(connectionId);
     const overrideMap = new Map(overrides.map((override) => [override.catalogModelId, override]));
 
     for (const model of catalogModels) {
@@ -272,9 +273,7 @@ export function listResolvedModelsForConnection({
     }
   }
 
-  const customModels = db.query.aiConnectionCustomModels
-    .findMany({ where: eq(schema.aiConnectionCustomModels.connectionId, connectionId) })
-    .sync();
+  const customModels = listCustomModelsForConnectionFromConfig(connectionId);
   for (const model of customModels) {
     if (!includeDisabled && !model.isEnabled) continue;
     resolved.push({

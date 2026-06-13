@@ -6,17 +6,62 @@ import type { schema } from "@/db";
 
 export type AiCatalogProviderRow = InferSelectModel<typeof schema.aiCatalogProviders>;
 export type AiCatalogModelRow = InferSelectModel<typeof schema.aiCatalogModels>;
-export type AiConnectionRow = InferSelectModel<typeof schema.aiConnections>;
-export type AiConnectionCatalogOverrideRow = InferSelectModel<
-  typeof schema.aiConnectionCatalogOverrides
->;
-export type AiConnectionCustomModelRow = InferSelectModel<typeof schema.aiConnectionCustomModels>;
 export type AiRegistryStateRow = InferSelectModel<typeof schema.aiRegistryState>;
-export type GlobalPromptRow = InferSelectModel<typeof schema.globalPrompts>;
 export type AgentThreadRow = InferSelectModel<typeof schema.agentThreads>;
 export type AgentProjectStateRow = InferSelectModel<typeof schema.agentProjectState>;
 export type AgentThreadNodeRow = InferSelectModel<typeof schema.agentThreadNodes>;
 export type AgentRunRow = InferSelectModel<typeof schema.agentRuns>;
+
+export interface AiConnectionRow {
+  id: string;
+  kind: string;
+  name: string;
+  sdkPackage: string;
+  catalogProviderId: string | null;
+  baseUrl: string | null;
+  apiKey: string | null;
+  configJson: string;
+  isEnabled: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface AiConnectionCatalogOverrideRow {
+  id: string;
+  connectionId: string;
+  catalogModelId: string;
+  isEnabled: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface AiConnectionCustomModelRow {
+  id: string;
+  connectionId: string;
+  modelId: string;
+  displayName: string;
+  contextWindow: number | null;
+  maxOutputTokens: number | null;
+  supportsVision: boolean;
+  supportsToolUse: boolean;
+  supportsReasoning: boolean;
+  supportsTemperature: boolean;
+  inputPricePer1m: number | null;
+  outputPricePer1m: number | null;
+  isEnabled: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface GlobalPromptRow {
+  id: string;
+  name: string;
+  description: string | null;
+  content: string;
+  isEnabled: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
 
 export interface AiRunsMetaPayload {
   threads: AgentThreadRow[];
