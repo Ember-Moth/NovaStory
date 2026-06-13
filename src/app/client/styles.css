@@ -168,12 +168,12 @@
 }
 
 .main-text-editor .cm-content {
-  padding-top: 1rem;
-  padding-bottom: 1rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
 }
 
 .main-text-editor .cm-line {
-  padding-inline: 1rem;
+  padding-inline: 0.5rem;
 }
 
 .main-text-editor .cm-activeLine {
