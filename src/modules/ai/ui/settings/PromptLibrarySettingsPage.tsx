@@ -10,6 +10,7 @@ import { cn } from "@/shared/lib/cn";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import { LoadingBlock } from "@/shared/ui/Loading";
 import { OverlayScrollbar } from "@/shared/ui/OverlayScrollbar";
+import { Toggle } from "@/shared/ui/Toggle";
 
 import { SettingsSidebar } from "./SettingsSidebar";
 
@@ -448,7 +449,7 @@ function PromptEditor({
           </div>
         ) : null}
 
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_12rem]">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
           <label className="block space-y-1">
             <span className="text-[11px] font-medium text-foreground-muted">名称</span>
             <input
@@ -460,18 +461,14 @@ function PromptEditor({
             />
           </label>
 
-          <label className="flex items-end gap-2 rounded-md border border-border bg-editor-background px-3 py-2">
-            <input
-              type="checkbox"
+          <div className="flex items-center pt-5">
+            <Toggle
               checked={isEnabled}
-              onChange={(event) => setIsEnabled(event.target.checked)}
-              className="mb-1 size-4 accent-accent-foreground"
+              onChange={setIsEnabled}
+              label="启用"
+              description="可用于后续候选"
             />
-            <span className="min-w-0">
-              <span className="block text-sm font-medium text-foreground">启用</span>
-              <span className="block text-[11px] text-foreground-muted">可用于后续候选</span>
-            </span>
-          </label>
+          </div>
         </div>
 
         <label className="block space-y-1">
