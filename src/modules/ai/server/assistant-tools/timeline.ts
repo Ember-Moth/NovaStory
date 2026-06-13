@@ -57,7 +57,7 @@ export function buildTimelineTools({ projectId, runtimeContext }: ToolBuildConte
     }),
     list_current_timeline_aux_changes: tool({
       description:
-        "查看某个时间锚点相对前一个锚点的辅助资料变更详情。用于了解「从这个锚点开始世界设定发生了什么变化」。默认读取当前锚点；会列出新增、修改、删除及符号链接目标变化，但不返回文件内容。",
+        "查看某个时间锚点相对前一个锚点的辅助资料变更详情。用于了解「从这个锚点开始世界设定发生了什么变化」。默认读取当前锚点；会列出新增、修改、删除及符号链接目标变化，但不返回文件内容。注意：对 origin 原点调用无意义——原点之前没有锚点，无法计算变更。",
       inputSchema: jsonSchema<{ timelinePointId?: string }>({
         type: "object",
         additionalProperties: false,
