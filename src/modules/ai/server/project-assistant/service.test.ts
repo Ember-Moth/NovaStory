@@ -909,6 +909,116 @@ test("continueProjectAssistantRun reuses parent prompt ref snapshots", async () 
   expect(JSON.stringify(capturedMessages.at(-1))).not.toContain("继续新版 Prompt 内容。");
 });
 
+test("editProjectAssistantMessage resolves edited mentions into fresh prompt ref snapshots", async () => {
+  seedProject("assistant_edit_refs");
+  const seeded = seedCustomConnection({
+    connectionId: "conn_edit_refs",
+    modelId: "story-model",
+    modelRowId: "cmodel_edit_refs",
+  });
+  db.insert(schema.globalPrompts)
+    .values([
+      {
+        id: "prompt_edit_old",
+        name: "旧 Prompt",
+        description: null,
+        content: "编辑前 Prompt 内容。",
+        isEnabled: true,
+        updatedAt: 100,
+      },
+      {
+        id: "prompt_edit_new",
+        name: "新 Prompt",
+        description: null,
+        content: "编辑后 Prompt 内容。",
+        isEnabled: true,
+        updatedAt: 200,
+      },
+    ])
+    .run();
+  const capturedMessages: unknown[][] = [];
+  const service = createProjectAssistantService({
+    readStoredSelection: () => seeded.selection,
+    streamAssistantText: ((input: { messages: unknown[] }) => {
+      capturedMessages.push(input.messages);
+      return createMockStream({
+        chunks: [
+          { type: "start-step", stepNumber: 0 },
+          { type: "text-delta", stepNumber: 0, delta: "收到。" },
+          { type: "finish-step", stepNumber: 0, finishReason: "stop", usage: { totalTokens: 1 } },
+        ],
+        text: "收到。",
+        usage: { totalTokens: 1 },
+        finishReason: "stop",
+        steps: [
+          {
+            stepNumber: 0,
+            preparedMessages: input.messages as never,
+            model: { provider: "openai", modelId: "story-model" },
+            finishReason: "stop",
+            rawFinishReason: "stop",
+            usage: { totalTokens: 1 },
+            request: { body: {} },
+            response: {
+              body: { id: `resp_edit_refs_${capturedMessages.length}` },
+              messages: [
+                {
+                  role: "assistant",
+                  content: [{ type: "text", text: "收到。" }],
+                },
+              ],
+            },
+            providerMetadata: {},
+            toolCalls: [],
+            toolResults: [],
+          },
+        ],
+      })();
+    }) as any,
+  });
+  const thread = service.createProjectAssistantThread("assistant_edit_refs");
+
+  const first = await service.sendProjectAssistantMessage({
+    projectId: "assistant_edit_refs",
+    threadId: thread.id,
+    text: "按旧版本处理",
+    mentions: [
+      {
+        kind: "global-prompt",
+        mode: "snapshot-ref",
+        targetId: "prompt_edit_old",
+        label: "旧 Prompt",
+      },
+    ],
+  });
+  const edited = await service.editProjectAssistantMessage({
+    projectId: "assistant_edit_refs",
+    threadId: thread.id,
+    nodeId: first.userNode.id,
+    text: "按新版本处理",
+    mentions: [
+      {
+        kind: "global-prompt",
+        mode: "snapshot-ref",
+        targetId: "prompt_edit_new",
+        label: "新 Prompt",
+      },
+    ],
+  });
+
+  expect(edited.run.inputRefsSnapshot).toEqual([
+    expect.objectContaining({
+      source: { promptId: "prompt_edit_new" },
+      snapshot: expect.objectContaining({
+        content: "编辑后 Prompt 内容。",
+      }),
+    }),
+  ]);
+  expect(JSON.stringify(edited.run.inputRefsSnapshot)).not.toContain("编辑前 Prompt 内容。");
+  expect(JSON.stringify(capturedMessages.at(-1))).toContain("编辑后 Prompt 内容。");
+  expect(JSON.stringify(capturedMessages.at(-1))).not.toContain("编辑前 Prompt 内容。");
+});
+
 test("sendProjectAssistantMessage rejects explicit tools when the model does not support tool use", async () => {
   seedProject("assistant_tool_guard");
   const seeded = seedCustomConnection({

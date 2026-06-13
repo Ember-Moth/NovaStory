@@ -11,7 +11,7 @@ import {
   shouldClearActiveContentDraftForRefresh,
   shouldHandleWorkspaceRefreshRequested,
   shouldRefetchActiveAuxForRefresh,
-} from "./WorkspaceEditorPage";
+} from "./workspaceEditorPageModel";
 
 function createWorkspaceRefreshRequestedEvent(
   overrides: Partial<WorkspaceRefreshRequestedEvent> = {},

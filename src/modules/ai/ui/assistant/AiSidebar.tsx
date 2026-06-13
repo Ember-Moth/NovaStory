@@ -28,8 +28,11 @@ import {
   getRunSummaryByDisplayNode,
 } from "./assistantState";
 import { type AssistantStreamOverlay, useAiAssistantController } from "./useAiAssistantController";
+import { getMessagesViewportSessionKey, shouldAnimateMessageMount } from "./aiSidebarModel";
 import { useAssistantSheetLayout } from "./useAssistantSheetLayout";
 import { OverlayScrollbar } from "@/shared/ui/OverlayScrollbar";
+
+export { getMessagesViewportSessionKey, shouldAnimateMessageMount } from "./aiSidebarModel";
 
 export function AiSidebar({
   projectId,
@@ -811,18 +814,6 @@ function AiSidebarMessagesContent({
 
 function isViewportNearBottom(viewport: HTMLElement) {
   return viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop <= 24;
-}
-
-export function getMessagesViewportSessionKey(activeThreadId: string | null) {
-  return activeThreadId ?? "__empty-thread__";
-}
-
-export function shouldAnimateMessageMount(
-  role: string,
-  messageId: string,
-  streamedAssistantMessageIds: ReadonlySet<string>,
-) {
-  return !(role === "assistant" && streamedAssistantMessageIds.has(messageId));
 }
 
 function UserMessageBubble({

@@ -5,7 +5,7 @@ import {
   PROJECT_ASSISTANT_WRITE_TOOL_NAMES,
 } from "@/modules/ai/domain/types";
 
-import { getMessagesViewportSessionKey, shouldAnimateMessageMount } from "./AiSidebar";
+import { getMessagesViewportSessionKey, shouldAnimateMessageMount } from "./aiSidebarModel";
 import {
   applyStreamEvent,
   buildProjectAssistantRetryActiveTools,

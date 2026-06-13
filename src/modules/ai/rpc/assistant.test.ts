@@ -98,6 +98,7 @@ test("getProjectAssistantState watches overview, threads, and the active thread 
 
 test("sendProjectAssistantMessage invalidates overview, thread view, candidates, and run trace", async () => {
   let receivedActiveTools: unknown = null;
+  let receivedMentions: unknown = null;
   useService({
     getProjectAssistantState: () => ({
       activeThreadId: null,
@@ -160,6 +161,7 @@ test("sendProjectAssistantMessage invalidates overview, thread view, candidates,
     },
     sendProjectAssistantMessage: async (input: unknown) => {
       receivedActiveTools = (input as { activeTools?: unknown }).activeTools ?? null;
+      receivedMentions = (input as { mentions?: unknown }).mentions ?? null;
       return {
         thread: {
           id: "thread_send",
@@ -225,12 +227,28 @@ test("sendProjectAssistantMessage invalidates overview, thread view, candidates,
       projectId: "rpc_assistant_send",
       threadId: "thread_send",
       text: "Hello",
+      mentions: [
+        {
+          kind: "global-prompt",
+          mode: "snapshot-ref",
+          targetId: "prompt_rpc",
+          label: "RPC Prompt",
+        },
+      ],
       activeTools: ["read_file", "write_file"],
     },
     requestCtx,
   );
 
   expect(receivedActiveTools).toEqual(["read_file", "write_file"]);
+  expect(receivedMentions).toEqual([
+    {
+      kind: "global-prompt",
+      mode: "snapshot-ref",
+      targetId: "prompt_rpc",
+      label: "RPC Prompt",
+    },
+  ]);
   expect(result.invalidate).toEqual([
     rpcTags.aiProjectAssistantOverview("rpc_assistant_send"),
     rpcTags.aiProjectThreads("rpc_assistant_send"),
@@ -758,6 +776,7 @@ test("sendProjectAssistantMessage does not invalidate aux workspace for failed m
 
 test("sendProjectAssistantMessageStream emits events and returns invalidate tags on complete", async () => {
   let receivedActiveTools: unknown = null;
+  let receivedMentions: unknown = null;
   const run = {
     id: "run_stream",
     threadId: "thread_stream",
@@ -898,6 +917,7 @@ test("sendProjectAssistantMessageStream emits events and returns invalidate tags
     },
     sendProjectAssistantMessageStream: (input: unknown) => {
       receivedActiveTools = (input as { activeTools?: unknown }).activeTools ?? null;
+      receivedMentions = (input as { mentions?: unknown }).mentions ?? null;
       return {
         initialResult: {
           ...finalResult,
@@ -945,6 +965,14 @@ test("sendProjectAssistantMessageStream emits events and returns invalidate tags
       projectId: "rpc_assistant_stream",
       threadId: "thread_stream",
       text: "Hello",
+      mentions: [
+        {
+          kind: "global-prompt",
+          mode: "snapshot-ref",
+          targetId: "prompt_stream",
+          label: "Stream Prompt",
+        },
+      ],
       activeTools: ["read_file"],
     },
     streamRequestCtx,
@@ -956,6 +984,14 @@ test("sendProjectAssistantMessageStream emits events and returns invalidate tags
   );
 
   expect(receivedActiveTools).toEqual(["read_file"]);
+  expect(receivedMentions).toEqual([
+    {
+      kind: "global-prompt",
+      mode: "snapshot-ref",
+      targetId: "prompt_stream",
+      label: "Stream Prompt",
+    },
+  ]);
   expect(emitted).toEqual([
     {
       type: "run-started",
