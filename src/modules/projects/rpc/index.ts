@@ -2,7 +2,7 @@ import { mutation, query } from "@codehz/rpc/core";
 import { and, eq, type InferInsertModel, type InferSelectModel } from "drizzle-orm";
 
 import { db, schema } from "@/db";
-import { createDefaultWorkspaceWithExecutor } from "@/modules/workspace/domain";
+import { createDefaultWorkspace } from "@/modules/workspace/domain";
 import { invariant } from "@/shared/lib/domain";
 import { rpcTags, type RpcTagList } from "@/rpc/tags";
 
@@ -33,10 +33,8 @@ export const get = query<{ projectId: string }, ProjectRow, RpcTagList>({
 export const create = mutation<ProjectMutationInput, { workspaceId: string }, RpcTagList>({
   invalidate: (input) => [rpcTags.projectsList(), rpcTags.project(input.id)],
   handler: (input) => {
-    const workspace = db.transaction((tx) => {
-      tx.insert(schema.projects).values(input).run();
-      return createDefaultWorkspaceWithExecutor(tx, input.id);
-    });
+    db.insert(schema.projects).values(input).run();
+    const workspace = createDefaultWorkspace(input.id);
     return { workspaceId: workspace.id };
   },
 });

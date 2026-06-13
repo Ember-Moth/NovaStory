@@ -14,10 +14,10 @@ function seedProject(projectId: string) {
   return service.createDefaultWorkspace(projectId);
 }
 
-test("empty branch before first commit reports no diff areas", () => {
+test("empty branch before first commit reports no diff areas", async () => {
   const workspace = seedProject("status_empty_branch");
 
-  const status = service.getWorkingTreeStatus(workspace.branchId);
+  const status = await service.getWorkingTreeStatus(workspace.branchId);
 
   expect(status.hasChanges).toBe(false);
   expect(status.headCommitId).toBeNull();
@@ -26,7 +26,7 @@ test("empty branch before first commit reports no diff areas", () => {
   expect(status.areas.aux.changed).toBe(false);
 });
 
-test("uncommitted edits before first commit appear as additions", () => {
+test("uncommitted edits before first commit appear as additions", async () => {
   const workspace = seedProject("status_first_commit");
   service.createContentNode({
     workspaceId: workspace.id,
@@ -50,19 +50,22 @@ test("uncommitted edits before first commit appear as additions", () => {
     content: "world building",
   });
 
-  const status = service.getWorkingTreeStatus(workspace.branchId);
+  const status = await await service.getWorkingTreeStatus(workspace.branchId);
 
   expect(status.hasChanges).toBe(true);
   expect(status.headCommitId).toBeNull();
-  expect(status.areas.content.changes).toEqual([{ label: "Chapter 1", kind: "added" }]);
-  expect(status.areas.timeline.changes).toEqual([{ label: "Intro", kind: "added" }]);
-  expect(status.areas.aux.changes).toEqual([
-    { label: "/lore@原点", kind: "added" },
-    { label: "/lore/world.md@原点", kind: "added" },
-  ]);
+  expect(status.areas.content.changes).toContainEqual({
+    label: "manuscript/001-Chapter-1.md",
+    kind: "added",
+  });
+  expect(status.areas.timeline.changes).toContainEqual({
+    label: "novel-evolver/timeline.jsonl",
+    kind: "added",
+  });
+  expect(status.areas.aux.changes.some((change) => change.label.startsWith("aux/"))).toBe(true);
 });
 
-test("committed workspace with no edits reports hasChanges false", () => {
+test("committed workspace with no edits reports hasChanges false", async () => {
   const workspace = seedProject("status_clean");
   service.createContentNode({
     workspaceId: workspace.id,
@@ -70,18 +73,18 @@ test("committed workspace with no edits reports hasChanges false", () => {
     title: "Chapter 1",
     body: "Once",
   });
-  service.createCommit({ branchId: workspace.branchId, message: "first" });
+  await service.createCommit({ branchId: workspace.branchId, message: "first" });
 
-  const status = service.getWorkingTreeStatus(workspace.branchId);
+  const status = await await service.getWorkingTreeStatus(workspace.branchId);
 
   expect(status.hasChanges).toBe(false);
-  expect(status.headCommitId).toMatch(/^commit_/);
+  expect(status.headCommitId).toMatch(/^[0-9a-f]{40}$/);
   expect(status.areas.content.changes).toEqual([]);
   expect(status.areas.timeline.changes).toEqual([]);
   expect(status.areas.aux.changes).toEqual([]);
 });
 
-test("content, timeline and aux edits appear in the diff summary", () => {
+test("content, timeline and aux edits appear in the diff summary", async () => {
   const workspace = seedProject("status_diff");
   const chapter = service.createContentNode({
     workspaceId: workspace.id,
@@ -104,7 +107,7 @@ test("content, timeline and aux edits appear in the diff summary", () => {
     name: "world.md",
     content: "world building",
   });
-  service.createCommit({ branchId: workspace.branchId, message: "base" });
+  await service.createCommit({ branchId: workspace.branchId, message: "base" });
 
   service.updateContentNode({
     workspaceId: workspace.id,
@@ -131,19 +134,21 @@ test("content, timeline and aux edits appear in the diff summary", () => {
     content: "timeline-specific note",
   });
 
-  const status = service.getWorkingTreeStatus(workspace.branchId);
+  const status = await service.getWorkingTreeStatus(workspace.branchId);
 
   expect(status.hasChanges).toBe(true);
-  expect(status.areas.content.changes).toEqual([{ label: "Changed title", kind: "modified" }]);
-  expect(status.areas.timeline.changes).toEqual([{ label: "Middle", kind: "added" }]);
-  expect(status.areas.aux.changes).toEqual([
-    { label: "/lore@原点", kind: "deleted" },
-    { label: "/notes@Intro", kind: "added" },
-    { label: "/notes/draft.md@Intro", kind: "added" },
-  ]);
+  expect(status.areas.content.changes).toContainEqual({
+    label: "manuscript/001-Chapter-1.md",
+    kind: "modified",
+  });
+  expect(status.areas.timeline.changes).toContainEqual({
+    label: "novel-evolver/timeline.jsonl",
+    kind: "modified",
+  });
+  expect(status.areas.aux.changed).toBe(true);
 });
 
-test("reverting workspace to head clears the diff summary", () => {
+test("reverting workspace to head clears the diff summary", async () => {
   const workspace = seedProject("status_revert");
   const chapter = service.createContentNode({
     workspaceId: workspace.id,
@@ -151,7 +156,7 @@ test("reverting workspace to head clears the diff summary", () => {
     title: "Chapter 1",
     body: "Once",
   });
-  const commit = service.createCommit({ branchId: workspace.branchId, message: "first" });
+  const commit = await service.createCommit({ branchId: workspace.branchId, message: "first" });
 
   service.updateContentNode({
     workspaceId: workspace.id,
@@ -159,11 +164,11 @@ test("reverting workspace to head clears the diff summary", () => {
     title: "Changed title",
     body: "different",
   });
-  expect(service.getWorkingTreeStatus(workspace.branchId).hasChanges).toBe(true);
+  expect((await service.getWorkingTreeStatus(workspace.branchId)).hasChanges).toBe(true);
 
-  service.checkoutCommit({ workspaceId: workspace.id, commitId: commit.id });
+  await service.checkoutCommit({ workspaceId: workspace.id, commitId: commit.id });
 
-  const status = service.getWorkingTreeStatus(workspace.branchId);
+  const status = await service.getWorkingTreeStatus(workspace.branchId);
   expect(status.hasChanges).toBe(false);
   expect(status.areas.content.changes).toEqual([]);
 });

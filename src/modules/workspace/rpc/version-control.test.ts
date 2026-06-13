@@ -35,7 +35,7 @@ test("creating a branch with workspace invalidates branches and workspaces", asy
     parentId: workspace.contentRootId!,
     title: "Base",
   });
-  const commit = service.createCommit({ branchId: workspace.branchId, message: "base" });
+  const commit = await service.createCommit({ branchId: workspace.branchId, message: "base" });
 
   const result = await branchHandlers.createWithWorkspace.handler(
     { projectId: "rpc_branch_create", name: "feature", fromCommitId: commit.id },
@@ -53,7 +53,7 @@ test("creating a branch with workspace invalidates branches and workspaces", asy
 
 test("deleting a branch invalidates branch, workspace, and project tags", async () => {
   seedProject("rpc_branch_delete");
-  const featureWorkspace = service.createBranchWorkspace({
+  const featureWorkspace = await service.createBranchWorkspace({
     projectId: "rpc_branch_delete",
     name: "feature",
   });
@@ -96,7 +96,7 @@ test("commit create invalidates history and branch tags", async () => {
     rpcTags.project("rpc_commit_create"),
     rpcTags.projectsList(),
   ]);
-  expect(result.data.id).toMatch(/^commit_/);
+  expect(result.data.id).toMatch(/^[0-9a-f]{40}$/);
 });
 
 test("commit checkout invalidates the workspace content views", async () => {
@@ -106,7 +106,7 @@ test("commit checkout invalidates the workspace content views", async () => {
     parentId: workspace.contentRootId!,
     title: "One",
   });
-  const commit = service.createCommit({ branchId: workspace.branchId, message: "one" });
+  const commit = await await service.createCommit({ branchId: workspace.branchId, message: "one" });
 
   const result = await commitHandlers.checkout.handler(
     { workspaceId: workspace.id, commitId: commit.id },
@@ -147,13 +147,13 @@ test("commit history returns the mainline newest first", async () => {
     parentId: workspace.contentRootId!,
     title: "One",
   });
-  const c1 = service.createCommit({ branchId: workspace.branchId, message: "one" });
+  const c1 = await await service.createCommit({ branchId: workspace.branchId, message: "one" });
   service.createContentNode({
     workspaceId: workspace.id,
     parentId: workspace.contentRootId!,
     title: "Two",
   });
-  const c2 = service.createCommit({ branchId: workspace.branchId, message: "two" });
+  const c2 = await await service.createCommit({ branchId: workspace.branchId, message: "two" });
 
   const result = await commitHandlers.history.handler({ branchId: workspace.branchId }, requestCtx);
 

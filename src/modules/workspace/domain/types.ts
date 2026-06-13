@@ -99,6 +99,7 @@ export interface AuxTimelineChangeView {
   symlinkTargetPath: string | null;
   previousSymlinkTargetPath: string | null;
   changedAspects: AuxTimelineModifiedAspect[];
+  isDeleted?: boolean;
 }
 
 export interface ResolvedAuxNode {
@@ -113,8 +114,13 @@ export interface ResolvedAuxNode {
 }
 
 export interface AuxDirListTreeNode {
+  id?: string;
   nodeType: AuxNodeType;
+  parentAuxNodeId?: string | null;
   name: string | null;
+  content?: string | null;
+  symlinkTargetAuxNodeId?: string | null;
+  timelinePointId?: string | typeof ORIGIN_TIMELINE_POINT_ID;
   path: string;
   symlinkTargetPath?: string;
   children: AuxDirListTreeNode[];

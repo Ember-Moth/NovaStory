@@ -67,11 +67,11 @@ test("setDefaultBranch invalidates project list and detail tags", async () => {
     parentId: workspace.contentRootId!,
     title: "Base",
   });
-  const baseCommit = workspaceService.createCommit({
+  const baseCommit = await workspaceService.createCommit({
     branchId: workspace.branchId,
     message: "base",
   });
-  const featureWorkspace = workspaceService.createBranchWorkspace({
+  const featureWorkspace = await workspaceService.createBranchWorkspace({
     projectId: "project_default_switch",
     name: "feature",
     fromCommitId: baseCommit.id,

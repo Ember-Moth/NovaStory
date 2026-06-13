@@ -1,145 +1,181 @@
+import { mkdirSync } from "node:fs";
+
 import { eq } from "drizzle-orm";
 
-import { type DatabaseExecutor, db, schema } from "@/db";
-
-import { createBranchWithExecutor, checkoutBranchIntoWorkspace } from "./branches";
-import {
-  getBranchOrThrow,
-  getProjectOrThrow,
-  getWorkspaceForBranch,
-  getWorkspaceOrThrow,
-  touchProject,
-} from "./internal/access";
+import { db, schema } from "@/db";
 import { createId, invariant, now } from "@/shared/lib/domain";
 
-function seedWorkspaceRoots(executor: DatabaseExecutor, workspaceId: string, timestamp: number) {
-  const contentRootId = createId("content");
-  const auxRootId = createId("aux");
+import { createBranch } from "./branches";
+import {
+  checkoutCommitToWorktree,
+  commitCustomRef,
+  ensureProjectRepo,
+  metaRef,
+} from "./git-storage/git-store";
+import { stringifyJsonl } from "./git-storage/jsonl";
+import { getProjectWorktreeDir } from "./git-storage/paths";
+import type {
+  BranchIndexRow,
+  ProjectIndexRow,
+  ProjectMetaPayload,
+  WorkspaceIndexRow,
+} from "./git-storage/types";
+import { readWorktreeState, seedEmptyWorktree } from "./git-storage/worktree-state";
 
-  executor
-    .insert(schema.contentNodes)
-    .values({
-      id: contentRootId,
-      workspaceId,
-      parentId: null,
-      nextSiblingId: null,
-      anchorTimelinePointId: null,
-      title: null,
-      body: null,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    })
-    .run();
+export type WorkspaceRow = WorkspaceIndexRow;
 
-  executor
-    .insert(schema.auxNodes)
-    .values({
-      id: auxRootId,
-      workspaceId,
-      nodeType: "root",
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    })
-    .run();
-
-  executor
-    .update(schema.workspaces)
-    .set({ contentRootId, auxRootId, updatedAt: timestamp })
-    .where(eq(schema.workspaces.id, workspaceId))
-    .run();
+function getProjectRow(projectId: string): ProjectIndexRow {
+  const project = db.select().from(schema.projects).where(eq(schema.projects.id, projectId)).get();
+  invariant(project, "未找到项目。");
+  return project as ProjectIndexRow;
 }
 
-export function createWorkspaceForBranchWithExecutor(
-  executor: DatabaseExecutor,
-  branchId: string,
-  name?: string,
-) {
-  const branch = getBranchOrThrow(executor, branchId);
-  invariant(!getWorkspaceForBranch(executor, branch.id), "无法创建工作区：该分支已存在工作区。");
+function getBranchRow(branchId: string): BranchIndexRow {
+  const branch = db.select().from(schema.branches).where(eq(schema.branches.id, branchId)).get();
+  invariant(branch, "未找到分支。");
+  return branch as BranchIndexRow;
+}
 
-  const workspaceId = createId("workspace");
+export function listWorkspaces(projectId: string): WorkspaceRow[] {
+  getProjectRow(projectId);
+  return db
+    .select()
+    .from(schema.workspaces)
+    .where(eq(schema.workspaces.projectId, projectId))
+    .all() as WorkspaceRow[];
+}
+
+export function getWorkspace(workspaceId: string): WorkspaceRow {
+  const workspace = db
+    .select()
+    .from(schema.workspaces)
+    .where(eq(schema.workspaces.id, workspaceId))
+    .get();
+  invariant(workspace, "未找到工作区。");
+  return workspace as WorkspaceRow;
+}
+
+export function getWorkspaceForBranchId(branchId: string): WorkspaceRow | null {
+  return (
+    (db.select().from(schema.workspaces).where(eq(schema.workspaces.branchId, branchId)).get() as
+      | WorkspaceRow
+      | undefined) ?? null
+  );
+}
+
+export function getDefaultWorkspace(projectId: string) {
+  const project = getProjectRow(projectId);
+  return project.defaultBranchId
+    ? (getWorkspaceForBranchId(project.defaultBranchId) ?? undefined)
+    : undefined;
+}
+
+export async function writeProjectMeta(projectId: string) {
+  const project = getProjectRow(projectId);
+  const branches = db
+    .select()
+    .from(schema.branches)
+    .where(eq(schema.branches.projectId, projectId))
+    .all() as BranchIndexRow[];
+  const workspaces = listWorkspaces(projectId) as WorkspaceIndexRow[];
+  const payload: ProjectMetaPayload = { project, branches, workspaces };
+  await commitCustomRef({
+    projectId,
+    ref: metaRef(projectId),
+    message: "Update project metadata",
+    files: {
+      "project.json": `${JSON.stringify(payload.project, null, 2)}\n`,
+      "branches.jsonl": stringifyJsonl(payload.branches),
+      "workspaces.jsonl": stringifyJsonl(payload.workspaces),
+    },
+  });
+}
+
+export async function createWorkspaceForBranch(branchId: string, name?: string) {
+  const branch = getBranchRow(branchId);
+  invariant(!getWorkspaceForBranchId(branch.id), "无法创建工作区：该分支已存在工作区。");
+
   const timestamp = now();
+  const workspaceId = createId("workspace");
+  let contentRootId = createId("content");
+  let auxRootId = createId("aux");
+  const worktreePath = getProjectWorktreeDir(branch.projectId, workspaceId);
 
-  executor
-    .insert(schema.workspaces)
+  mkdirSync(worktreePath, { recursive: true });
+  seedEmptyWorktree(worktreePath, { contentRootId, auxRootId });
+  if (branch.headCommitId) {
+    await checkoutCommitToWorktree({
+      projectId: branch.projectId,
+      workspaceId,
+      commitId: branch.headCommitId,
+    });
+    const restored = readWorktreeState(worktreePath);
+    contentRootId = restored.content.find((node) => node.parentId === null)?.id ?? contentRootId;
+    auxRootId =
+      restored.auxLayers.find(
+        (layer) => layer.nodeType === "root" && layer.timelinePointId === null,
+      )?.auxNodeId ?? auxRootId;
+  }
+
+  db.insert(schema.workspaces)
     .values({
       id: workspaceId,
       projectId: branch.projectId,
       branchId: branch.id,
       name: name ?? branch.name,
-      contentRootId: null,
-      auxRootId: null,
+      worktreePath,
+      contentRootId,
+      auxRootId,
       createdAt: timestamp,
       updatedAt: timestamp,
-    })
+    } as typeof schema.workspaces.$inferInsert)
     .run();
-
-  if (branch.headCommitId) {
-    checkoutBranchIntoWorkspace(executor, workspaceId, branch.id);
-  } else {
-    seedWorkspaceRoots(executor, workspaceId, timestamp);
-  }
-
-  touchProject(executor, branch.projectId);
-  return getWorkspaceOrThrow(executor, workspaceId);
-}
-
-export function createWorkspaceForBranch(branchId: string, name?: string) {
-  return db.transaction((tx) => createWorkspaceForBranchWithExecutor(tx, branchId, name));
-}
-
-export function createDefaultWorkspaceWithExecutor(
-  executor: DatabaseExecutor,
-  projectId: string,
-  name = "main",
-) {
-  const project = getProjectOrThrow(executor, projectId);
-  const branch = createBranchWithExecutor(executor, { projectId: project.id, name });
-  executor
-    .update(schema.projects)
-    .set({ defaultBranchId: branch.id, updatedAt: now() })
-    .where(eq(schema.projects.id, project.id))
-    .run();
-  return createWorkspaceForBranchWithExecutor(executor, branch.id, name);
+  void writeProjectMeta(branch.projectId).catch(() => undefined);
+  return getWorkspace(workspaceId);
 }
 
 export function createDefaultWorkspace(projectId: string, name = "main") {
-  return db.transaction((tx) => createDefaultWorkspaceWithExecutor(tx, projectId, name));
+  void ensureProjectRepo(projectId).catch(() => undefined);
+  const branch = createBranch({ projectId, name });
+  db.update(schema.projects)
+    .set({ defaultBranchId: branch.id, updatedAt: now() })
+    .where(eq(schema.projects.id, projectId))
+    .run();
+  const workspaceId = createId("workspace");
+  const contentRootId = createId("content");
+  const auxRootId = createId("aux");
+  const worktreePath = getProjectWorktreeDir(projectId, workspaceId);
+  mkdirSync(worktreePath, { recursive: true });
+  seedEmptyWorktree(worktreePath, { contentRootId, auxRootId });
+  const timestamp = now();
+  db.insert(schema.workspaces)
+    .values({
+      id: workspaceId,
+      projectId,
+      branchId: branch.id,
+      name,
+      worktreePath,
+      contentRootId,
+      auxRootId,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    } as typeof schema.workspaces.$inferInsert)
+    .run();
+  const workspace = getWorkspace(workspaceId);
+  void writeProjectMeta(projectId).catch(() => undefined);
+  return workspace;
 }
 
-export function createBranchWorkspace(input: {
+export async function createBranchWorkspace(input: {
   projectId: string;
   name: string;
   fromCommitId?: string | null;
   workspaceName?: string;
 }) {
-  return db.transaction((tx) => {
-    const branch = createBranchWithExecutor(tx, {
-      projectId: input.projectId,
-      name: input.name,
-      fromCommitId: input.fromCommitId,
-    });
-    return createWorkspaceForBranchWithExecutor(tx, branch.id, input.workspaceName ?? input.name);
+  const branch = createBranch({
+    projectId: input.projectId,
+    name: input.name,
+    fromCommitId: input.fromCommitId,
   });
-}
-
-export function getDefaultWorkspace(projectId: string) {
-  const project = getProjectOrThrow(db, projectId);
-  if (!project.defaultBranchId) {
-    return undefined;
-  }
-  return getWorkspaceForBranch(db, project.defaultBranchId);
-}
-
-export function getWorkspace(workspaceId: string) {
-  return getWorkspaceOrThrow(db, workspaceId);
-}
-
-export function listWorkspaces(projectId: string) {
-  getProjectOrThrow(db, projectId);
-  return db
-    .select()
-    .from(schema.workspaces)
-    .where(eq(schema.workspaces.projectId, projectId))
-    .all();
+  return await createWorkspaceForBranch(branch.id, input.workspaceName ?? input.name);
 }

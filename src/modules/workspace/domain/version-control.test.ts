@@ -15,7 +15,7 @@ function seedProject(projectId: string) {
   return service.createDefaultWorkspace(projectId);
 }
 
-test("default workspace creates a default branch and links project", () => {
+test("default workspace creates a default branch and links project", async () => {
   const workspace = seedProject("proj_default");
   expect(workspace.branchId).toBeTruthy();
 
@@ -31,7 +31,7 @@ test("default workspace creates a default branch and links project", () => {
   expect(branch.headCommitId).toBeNull();
 });
 
-test("commit then checkout round-trips content, timeline and aux state", () => {
+test("commit then checkout round-trips content, timeline and aux state", async () => {
   const workspace = seedProject("proj_rt");
   const rootId = workspace.contentRootId!;
 
@@ -68,12 +68,12 @@ test("commit then checkout round-trips content, timeline and aux state", () => {
   const auxBefore = service.exportAuxSnapshotTree(workspace.id);
   const timelineBefore = service.listTimelinePoints(workspace.id);
 
-  const commit = service.createCommit({
+  const commit = await service.createCommit({
     branchId: workspace.branchId,
     message: "first commit",
     author: "tester",
   });
-  expect(commit.id).toMatch(/^commit_/);
+  expect(commit.id).toMatch(/^[0-9a-f]{40}$/);
 
   // Mutate the working copy after the commit.
   service.updateContentNode({
@@ -85,14 +85,14 @@ test("commit then checkout round-trips content, timeline and aux state", () => {
   service.deleteAuxNodeAt({ workspaceId: workspace.id, nodeId: dir.id });
 
   // Checkout the commit and verify state is restored exactly.
-  service.checkoutCommit({ workspaceId: workspace.id, commitId: commit.id });
+  await service.checkoutCommit({ workspaceId: workspace.id, commitId: commit.id });
 
   expect(service.exportContentSubtree(workspace.id)).toEqual(before);
   expect(service.exportAuxSnapshotTree(workspace.id)).toEqual(auxBefore);
   expect(service.listTimelinePoints(workspace.id)).toEqual(timelineBefore);
 });
 
-test("identical content across commits shares blobs and tree objects", () => {
+test("identical content across commits shares blobs and tree objects", async () => {
   const workspace = seedProject("proj_dedup");
   service.createContentNode({
     workspaceId: workspace.id,
@@ -101,17 +101,17 @@ test("identical content across commits shares blobs and tree objects", () => {
     body: "shared body text",
   });
 
-  service.createCommit({ branchId: workspace.branchId, message: "c1" });
+  await service.createCommit({ branchId: workspace.branchId, message: "c1" });
   const blobCountAfterFirst = db.select().from(schema.blobs).all().length;
   const treeCountAfterFirst = db.select().from(schema.treeObjects).all().length;
 
   // Commit again without changes: should not create new blobs or tree objects.
-  service.createCommit({ branchId: workspace.branchId, message: "c2" });
+  await service.createCommit({ branchId: workspace.branchId, message: "c2" });
   expect(db.select().from(schema.blobs).all().length).toBe(blobCountAfterFirst);
   expect(db.select().from(schema.treeObjects).all().length).toBe(treeCountAfterFirst);
 });
 
-test("branch off a commit shares the same head and forked metadata", () => {
+test("branch off a commit shares the same head and forked metadata", async () => {
   const workspace = seedProject("proj_branch");
   service.createContentNode({
     workspaceId: workspace.id,
@@ -119,9 +119,12 @@ test("branch off a commit shares the same head and forked metadata", () => {
     title: "Base",
     body: "base",
   });
-  const commit = service.createCommit({ branchId: workspace.branchId, message: "base" });
+  const commit = await await service.createCommit({
+    branchId: workspace.branchId,
+    message: "base",
+  });
 
-  const featureWorkspace = service.createBranchWorkspace({
+  const featureWorkspace = await service.createBranchWorkspace({
     projectId: "proj_branch",
     name: "feature",
     fromCommitId: commit.id,
@@ -137,7 +140,7 @@ test("branch off a commit shares the same head and forked metadata", () => {
   expect(exported.nodes[0]?.body).toBe("base");
 });
 
-test("branch workspaces restore aux layers with globally unique layer ids", () => {
+test("branch workspaces restore aux layers with globally unique layer ids", async () => {
   const workspace = seedProject("proj_branch_aux_layer_ids");
   const rootId = workspace.auxRootId!;
   const notesFile = service.writeFileAt({
@@ -156,14 +159,17 @@ test("branch workspaces restore aux layers with globally unique layer ids", () =
     nodeId: notesFile.id,
     content: "point",
   });
-  const commit = service.createCommit({ branchId: workspace.branchId, message: "base" });
+  const commit = await await service.createCommit({
+    branchId: workspace.branchId,
+    message: "base",
+  });
 
-  const firstFeature = service.createBranchWorkspace({
+  const firstFeature = await service.createBranchWorkspace({
     projectId: "proj_branch_aux_layer_ids",
     name: "feature-one",
     fromCommitId: commit.id,
   });
-  const secondFeature = service.createBranchWorkspace({
+  const secondFeature = await service.createBranchWorkspace({
     projectId: "proj_branch_aux_layer_ids",
     name: "feature-two",
     fromCommitId: commit.id,
@@ -173,7 +179,7 @@ test("branch workspaces restore aux layers with globally unique layer ids", () =
   expect(service.readAuxByPathAt(secondFeature.id, point.id, "/notes.md")?.content).toBe("point");
 });
 
-test("branch workspace timeline deletion only checks anchors in that workspace", () => {
+test("branch workspace timeline deletion only checks anchors in that workspace", async () => {
   const workspace = seedProject("proj_branch_timeline_delete");
   const point = service.createTimelinePoint({
     workspaceId: workspace.id,
@@ -185,8 +191,11 @@ test("branch workspace timeline deletion only checks anchors in that workspace",
     title: "Main branch chapter",
     anchorPointId: point.id,
   });
-  const commit = service.createCommit({ branchId: workspace.branchId, message: "base" });
-  const featureWorkspace = service.createBranchWorkspace({
+  const commit = await await service.createCommit({
+    branchId: workspace.branchId,
+    message: "base",
+  });
+  const featureWorkspace = await service.createBranchWorkspace({
     projectId: "proj_branch_timeline_delete",
     name: "feature",
     fromCommitId: commit.id,
@@ -206,52 +215,54 @@ test("branch workspace timeline deletion only checks anchors in that workspace",
   expect(service.listTimelinePoints(workspace.id).map((item) => item.id)).toContain(point.id);
 });
 
-test("deleting a branch also deletes its workspace", () => {
+test("deleting a branch also deletes its workspace", async () => {
   const workspace = seedProject("proj_delete_branch");
-  const featureWorkspace = service.createBranchWorkspace({
+  const featureWorkspace = await service.createBranchWorkspace({
     projectId: "proj_delete_branch",
     name: "feature",
   });
 
-  service.deleteBranch(featureWorkspace.branchId);
+  await service.deleteBranch(featureWorkspace.branchId);
 
   expect(() => service.getBranch(featureWorkspace.branchId)).toThrow("未找到分支。");
   expect(() => service.getWorkspace(featureWorkspace.id)).toThrow("未找到工作区。");
   expect(service.getWorkspace(workspace.id).branchId).toBe(workspace.branchId);
 });
 
-test("default branch still cannot be deleted", () => {
+test("default branch still cannot be deleted", async () => {
   const workspace = seedProject("proj_delete_default");
 
-  expect(() => service.deleteBranch(workspace.branchId)).toThrow("无法删除：这是项目的默认分支。");
+  await expect(service.deleteBranch(workspace.branchId)).rejects.toThrow(
+    "无法删除：这是项目的默认分支。",
+  );
 });
 
-test("merge metadata records multiple parents without merging", () => {
+test("merge metadata records multiple parents without merging", async () => {
   const workspace = seedProject("proj_merge");
   service.createContentNode({
     workspaceId: workspace.id,
     parentId: workspace.contentRootId!,
     title: "A",
   });
-  const base = service.createCommit({ branchId: workspace.branchId, message: "base" });
+  const base = await await service.createCommit({ branchId: workspace.branchId, message: "base" });
 
-  const otherWorkspace = service.createBranchWorkspace({
+  const otherWorkspace = await service.createBranchWorkspace({
     projectId: "proj_merge",
     name: "side",
     fromCommitId: base.id,
   });
-  const sideCommit = service.createCommit({
+  const sideCommit = await await service.createCommit({
     branchId: otherWorkspace.branchId,
     message: "side change",
   });
 
-  const mergeCommit = service.createCommit({
+  const mergeCommit = await service.createCommit({
     branchId: workspace.branchId,
     message: "merge side",
     extraParents: [{ parentId: sideCommit.id }],
   });
 
-  const detail = service.getCommit(mergeCommit.id, "proj_merge");
+  const detail = await service.getCommit(mergeCommit.id, "proj_merge");
   expect(detail.parents.length).toBe(2);
   expect(detail.parents[0]?.parentId).toBe(base.id);
   expect(detail.parents[0]?.mergeRole).toBe("mainline");
@@ -259,21 +270,21 @@ test("merge metadata records multiple parents without merging", () => {
   expect(detail.parents[1]?.mergeRole).toBe("merged");
 });
 
-test("listCommits walks the mainline history newest first", () => {
+test("listCommits walks the mainline history newest first", async () => {
   const workspace = seedProject("proj_history");
   service.createContentNode({
     workspaceId: workspace.id,
     parentId: workspace.contentRootId!,
     title: "One",
   });
-  const c1 = service.createCommit({ branchId: workspace.branchId, message: "one" });
+  const c1 = await await service.createCommit({ branchId: workspace.branchId, message: "one" });
   service.createContentNode({
     workspaceId: workspace.id,
     parentId: workspace.contentRootId!,
     title: "Two",
   });
-  const c2 = service.createCommit({ branchId: workspace.branchId, message: "two" });
+  const c2 = await await service.createCommit({ branchId: workspace.branchId, message: "two" });
 
-  const history = service.listCommits(workspace.branchId);
+  const history = await service.listCommits(workspace.branchId);
   expect(history.map((commit) => commit.id)).toEqual([c2.id, c1.id]);
 });

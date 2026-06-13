@@ -369,13 +369,12 @@ CREATE TABLE `branches` (
 	`id` text PRIMARY KEY NOT NULL,
 	`project_id` text NOT NULL,
 	`name` text NOT NULL,
+	`ref` text,
 	`head_commit_id` text,
 	`forked_from_commit_id` text,
 	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
 	`updated_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
 	FOREIGN KEY (`project_id`) REFERENCES `projects`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`head_commit_id`) REFERENCES `commits`(`id`) ON UPDATE no action ON DELETE set null,
-	FOREIGN KEY (`forked_from_commit_id`) REFERENCES `commits`(`id`) ON UPDATE no action ON DELETE set null,
 	CONSTRAINT "branches_name_nonempty" CHECK(length("branches"."name") > 0)
 );
 --> statement-breakpoint
@@ -502,6 +501,7 @@ CREATE TABLE `workspaces` (
 	`project_id` text NOT NULL,
 	`branch_id` text NOT NULL,
 	`name` text NOT NULL,
+	`worktree_path` text,
 	`content_root_id` text,
 	`aux_root_id` text,
 	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,

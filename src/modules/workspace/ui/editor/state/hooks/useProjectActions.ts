@@ -1324,7 +1324,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
           setTimelineDeleteDialog({
             pointId,
             pointLabel,
-            auxPaths: (auxChanges ?? []).map((change: { path: string; isDeleted: boolean }) =>
+            auxPaths: (auxChanges ?? []).map((change: { path: string; isDeleted?: boolean }) =>
               change.isDeleted ? `${change.path}（已删除）` : change.path,
             ),
             anchorId,

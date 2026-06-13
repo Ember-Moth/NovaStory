@@ -28,7 +28,7 @@ type AuxWriteErrorContext = AssistantToolErrorContext & {
   tool: AuxWriteToolName;
 };
 
-function summarizeAuxNode(node: ResolvedAuxNode | null | undefined) {
+function summarizeAuxNode(node: Partial<ResolvedAuxNode> | null | undefined) {
   if (!node) {
     return null;
   }

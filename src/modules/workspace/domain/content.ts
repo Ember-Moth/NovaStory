@@ -1,29 +1,51 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import { db, schema } from "@/db";
-
-import {
-  assertContentRoot,
-  getContentNodeOrThrow,
-  getWorkspaceOrThrow,
-  touchWorkspace,
-} from "./internal/access";
-import {
-  collectContentSubtreeIds,
-  exportContentNode,
-  getContentPrevSibling,
-  listContentChildren,
-  orderContentChildren,
-} from "./internal/content-chain";
 import { createId, invariant, now } from "@/shared/lib/domain";
-import { pointIdOrOrigin, validateTimelinePointRef } from "./internal/timeline-point";
+
+import { getWorkspace } from "./lifecycle";
 import type {
+  ExportedContentNode,
   ExportedContentSubtree,
   ManuscriptListNode,
   ManuscriptNodeList,
   ManuscriptNodeRead,
   TimelinePointRef,
 } from "./types";
+import {
+  assertTimelinePoint,
+  pointIdOrOrigin,
+  readContentBody,
+  readWorktreeState,
+  writeContentBody,
+  writeWorktreeStateSync,
+} from "./git-storage/worktree-state";
+import type { ContentMetaRow } from "./git-storage/types";
+
+function touchWorkspace(workspaceId: string) {
+  db.update(schema.workspaces)
+    .set({ updatedAt: now() })
+    .where(eq(schema.workspaces.id, workspaceId))
+    .run();
+}
+
+function childrenOf(state: { content: ContentMetaRow[] }, parentId: string | null) {
+  return state.content
+    .filter((node) => node.parentId === parentId)
+    .sort((left, right) => left.order - right.order || left.id.localeCompare(right.id));
+}
+
+function getNode(state: { content: ContentMetaRow[] }, nodeId: string) {
+  const node = state.content.find((item) => item.id === nodeId);
+  invariant(node, "未找到章节。");
+  return node;
+}
+
+function reindexSiblings(state: { content: ContentMetaRow[] }, parentId: string | null) {
+  childrenOf(state, parentId).forEach((child, index) => {
+    child.order = index;
+  });
+}
 
 export function createContentNode(input: {
   workspaceId: string;
@@ -33,73 +55,38 @@ export function createContentNode(input: {
   title?: string | null;
   body?: string | null;
 }) {
-  return db.transaction((tx) => {
-    const workspace = getWorkspaceOrThrow(tx, input.workspaceId);
-    getContentNodeOrThrow(tx, workspace.id, input.parentId);
-    const anchorTimelinePointId = validateTimelinePointRef(tx, workspace.id, input.anchorPointId);
-    const timestamp = now();
-    const nodeId = createId("content");
-
-    if (input.afterSiblingId) {
-      const previousSibling = getContentNodeOrThrow(tx, workspace.id, input.afterSiblingId);
-      invariant(
-        previousSibling.parentId === input.parentId,
-        "无法创建章节：目标位置不在同一个父级下。",
-      );
-
-      tx.insert(schema.contentNodes)
-        .values({
-          id: nodeId,
-          workspaceId: workspace.id,
-          parentId: input.parentId,
-          nextSiblingId: null,
-          anchorTimelinePointId,
-          title: input.title ?? null,
-          body: input.body ?? null,
-          createdAt: timestamp,
-          updatedAt: timestamp,
-        })
-        .run();
-
-      tx.update(schema.contentNodes)
-        .set({ nextSiblingId: nodeId, updatedAt: timestamp })
-        .where(
-          and(
-            eq(schema.contentNodes.workspaceId, workspace.id),
-            eq(schema.contentNodes.id, previousSibling.id),
-          ),
-        )
-        .run();
-
-      tx.update(schema.contentNodes)
-        .set({ nextSiblingId: previousSibling.nextSiblingId, updatedAt: timestamp })
-        .where(
-          and(
-            eq(schema.contentNodes.workspaceId, workspace.id),
-            eq(schema.contentNodes.id, nodeId),
-          ),
-        )
-        .run();
-    } else {
-      const head = orderContentChildren(listContentChildren(tx, workspace.id, input.parentId))[0];
-      tx.insert(schema.contentNodes)
-        .values({
-          id: nodeId,
-          workspaceId: workspace.id,
-          parentId: input.parentId,
-          nextSiblingId: head?.id ?? null,
-          anchorTimelinePointId,
-          title: input.title ?? null,
-          body: input.body ?? null,
-          createdAt: timestamp,
-          updatedAt: timestamp,
-        })
-        .run();
-    }
-
-    touchWorkspace(tx, workspace.id);
-    return getContentNodeOrThrow(tx, workspace.id, nodeId);
-  });
+  const workspace = getWorkspace(input.workspaceId);
+  const state = readWorktreeState(workspace.worktreePath);
+  getNode(state, input.parentId);
+  const anchorTimelinePointId = assertTimelinePoint(state, input.anchorPointId);
+  const siblings = childrenOf(state, input.parentId);
+  const node: ContentMetaRow = {
+    id: createId("content"),
+    parentId: input.parentId,
+    order: input.afterSiblingId
+      ? siblings.findIndex((sibling) => sibling.id === input.afterSiblingId) + 1
+      : 0,
+    title: input.title ?? null,
+    bodyPath: null,
+    anchorTimelinePointId,
+  };
+  if (input.afterSiblingId) {
+    invariant(node.order > 0, "无法创建章节：目标位置不在同一个父级下。");
+  }
+  for (const sibling of siblings) {
+    if (sibling.order >= node.order) sibling.order += 1;
+  }
+  writeContentBody(workspace.worktreePath, node, input.body ?? null);
+  state.content.push(node);
+  reindexSiblings(state, input.parentId);
+  writeWorktreeStateSync(workspace.worktreePath, state);
+  touchWorkspace(workspace.id);
+  return {
+    ...node,
+    workspaceId: workspace.id,
+    body: readContentBody(workspace.worktreePath, node),
+    nextSiblingId: null,
+  };
 }
 
 export function moveContentNode(input: {
@@ -108,125 +95,57 @@ export function moveContentNode(input: {
   newParentId: string;
   afterSiblingId?: string | null;
 }) {
-  return db.transaction((tx) => {
-    const workspace = getWorkspaceOrThrow(tx, input.workspaceId);
-    const contentRootId = assertContentRoot(workspace);
-    const node = getContentNodeOrThrow(tx, workspace.id, input.nodeId);
-    invariant(node.id !== contentRootId, "无法移动隐藏的正文根节点。");
-    const newParent = getContentNodeOrThrow(tx, workspace.id, input.newParentId);
-    const subtreeIds = collectContentSubtreeIds(tx, workspace.id, node.id);
-    invariant(!subtreeIds.has(newParent.id), "无法移动：不能把章节移动到自己的子章节下。");
-    if (input.afterSiblingId) {
-      const previousSibling = getContentNodeOrThrow(tx, workspace.id, input.afterSiblingId);
-      invariant(previousSibling.parentId === newParent.id, "无法移动：目标位置不在目标父级下。");
-      invariant(previousSibling.id !== node.id, "无法移动：不能把章节移动到自己后面。");
+  const workspace = getWorkspace(input.workspaceId);
+  const state = readWorktreeState(workspace.worktreePath);
+  const node = getNode(state, input.nodeId);
+  invariant(node.id !== workspace.contentRootId, "无法移动隐藏的正文根节点。");
+  getNode(state, input.newParentId);
+  const descendants = new Set<string>();
+  const collect = (id: string) => {
+    for (const child of childrenOf(state, id)) {
+      descendants.add(child.id);
+      collect(child.id);
     }
-
-    const oldPrev = getContentPrevSibling(tx, workspace.id, node.id);
-    const timestamp = now();
-
-    tx.update(schema.contentNodes)
-      .set({ nextSiblingId: null, updatedAt: timestamp })
-      .where(
-        and(eq(schema.contentNodes.workspaceId, workspace.id), eq(schema.contentNodes.id, node.id)),
-      )
-      .run();
-
-    if (oldPrev) {
-      tx.update(schema.contentNodes)
-        .set({ nextSiblingId: node.nextSiblingId, updatedAt: timestamp })
-        .where(
-          and(
-            eq(schema.contentNodes.workspaceId, workspace.id),
-            eq(schema.contentNodes.id, oldPrev.id),
-          ),
-        )
-        .run();
-    }
-
-    if (input.afterSiblingId) {
-      const previousSibling = getContentNodeOrThrow(tx, workspace.id, input.afterSiblingId);
-      const afterNext = previousSibling.nextSiblingId;
-      tx.update(schema.contentNodes)
-        .set({ nextSiblingId: node.id, updatedAt: timestamp })
-        .where(
-          and(
-            eq(schema.contentNodes.workspaceId, workspace.id),
-            eq(schema.contentNodes.id, previousSibling.id),
-          ),
-        )
-        .run();
-
-      tx.update(schema.contentNodes)
-        .set({ parentId: newParent.id, nextSiblingId: afterNext, updatedAt: timestamp })
-        .where(
-          and(
-            eq(schema.contentNodes.workspaceId, workspace.id),
-            eq(schema.contentNodes.id, node.id),
-          ),
-        )
-        .run();
-    } else {
-      const head = orderContentChildren(
-        listContentChildren(tx, workspace.id, newParent.id).filter((child) => child.id !== node.id),
-      )[0];
-      tx.update(schema.contentNodes)
-        .set({ parentId: newParent.id, nextSiblingId: head?.id ?? null, updatedAt: timestamp })
-        .where(
-          and(
-            eq(schema.contentNodes.workspaceId, workspace.id),
-            eq(schema.contentNodes.id, node.id),
-          ),
-        )
-        .run();
-    }
-
-    touchWorkspace(tx, workspace.id);
-    return getContentNodeOrThrow(tx, workspace.id, node.id);
-  });
+  };
+  collect(node.id);
+  invariant(!descendants.has(input.newParentId), "无法移动：不能把章节移动到自己的子章节下。");
+  const oldParentId = node.parentId;
+  node.parentId = input.newParentId;
+  const siblings = childrenOf(state, input.newParentId).filter((sibling) => sibling.id !== node.id);
+  node.order = input.afterSiblingId
+    ? siblings.findIndex((sibling) => sibling.id === input.afterSiblingId) + 1
+    : 0;
+  if (input.afterSiblingId) invariant(node.order > 0, "无法移动：目标位置不在目标父级下。");
+  for (const sibling of siblings) {
+    if (sibling.order >= node.order) sibling.order += 1;
+  }
+  reindexSiblings(state, oldParentId);
+  reindexSiblings(state, input.newParentId);
+  writeWorktreeStateSync(workspace.worktreePath, state);
+  touchWorkspace(workspace.id);
+  return {
+    ...node,
+    workspaceId: workspace.id,
+    body: readContentBody(workspace.worktreePath, node),
+    nextSiblingId: null,
+  };
 }
 
 export function deleteContentNode(input: { workspaceId: string; nodeId: string }) {
-  return db.transaction((tx) => {
-    const workspace = getWorkspaceOrThrow(tx, input.workspaceId);
-    const contentRootId = assertContentRoot(workspace);
-    const node = getContentNodeOrThrow(tx, workspace.id, input.nodeId);
-    invariant(node.id !== contentRootId, "无法删除隐藏的正文根节点。");
-
-    const oldPrev = getContentPrevSibling(tx, workspace.id, node.id);
-    const timestamp = now();
-
-    if (oldPrev && node.nextSiblingId) {
-      tx.update(schema.contentNodes)
-        .set({ nextSiblingId: null, updatedAt: timestamp })
-        .where(
-          and(
-            eq(schema.contentNodes.workspaceId, workspace.id),
-            eq(schema.contentNodes.id, node.id),
-          ),
-        )
-        .run();
-    }
-
-    if (oldPrev) {
-      tx.update(schema.contentNodes)
-        .set({ nextSiblingId: node.nextSiblingId, updatedAt: timestamp })
-        .where(
-          and(
-            eq(schema.contentNodes.workspaceId, workspace.id),
-            eq(schema.contentNodes.id, oldPrev.id),
-          ),
-        )
-        .run();
-    }
-
-    tx.delete(schema.contentNodes)
-      .where(
-        and(eq(schema.contentNodes.workspaceId, workspace.id), eq(schema.contentNodes.id, node.id)),
-      )
-      .run();
-    touchWorkspace(tx, workspace.id);
-  });
+  const workspace = getWorkspace(input.workspaceId);
+  const state = readWorktreeState(workspace.worktreePath);
+  const node = getNode(state, input.nodeId);
+  invariant(node.id !== workspace.contentRootId, "无法删除隐藏的正文根节点。");
+  const deleteIds = new Set<string>();
+  const collect = (id: string) => {
+    deleteIds.add(id);
+    for (const child of childrenOf(state, id)) collect(child.id);
+  };
+  collect(node.id);
+  state.content = state.content.filter((item) => !deleteIds.has(item.id));
+  reindexSiblings(state, node.parentId);
+  writeWorktreeStateSync(workspace.worktreePath, state);
+  touchWorkspace(workspace.id);
 }
 
 export function updateContentNode(input: {
@@ -236,87 +155,88 @@ export function updateContentNode(input: {
   title?: string | null;
   body?: string | null;
 }) {
-  return db.transaction((tx) => {
-    const workspace = getWorkspaceOrThrow(tx, input.workspaceId);
-    const node = getContentNodeOrThrow(tx, workspace.id, input.nodeId);
-    const anchorTimelinePointId =
-      input.anchorPointId === undefined
-        ? node.anchorTimelinePointId
-        : validateTimelinePointRef(tx, workspace.id, input.anchorPointId);
-
-    tx.update(schema.contentNodes)
-      .set({
-        anchorTimelinePointId,
-        title: input.title === undefined ? node.title : input.title,
-        body: input.body === undefined ? node.body : input.body,
-        updatedAt: now(),
-      })
-      .where(
-        and(eq(schema.contentNodes.workspaceId, workspace.id), eq(schema.contentNodes.id, node.id)),
-      )
-      .run();
-
-    touchWorkspace(tx, workspace.id);
-    return getContentNodeOrThrow(tx, workspace.id, node.id);
-  });
+  const workspace = getWorkspace(input.workspaceId);
+  const state = readWorktreeState(workspace.worktreePath);
+  const node = getNode(state, input.nodeId);
+  if (input.anchorPointId !== undefined) {
+    node.anchorTimelinePointId = assertTimelinePoint(state, input.anchorPointId);
+  }
+  if (input.title !== undefined) node.title = input.title;
+  if (input.body !== undefined) writeContentBody(workspace.worktreePath, node, input.body);
+  writeWorktreeStateSync(workspace.worktreePath, state);
+  touchWorkspace(workspace.id);
+  return {
+    ...node,
+    workspaceId: workspace.id,
+    body: readContentBody(workspace.worktreePath, node),
+    nextSiblingId: null,
+  };
 }
 
-export function exportContentSubtree(workspaceId: string, rootNodeId?: string) {
-  const workspace = getWorkspaceOrThrow(db, workspaceId);
-  const contentRootId = assertContentRoot(workspace);
-  const targetRootId = rootNodeId ?? contentRootId;
-  const targetNode = getContentNodeOrThrow(db, workspace.id, targetRootId);
-  if (targetRootId === contentRootId) {
-    return {
-      rootNodeId: targetRootId,
-      isWorkspaceRoot: true,
-      nodes: orderContentChildren(listContentChildren(db, workspace.id, targetRootId)).map(
-        (child) => exportContentNode(db, workspace.id, child),
-      ),
-    } satisfies ExportedContentSubtree;
-  }
+function exportNode(
+  worktreePath: string,
+  state: { content: ContentMetaRow[] },
+  node: ContentMetaRow,
+): ExportedContentNode {
+  return {
+    id: node.id,
+    anchorTimelinePointId: pointIdOrOrigin(node.anchorTimelinePointId),
+    title: node.title,
+    body: readContentBody(worktreePath, node),
+    children: childrenOf(state, node.id).map((child) => exportNode(worktreePath, state, child)),
+  };
+}
 
+export function exportContentSubtree(
+  workspaceId: string,
+  rootNodeId?: string,
+): ExportedContentSubtree {
+  const workspace = getWorkspace(workspaceId);
+  const state = readWorktreeState(workspace.worktreePath);
+  const targetRootId = rootNodeId ?? workspace.contentRootId;
+  const targetNode = getNode(state, targetRootId);
   return {
     rootNodeId: targetRootId,
-    isWorkspaceRoot: false,
-    nodes: [exportContentNode(db, workspace.id, targetNode)],
-  } satisfies ExportedContentSubtree;
+    isWorkspaceRoot: targetRootId === workspace.contentRootId,
+    nodes:
+      targetRootId === workspace.contentRootId
+        ? childrenOf(state, targetRootId).map((child) =>
+            exportNode(workspace.worktreePath, state, child),
+          )
+        : [exportNode(workspace.worktreePath, state, targetNode)],
+  };
 }
 
-function buildManuscriptListNode(
-  workspaceId: string,
-  node: ReturnType<typeof getContentNodeOrThrow>,
-  remainingDepth: number,
+function listNode(
+  state: { content: ContentMetaRow[] },
+  node: ContentMetaRow,
+  depth: number,
 ): { node: ManuscriptListNode; truncated: boolean } {
-  const children = orderContentChildren(listContentChildren(db, workspaceId, node.id));
-  if (remainingDepth <= 1) {
+  const children = childrenOf(state, node.id);
+  if (depth <= 1) {
     return {
       node: {
         id: node.id,
         anchorTimelinePointId: pointIdOrOrigin(node.anchorTimelinePointId),
         title: node.title,
         children: [],
-        ...(children.length > 0 ? { hiddenChildrenCount: children.length } : {}),
+        ...(children.length ? { hiddenChildrenCount: children.length } : {}),
       },
       truncated: children.length > 0,
     };
   }
-
   let truncated = false;
-  const listedChildren = children.map((child) => {
-    const listed = buildManuscriptListNode(workspaceId, child, remainingDepth - 1);
-    if (listed.truncated) {
-      truncated = true;
-    }
-    return listed.node;
+  const listed = children.map((child) => {
+    const result = listNode(state, child, depth - 1);
+    truncated ||= result.truncated;
+    return result.node;
   });
-
   return {
     node: {
       id: node.id,
       anchorTimelinePointId: pointIdOrOrigin(node.anchorTimelinePointId),
       title: node.title,
-      children: listedChildren,
+      children: listed,
     },
     truncated,
   };
@@ -327,44 +247,35 @@ export function listManuscriptNodes(
   rootNodeId?: string,
   options: { depth?: number } = {},
 ): ManuscriptNodeList {
-  const workspace = getWorkspaceOrThrow(db, workspaceId);
-  const contentRootId = assertContentRoot(workspace);
-  const targetRootId = rootNodeId ?? contentRootId;
-  const targetNode = getContentNodeOrThrow(db, workspace.id, targetRootId);
-  const depth = Math.max(1, Math.trunc(options.depth ?? 2));
+  const workspace = getWorkspace(workspaceId);
+  const state = readWorktreeState(workspace.worktreePath);
+  const targetRootId = rootNodeId ?? workspace.contentRootId;
+  const targetNode = getNode(state, targetRootId);
   const roots =
-    targetRootId === contentRootId
-      ? orderContentChildren(listContentChildren(db, workspace.id, targetRootId))
-      : [targetNode];
+    targetRootId === workspace.contentRootId ? childrenOf(state, targetRootId) : [targetNode];
   let truncated = false;
   const nodes = roots.map((node) => {
-    const listed = buildManuscriptListNode(workspace.id, node, depth);
-    if (listed.truncated) {
-      truncated = true;
-    }
+    const listed = listNode(state, node, Math.max(1, options.depth ?? 2));
+    truncated ||= listed.truncated;
     return listed.node;
   });
-
   return {
     rootNodeId: targetRootId,
-    isWorkspaceRoot: targetRootId === contentRootId,
+    isWorkspaceRoot: targetRootId === workspace.contentRootId,
     nodes,
     truncated,
   };
 }
 
 export function readManuscriptNode(workspaceId: string, nodeId: string): ManuscriptNodeRead {
-  const workspace = getWorkspaceOrThrow(db, workspaceId);
-  const node = getContentNodeOrThrow(db, workspace.id, nodeId);
-  const children = orderContentChildren(listContentChildren(db, workspace.id, node.id)).map(
-    (child) => buildManuscriptListNode(workspace.id, child, 1).node,
-  );
-
+  const workspace = getWorkspace(workspaceId);
+  const state = readWorktreeState(workspace.worktreePath);
+  const node = getNode(state, nodeId);
   return {
     id: node.id,
     anchorTimelinePointId: pointIdOrOrigin(node.anchorTimelinePointId),
     title: node.title,
-    body: node.body,
-    children,
+    body: readContentBody(workspace.worktreePath, node),
+    children: childrenOf(state, node.id).map((child) => listNode(state, child, 1).node),
   };
 }

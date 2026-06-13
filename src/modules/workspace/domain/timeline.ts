@@ -1,57 +1,42 @@
-import { and, eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
-import { type DatabaseExecutor, db, schema } from "@/db";
+import { db, schema } from "@/db";
 import { ORIGIN_TIMELINE_POINT_ID } from "@/modules/workspace/domain/constants";
-
-import {
-  assertContentRoot,
-  getTimelinePointOrThrow,
-  getWorkspaceOrThrow,
-  touchWorkspace,
-} from "./internal/access";
-import { purgeAuxLayersAtTimelinePoint } from "./internal/aux-snapshot";
-import { buildContentNodeTitlePath } from "./internal/content-chain";
 import { createId, invariant, now } from "@/shared/lib/domain";
+
+import { getWorkspace } from "./lifecycle";
+import type { TimelinePointRef, TimelinePointView } from "./types";
 import {
-  getTimelineSuccessor,
-  listTimelineRows,
+  normalizePointId,
   orderTimelineRows,
-} from "./internal/timeline-chain";
-import {
-  originTimelinePoint,
   pointIdOrOrigin,
-  validateTimelinePointRef,
-} from "./internal/timeline-point";
-import type { TimelinePointView } from "./types";
+  readWorktreeState,
+  writeWorktreeStateSync,
+} from "./git-storage/worktree-state";
 
-function enableDeferredForeignKeys(tx: DatabaseExecutor) {
-  tx.run(sql.raw("PRAGMA defer_foreign_keys = ON;"));
-}
-
-function setTimelinePrevPoint(
-  tx: DatabaseExecutor,
-  workspaceId: string,
-  pointId: string,
-  prevPointId: string | null,
-  updatedAt: number,
-) {
-  tx.update(schema.timelinePoints)
-    .set({ prevPointId, updatedAt })
-    .where(
-      and(
-        eq(schema.timelinePoints.workspaceId, workspaceId),
-        eq(schema.timelinePoints.id, pointId),
-      ),
-    )
+function touchWorkspace(workspaceId: string) {
+  db.update(schema.workspaces)
+    .set({ updatedAt: now() })
+    .where(eq(schema.workspaces.id, workspaceId))
     .run();
 }
 
+function originTimelinePoint(): TimelinePointView {
+  return {
+    id: ORIGIN_TIMELINE_POINT_ID,
+    label: "原点",
+    description: null,
+    prevPointId: null,
+    isImplicitOrigin: true,
+  };
+}
+
 export function listTimelinePoints(workspaceId: string): TimelinePointView[] {
-  getWorkspaceOrThrow(db, workspaceId);
-  const ordered = orderTimelineRows(listTimelineRows(db, workspaceId));
+  const workspace = getWorkspace(workspaceId);
+  const state = readWorktreeState(workspace.worktreePath);
   return [
     originTimelinePoint(),
-    ...ordered.map((row) => ({
+    ...orderTimelineRows(state.timeline).map((row) => ({
       id: row.id,
       label: row.label,
       description: row.description,
@@ -59,6 +44,15 @@ export function listTimelinePoints(workspaceId: string): TimelinePointView[] {
       isImplicitOrigin: false,
     })),
   ];
+}
+
+function validatePoint(state: ReturnType<typeof readWorktreeState>, pointId: TimelinePointRef) {
+  const normalized = normalizePointId(pointId);
+  invariant(
+    !normalized || state.timeline.some((point) => point.id === normalized),
+    "未找到时间点。",
+  );
+  return normalized;
 }
 
 export function createTimelinePoint(input: {
@@ -70,69 +64,35 @@ export function createTimelinePoint(input: {
   return createTimelinePoints({
     workspaceId: input.workspaceId,
     afterPointId: input.afterPointId,
-    points: [
-      {
-        label: input.label,
-        description: input.description,
-      },
-    ],
+    points: [{ label: input.label, description: input.description }],
   })[0]!;
 }
 
 export function createTimelinePoints(input: {
   workspaceId: string;
   afterPointId?: string | typeof ORIGIN_TIMELINE_POINT_ID;
-  points: Array<{
-    label: string;
-    description?: string | null;
-  }>;
+  points: Array<{ label: string; description?: string | null }>;
 }) {
-  return db.transaction((tx) => {
-    enableDeferredForeignKeys(tx);
-
-    const workspace = getWorkspaceOrThrow(tx, input.workspaceId);
-    const afterPointId = validateTimelinePointRef(tx, workspace.id, input.afterPointId);
-    const successor = getTimelineSuccessor(tx, workspace.id, afterPointId);
-    const timestamp = now();
-    const createdPointIds: string[] = [];
-
-    invariant(input.points.length > 0, "至少需要创建一个时间点。");
-
-    if (successor) {
-      setTimelinePrevPoint(
-        tx,
-        workspace.id,
-        successor.id,
-        createId("timeline_prev_batch_anchor"),
-        timestamp,
-      );
-    }
-
-    let prevPointId = afterPointId;
-    for (const point of input.points) {
-      const pointId = createId("timeline");
-      createdPointIds.push(pointId);
-      tx.insert(schema.timelinePoints)
-        .values({
-          id: pointId,
-          workspaceId: workspace.id,
-          label: point.label,
-          description: point.description ?? null,
-          prevPointId,
-          createdAt: timestamp,
-          updatedAt: timestamp,
-        })
-        .run();
-      prevPointId = pointId;
-    }
-
-    if (successor) {
-      setTimelinePrevPoint(tx, workspace.id, successor.id, prevPointId, timestamp);
-    }
-
-    touchWorkspace(tx, workspace.id);
-    return createdPointIds.map((pointId) => getTimelinePointOrThrow(tx, workspace.id, pointId));
+  const workspace = getWorkspace(input.workspaceId);
+  const state = readWorktreeState(workspace.worktreePath);
+  invariant(input.points.length > 0, "至少需要创建一个时间点。");
+  let prevPointId = validatePoint(state, input.afterPointId);
+  const successor = state.timeline.find((point) => point.prevPointId === prevPointId);
+  const created = input.points.map((point) => {
+    const row = {
+      id: createId("timeline"),
+      label: point.label,
+      description: point.description ?? null,
+      prevPointId,
+    };
+    state.timeline.push(row);
+    prevPointId = row.id;
+    return row;
   });
+  if (successor) successor.prevPointId = prevPointId;
+  writeWorktreeStateSync(workspace.worktreePath, state);
+  touchWorkspace(workspace.id);
+  return created;
 }
 
 export function moveTimelinePoint(input: {
@@ -140,49 +100,21 @@ export function moveTimelinePoint(input: {
   pointId: string;
   afterPointId?: string | typeof ORIGIN_TIMELINE_POINT_ID;
 }) {
-  return db.transaction((tx) => {
-    enableDeferredForeignKeys(tx);
-
-    const workspace = getWorkspaceOrThrow(tx, input.workspaceId);
-    const point = getTimelinePointOrThrow(tx, workspace.id, input.pointId);
-    const afterPointId = validateTimelinePointRef(tx, workspace.id, input.afterPointId);
-    invariant(point.id !== afterPointId, "无法移动：不能把时间点移动到自己后面。");
-    if (point.prevPointId === afterPointId) {
-      return point;
-    }
-
-    const successor = getTimelineSuccessor(tx, workspace.id, point.id);
-    const timestamp = now();
-    const targetSuccessor = getTimelineSuccessor(tx, workspace.id, afterPointId);
-    const targetSuccessorNeedsRewire = targetSuccessor && targetSuccessor.id !== point.id;
-
-    if (targetSuccessorNeedsRewire) {
-      setTimelinePrevPoint(
-        tx,
-        workspace.id,
-        targetSuccessor.id,
-        createId("timeline_prev"),
-        timestamp,
-      );
-    }
-
-    if (successor) {
-      setTimelinePrevPoint(tx, workspace.id, successor.id, createId("timeline_prev"), timestamp);
-    }
-
-    setTimelinePrevPoint(tx, workspace.id, point.id, afterPointId, timestamp);
-
-    if (successor) {
-      setTimelinePrevPoint(tx, workspace.id, successor.id, point.prevPointId, timestamp);
-    }
-
-    if (targetSuccessorNeedsRewire) {
-      setTimelinePrevPoint(tx, workspace.id, targetSuccessor.id, point.id, timestamp);
-    }
-
-    touchWorkspace(tx, workspace.id);
-    return getTimelinePointOrThrow(tx, workspace.id, point.id);
-  });
+  invariant(input.pointId !== ORIGIN_TIMELINE_POINT_ID, "无法移动原点时间点。");
+  const workspace = getWorkspace(input.workspaceId);
+  const state = readWorktreeState(workspace.worktreePath);
+  const point = state.timeline.find((item) => item.id === input.pointId);
+  invariant(point, "未找到时间点。");
+  const afterPointId = validatePoint(state, input.afterPointId);
+  invariant(point.id !== afterPointId, "无法移动：不能把时间点移动到自己后面。");
+  const oldSuccessor = state.timeline.find((item) => item.prevPointId === point.id);
+  const targetSuccessor = state.timeline.find((item) => item.prevPointId === afterPointId);
+  if (oldSuccessor) oldSuccessor.prevPointId = point.prevPointId;
+  point.prevPointId = afterPointId;
+  if (targetSuccessor && targetSuccessor.id !== point.id) targetSuccessor.prevPointId = point.id;
+  writeWorktreeStateSync(workspace.worktreePath, state);
+  touchWorkspace(workspace.id);
+  return point;
 }
 
 export function updateTimelinePoint(input: {
@@ -191,109 +123,59 @@ export function updateTimelinePoint(input: {
   label?: string;
   description?: string | null;
 }) {
-  return db.transaction((tx) => {
-    invariant(input.pointId !== ORIGIN_TIMELINE_POINT_ID, "无法修改原点时间点。");
-
-    const workspace = getWorkspaceOrThrow(tx, input.workspaceId);
-    const point = getTimelinePointOrThrow(tx, workspace.id, input.pointId);
-
-    tx.update(schema.timelinePoints)
-      .set({
-        label: input.label === undefined ? point.label : input.label,
-        description: input.description === undefined ? point.description : input.description,
-        updatedAt: now(),
-      })
-      .where(
-        and(
-          eq(schema.timelinePoints.workspaceId, workspace.id),
-          eq(schema.timelinePoints.id, point.id),
-        ),
-      )
-      .run();
-
-    touchWorkspace(tx, workspace.id);
-    return getTimelinePointOrThrow(tx, workspace.id, point.id);
-  });
-}
-
-function formatContentAnchorBlockMessage(
-  tx: DatabaseExecutor,
-  workspaceId: string,
-  contentRootId: string,
-  anchors: Array<{ id: string }>,
-) {
-  const paths = anchors.map((anchor) =>
-    buildContentNodeTitlePath(tx, workspaceId, anchor.id, contentRootId),
-  );
-
-  if (paths.length === 1) {
-    return `无法删除：章节「${paths[0]}」仍锚定在此时间点。`;
-  }
-
-  return `无法删除：以下章节仍锚定在此时间点：${paths.map((path) => `「${path}」`).join("、")}。`;
+  invariant(input.pointId !== ORIGIN_TIMELINE_POINT_ID, "无法修改原点时间点。");
+  const workspace = getWorkspace(input.workspaceId);
+  const state = readWorktreeState(workspace.worktreePath);
+  const point = state.timeline.find((item) => item.id === input.pointId);
+  invariant(point, "未找到时间点。");
+  if (input.label !== undefined) point.label = input.label;
+  if (input.description !== undefined) point.description = input.description;
+  writeWorktreeStateSync(workspace.worktreePath, state);
+  touchWorkspace(workspace.id);
+  return point;
 }
 
 export function deleteTimelinePoint(
   workspaceId: string,
   pointId: string,
-  options?: { purgeAuxLayers?: boolean },
+  options: { purgeAuxLayers?: boolean } = {},
 ) {
-  return db.transaction((tx) => {
-    enableDeferredForeignKeys(tx);
-
-    const workspace = getWorkspaceOrThrow(tx, workspaceId);
-    const contentRootId = assertContentRoot(workspace);
-    const point = getTimelinePointOrThrow(tx, workspace.id, pointId);
-    const contentAnchors = tx
-      .select()
-      .from(schema.contentNodes)
-      .where(
-        and(
-          eq(schema.contentNodes.workspaceId, workspace.id),
-          eq(schema.contentNodes.anchorTimelinePointId, point.id),
-        ),
-      )
-      .all();
+  invariant(pointId !== ORIGIN_TIMELINE_POINT_ID, "无法删除原点时间点。");
+  const workspace = getWorkspace(workspaceId);
+  const state = readWorktreeState(workspace.worktreePath);
+  const point = state.timeline.find((item) => item.id === pointId);
+  invariant(point, "未找到时间点。");
+  invariant(
+    !state.content.some((node) => node.anchorTimelinePointId === pointId),
+    "无法删除：仍有章节锚定到该时间点。",
+  );
+  if (!options.purgeAuxLayers) {
     invariant(
-      contentAnchors.length === 0,
-      contentAnchors.length > 0
-        ? formatContentAnchorBlockMessage(tx, workspace.id, contentRootId, contentAnchors)
-        : "无法删除：仍有章节锚定在此时间点。",
+      !state.auxLayers.some((layer) => layer.timelinePointId === pointId),
+      "无法删除：该时间点仍有辅助信息变更。",
     );
+  }
+  const successor = state.timeline.find((item) => item.prevPointId === pointId);
+  if (successor) successor.prevPointId = point.prevPointId;
+  state.timeline = state.timeline.filter((item) => item.id !== pointId);
+  if (options.purgeAuxLayers)
+    state.auxLayers = state.auxLayers.filter((layer) => layer.timelinePointId !== pointId);
+  writeWorktreeStateSync(workspace.worktreePath, state);
+  touchWorkspace(workspace.id);
+}
 
-    const auxLayers = tx
-      .select()
-      .from(schema.auxNodeLayers)
-      .where(
-        and(
-          eq(schema.auxNodeLayers.workspaceId, workspace.id),
-          eq(schema.auxNodeLayers.timelinePointId, point.id),
-        ),
-      )
-      .all();
-    if (auxLayers.length > 0) {
-      invariant(
-        options?.purgeAuxLayers === true,
-        "无法删除：该时间点仍有关联的辅助信息，请先确认是否一并删除。",
-      );
-      purgeAuxLayersAtTimelinePoint(tx, workspace.id, point.id);
-    }
+export function normalizeTimelinePointId(pointId: TimelinePointRef) {
+  return normalizePointId(pointId) ?? ORIGIN_TIMELINE_POINT_ID;
+}
 
-    const successor = getTimelineSuccessor(tx, workspace.id, point.id);
-    const timestamp = now();
-    tx.delete(schema.timelinePoints)
-      .where(
-        and(
-          eq(schema.timelinePoints.workspaceId, workspace.id),
-          eq(schema.timelinePoints.id, point.id),
-        ),
-      )
-      .run();
+export function listAffectedTimelinePointIdsForDelete() {
+  return [];
+}
 
-    if (successor) {
-      setTimelinePrevPoint(tx, workspace.id, successor.id, point.prevPointId, timestamp);
-    }
+export function listAffectedTimelinePointIdsForInsert() {
+  return [];
+}
 
-    touchWorkspace(tx, workspace.id);
-  });
+export function listAffectedTimelinePointIdsForMove() {
+  return [];
 }

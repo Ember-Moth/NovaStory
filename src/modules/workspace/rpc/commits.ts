@@ -13,14 +13,18 @@ import {
 import { getWorkspaceForBranch } from "@/modules/workspace/domain/internal/access";
 import { rpcTags, type RpcTagList } from "@/rpc/tags";
 
-export const history = query<{ branchId: string }, ReturnType<typeof listCommits>, RpcTagList>({
+export const history = query<
+  { branchId: string },
+  Awaited<ReturnType<typeof listCommits>>,
+  RpcTagList
+>({
   watch: ({ branchId }) => [rpcTags.commitHistory(branchId)],
   handler: ({ branchId }) => listCommits(branchId),
 });
 
 export const workingTreeStatus = query<
   { branchId: string },
-  ReturnType<typeof getWorkingTreeStatus>,
+  Awaited<ReturnType<typeof getWorkingTreeStatus>>,
   RpcTagList
 >({
   watch: ({ branchId }) => {
@@ -40,7 +44,7 @@ export const workingTreeStatus = query<
 
 export const get = query<
   { commitId: string; projectId: string },
-  ReturnType<typeof getCommit>,
+  Awaited<ReturnType<typeof getCommit>>,
   RpcTagList
 >({
   watch: ({ commitId }) => [rpcTags.commit(commitId)],
@@ -54,10 +58,10 @@ export const create = mutation<
     author?: string | null;
     extraParents?: Array<{ parentId: string; mergeRole?: "normal" | "mainline" | "merged" }>;
   },
-  ReturnType<typeof createCommit>,
+  Awaited<ReturnType<typeof createCommit>>,
   RpcTagList
->((input, ctx) => {
-  const commit = createCommit(input);
+>(async (input, ctx) => {
+  const commit = await createCommit(input);
   const branch = getBranch(input.branchId);
   ctx.invalidate(
     rpcTags.commitHistory(input.branchId),
@@ -71,10 +75,10 @@ export const create = mutation<
 
 export const checkout = mutation<
   { workspaceId: string; commitId: string },
-  ReturnType<typeof checkoutCommit>,
+  Awaited<ReturnType<typeof checkoutCommit>>,
   RpcTagList
->((input, ctx) => {
-  const commit = checkoutCommit(input);
+>(async (input, ctx) => {
+  const commit = await checkoutCommit(input);
   const workspace = getWorkspace(input.workspaceId);
   ctx.invalidate(
     rpcTags.workspace(workspace.id),

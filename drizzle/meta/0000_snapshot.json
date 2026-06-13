@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "ea15153a-4d70-40b1-860b-d9b6d1e216d8",
+  "id": "3226a473-293f-47aa-aa6e-2f91c7b39f68",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "agent_artifacts": {
@@ -2390,6 +2390,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "ref": {
+          "name": "ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "head_commit_id": {
           "name": "head_commit_id",
           "type": "text",
@@ -2446,24 +2453,6 @@
           "columnsFrom": ["project_id"],
           "columnsTo": ["id"],
           "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "branches_head_commit_id_commits_id_fk": {
-          "name": "branches_head_commit_id_commits_id_fk",
-          "tableFrom": "branches",
-          "tableTo": "commits",
-          "columnsFrom": ["head_commit_id"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "branches_forked_from_commit_id_commits_id_fk": {
-          "name": "branches_forked_from_commit_id_commits_id_fk",
-          "tableFrom": "branches",
-          "tableTo": "commits",
-          "columnsFrom": ["forked_from_commit_id"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -3213,6 +3202,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "worktree_path": {
+          "name": "worktree_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "content_root_id": {

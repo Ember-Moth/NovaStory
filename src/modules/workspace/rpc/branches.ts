@@ -34,7 +34,7 @@ export const create = mutation<
 
 export const createWithWorkspace = mutation<
   { projectId: string; name: string; fromCommitId?: string | null; workspaceName?: string },
-  ReturnType<typeof createBranchWorkspace>,
+  Awaited<ReturnType<typeof createBranchWorkspace>>,
   RpcTagList
 >({
   invalidate: (input) => [
@@ -43,7 +43,7 @@ export const createWithWorkspace = mutation<
     rpcTags.project(input.projectId),
     rpcTags.projectsList(),
   ],
-  handler: (input) => createBranchWorkspace(input),
+  handler: async (input) => await createBranchWorkspace(input),
 });
 
 export const deleteMutation = mutation<{ projectId: string; branchId: string }, void, RpcTagList>({

@@ -5,6 +5,8 @@ import { type DatabaseExecutor, db, schema } from "@/db";
 import { createId, invariant, now } from "@/shared/lib/domain";
 
 import { PROJECT_ASSISTANT_MAX_STEPS, PROJECT_ASSISTANT_TOOL_NAMES } from "./types";
+import { aiRunsRef, commitCustomRef } from "@/modules/workspace/domain/git-storage/git-store";
+import { stringifyJsonl } from "@/modules/workspace/domain/git-storage/jsonl";
 import type {
   AgentArtifactKind,
   AgentArtifactRow,
@@ -2066,7 +2068,7 @@ function nextRunEventSeq(executor: DatabaseExecutor, runId: string) {
 }
 
 export function appendRunEvent(input: CreateRunEventInput) {
-  return db.transaction((tx) => {
+  const result = db.transaction((tx) => {
     const run = getRunOrThrow(tx, input.runId);
     if (input.stepId) {
       const step = getStepOrThrow(tx, input.stepId);
@@ -2102,6 +2104,28 @@ export function appendRunEvent(input: CreateRunEventInput) {
     return mapRunEventRow(
       tx.select().from(schema.agentRunEvents).where(eq(schema.agentRunEvents.id, id)).get()!,
     );
+  });
+  void persistRunTraceEventToGit(input.runId).catch((error) => {
+    console.error("Failed to persist AI run event to Git:", error);
+  });
+  return result;
+}
+
+async function persistRunTraceEventToGit(runId: string) {
+  const run = getRunOrThrow(db, runId);
+  const thread = getThreadOrThrow(db, run.threadId);
+  const trace = getRunTrace(runId);
+  await commitCustomRef({
+    projectId: thread.projectId,
+    ref: aiRunsRef(thread.projectId),
+    message: `Append AI run event ${runId}`,
+    files: {
+      [`runs/${runId}/run.json`]: `${JSON.stringify(trace.run, null, 2)}\n`,
+      [`runs/${runId}/steps.jsonl`]: stringifyJsonl(trace.steps),
+      [`runs/${runId}/events.jsonl`]: stringifyJsonl(trace.events),
+      [`runs/${runId}/artifacts.jsonl`]: stringifyJsonl(trace.artifacts),
+      [`runs/${runId}/child-runs.jsonl`]: stringifyJsonl(trace.childRuns),
+    },
   });
 }
 

@@ -76,6 +76,7 @@ export const workspaces = sqliteTable(
       .notNull()
       .references((): any => branches.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    worktreePath: text("worktree_path"),
     contentRootId: text("content_root_id"),
     auxRootId: text("aux_root_id"),
     ...timestampColumns,
@@ -173,12 +174,9 @@ export const branches = sqliteTable(
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
-    headCommitId: text("head_commit_id").references((): any => commits.id, {
-      onDelete: "set null",
-    }),
-    forkedFromCommitId: text("forked_from_commit_id").references((): any => commits.id, {
-      onDelete: "set null",
-    }),
+    ref: text("ref"),
+    headCommitId: text("head_commit_id"),
+    forkedFromCommitId: text("forked_from_commit_id"),
     ...timestampColumns,
   },
   (table) => [
