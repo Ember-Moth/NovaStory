@@ -1,6 +1,8 @@
 import { markdown } from "@codemirror/lang-markdown";
+import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import CodeMirror, { type ReactCodeMirrorProps } from "@uiw/react-codemirror";
 import { EditorView } from "@codemirror/view";
+import { tags } from "@lezer/highlight";
 
 import { cn } from "@/shared/lib/cn";
 
@@ -32,8 +34,54 @@ export const MAIN_TEXT_EDITOR_BASIC_SETUP: NonNullable<ReactCodeMirrorProps["bas
   tabSize: 2,
 };
 
-export const MAIN_TEXT_EDITOR_EXTENSIONS = [
+export const MAIN_TEXT_EDITOR_MARKDOWN_HIGHLIGHT_STYLE = HighlightStyle.define([
+  {
+    tag: [tags.heading, tags.heading1, tags.heading2, tags.heading3, tags.heading4],
+    color: "#f0d7a1",
+    fontWeight: "700",
+  },
+  {
+    tag: [tags.heading5, tags.heading6],
+    color: "#e6c989",
+    fontWeight: "650",
+  },
+  {
+    tag: tags.contentSeparator,
+    color: "#7a8b99",
+  },
+  {
+    tag: [tags.strong, tags.emphasis],
+    color: "#f3c0d6",
+    fontWeight: "700",
+  },
+  {
+    tag: [tags.link, tags.url],
+    color: "#8fc7ff",
+    textDecoration: "underline",
+    textUnderlineOffset: "2px",
+  },
+  {
+    tag: [tags.monospace, tags.strikethrough],
+    color: "#9cdcfe",
+  },
+  {
+    tag: [tags.list, tags.quote],
+    color: "#b9d88a",
+    fontWeight: "600",
+  },
+  {
+    tag: tags.punctuation,
+    color: "#8d9aa3",
+  },
+]);
+
+export const MAIN_TEXT_EDITOR_MARKDOWN_EXTENSIONS = [
   markdown(),
+  syntaxHighlighting(MAIN_TEXT_EDITOR_MARKDOWN_HIGHLIGHT_STYLE),
+];
+
+export const MAIN_TEXT_EDITOR_EXTENSIONS = [
+  ...MAIN_TEXT_EDITOR_MARKDOWN_EXTENSIONS,
   EditorView.lineWrapping,
   EditorView.theme(
     {

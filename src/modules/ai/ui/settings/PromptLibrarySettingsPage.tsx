@@ -1,6 +1,5 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
-import { markdown } from "@codemirror/lang-markdown";
 import { EditorView } from "@codemirror/view";
 
 import { AppShell } from "@/app/shell/AppShell";
@@ -8,6 +7,7 @@ import type { GlobalPromptRow } from "@/modules/ai/domain/types";
 import { rpc } from "@/rpc/client";
 import { cn } from "@/shared/lib/cn";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
+import { MAIN_TEXT_EDITOR_MARKDOWN_EXTENSIONS } from "@/shared/ui/editor/MainTextEditor";
 import { LoadingBlock } from "@/shared/ui/Loading";
 import { OverlayScrollbar } from "@/shared/ui/OverlayScrollbar";
 
@@ -500,7 +500,7 @@ function PromptEditor({
           tabSize: 2,
         }}
         extensions={[
-          markdown(),
+          ...MAIN_TEXT_EDITOR_MARKDOWN_EXTENSIONS,
           EditorView.lineWrapping,
           EditorView.theme(
             {

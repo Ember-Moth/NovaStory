@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   MAIN_TEXT_EDITOR_BASIC_SETUP,
   MAIN_TEXT_EDITOR_EXTENSIONS,
+  MAIN_TEXT_EDITOR_MARKDOWN_EXTENSIONS,
   MainTextEditor,
   getMainTextEditorAriaLabel,
 } from "./MainTextEditor";
@@ -40,7 +41,9 @@ test("MainTextEditor basic setup enables line numbers and search without code-ce
 });
 
 test("MainTextEditor includes markdown highlighting", () => {
-  expect(MAIN_TEXT_EDITOR_EXTENSIONS[0]).toBeInstanceOf(LanguageSupport);
+  expect(MAIN_TEXT_EDITOR_MARKDOWN_EXTENSIONS[0]).toBeInstanceOf(LanguageSupport);
+  expect(MAIN_TEXT_EDITOR_MARKDOWN_EXTENSIONS).toHaveLength(2);
+  expect(MAIN_TEXT_EDITOR_EXTENSIONS.slice(0, 2)).toEqual(MAIN_TEXT_EDITOR_MARKDOWN_EXTENSIONS);
 });
 
 test("getMainTextEditorAriaLabel maps variants to localized labels", () => {
