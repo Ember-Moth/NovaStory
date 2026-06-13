@@ -3,12 +3,14 @@ import {
   appendUserNode,
   createReplacementNode,
   createRun,
+  getLatestRunForTriggerNode,
   getRunTrace,
   getThreadView,
   hasPendingRun,
   PROJECT_ASSISTANT_AGENT_PROFILE,
 } from "@/modules/ai/domain/logs";
 import type {
+  AssistantInputRefSnapshot,
   AssistantMentionInput,
   AgentThreadView,
   ProjectAssistantContextSnapshot,
@@ -41,6 +43,17 @@ function normalizeAssistantUserText(text: string, inputRefCount: number) {
   const normalized = text.trim();
   invariant(normalized.length > 0 || inputRefCount > 0, "消息不能为空。");
   return normalized;
+}
+
+function cloneInputRefsSnapshot(
+  inputRefs: readonly AssistantInputRefSnapshot[] | null | undefined,
+): AssistantInputRefSnapshot[] {
+  return inputRefs == null ? [] : inputRefs.map((ref) => structuredClone(ref));
+}
+
+function findLatestInputRefsForTriggerNode(threadId: string, triggerNodeId: string) {
+  const previousRun = getLatestRunForTriggerNode(threadId, triggerNodeId);
+  return cloneInputRefsSnapshot(previousRun?.inputRefsSnapshot);
 }
 
 export function assertNoPendingRunForThread(thread: AgentThreadView) {
@@ -181,6 +194,7 @@ export function buildRetryRun({
   const triggerNode = threadView.activePath.find((node) => node.id === triggerNodeId);
   invariant(triggerNode, "当前只支持重试 active path 上的节点。");
   invariant(triggerNode.role === "user", "当前版本只能重试用户消息的回复。");
+  const inputRefs = findLatestInputRefsForTriggerNode(thread.id, triggerNodeId);
 
   const run = createRun({
     threadId: thread.id,
@@ -190,6 +204,7 @@ export function buildRetryRun({
     agentProfile: PROJECT_ASSISTANT_AGENT_PROFILE,
     selectionSnapshot: selection.snapshot,
     contextSnapshot: normalizedContext,
+    inputRefsSnapshot: inputRefs,
     activeTools: resolvedActiveTools,
   });
   appendRunEvent({
@@ -206,6 +221,7 @@ export function buildRetryRun({
     system,
     selection,
     context: normalizedContext,
+    inputRefs,
   });
 
   return {
@@ -385,6 +401,7 @@ export function buildContinueRun({
     "原 run 使用了工具，但当前模型不支持工具调用，无法继续。",
   );
   const context = normalizeAssistantContextSnapshot(parentRun.contextSnapshot);
+  const inputRefs = cloneInputRefsSnapshot(parentRun.inputRefsSnapshot);
   const system = buildProjectAssistantSystemPrompt();
   const request = resolveAssistantRequest({
     threadId: thread.id,
@@ -392,6 +409,7 @@ export function buildContinueRun({
     system,
     selection,
     context,
+    inputRefs,
   });
   const run = createRun({
     threadId: thread.id,
@@ -402,6 +420,7 @@ export function buildContinueRun({
     agentProfile: PROJECT_ASSISTANT_AGENT_PROFILE,
     selectionSnapshot: selection.snapshot,
     contextSnapshot: context,
+    inputRefsSnapshot: inputRefs,
     activeTools,
   });
   appendRunEvent({

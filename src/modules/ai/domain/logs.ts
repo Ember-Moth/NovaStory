@@ -1703,6 +1703,25 @@ export function listLatestRuns(threadId: string, limit = 10) {
     .map(mapRunRow);
 }
 
+export function getLatestRunForTriggerNode(threadId: string, triggerNodeId: string) {
+  getThreadOrThrow(db, threadId);
+  return (
+    db
+      .select()
+      .from(schema.agentRuns)
+      .where(
+        and(
+          eq(schema.agentRuns.threadId, threadId),
+          eq(schema.agentRuns.triggerNodeId, triggerNodeId),
+        ),
+      )
+      .orderBy(desc(schema.agentRuns.createdAt))
+      .limit(1)
+      .all()
+      .map(mapRunRow)[0] ?? null
+  );
+}
+
 export function getThreadView(threadId: string): AgentThreadStateView {
   const thread = getThreadOrThrow(db, threadId);
   const activePath = resolveThreadPath(thread.id);

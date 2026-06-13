@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { eq } from "drizzle-orm";
 
 import {
   PROJECT_ASSISTANT_MAX_STEPS,
@@ -305,6 +306,97 @@ test("retryProjectAssistantMessage creates sibling assistant candidates", async 
 
   expect(result.assistantNode?.summaryText).toBe("Retried reply");
   expect(service.getNodeCandidates(userNode.id)).toHaveLength(1);
+});
+
+test("retryProjectAssistantMessage reuses original prompt ref snapshots", async () => {
+  seedProject("assistant_retry_refs");
+  const seeded = seedCustomConnection({
+    connectionId: "conn_retry_refs",
+    modelId: "story-model",
+    modelRowId: "cmodel_retry_refs",
+  });
+  db.insert(schema.globalPrompts)
+    .values({
+      id: "prompt_retry_refs",
+      name: "重试引用",
+      description: null,
+      content: "旧版 Prompt 内容。",
+      isEnabled: true,
+      updatedAt: 100,
+    })
+    .run();
+  const capturedMessages: unknown[][] = [];
+  const service = createProjectAssistantService({
+    readStoredSelection: () => seeded.selection,
+    streamAssistantText: ((input: { messages: unknown[] }) => {
+      capturedMessages.push(input.messages);
+      return createMockStream({
+        chunks: [
+          { type: "start-step", stepNumber: 0 },
+          { type: "text-delta", stepNumber: 0, delta: "收到。" },
+          { type: "finish-step", stepNumber: 0, finishReason: "stop", usage: { totalTokens: 1 } },
+        ],
+        text: "收到。",
+        usage: { totalTokens: 1 },
+        finishReason: "stop",
+        steps: [
+          {
+            stepNumber: 0,
+            preparedMessages: input.messages as never,
+            model: { provider: "openai", modelId: "story-model" },
+            finishReason: "stop",
+            rawFinishReason: "stop",
+            usage: { totalTokens: 1 },
+            request: { body: {} },
+            response: {
+              body: { id: `resp_retry_refs_${capturedMessages.length}` },
+              messages: [
+                {
+                  role: "assistant",
+                  content: [{ type: "text", text: "收到。" }],
+                },
+              ],
+            },
+            providerMetadata: {},
+            toolCalls: [],
+            toolResults: [],
+          },
+        ],
+      })();
+    }) as any,
+  });
+  const thread = service.createProjectAssistantThread("assistant_retry_refs");
+
+  const first = await service.sendProjectAssistantMessage({
+    projectId: "assistant_retry_refs",
+    threadId: thread.id,
+    text: "按这个处理",
+    mentions: [
+      {
+        kind: "global-prompt",
+        mode: "snapshot-ref",
+        targetId: "prompt_retry_refs",
+        label: "重试引用",
+      },
+    ],
+  });
+  db.update(schema.globalPrompts)
+    .set({
+      name: "重试引用新版",
+      content: "新版 Prompt 内容。",
+      updatedAt: 200,
+    })
+    .where(eq(schema.globalPrompts.id, "prompt_retry_refs"))
+    .run();
+  const retried = await service.retryProjectAssistantMessage({
+    projectId: "assistant_retry_refs",
+    threadId: thread.id,
+    triggerNodeId: first.userNode.id,
+  });
+
+  expect(retried.run.inputRefsSnapshot).toEqual(first.run.inputRefsSnapshot);
+  expect(JSON.stringify(capturedMessages.at(-1))).toContain("旧版 Prompt 内容。");
+  expect(JSON.stringify(capturedMessages.at(-1))).not.toContain("新版 Prompt 内容。");
 });
 
 test("sendProjectAssistantMessage uses read-only tools by default and can opt into write tools", async () => {
@@ -716,6 +808,105 @@ test("continueProjectAssistantRun inherits the updated timeline context snapshot
     activeTimelinePointId: timelinePoint.id,
     activeTimelineLabel: "现在",
   });
+});
+
+test("continueProjectAssistantRun reuses parent prompt ref snapshots", async () => {
+  seedProject("assistant_continue_refs");
+  const seeded = seedCustomConnection({
+    connectionId: "conn_continue_refs",
+    modelId: "story-model",
+    modelRowId: "cmodel_continue_refs",
+    supportsToolUse: true,
+  });
+  db.insert(schema.globalPrompts)
+    .values({
+      id: "prompt_continue_refs",
+      name: "继续引用",
+      description: null,
+      content: "继续旧版 Prompt 内容。",
+      isEnabled: true,
+      updatedAt: 100,
+    })
+    .run();
+  const capturedMessages: unknown[][] = [];
+  const service = createProjectAssistantService({
+    readStoredSelection: () => seeded.selection,
+    streamAssistantText: ((input: { messages: unknown[] }) => {
+      capturedMessages.push(input.messages);
+      if (capturedMessages.length === 1) {
+        return createStepLimitMockStream({
+          modelId: "story-model",
+          finalFinishReason: "tool-calls",
+        })();
+      }
+      return createMockStream({
+        chunks: [
+          { type: "start-step", stepNumber: 0 },
+          { type: "text-delta", stepNumber: 0, delta: "继续完成。" },
+          { type: "finish-step", stepNumber: 0, finishReason: "stop", usage: { totalTokens: 1 } },
+        ],
+        text: "继续完成。",
+        usage: { totalTokens: 1 },
+        finishReason: "stop",
+        steps: [
+          {
+            stepNumber: 0,
+            preparedMessages: input.messages as never,
+            model: { provider: "openai", modelId: "story-model" },
+            finishReason: "stop",
+            rawFinishReason: "stop",
+            usage: { totalTokens: 1 },
+            request: { body: {} },
+            response: {
+              body: { id: "resp_continue_refs" },
+              messages: [
+                {
+                  role: "assistant",
+                  content: [{ type: "text", text: "继续完成。" }],
+                },
+              ],
+            },
+            providerMetadata: {},
+            toolCalls: [],
+            toolResults: [],
+          },
+        ],
+      })();
+    }) as any,
+  });
+  const thread = service.createProjectAssistantThread("assistant_continue_refs");
+
+  const first = await service.sendProjectAssistantMessage({
+    projectId: "assistant_continue_refs",
+    threadId: thread.id,
+    text: "连续执行",
+    mentions: [
+      {
+        kind: "global-prompt",
+        mode: "snapshot-ref",
+        targetId: "prompt_continue_refs",
+        label: "继续引用",
+      },
+    ],
+    activeTools: ["read_file"],
+  });
+  db.update(schema.globalPrompts)
+    .set({
+      name: "继续引用新版",
+      content: "继续新版 Prompt 内容。",
+      updatedAt: 200,
+    })
+    .where(eq(schema.globalPrompts.id, "prompt_continue_refs"))
+    .run();
+  const continued = await service.continueProjectAssistantRun({
+    projectId: "assistant_continue_refs",
+    threadId: thread.id,
+    runId: first.run.id,
+  });
+
+  expect(continued.run.inputRefsSnapshot).toEqual(first.run.inputRefsSnapshot);
+  expect(JSON.stringify(capturedMessages.at(-1))).toContain("继续旧版 Prompt 内容。");
+  expect(JSON.stringify(capturedMessages.at(-1))).not.toContain("继续新版 Prompt 内容。");
 });
 
 test("sendProjectAssistantMessage rejects explicit tools when the model does not support tool use", async () => {
