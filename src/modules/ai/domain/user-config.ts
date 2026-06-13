@@ -1,3 +1,4 @@
+import { YAML } from "bun";
 import {
   existsSync,
   mkdirSync,
@@ -37,36 +38,110 @@ function getPromptsConfigDir() {
 }
 
 function getPromptConfigFilePath(id: string) {
-  return join(getPromptsConfigDir(), `${encodeURIComponent(id)}.json`);
+  return join(getPromptsConfigDir(), `${encodeURIComponent(id)}.md`);
 }
 
-function readJsonFile<T>(filepath: string): T {
+type PromptFrontMatter = Omit<GlobalPromptRow, "content">;
+type PromptFrontMatterValues = Record<string, unknown>;
+
+function readPromptFile(filepath: string): GlobalPromptRow {
   try {
-    return JSON.parse(readFileSync(filepath, "utf8")) as T;
+    const raw = readFileSync(filepath, "utf8");
+    const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/.exec(raw);
+    if (!match) {
+      throw new Error("缺少 YAML Front Matter。");
+    }
+
+    const frontMatter = parsePromptFrontMatter(match[1] ?? "");
+    return {
+      ...frontMatter,
+      content: stripTrailingNewline(match[2] ?? ""),
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`配置文件 ${filepath} 不是有效 JSON：${message}`);
+    throw new Error(`配置文件 ${filepath} 不是有效 Prompt Markdown：${message}`);
   }
 }
 
-function writeJsonFile<T>(filepath: string, value: T): T {
-  const json = `${JSON.stringify(value, null, 2)}\n`;
+function writePromptFile(filepath: string, prompt: GlobalPromptRow): GlobalPromptRow {
+  const { content, ...frontMatter } = prompt;
+  const markdown = `---\n${stringifyPromptFrontMatter(frontMatter)}---\n${content.trim()}\n`;
   const tempPath = `${filepath}.${createId("tmp")}.tmp`;
-  writeFileSync(tempPath, json, "utf8");
+  writeFileSync(tempPath, markdown, "utf8");
   renameSync(tempPath, filepath);
-  return value;
+  return prompt;
 }
 
 function listPromptConfigFiles(dir: string) {
   return readdirSync(dir, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
     .map((entry) => join(dir, entry.name))
     .sort();
 }
 
 function readPromptConfigDirectory() {
   const dir = getPromptsConfigDir();
-  return listPromptConfigFiles(dir).map((filepath) => readJsonFile<GlobalPromptRow>(filepath));
+  return listPromptConfigFiles(dir).map((filepath) => readPromptFile(filepath));
+}
+
+function parsePromptFrontMatter(raw: string): PromptFrontMatter {
+  const parsed = YAML.parse(raw);
+  if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Front Matter 必须是 YAML 对象。");
+  }
+  const values = parsed as PromptFrontMatterValues;
+
+  return {
+    id: requireFrontMatterString(values, "id"),
+    name: requireFrontMatterString(values, "name"),
+    description: requireNullableFrontMatterString(values, "description"),
+    isEnabled: requireFrontMatterBoolean(values, "isEnabled"),
+    createdAt: requireFrontMatterNumber(values, "createdAt"),
+    updatedAt: requireFrontMatterNumber(values, "updatedAt"),
+  };
+}
+
+function stripTrailingNewline(value: string) {
+  return value.replace(/\r?\n$/, "");
+}
+
+function stringifyPromptFrontMatter(frontMatter: PromptFrontMatter) {
+  return `${YAML.stringify(frontMatter, null, 2).trimEnd()}\n`;
+}
+
+function requireFrontMatterString(values: PromptFrontMatterValues, key: string) {
+  const value = values[key];
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(`Front Matter 字段 ${key} 必须是非空字符串。`);
+  }
+  return value;
+}
+
+function requireNullableFrontMatterString(values: PromptFrontMatterValues, key: string) {
+  const value = values[key];
+  if (value === null) {
+    return null;
+  }
+  if (typeof value !== "string") {
+    throw new Error(`Front Matter 字段 ${key} 必须是字符串或 null。`);
+  }
+  return value.trim().length > 0 ? value : null;
+}
+
+function requireFrontMatterBoolean(values: PromptFrontMatterValues, key: string) {
+  const value = values[key];
+  if (typeof value !== "boolean") {
+    throw new Error(`Front Matter 字段 ${key} 必须是布尔值。`);
+  }
+  return value;
+}
+
+function requireFrontMatterNumber(values: PromptFrontMatterValues, key: string) {
+  const value = values[key];
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error(`Front Matter 字段 ${key} 必须是数字。`);
+  }
+  return value;
 }
 
 function normalizeAiConnectionsFile(file: AiConnectionsConfigFile): AiConnectionsConfigFile {
@@ -91,7 +166,7 @@ export function findGlobalPromptByNameFromConfig(name: string) {
 
 export function insertGlobalPromptToConfig(prompt: GlobalPromptRow) {
   readPromptConfigDirectory();
-  return writeJsonFile(getPromptConfigFilePath(prompt.id), prompt);
+  return writePromptFile(getPromptConfigFilePath(prompt.id), prompt);
 }
 
 export function updateGlobalPromptInConfig(id: string, updates: Partial<GlobalPromptRow>) {
@@ -99,7 +174,7 @@ export function updateGlobalPromptInConfig(id: string, updates: Partial<GlobalPr
   if (!prompt) return null;
 
   const updated = { ...prompt, ...updates };
-  return writeJsonFile(getPromptConfigFilePath(id), updated);
+  return writePromptFile(getPromptConfigFilePath(id), updated);
 }
 
 export function deleteGlobalPromptFromConfig(id: string) {

@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { YAML } from "bun";
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -26,7 +27,7 @@ function getPromptsConfigDir() {
 }
 
 function getPromptConfigFilePath(id: string) {
-  return join(getPromptsConfigDir(), `${encodeURIComponent(id)}.json`);
+  return join(getPromptsConfigDir(), `${encodeURIComponent(id)}.md`);
 }
 
 test("user config files default to empty lists when missing", () => {
@@ -52,12 +53,19 @@ test("prompt config persists create update and delete operations", () => {
   userConfig.deleteGlobalPromptFromConfig("prompt_b");
   expect(userConfig.listGlobalPromptsFromConfig().map((item) => item.id)).toEqual(["prompt_a"]);
 
-  const promptFiles = readdirSync(getPromptsConfigDir()).filter((name) => name.endsWith(".json"));
-  expect(promptFiles).toEqual(["prompt_a.json"]);
-  const rawPrompt = JSON.parse(readFileSync(getPromptConfigFilePath("prompt_a"), "utf8")) as {
-    content: string;
-  };
-  expect(rawPrompt.content).toBe("Updated");
+  const promptFiles = readdirSync(getPromptsConfigDir()).filter((name) => name.endsWith(".md"));
+  expect(promptFiles).toEqual(["prompt_a.md"]);
+  const rawPrompt = readFileSync(getPromptConfigFilePath("prompt_a"), "utf8");
+  const frontMatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(rawPrompt)?.[1] ?? "";
+  expect(YAML.parse(frontMatter)).toEqual({
+    id: "prompt_a",
+    name: "Alpha",
+    description: null,
+    isEnabled: true,
+    createdAt: 1,
+    updatedAt: 2,
+  });
+  expect(rawPrompt).toContain("---\nUpdated\n");
   expect(existsSync(getPromptConfigFilePath("prompt_b"))).toBe(false);
 });
 
@@ -113,16 +121,16 @@ test("ai connection config persists connections overrides and custom models", ()
 
 test("invalid prompt directory file throws and is not overwritten", () => {
   userConfig.insertGlobalPromptToConfig(prompt("prompt_a", "Alpha"));
-  writeFileSync(getPromptConfigFilePath("prompt_a"), "{not-json", "utf8");
+  writeFileSync(getPromptConfigFilePath("prompt_a"), "{not-front-matter", "utf8");
 
-  expect(() => userConfig.listGlobalPromptsFromConfig()).toThrow("不是有效 JSON");
+  expect(() => userConfig.listGlobalPromptsFromConfig()).toThrow("不是有效 Prompt Markdown");
   expect(() =>
     userConfig.updateGlobalPromptInConfig("prompt_a", {
       content: "Updated",
       updatedAt: 2,
     }),
-  ).toThrow("不是有效 JSON");
-  expect(readFileSync(getPromptConfigFilePath("prompt_a"), "utf8")).toBe("{not-json");
+  ).toThrow("不是有效 Prompt Markdown");
+  expect(readFileSync(getPromptConfigFilePath("prompt_a"), "utf8")).toBe("{not-front-matter");
 });
 
 test("multiple file-backed writes keep all records", async () => {
