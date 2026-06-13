@@ -438,61 +438,59 @@ function PromptEditor({
         </div>
       </div>
 
-      <OverlayScrollbar variant="inline">
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
-          {formError ? (
-            <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
-              {formError}
-            </div>
-          ) : null}
-
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_12rem]">
-            <label className="block space-y-1">
-              <span className="text-[11px] font-medium text-foreground-muted">名称</span>
-              <input
-                autoFocus
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="例如：章节扩写"
-                className="w-full rounded-md border border-border bg-sidebar-background px-3 py-2 text-sm text-foreground outline-none placeholder:text-foreground-muted/50 focus:border-accent-foreground"
-              />
-            </label>
-
-            <label className="flex items-end gap-2 rounded-md border border-border bg-sidebar-background px-3 py-2">
-              <input
-                type="checkbox"
-                checked={isEnabled}
-                onChange={(event) => setIsEnabled(event.target.checked)}
-                className="mb-1 size-4 accent-accent-foreground"
-              />
-              <span className="min-w-0">
-                <span className="block text-sm font-medium text-foreground">启用</span>
-                <span className="block text-[11px] text-foreground-muted">可用于后续候选</span>
-              </span>
-            </label>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
+        {formError ? (
+          <div className="shrink-0 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+            {formError}
           </div>
+        ) : null}
 
+        <div className="grid shrink-0 gap-4 lg:grid-cols-[minmax(0,1fr)_12rem]">
           <label className="block space-y-1">
-            <span className="text-[11px] font-medium text-foreground-muted">说明</span>
+            <span className="text-[11px] font-medium text-foreground-muted">名称</span>
             <input
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              placeholder="可选，用于区分用途"
+              autoFocus
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="例如：章节扩写"
               className="w-full rounded-md border border-border bg-sidebar-background px-3 py-2 text-sm text-foreground outline-none placeholder:text-foreground-muted/50 focus:border-accent-foreground"
             />
           </label>
 
-          <label className="block space-y-1">
-            <span className="text-[11px] font-medium text-foreground-muted">正文</span>
-            <textarea
-              value={content}
-              onChange={(event) => setContent(event.target.value)}
-              placeholder="输入 Prompt 正文..."
-              className="min-h-[28rem] w-full resize-y rounded-md border border-border bg-sidebar-background px-3 py-2 font-mono text-sm leading-6 text-foreground outline-none placeholder:font-sans placeholder:text-foreground-muted/50 focus:border-accent-foreground"
+          <label className="flex items-end gap-2 rounded-md border border-border bg-sidebar-background px-3 py-2">
+            <input
+              type="checkbox"
+              checked={isEnabled}
+              onChange={(event) => setIsEnabled(event.target.checked)}
+              className="mb-1 size-4 accent-accent-foreground"
             />
+            <span className="min-w-0">
+              <span className="block text-sm font-medium text-foreground">启用</span>
+              <span className="block text-[11px] text-foreground-muted">可用于后续候选</span>
+            </span>
           </label>
         </div>
-      </OverlayScrollbar>
+
+        <label className="mt-4 block shrink-0 space-y-1">
+          <span className="text-[11px] font-medium text-foreground-muted">说明</span>
+          <input
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="可选，用于区分用途"
+            className="w-full rounded-md border border-border bg-sidebar-background px-3 py-2 text-sm text-foreground outline-none placeholder:text-foreground-muted/50 focus:border-accent-foreground"
+          />
+        </label>
+
+        <label className="mt-4 flex min-h-0 flex-1 flex-col space-y-1">
+          <span className="shrink-0 text-[11px] font-medium text-foreground-muted">正文</span>
+          <textarea
+            value={content}
+            onChange={(event) => setContent(event.target.value)}
+            placeholder="输入 Prompt 正文..."
+            className="min-h-0 w-full flex-1 resize-none rounded-md border border-border bg-sidebar-background px-3 py-2 font-mono text-sm leading-6 text-foreground outline-none placeholder:font-sans placeholder:text-foreground-muted/50 focus:border-accent-foreground"
+          />
+        </label>
+      </div>
     </form>
   );
 }
