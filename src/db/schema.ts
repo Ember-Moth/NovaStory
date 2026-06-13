@@ -18,6 +18,8 @@ const timestampColumns = {
     .default(sql`(unixepoch() * 1000)`),
 };
 
+// === Projects & Workspaces ===
+
 export const projects = sqliteTable(
   "projects",
   {
@@ -32,7 +34,27 @@ export const projects = sqliteTable(
   (table) => [
     check("projects_name_nonempty", sql`length(${table.name}) > 0`),
     index("projects_updated_at_idx").on(table.updatedAt),
-    index("projects_default_branch_idx").on(table.defaultBranchId),
+  ],
+);
+
+export const branches = sqliteTable(
+  "branches",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    ref: text("ref").notNull(),
+    headCommitId: text("head_commit_id"),
+    forkedFromCommitId: text("forked_from_commit_id"),
+    ...timestampColumns,
+  },
+  (table) => [
+    check("branches_name_nonempty", sql`length(${table.name}) > 0`),
+    uniqueIndex("branches_project_name_idx").on(table.projectId, table.name),
+    uniqueIndex("branches_project_ref_idx").on(table.projectId, table.ref),
+    index("branches_project_idx").on(table.projectId),
   ],
 );
 
@@ -60,46 +82,19 @@ export const workspaces = sqliteTable(
   ],
 );
 
-export const branches = sqliteTable(
-  "branches",
+// === Simplified Cache State (only OID tracking) ===
+
+export const cacheState = sqliteTable(
+  "cache_state",
   {
-    id: text("id").primaryKey(),
-    projectId: text("project_id")
-      .notNull()
-      .references(() => projects.id, { onDelete: "cascade" }),
-    name: text("name").notNull(),
-    ref: text("ref").notNull(),
-    headCommitId: text("head_commit_id"),
-    forkedFromCommitId: text("forked_from_commit_id"),
+    id: text("id").primaryKey(), // format: "projects:<projectId>" or "ai-runs:<projectId>"
+    sourceOid: text("source_oid"), // Git OID of the cached ref
     ...timestampColumns,
   },
-  (table) => [
-    check("branches_name_nonempty", sql`length(${table.name}) > 0`),
-    uniqueIndex("branches_project_name_idx").on(table.projectId, table.name),
-    uniqueIndex("branches_project_ref_idx").on(table.projectId, table.ref),
-    index("branches_project_idx").on(table.projectId),
-    index("branches_head_commit_idx").on(table.headCommitId),
-  ],
+  (table) => [index("cache_state_oid_idx").on(table.sourceOid)],
 );
 
-export const cacheRebuildState = sqliteTable(
-  "cache_rebuild_state",
-  {
-    id: text("id").primaryKey(),
-    domain: text("domain").notNull(),
-    projectId: text("project_id"),
-    sourceRef: text("source_ref"),
-    sourceOid: text("source_oid"),
-    rebuiltAt: integer("rebuilt_at", { mode: "number" }),
-    lastError: text("last_error"),
-    ...timestampColumns,
-  },
-  (table) => [
-    check("cache_rebuild_state_domain_valid", sql`${table.domain} IN ('projects', 'ai-runs')`),
-    uniqueIndex("cache_rebuild_state_domain_project_idx").on(table.domain, table.projectId),
-    index("cache_rebuild_state_project_idx").on(table.projectId),
-  ],
-);
+// === AI Catalog (external data cache - keep as is) ===
 
 export const aiCatalogProviders = sqliteTable(
   "ai_catalog_providers",
@@ -171,6 +166,8 @@ export const aiRegistryState = sqliteTable(
   (table) => [check("ai_registry_state_id_nonempty", sql`length(${table.id}) > 0`)],
 );
 
+// === AI Threads & Runs (keep core indexes for performance) ===
+
 export const agentThreads = sqliteTable(
   "agent_threads",
   {
@@ -190,13 +187,6 @@ export const agentThreads = sqliteTable(
     index("agent_threads_project_idx").on(table.projectId),
     index("agent_threads_project_profile_idx").on(table.projectId, table.agentProfile),
     index("agent_threads_project_archived_idx").on(table.projectId, table.archivedAt),
-    index("agent_threads_project_profile_archived_updated_idx").on(
-      table.projectId,
-      table.agentProfile,
-      table.archivedAt,
-      table.updatedAt,
-      table.createdAt,
-    ),
     index("agent_threads_active_tip_idx").on(table.activeTipNodeId),
   ],
 );
@@ -217,7 +207,6 @@ export const agentProjectState = sqliteTable(
   (table) => [
     check("agent_project_state_profile_nonempty", sql`length(${table.agentProfile}) > 0`),
     uniqueIndex("agent_project_state_unique_idx").on(table.projectId, table.agentProfile),
-    index("agent_project_state_active_thread_idx").on(table.activeThreadId),
   ],
 );
 
@@ -263,14 +252,8 @@ export const agentRuns = sqliteTable(
     check("agent_runs_profile_nonempty", sql`length(${table.agentProfile}) > 0`),
     index("agent_runs_thread_idx").on(table.threadId),
     index("agent_runs_parent_run_idx").on(table.parentRunId),
-    index("agent_runs_trigger_node_idx").on(table.triggerNodeId),
     index("agent_runs_thread_status_idx").on(table.threadId, table.status),
     index("agent_runs_thread_created_idx").on(table.threadId, table.createdAt),
-    index("agent_runs_thread_trigger_created_idx").on(
-      table.threadId,
-      table.triggerNodeId,
-      table.createdAt,
-    ),
   ],
 );
 
@@ -315,6 +298,5 @@ export const agentThreadNodes = sqliteTable(
       table.createdAt,
     ),
     index("agent_thread_nodes_run_idx").on(table.createdByRunId),
-    index("agent_thread_nodes_step_idx").on(table.sourceStepId),
   ],
 );

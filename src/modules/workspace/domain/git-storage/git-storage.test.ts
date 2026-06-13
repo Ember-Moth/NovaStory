@@ -211,5 +211,5 @@ test("volatile cache rebuild prunes stale rows and preserves AI catalog", async 
   ).toEqual(["git_rebuild_all"]);
   expect(db.select().from(schema.workspaces).get()?.id).toBe(workspace.id);
   expect(db.select().from(schema.aiCatalogProviders).get()?.id).toBe("provider_keep");
-  expect(db.select().from(schema.cacheRebuildState).all().length).toBeGreaterThan(0);
+  expect(db.select().from(schema.cacheState).all().length).toBeGreaterThan(0);
 });

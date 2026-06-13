@@ -11,7 +11,6 @@ CREATE TABLE `agent_project_state` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `agent_project_state_unique_idx` ON `agent_project_state` (`project_id`,`agent_profile`);--> statement-breakpoint
-CREATE INDEX `agent_project_state_active_thread_idx` ON `agent_project_state` (`active_thread_id`);--> statement-breakpoint
 CREATE TABLE `agent_runs` (
 	`id` text PRIMARY KEY NOT NULL,
 	`thread_id` text NOT NULL,
@@ -44,10 +43,8 @@ CREATE TABLE `agent_runs` (
 --> statement-breakpoint
 CREATE INDEX `agent_runs_thread_idx` ON `agent_runs` (`thread_id`);--> statement-breakpoint
 CREATE INDEX `agent_runs_parent_run_idx` ON `agent_runs` (`parent_run_id`);--> statement-breakpoint
-CREATE INDEX `agent_runs_trigger_node_idx` ON `agent_runs` (`trigger_node_id`);--> statement-breakpoint
 CREATE INDEX `agent_runs_thread_status_idx` ON `agent_runs` (`thread_id`,`status`);--> statement-breakpoint
 CREATE INDEX `agent_runs_thread_created_idx` ON `agent_runs` (`thread_id`,`created_at`);--> statement-breakpoint
-CREATE INDEX `agent_runs_thread_trigger_created_idx` ON `agent_runs` (`thread_id`,`trigger_node_id`,`created_at`);--> statement-breakpoint
 CREATE TABLE `agent_thread_nodes` (
 	`id` text PRIMARY KEY NOT NULL,
 	`thread_id` text NOT NULL,
@@ -70,7 +67,6 @@ CREATE INDEX `agent_thread_nodes_thread_idx` ON `agent_thread_nodes` (`thread_id
 CREATE INDEX `agent_thread_nodes_parent_idx` ON `agent_thread_nodes` (`parent_node_id`);--> statement-breakpoint
 CREATE INDEX `agent_thread_nodes_thread_parent_created_idx` ON `agent_thread_nodes` (`thread_id`,`parent_node_id`,`created_at`);--> statement-breakpoint
 CREATE INDEX `agent_thread_nodes_run_idx` ON `agent_thread_nodes` (`created_by_run_id`);--> statement-breakpoint
-CREATE INDEX `agent_thread_nodes_step_idx` ON `agent_thread_nodes` (`source_step_id`);--> statement-breakpoint
 CREATE TABLE `agent_threads` (
 	`id` text PRIMARY KEY NOT NULL,
 	`project_id` text NOT NULL,
@@ -88,7 +84,6 @@ CREATE TABLE `agent_threads` (
 CREATE INDEX `agent_threads_project_idx` ON `agent_threads` (`project_id`);--> statement-breakpoint
 CREATE INDEX `agent_threads_project_profile_idx` ON `agent_threads` (`project_id`,`agent_profile`);--> statement-breakpoint
 CREATE INDEX `agent_threads_project_archived_idx` ON `agent_threads` (`project_id`,`archived_at`);--> statement-breakpoint
-CREATE INDEX `agent_threads_project_profile_archived_updated_idx` ON `agent_threads` (`project_id`,`agent_profile`,`archived_at`,`updated_at`,`created_at`);--> statement-breakpoint
 CREATE INDEX `agent_threads_active_tip_idx` ON `agent_threads` (`active_tip_node_id`);--> statement-breakpoint
 CREATE TABLE `ai_catalog_models` (
 	`id` text PRIMARY KEY NOT NULL,
@@ -163,22 +158,14 @@ CREATE TABLE `branches` (
 CREATE UNIQUE INDEX `branches_project_name_idx` ON `branches` (`project_id`,`name`);--> statement-breakpoint
 CREATE UNIQUE INDEX `branches_project_ref_idx` ON `branches` (`project_id`,`ref`);--> statement-breakpoint
 CREATE INDEX `branches_project_idx` ON `branches` (`project_id`);--> statement-breakpoint
-CREATE INDEX `branches_head_commit_idx` ON `branches` (`head_commit_id`);--> statement-breakpoint
-CREATE TABLE `cache_rebuild_state` (
+CREATE TABLE `cache_state` (
 	`id` text PRIMARY KEY NOT NULL,
-	`domain` text NOT NULL,
-	`project_id` text,
-	`source_ref` text,
 	`source_oid` text,
-	`rebuilt_at` integer,
-	`last_error` text,
 	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
-	`updated_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
-	CONSTRAINT "cache_rebuild_state_domain_valid" CHECK("cache_rebuild_state"."domain" IN ('projects', 'ai-runs'))
+	`updated_at` integer DEFAULT (unixepoch() * 1000) NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `cache_rebuild_state_domain_project_idx` ON `cache_rebuild_state` (`domain`,`project_id`);--> statement-breakpoint
-CREATE INDEX `cache_rebuild_state_project_idx` ON `cache_rebuild_state` (`project_id`);--> statement-breakpoint
+CREATE INDEX `cache_state_oid_idx` ON `cache_state` (`source_oid`);--> statement-breakpoint
 CREATE TABLE `projects` (
 	`id` text PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
@@ -191,7 +178,6 @@ CREATE TABLE `projects` (
 );
 --> statement-breakpoint
 CREATE INDEX `projects_updated_at_idx` ON `projects` (`updated_at`);--> statement-breakpoint
-CREATE INDEX `projects_default_branch_idx` ON `projects` (`default_branch_id`);--> statement-breakpoint
 CREATE TABLE `workspaces` (
 	`id` text PRIMARY KEY NOT NULL,
 	`project_id` text NOT NULL,

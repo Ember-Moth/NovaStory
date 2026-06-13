@@ -81,42 +81,32 @@ async function resolveBranchHead(projectId: string, branch: BranchIndexRow) {
   return (await resolveRef(projectId, branch.ref)) ?? branch.headCommitId;
 }
 
-function rebuildStateId(domain: "projects" | "ai-runs", projectId: string) {
+function cacheStateId(domain: "projects" | "ai-runs", projectId: string) {
   return `${domain}:${projectId}`;
 }
 
-function recordRebuildState(input: {
-  domain: "projects" | "ai-runs";
-  projectId: string;
-  sourceRef: string;
-  sourceOid: string | null;
-  rebuiltAt: number | null;
-  lastError: string | null;
-}) {
+function updateCacheState(id: string, sourceOid: string | null) {
   const timestamp = now();
-  db.insert(schema.cacheRebuildState)
+  db.insert(schema.cacheState)
     .values({
-      id: rebuildStateId(input.domain, input.projectId),
-      domain: input.domain,
-      projectId: input.projectId,
-      sourceRef: input.sourceRef,
-      sourceOid: input.sourceOid,
-      rebuiltAt: input.rebuiltAt,
-      lastError: input.lastError,
+      id,
+      sourceOid,
       createdAt: timestamp,
       updatedAt: timestamp,
     })
     .onConflictDoUpdate({
-      target: schema.cacheRebuildState.id,
+      target: schema.cacheState.id,
       set: {
-        sourceRef: input.sourceRef,
-        sourceOid: input.sourceOid,
-        rebuiltAt: input.rebuiltAt,
-        lastError: input.lastError,
+        sourceOid,
         updatedAt: timestamp,
       },
     })
     .run();
+}
+
+function getCacheState(id: string): string | null {
+  const row = db.query.cacheState.findFirst({ where: eq(schema.cacheState.id, id) }).sync();
+  return row?.sourceOid ?? null;
 }
 
 function clearProjectRows(projectId: string) {
@@ -140,26 +130,35 @@ function clearVolatileCacheRows() {
   db.delete(schema.workspaces).run();
   db.delete(schema.branches).run();
   db.delete(schema.projects).run();
-  db.delete(schema.cacheRebuildState).run();
+  db.delete(schema.cacheState).run();
 }
 
 export async function rebuildProjectCache(projectId: string): Promise<ProjectRebuildResult> {
   return await withProjectLock(projectId, async () => {
     const errors: string[] = [];
     const ref = metaRef(projectId);
+    const cacheId = cacheStateId("projects", projectId);
     let sourceOid: string | null = null;
     try {
       sourceOid = await resolveRef(projectId, ref);
+      const cachedOid = getCacheState(cacheId);
+
+      // Skip rebuild if OID hasn't changed
+      if (sourceOid && cachedOid === sourceOid) {
+        return {
+          projectId,
+          rebuilt: false,
+          projects: 0,
+          branches: 0,
+          workspaces: 0,
+          sourceOid,
+          errors,
+        };
+      }
+
       if (!sourceOid) {
         clearProjectRows(projectId);
-        recordRebuildState({
-          domain: "projects",
-          projectId,
-          sourceRef: ref,
-          sourceOid,
-          rebuiltAt: null,
-          lastError: null,
-        });
+        updateCacheState(cacheId, null);
         return {
           projectId,
           rebuilt: false,
@@ -204,14 +203,7 @@ export async function rebuildProjectCache(projectId: string): Promise<ProjectReb
           tx.insert(schema.workspaces).values(workspace).run();
         }
       });
-      recordRebuildState({
-        domain: "projects",
-        projectId,
-        sourceRef: ref,
-        sourceOid,
-        rebuiltAt: now(),
-        lastError: null,
-      });
+      updateCacheState(cacheId, sourceOid);
 
       return {
         projectId,
@@ -225,14 +217,7 @@ export async function rebuildProjectCache(projectId: string): Promise<ProjectReb
     } catch (error) {
       const message = stringifyError(error);
       errors.push(message);
-      recordRebuildState({
-        domain: "projects",
-        projectId,
-        sourceRef: ref,
-        sourceOid,
-        rebuiltAt: null,
-        lastError: message,
-      });
+      updateCacheState(cacheId, sourceOid);
       return {
         projectId,
         rebuilt: false,
@@ -309,19 +294,29 @@ export async function rebuildAiCache(projectId: string): Promise<AiRebuildResult
   return await withProjectLock(projectId, async () => {
     const errors: string[] = [];
     const ref = aiRunsRef(projectId);
+    const cacheId = cacheStateId("ai-runs", projectId);
     let sourceOid: string | null = null;
     try {
       sourceOid = await resolveRef(projectId, ref);
+      const cachedOid = getCacheState(cacheId);
+
+      // Skip rebuild if OID hasn't changed
+      if (sourceOid && cachedOid === sourceOid) {
+        return {
+          projectId,
+          rebuilt: false,
+          threads: 0,
+          projectState: 0,
+          nodes: 0,
+          runs: 0,
+          sourceOid,
+          errors,
+        };
+      }
+
       if (!sourceOid) {
         clearAiRows(projectId);
-        recordRebuildState({
-          domain: "ai-runs",
-          projectId,
-          sourceRef: ref,
-          sourceOid,
-          rebuiltAt: null,
-          lastError: null,
-        });
+        updateCacheState(cacheId, null);
         return {
           projectId,
           rebuilt: false,
@@ -363,14 +358,7 @@ export async function rebuildAiCache(projectId: string): Promise<AiRebuildResult
           tx.insert(schema.agentThreadNodes).values(node).run();
         }
       });
-      recordRebuildState({
-        domain: "ai-runs",
-        projectId,
-        sourceRef: ref,
-        sourceOid,
-        rebuiltAt: now(),
-        lastError: null,
-      });
+      updateCacheState(cacheId, sourceOid);
 
       return {
         projectId,
@@ -385,14 +373,7 @@ export async function rebuildAiCache(projectId: string): Promise<AiRebuildResult
     } catch (error) {
       const message = stringifyError(error);
       errors.push(message);
-      recordRebuildState({
-        domain: "ai-runs",
-        projectId,
-        sourceRef: ref,
-        sourceOid,
-        rebuiltAt: null,
-        lastError: message,
-      });
+      updateCacheState(cacheId, sourceOid);
       return {
         projectId,
         rebuilt: false,

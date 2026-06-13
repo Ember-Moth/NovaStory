@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "0ba53999-88f6-4f88-b8f0-340aee95c094",
+  "id": "98c7a988-3d8b-4091-aa67-8a9fdc5b1f6b",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "agent_project_state": {
@@ -57,11 +57,6 @@
           "name": "agent_project_state_unique_idx",
           "columns": ["project_id", "agent_profile"],
           "isUnique": true
-        },
-        "agent_project_state_active_thread_idx": {
-          "name": "agent_project_state_active_thread_idx",
-          "columns": ["active_thread_id"],
-          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -274,11 +269,6 @@
           "columns": ["parent_run_id"],
           "isUnique": false
         },
-        "agent_runs_trigger_node_idx": {
-          "name": "agent_runs_trigger_node_idx",
-          "columns": ["trigger_node_id"],
-          "isUnique": false
-        },
         "agent_runs_thread_status_idx": {
           "name": "agent_runs_thread_status_idx",
           "columns": ["thread_id", "status"],
@@ -287,11 +277,6 @@
         "agent_runs_thread_created_idx": {
           "name": "agent_runs_thread_created_idx",
           "columns": ["thread_id", "created_at"],
-          "isUnique": false
-        },
-        "agent_runs_thread_trigger_created_idx": {
-          "name": "agent_runs_thread_trigger_created_idx",
-          "columns": ["thread_id", "trigger_node_id", "created_at"],
           "isUnique": false
         }
       },
@@ -419,11 +404,6 @@
           "name": "agent_thread_nodes_run_idx",
           "columns": ["created_by_run_id"],
           "isUnique": false
-        },
-        "agent_thread_nodes_step_idx": {
-          "name": "agent_thread_nodes_step_idx",
-          "columns": ["source_step_id"],
-          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -539,11 +519,6 @@
         "agent_threads_project_archived_idx": {
           "name": "agent_threads_project_archived_idx",
           "columns": ["project_id", "archived_at"],
-          "isUnique": false
-        },
-        "agent_threads_project_profile_archived_updated_idx": {
-          "name": "agent_threads_project_profile_archived_updated_idx",
-          "columns": ["project_id", "agent_profile", "archived_at", "updated_at", "created_at"],
           "isUnique": false
         },
         "agent_threads_active_tip_idx": {
@@ -1022,11 +997,6 @@
           "name": "branches_project_idx",
           "columns": ["project_id"],
           "isUnique": false
-        },
-        "branches_head_commit_idx": {
-          "name": "branches_head_commit_idx",
-          "columns": ["head_commit_id"],
-          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -1049,8 +1019,8 @@
         }
       }
     },
-    "cache_rebuild_state": {
-      "name": "cache_rebuild_state",
+    "cache_state": {
+      "name": "cache_state",
       "columns": {
         "id": {
           "name": "id",
@@ -1059,43 +1029,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "domain": {
-          "name": "domain",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "project_id": {
-          "name": "project_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "source_ref": {
-          "name": "source_ref",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "source_oid": {
           "name": "source_oid",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "rebuilt_at": {
-          "name": "rebuilt_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "last_error": {
-          "name": "last_error",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -1119,26 +1054,16 @@
         }
       },
       "indexes": {
-        "cache_rebuild_state_domain_project_idx": {
-          "name": "cache_rebuild_state_domain_project_idx",
-          "columns": ["domain", "project_id"],
-          "isUnique": true
-        },
-        "cache_rebuild_state_project_idx": {
-          "name": "cache_rebuild_state_project_idx",
-          "columns": ["project_id"],
+        "cache_state_oid_idx": {
+          "name": "cache_state_oid_idx",
+          "columns": ["source_oid"],
           "isUnique": false
         }
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {
-        "cache_rebuild_state_domain_valid": {
-          "name": "cache_rebuild_state_domain_valid",
-          "value": "\"cache_rebuild_state\".\"domain\" IN ('projects', 'ai-runs')"
-        }
-      }
+      "checkConstraints": {}
     },
     "projects": {
       "name": "projects",
@@ -1192,11 +1117,6 @@
         "projects_updated_at_idx": {
           "name": "projects_updated_at_idx",
           "columns": ["updated_at"],
-          "isUnique": false
-        },
-        "projects_default_branch_idx": {
-          "name": "projects_default_branch_idx",
-          "columns": ["default_branch_id"],
           "isUnique": false
         }
       },
