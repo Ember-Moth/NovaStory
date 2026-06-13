@@ -613,20 +613,6 @@ test("list_files returns a recursive tree by default and does not recurse into s
       entries: [
         {
           nodeType: "dir",
-          name: "索引",
-          path: "/索引",
-          children: [
-            {
-              nodeType: "symlink",
-              name: "设定入口",
-              path: "/索引/设定入口",
-              symlinkTargetPath: "/设定",
-              children: [],
-            },
-          ],
-        },
-        {
-          nodeType: "dir",
           name: "设定",
           path: "/设定",
           children: [
@@ -641,6 +627,20 @@ test("list_files returns a recursive tree by default and does not recurse into s
               nodeType: "file",
               name: "角色.md",
               path: "/设定/角色.md",
+              children: [],
+            },
+          ],
+        },
+        {
+          nodeType: "dir",
+          name: "索引",
+          path: "/索引",
+          children: [
+            {
+              nodeType: "symlink",
+              name: "设定入口",
+              path: "/索引/设定入口",
+              symlinkTargetPath: "/设定",
               children: [],
             },
           ],
