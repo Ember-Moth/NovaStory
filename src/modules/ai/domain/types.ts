@@ -24,16 +24,6 @@ export interface AiRunsMetaPayload {
   nodes: AgentThreadNodeRow[];
 }
 
-export interface AgentRunInputRow {
-  id: string;
-  runId: string;
-  selectionSnapshotJson: string;
-  contextSnapshotJson: string | null;
-  activeToolsJson: string | null;
-  createdAt: number;
-  updatedAt: number;
-}
-
 export interface AgentRunInputRefRow {
   id: string;
   runId: string;

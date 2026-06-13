@@ -5,12 +5,8 @@ import git from "isomorphic-git";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type {
-  AgentArtifactRow,
   AgentProjectStateRow,
-  AgentRunEventRow,
-  AgentRunInputRefRow,
   AgentRunRow,
-  AgentRunStepRow,
   AgentThreadNodeRow,
   AgentThreadRow,
   AiRunsMetaPayload,
@@ -186,24 +182,6 @@ function parseRunRow(files: Record<string, string>, runId: string): AgentRunRow 
     status: String(view.status),
     agentProfile: String(view.agentProfile),
     errorArtifactId: typeof view.errorArtifactId === "string" ? view.errorArtifactId : null,
-    selectionSnapshotJson: JSON.stringify(view.selectionSnapshot ?? {}),
-    contextSnapshotJson:
-      view.contextSnapshot === undefined ? null : JSON.stringify(view.contextSnapshot),
-    activeToolsJson: view.activeTools === undefined ? null : JSON.stringify(view.activeTools),
-    inputRefsJson: JSON.stringify(
-      parseJsonl<AgentRunInputRefRow>(files[`runs/${runId}/input-refs.jsonl`]),
-    ),
-    stepsJson: JSON.stringify(
-      parseJsonl<AgentRunStepRow | Record<string, unknown>>(files[`runs/${runId}/steps.jsonl`]).map(
-        normalizeStepRow,
-      ),
-    ),
-    eventsJson: JSON.stringify(parseJsonl<AgentRunEventRow>(files[`runs/${runId}/events.jsonl`])),
-    artifactsJson: JSON.stringify(
-      parseJsonl<AgentArtifactRow | Record<string, unknown>>(
-        files[`runs/${runId}/artifacts.jsonl`],
-      ).map(normalizeArtifactRow),
-    ),
     startedAt: Number(view.startedAt),
     completedAt: typeof view.completedAt === "number" ? view.completedAt : null,
     createdAt: Number(view.createdAt),
@@ -218,53 +196,6 @@ function discoverRunIds(files: Record<string, string>) {
     if (match?.[1]) runIds.add(match[1]);
   }
   return [...runIds].sort((left, right) => left.localeCompare(right));
-}
-
-function optionalJson(value: unknown) {
-  return value === undefined ? null : JSON.stringify(value);
-}
-
-function normalizeStepRow(row: AgentRunStepRow | Record<string, unknown>): AgentRunStepRow {
-  if ("systemJson" in row) return row as AgentRunStepRow;
-  return {
-    id: String(row.id),
-    runId: String(row.runId),
-    stepIndex: Number(row.stepIndex),
-    provider: String(row.provider),
-    modelId: String(row.modelId),
-    finishReason: typeof row.finishReason === "string" ? row.finishReason : null,
-    rawFinishReason: typeof row.rawFinishReason === "string" ? row.rawFinishReason : null,
-    systemJson: optionalJson(row.system),
-    preparedMessagesArtifactId:
-      typeof row.preparedMessagesArtifactId === "string" ? row.preparedMessagesArtifactId : null,
-    responseMessagesArtifactId:
-      typeof row.responseMessagesArtifactId === "string" ? row.responseMessagesArtifactId : null,
-    requestBodyArtifactId:
-      typeof row.requestBodyArtifactId === "string" ? row.requestBodyArtifactId : null,
-    responseBodyArtifactId:
-      typeof row.responseBodyArtifactId === "string" ? row.responseBodyArtifactId : null,
-    providerMetadataArtifactId:
-      typeof row.providerMetadataArtifactId === "string" ? row.providerMetadataArtifactId : null,
-    usageJson: optionalJson(row.usage),
-    startedAt: Number(row.startedAt),
-    completedAt: Number(row.completedAt),
-    createdAt: Number(row.createdAt),
-  };
-}
-
-function normalizeArtifactRow(row: AgentArtifactRow | Record<string, unknown>): AgentArtifactRow {
-  if ("contentJson" in row) return row as AgentArtifactRow;
-  return {
-    id: String(row.id),
-    runId: typeof row.runId === "string" ? row.runId : null,
-    stepId: typeof row.stepId === "string" ? row.stepId : null,
-    artifactKind: String(row.artifactKind) as AgentArtifactRow["artifactKind"],
-    visibility: String(row.visibility) as AgentArtifactRow["visibility"],
-    mimeType: typeof row.mimeType === "string" ? row.mimeType : null,
-    contentJson: JSON.stringify(row.content ?? null),
-    summaryText: typeof row.summaryText === "string" ? row.summaryText : null,
-    createdAt: Number(row.createdAt),
-  };
 }
 
 export async function restoreAiCache(projectId: string): Promise<AiRestoreResult> {
@@ -342,13 +273,6 @@ export async function restoreAiCache(projectId: string): Promise<AiRestoreResult
                 status: run.status,
                 agentProfile: run.agentProfile,
                 errorArtifactId: run.errorArtifactId,
-                selectionSnapshotJson: run.selectionSnapshotJson,
-                contextSnapshotJson: run.contextSnapshotJson,
-                activeToolsJson: run.activeToolsJson,
-                inputRefsJson: run.inputRefsJson,
-                stepsJson: run.stepsJson,
-                eventsJson: run.eventsJson,
-                artifactsJson: run.artifactsJson,
                 startedAt: run.startedAt,
                 completedAt: run.completedAt,
                 createdAt: run.createdAt,

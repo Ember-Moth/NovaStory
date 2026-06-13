@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 
 import { db, schema } from "@/db";
-import { appendRunEvent, createRun, createThread } from "@/modules/ai/domain/logs";
+import { appendRunEvent, createRun, createThread, getRunTrace } from "@/modules/ai/domain/logs";
 import { setupMockDatabase } from "@/test/mock-db";
 
 import { aiRunsRef, metaRef, readFileAtRef, resolveRef } from "./git-store";
@@ -169,5 +169,6 @@ test("AI sidebar and run cache can be restored from the AI custom ref", async ()
   expect(db.select().from(schema.agentProjectState).all()).toHaveLength(1);
   expect(db.select().from(schema.agentRuns).all()).toHaveLength(1);
   const restoredRun = db.select().from(schema.agentRuns).get();
-  expect(restoredRun?.eventsJson).toContain("run-started");
+  expect(restoredRun?.id).toBe(run.id);
+  expect(getRunTrace(run.id).events.map((event) => event.eventKind)).toEqual(["run-started"]);
 });

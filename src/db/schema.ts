@@ -314,13 +314,6 @@ export const agentRuns = sqliteTable(
     status: text("status").notNull(),
     agentProfile: text("agent_profile").notNull(),
     errorArtifactId: text("error_artifact_id"),
-    selectionSnapshotJson: text("selection_snapshot_json").notNull().default("{}"),
-    contextSnapshotJson: text("context_snapshot_json"),
-    activeToolsJson: text("active_tools_json"),
-    inputRefsJson: text("input_refs_json").notNull().default("[]"),
-    stepsJson: text("steps_json").notNull().default("[]"),
-    eventsJson: text("events_json").notNull().default("[]"),
-    artifactsJson: text("artifacts_json").notNull().default("[]"),
     startedAt: integer("started_at", { mode: "number" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),

@@ -170,7 +170,7 @@ test("run trace keeps steps, artifacts, and events", () => {
   expect(trace.artifacts).toHaveLength(1);
 });
 
-test("run trace reads Git projection when SQLite trace cache is empty", () => {
+test("run trace reads Git projection instead of SQLite run index fields", () => {
   seedProject("project_trace_git_authoritative");
   const thread = logs.createThread({
     projectId: "project_trace_git_authoritative",
@@ -211,16 +211,12 @@ test("run trace reads Git projection when SQLite trace cache is empty", () => {
   });
 
   db.update(schema.agentRuns)
-    .set({
-      inputRefsJson: "[]",
-      stepsJson: "[]",
-      eventsJson: "[]",
-      artifactsJson: "[]",
-    })
+    .set({ status: "failed" })
     .where(eq(schema.agentRuns.id, run.id))
     .run();
 
   const trace = logs.getRunTrace(run.id);
+  expect(trace.run.status).toBe("running");
   expect(trace.steps.map((entry) => entry.id)).toEqual([step.id]);
   expect(trace.events.map((entry) => entry.eventKind)).toEqual(["provider-requested"]);
   expect(trace.artifacts.map((entry) => entry.id)).toEqual([artifact.id]);
