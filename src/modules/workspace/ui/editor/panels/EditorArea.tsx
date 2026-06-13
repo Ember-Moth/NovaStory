@@ -1,5 +1,4 @@
 import { AuxNodeIcon, ContentNodeIcon } from "@/modules/workspace/ui/editor/components/icons";
-import { RefreshIndicator } from "@/shared/ui/RefreshIndicator";
 import { MainTextEditor } from "@/shared/ui/editor/MainTextEditor";
 import type {
   AuxTreeNodeVM,
@@ -9,21 +8,37 @@ import type {
 
 const EDITOR_HEADER_CLASS =
   "flex h-10 shrink-0 items-center gap-2 border-b border-border bg-title-bar-background px-4";
+const STATUS_LABEL_CLASS = "ml-auto shrink-0 text-[11px] text-foreground-muted";
+const TIMELINE_LABEL_CLASS = "shrink-0 text-[11px] text-accent-foreground";
 
-function SaveStatus({ saveState }: { saveState: SaveState }) {
+function SaveStatus({
+  saveState,
+  isPending = false,
+}: {
+  saveState: SaveState;
+  isPending?: boolean;
+}) {
   if (saveState.error) {
-    return <span className="ml-auto text-[11px] text-red-300">{saveState.error}</span>;
+    return <span className="ml-auto shrink-0 text-[11px] text-red-300">{saveState.error}</span>;
   }
 
-  if (saveState.isSaving) {
-    return <RefreshIndicator label="保存中..." size="xs" className="ml-auto" />;
+  if (saveState.isSaving || isPending) {
+    return <span className={STATUS_LABEL_CLASS}>保存中</span>;
   }
 
   if (saveState.isDirty) {
-    return <span className="ml-auto text-[11px] text-foreground-muted">待保存</span>;
+    return <span className={STATUS_LABEL_CLASS}>待保存</span>;
   }
 
-  return <span className="ml-auto text-[11px] text-foreground-muted">已同步</span>;
+  return <span className={STATUS_LABEL_CLASS}>已同步</span>;
+}
+
+function PendingStatus({ isPending }: { isPending: boolean }) {
+  if (!isPending) {
+    return null;
+  }
+
+  return <span className={STATUS_LABEL_CLASS}>保存中</span>;
 }
 
 export function EditorArea({
@@ -97,12 +112,10 @@ export function EditorArea({
           <div className={EDITOR_HEADER_CLASS}>
             <AuxNodeIcon nodeType={auxNode.nodeType} />
             <span className="truncate text-[14px] text-red-300">{title}</span>
-            <span className="ml-auto shrink-0 text-[11px] text-accent-foreground">
+            <PendingStatus isPending={auxPending} />
+            <span className={`${auxPending ? "" : "ml-auto"}${TIMELINE_LABEL_CLASS}`}>
               时间点: {timelineLabel}
             </span>
-            {auxPending ? (
-              <RefreshIndicator label="同步中..." size="xs" className="shrink-0" />
-            ) : null}
           </div>
           <div className="flex flex-1 items-center justify-center px-4 text-sm text-foreground-muted">
             该辅助信息已在当前时间点删除，需要恢复后才可以编辑
@@ -117,13 +130,10 @@ export function EditorArea({
           <div className={EDITOR_HEADER_CLASS}>
             <AuxNodeIcon nodeType="file" />
             <span className="truncate text-[14px] text-foreground">{auxNode.path}</span>
-            <SaveStatus saveState={auxSaveState} />
+            <SaveStatus saveState={auxSaveState} isPending={auxPending} />
             <span className="shrink-0 text-[11px] text-accent-foreground">
               时间点: {timelineLabel}
             </span>
-            {auxPending ? (
-              <RefreshIndicator label="同步中..." size="xs" className="shrink-0" />
-            ) : null}
           </div>
           <MainTextEditor
             value={auxContent}
@@ -149,12 +159,10 @@ export function EditorArea({
               ? `${auxNode.path} → ${auxNode.symlinkTargetPath}`
               : auxNode.path}
           </span>
-          <span className="ml-auto shrink-0 text-[11px] text-accent-foreground">
+          <PendingStatus isPending={auxPending} />
+          <span className={`${auxPending ? "" : "ml-auto"}${TIMELINE_LABEL_CLASS}`}>
             时间点: {timelineLabel}
           </span>
-          {auxPending ? (
-            <RefreshIndicator label="同步中..." size="xs" className="shrink-0" />
-          ) : null}
         </div>
         <div className="flex flex-1 items-center justify-center px-4 text-sm text-foreground-muted">
           {isAuxSymlinkTargetPickerActive
