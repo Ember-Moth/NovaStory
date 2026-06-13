@@ -47,9 +47,9 @@ export const workspaces = sqliteTable(
       .notNull()
       .references((): any => branches.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
-    worktreePath: text("worktree_path"),
-    contentRootId: text("content_root_id"),
-    auxRootId: text("aux_root_id"),
+    worktreePath: text("worktree_path").notNull(),
+    contentRootId: text("content_root_id").notNull(),
+    auxRootId: text("aux_root_id").notNull(),
     ...timestampColumns,
   },
   (table) => [
@@ -68,7 +68,7 @@ export const branches = sqliteTable(
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
-    ref: text("ref"),
+    ref: text("ref").notNull(),
     headCommitId: text("head_commit_id"),
     forkedFromCommitId: text("forked_from_commit_id"),
     ...timestampColumns,
@@ -76,8 +76,28 @@ export const branches = sqliteTable(
   (table) => [
     check("branches_name_nonempty", sql`length(${table.name}) > 0`),
     uniqueIndex("branches_project_name_idx").on(table.projectId, table.name),
+    uniqueIndex("branches_project_ref_idx").on(table.projectId, table.ref),
     index("branches_project_idx").on(table.projectId),
     index("branches_head_commit_idx").on(table.headCommitId),
+  ],
+);
+
+export const cacheRebuildState = sqliteTable(
+  "cache_rebuild_state",
+  {
+    id: text("id").primaryKey(),
+    domain: text("domain").notNull(),
+    projectId: text("project_id"),
+    sourceRef: text("source_ref"),
+    sourceOid: text("source_oid"),
+    rebuiltAt: integer("rebuilt_at", { mode: "number" }),
+    lastError: text("last_error"),
+    ...timestampColumns,
+  },
+  (table) => [
+    check("cache_rebuild_state_domain_valid", sql`${table.domain} IN ('projects', 'ai-runs')`),
+    uniqueIndex("cache_rebuild_state_domain_project_idx").on(table.domain, table.projectId),
+    index("cache_rebuild_state_project_idx").on(table.projectId),
   ],
 );
 
@@ -170,6 +190,13 @@ export const agentThreads = sqliteTable(
     index("agent_threads_project_idx").on(table.projectId),
     index("agent_threads_project_profile_idx").on(table.projectId, table.agentProfile),
     index("agent_threads_project_archived_idx").on(table.projectId, table.archivedAt),
+    index("agent_threads_project_profile_archived_updated_idx").on(
+      table.projectId,
+      table.agentProfile,
+      table.archivedAt,
+      table.updatedAt,
+      table.createdAt,
+    ),
     index("agent_threads_active_tip_idx").on(table.activeTipNodeId),
   ],
 );
@@ -209,6 +236,15 @@ export const agentRuns = sqliteTable(
     status: text("status").notNull(),
     agentProfile: text("agent_profile").notNull(),
     errorArtifactId: text("error_artifact_id"),
+    selectionSnapshotJson: text("selection_snapshot_json").notNull().default("{}"),
+    contextSnapshotJson: text("context_snapshot_json"),
+    inputRefsSnapshotJson: text("input_refs_snapshot_json"),
+    activeToolsJson: text("active_tools_json"),
+    stepCount: integer("step_count").notNull().default(0),
+    totalTokens: integer("total_tokens"),
+    lastFinishReason: text("last_finish_reason"),
+    errorSummary: text("error_summary"),
+    traceUpdatedAt: integer("trace_updated_at", { mode: "number" }),
     startedAt: integer("started_at", { mode: "number" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
@@ -229,6 +265,12 @@ export const agentRuns = sqliteTable(
     index("agent_runs_parent_run_idx").on(table.parentRunId),
     index("agent_runs_trigger_node_idx").on(table.triggerNodeId),
     index("agent_runs_thread_status_idx").on(table.threadId, table.status),
+    index("agent_runs_thread_created_idx").on(table.threadId, table.createdAt),
+    index("agent_runs_thread_trigger_created_idx").on(
+      table.threadId,
+      table.triggerNodeId,
+      table.createdAt,
+    ),
   ],
 );
 
@@ -267,6 +309,11 @@ export const agentThreadNodes = sqliteTable(
     ),
     index("agent_thread_nodes_thread_idx").on(table.threadId),
     index("agent_thread_nodes_parent_idx").on(table.parentNodeId),
+    index("agent_thread_nodes_thread_parent_created_idx").on(
+      table.threadId,
+      table.parentNodeId,
+      table.createdAt,
+    ),
     index("agent_thread_nodes_run_idx").on(table.createdByRunId),
     index("agent_thread_nodes_step_idx").on(table.sourceStepId),
   ],

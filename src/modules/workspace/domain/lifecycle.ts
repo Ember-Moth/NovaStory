@@ -6,7 +6,12 @@ import { db, schema } from "@/db";
 import { createId, invariant, now } from "@/shared/lib/domain";
 
 import { createBranch } from "./branches";
-import { checkoutCommitToWorktree, commitCustomRef, metaRef } from "./git-storage/git-store";
+import {
+  checkoutCommitToWorktree,
+  commitCustomRef,
+  commitCustomRefSync,
+  metaRef,
+} from "./git-storage/git-store";
 import { stringifyJsonl } from "./git-storage/jsonl";
 import { getProjectWorktreeDir } from "./git-storage/paths";
 import type {
@@ -86,6 +91,27 @@ export async function writeProjectMeta(projectId: string) {
   });
 }
 
+export function writeProjectMetaSync(projectId: string) {
+  const project = getProjectRow(projectId);
+  const branches = db
+    .select()
+    .from(schema.branches)
+    .where(eq(schema.branches.projectId, projectId))
+    .all() as BranchIndexRow[];
+  const workspaces = listWorkspaces(projectId) as WorkspaceIndexRow[];
+  const payload: ProjectMetaPayload = { project, branches, workspaces };
+  commitCustomRefSync({
+    projectId,
+    ref: metaRef(projectId),
+    message: "Update project metadata",
+    files: {
+      "project.json": `${JSON.stringify(payload.project, null, 2)}\n`,
+      "branches.jsonl": stringifyJsonl(payload.branches),
+      "workspaces.jsonl": stringifyJsonl(payload.workspaces),
+    },
+  });
+}
+
 export async function createWorkspaceForBranch(branchId: string, name?: string) {
   const branch = getBranchRow(branchId);
   invariant(!getWorkspaceForBranchId(branch.id), "无法创建工作区：该分支已存在工作区。");
@@ -125,7 +151,7 @@ export async function createWorkspaceForBranch(branchId: string, name?: string) 
       updatedAt: timestamp,
     } as typeof schema.workspaces.$inferInsert)
     .run();
-  void writeProjectMeta(branch.projectId).catch(() => undefined);
+  await writeProjectMeta(branch.projectId);
   return getWorkspace(workspaceId);
 }
 
@@ -156,7 +182,7 @@ export function createDefaultWorkspace(projectId: string, name = "main") {
     } as typeof schema.workspaces.$inferInsert)
     .run();
   const workspace = getWorkspace(workspaceId);
-  void writeProjectMeta(projectId).catch(() => undefined);
+  writeProjectMetaSync(projectId);
   return workspace;
 }
 

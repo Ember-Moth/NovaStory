@@ -3,44 +3,52 @@ import path from "node:path";
 
 import git from "isomorphic-git";
 import { eq } from "drizzle-orm";
+
 import { db, schema } from "@/db";
+import { buildAgentRunCacheFieldsFromTrace, type RunTraceRows } from "@/modules/ai/domain/logs";
 import type {
+  AgentArtifactRow,
   AgentProjectStateRow,
-  AgentRunRow,
+  AgentRunEventRow,
+  AgentRunInputRefRow,
+  AgentRunStepRow,
+  AgentRunView,
   AgentThreadNodeRow,
   AgentThreadRow,
   AiRunsMetaPayload,
 } from "@/modules/ai/domain/types";
-import { invariant } from "@/shared/lib/domain";
+import { invariant, now } from "@/shared/lib/domain";
 
 import { aiRunsRef, metaRef, readFilesAtRef, resolveRef } from "./git-store";
 import { parseJsonl } from "./jsonl";
+import { withProjectLock } from "./lock";
 import { ensureStorageRoot, getProjectRepoGitDir, getProjectWorktreeDir } from "./paths";
 import type { BranchIndexRow, ProjectIndexRow, WorkspaceIndexRow } from "./types";
-import { withProjectLock } from "./lock";
 
-export interface ProjectRestoreResult {
+export interface ProjectRebuildResult {
   projectId: string;
-  restored: boolean;
+  rebuilt: boolean;
   projects: number;
   branches: number;
   workspaces: number;
+  sourceOid: string | null;
   errors: string[];
 }
 
-export interface AiRestoreResult {
+export interface AiRebuildResult {
   projectId: string;
-  restored: boolean;
+  rebuilt: boolean;
   threads: number;
   projectState: number;
   nodes: number;
   runs: number;
+  sourceOid: string | null;
   errors: string[];
 }
 
-export interface RestoreReport {
-  projects: ProjectRestoreResult[];
-  ai: AiRestoreResult[];
+export interface RebuildReport {
+  projects: ProjectRebuildResult[];
+  ai: AiRebuildResult[];
   errors: string[];
 }
 
@@ -70,19 +78,100 @@ function parseRequiredJson<T>(content: string | undefined, label: string): T {
 }
 
 async function resolveBranchHead(projectId: string, branch: BranchIndexRow) {
-  if (!branch.ref) return branch.headCommitId;
   return (await resolveRef(projectId, branch.ref)) ?? branch.headCommitId;
 }
 
-export async function restoreProjectCache(projectId: string): Promise<ProjectRestoreResult> {
+function rebuildStateId(domain: "projects" | "ai-runs", projectId: string) {
+  return `${domain}:${projectId}`;
+}
+
+function recordRebuildState(input: {
+  domain: "projects" | "ai-runs";
+  projectId: string;
+  sourceRef: string;
+  sourceOid: string | null;
+  rebuiltAt: number | null;
+  lastError: string | null;
+}) {
+  const timestamp = now();
+  db.insert(schema.cacheRebuildState)
+    .values({
+      id: rebuildStateId(input.domain, input.projectId),
+      domain: input.domain,
+      projectId: input.projectId,
+      sourceRef: input.sourceRef,
+      sourceOid: input.sourceOid,
+      rebuiltAt: input.rebuiltAt,
+      lastError: input.lastError,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    })
+    .onConflictDoUpdate({
+      target: schema.cacheRebuildState.id,
+      set: {
+        sourceRef: input.sourceRef,
+        sourceOid: input.sourceOid,
+        rebuiltAt: input.rebuiltAt,
+        lastError: input.lastError,
+        updatedAt: timestamp,
+      },
+    })
+    .run();
+}
+
+function clearProjectRows(projectId: string) {
+  db.delete(schema.workspaces).where(eq(schema.workspaces.projectId, projectId)).run();
+  db.delete(schema.branches).where(eq(schema.branches.projectId, projectId)).run();
+  db.delete(schema.projects).where(eq(schema.projects.id, projectId)).run();
+}
+
+function clearAiRows(projectId: string) {
+  db.delete(schema.agentProjectState)
+    .where(eq(schema.agentProjectState.projectId, projectId))
+    .run();
+  db.delete(schema.agentThreads).where(eq(schema.agentThreads.projectId, projectId)).run();
+}
+
+function clearVolatileCacheRows() {
+  db.delete(schema.agentThreadNodes).run();
+  db.delete(schema.agentRuns).run();
+  db.delete(schema.agentProjectState).run();
+  db.delete(schema.agentThreads).run();
+  db.delete(schema.workspaces).run();
+  db.delete(schema.branches).run();
+  db.delete(schema.projects).run();
+  db.delete(schema.cacheRebuildState).run();
+}
+
+export async function rebuildProjectCache(projectId: string): Promise<ProjectRebuildResult> {
   return await withProjectLock(projectId, async () => {
     const errors: string[] = [];
+    const ref = metaRef(projectId);
+    let sourceOid: string | null = null;
     try {
-      if (!(await resolveRef(projectId, metaRef(projectId)))) {
-        return { projectId, restored: false, projects: 0, branches: 0, workspaces: 0, errors };
+      sourceOid = await resolveRef(projectId, ref);
+      if (!sourceOid) {
+        clearProjectRows(projectId);
+        recordRebuildState({
+          domain: "projects",
+          projectId,
+          sourceRef: ref,
+          sourceOid,
+          rebuiltAt: null,
+          lastError: null,
+        });
+        return {
+          projectId,
+          rebuilt: false,
+          projects: 0,
+          branches: 0,
+          workspaces: 0,
+          sourceOid,
+          errors,
+        };
       }
 
-      const files = await readFilesAtRef({ projectId, ref: metaRef(projectId) });
+      const files = await readFilesAtRef({ projectId, ref });
       const project = parseRequiredJson<ProjectIndexRow>(files["project.json"], "project.json");
       const branches = await Promise.all(
         parseJsonl<BranchIndexRow>(files["branches.jsonl"]).map(async (branch) => ({
@@ -98,95 +187,63 @@ export async function restoreProjectCache(projectId: string): Promise<ProjectRes
       );
 
       db.transaction((tx) => {
+        tx.delete(schema.workspaces).where(eq(schema.workspaces.projectId, projectId)).run();
+        tx.delete(schema.branches).where(eq(schema.branches.projectId, projectId)).run();
+        tx.delete(schema.projects).where(eq(schema.projects.id, projectId)).run();
         tx.insert(schema.projects)
           .values({ ...project, defaultBranchId: null })
-          .onConflictDoUpdate({
-            target: schema.projects.id,
-            set: {
-              name: project.name,
-              description: project.description,
-              defaultBranchId: null,
-              createdAt: project.createdAt,
-              updatedAt: project.updatedAt,
-            },
-          })
           .run();
         for (const branch of branches) {
-          tx.insert(schema.branches)
-            .values(branch)
-            .onConflictDoUpdate({
-              target: schema.branches.id,
-              set: {
-                projectId: branch.projectId,
-                name: branch.name,
-                ref: branch.ref,
-                headCommitId: branch.headCommitId,
-                forkedFromCommitId: branch.forkedFromCommitId,
-                createdAt: branch.createdAt,
-                updatedAt: branch.updatedAt,
-              },
-            })
-            .run();
+          tx.insert(schema.branches).values(branch).run();
         }
         tx.update(schema.projects)
           .set({ defaultBranchId: project.defaultBranchId, updatedAt: project.updatedAt })
           .where(eq(schema.projects.id, project.id))
           .run();
         for (const workspace of workspaces) {
-          tx.insert(schema.workspaces)
-            .values(workspace)
-            .onConflictDoUpdate({
-              target: schema.workspaces.id,
-              set: {
-                projectId: workspace.projectId,
-                branchId: workspace.branchId,
-                name: workspace.name,
-                worktreePath: workspace.worktreePath,
-                contentRootId: workspace.contentRootId,
-                auxRootId: workspace.auxRootId,
-                createdAt: workspace.createdAt,
-                updatedAt: workspace.updatedAt,
-              },
-            })
-            .run();
+          tx.insert(schema.workspaces).values(workspace).run();
         }
+      });
+      recordRebuildState({
+        domain: "projects",
+        projectId,
+        sourceRef: ref,
+        sourceOid,
+        rebuiltAt: now(),
+        lastError: null,
       });
 
       return {
         projectId,
-        restored: true,
+        rebuilt: true,
         projects: 1,
         branches: branches.length,
         workspaces: workspaces.length,
+        sourceOid,
         errors,
       };
     } catch (error) {
-      errors.push(stringifyError(error));
-      return { projectId, restored: false, projects: 0, branches: 0, workspaces: 0, errors };
+      const message = stringifyError(error);
+      errors.push(message);
+      recordRebuildState({
+        domain: "projects",
+        projectId,
+        sourceRef: ref,
+        sourceOid,
+        rebuiltAt: null,
+        lastError: message,
+      });
+      return {
+        projectId,
+        rebuilt: false,
+        projects: 0,
+        branches: 0,
+        workspaces: 0,
+        sourceOid,
+        errors,
+      };
     }
   });
-}
-
-function parseRunRow(files: Record<string, string>, runId: string): AgentRunRow | null {
-  const run = files[`runs/${runId}/run.json`];
-  if (!run) return null;
-  const view = JSON.parse(run) as Record<string, unknown>;
-  return {
-    id: String(view.id),
-    threadId: String(view.threadId),
-    parentRunId: typeof view.parentRunId === "string" ? view.parentRunId : null,
-    parentEventId: typeof view.parentEventId === "string" ? view.parentEventId : null,
-    triggerNodeId: typeof view.triggerNodeId === "string" ? view.triggerNodeId : null,
-    baseTipNodeId: typeof view.baseTipNodeId === "string" ? view.baseTipNodeId : null,
-    runMode: String(view.runMode),
-    status: String(view.status),
-    agentProfile: String(view.agentProfile),
-    errorArtifactId: typeof view.errorArtifactId === "string" ? view.errorArtifactId : null,
-    startedAt: Number(view.startedAt),
-    completedAt: typeof view.completedAt === "number" ? view.completedAt : null,
-    createdAt: Number(view.createdAt),
-    updatedAt: Number(view.updatedAt),
-  };
 }
 
 function discoverRunIds(files: Record<string, string>) {
@@ -198,160 +255,193 @@ function discoverRunIds(files: Record<string, string>) {
   return [...runIds].sort((left, right) => left.localeCompare(right));
 }
 
-export async function restoreAiCache(projectId: string): Promise<AiRestoreResult> {
+function parseRunTraceRows(files: Record<string, string>, runId: string): RunTraceRows | null {
+  const runJson = files[`runs/${runId}/run.json`];
+  if (!runJson) return null;
+  const run = JSON.parse(runJson) as AgentRunView;
+  const childRuns = discoverRunIds(files)
+    .flatMap((childRunId) => {
+      if (childRunId === run.id) return [];
+      const childRunJson = files[`runs/${childRunId}/run.json`];
+      if (!childRunJson) return [];
+      const childRun = JSON.parse(childRunJson) as AgentRunView;
+      return childRun.parentRunId === run.id ? [childRun] : [];
+    })
+    .sort((left, right) => left.createdAt - right.createdAt);
+  return {
+    run,
+    inputRefs: parseJsonl<AgentRunInputRefRow>(files[`runs/${runId}/input-refs.jsonl`]),
+    steps: parseJsonl<AgentRunStepRow>(files[`runs/${runId}/steps.jsonl`]).sort(
+      (left, right) => left.stepIndex - right.stepIndex,
+    ),
+    events: parseJsonl<AgentRunEventRow>(files[`runs/${runId}/events.jsonl`]).sort(
+      (left, right) => left.seq - right.seq,
+    ),
+    artifacts: parseJsonl<AgentArtifactRow>(files[`runs/${runId}/artifacts.jsonl`]).sort(
+      (left, right) => left.createdAt - right.createdAt,
+    ),
+    childRuns,
+  };
+}
+
+function buildRunRow(rows: RunTraceRows): typeof schema.agentRuns.$inferInsert {
+  const run = rows.run;
+  return {
+    id: run.id,
+    threadId: run.threadId,
+    parentRunId: run.parentRunId,
+    parentEventId: run.parentEventId,
+    triggerNodeId: run.triggerNodeId,
+    baseTipNodeId: run.baseTipNodeId,
+    runMode: run.runMode,
+    status: run.status,
+    agentProfile: run.agentProfile,
+    errorArtifactId: run.errorArtifactId,
+    ...buildAgentRunCacheFieldsFromTrace(rows),
+    startedAt: run.startedAt,
+    completedAt: run.completedAt,
+    createdAt: run.createdAt,
+    updatedAt: run.updatedAt,
+  };
+}
+
+export async function rebuildAiCache(projectId: string): Promise<AiRebuildResult> {
   return await withProjectLock(projectId, async () => {
     const errors: string[] = [];
+    const ref = aiRunsRef(projectId);
+    let sourceOid: string | null = null;
     try {
-      if (!(await resolveRef(projectId, aiRunsRef(projectId)))) {
+      sourceOid = await resolveRef(projectId, ref);
+      if (!sourceOid) {
+        clearAiRows(projectId);
+        recordRebuildState({
+          domain: "ai-runs",
+          projectId,
+          sourceRef: ref,
+          sourceOid,
+          rebuiltAt: null,
+          lastError: null,
+        });
         return {
           projectId,
-          restored: false,
+          rebuilt: false,
           threads: 0,
           projectState: 0,
           nodes: 0,
           runs: 0,
+          sourceOid,
           errors,
         };
       }
 
-      const files = await readFilesAtRef({ projectId, ref: aiRunsRef(projectId) });
+      const files = await readFilesAtRef({ projectId, ref });
       const payload: AiRunsMetaPayload = {
         threads: parseJsonl<AgentThreadRow>(files["threads.jsonl"]),
         projectState: parseJsonl<AgentProjectStateRow>(files["project-state.jsonl"]),
         nodes: parseJsonl<AgentThreadNodeRow>(files["nodes.jsonl"]),
       };
       const runs = discoverRunIds(files).flatMap((runId) => {
-        const row = parseRunRow(files, runId);
-        return row ? [row] : [];
+        const rows = parseRunTraceRows(files, runId);
+        return rows ? [buildRunRow(rows)] : [];
       });
 
       db.transaction((tx) => {
+        tx.delete(schema.agentProjectState)
+          .where(eq(schema.agentProjectState.projectId, projectId))
+          .run();
+        tx.delete(schema.agentThreads).where(eq(schema.agentThreads.projectId, projectId)).run();
         for (const thread of payload.threads) {
-          tx.insert(schema.agentThreads)
-            .values(thread)
-            .onConflictDoUpdate({
-              target: schema.agentThreads.id,
-              set: {
-                projectId: thread.projectId,
-                agentProfile: thread.agentProfile,
-                title: thread.title,
-                activeTipNodeId: thread.activeTipNodeId,
-                archivedAt: thread.archivedAt,
-                createdAt: thread.createdAt,
-                updatedAt: thread.updatedAt,
-              },
-            })
-            .run();
+          tx.insert(schema.agentThreads).values(thread).run();
         }
         for (const state of payload.projectState) {
-          tx.insert(schema.agentProjectState)
-            .values(state)
-            .onConflictDoUpdate({
-              target: schema.agentProjectState.id,
-              set: {
-                projectId: state.projectId,
-                agentProfile: state.agentProfile,
-                activeThreadId: state.activeThreadId,
-                createdAt: state.createdAt,
-                updatedAt: state.updatedAt,
-              },
-            })
-            .run();
+          tx.insert(schema.agentProjectState).values(state).run();
         }
         for (const run of runs) {
-          tx.insert(schema.agentRuns)
-            .values(run)
-            .onConflictDoUpdate({
-              target: schema.agentRuns.id,
-              set: {
-                threadId: run.threadId,
-                parentRunId: run.parentRunId,
-                parentEventId: run.parentEventId,
-                triggerNodeId: run.triggerNodeId,
-                baseTipNodeId: run.baseTipNodeId,
-                runMode: run.runMode,
-                status: run.status,
-                agentProfile: run.agentProfile,
-                errorArtifactId: run.errorArtifactId,
-                startedAt: run.startedAt,
-                completedAt: run.completedAt,
-                createdAt: run.createdAt,
-                updatedAt: run.updatedAt,
-              },
-            })
-            .run();
+          tx.insert(schema.agentRuns).values(run).run();
         }
         for (const node of payload.nodes) {
-          tx.insert(schema.agentThreadNodes)
-            .values(node)
-            .onConflictDoUpdate({
-              target: schema.agentThreadNodes.id,
-              set: {
-                threadId: node.threadId,
-                parentNodeId: node.parentNodeId,
-                role: node.role,
-                createdByRunId: node.createdByRunId,
-                sourceStepId: node.sourceStepId,
-                sourceKind: node.sourceKind,
-                summaryText: node.summaryText,
-                partsJson: node.partsJson,
-                createdAt: node.createdAt,
-              },
-            })
-            .run();
+          tx.insert(schema.agentThreadNodes).values(node).run();
         }
+      });
+      recordRebuildState({
+        domain: "ai-runs",
+        projectId,
+        sourceRef: ref,
+        sourceOid,
+        rebuiltAt: now(),
+        lastError: null,
       });
 
       return {
         projectId,
-        restored: true,
+        rebuilt: true,
         threads: payload.threads.length,
         projectState: payload.projectState.length,
         nodes: payload.nodes.length,
         runs: runs.length,
+        sourceOid,
         errors,
       };
     } catch (error) {
-      errors.push(stringifyError(error));
+      const message = stringifyError(error);
+      errors.push(message);
+      recordRebuildState({
+        domain: "ai-runs",
+        projectId,
+        sourceRef: ref,
+        sourceOid,
+        rebuiltAt: null,
+        lastError: message,
+      });
       return {
         projectId,
-        restored: false,
+        rebuilt: false,
         threads: 0,
         projectState: 0,
         nodes: 0,
         runs: 0,
+        sourceOid,
         errors,
       };
     }
   });
 }
 
-export async function restoreCachesFromStorage(): Promise<RestoreReport> {
+async function validateProjectRepo(projectId: string) {
+  const gitdir = getProjectRepoGitDir(projectId);
+  const headExists = await fs.promises
+    .access(path.join(gitdir, "HEAD"))
+    .then(() => true)
+    .catch(() => false);
+  if (!headExists) {
+    return `${projectId}: missing repo HEAD`;
+  }
+
+  try {
+    await git.listRefs({ fs, gitdir, filepath: "refs" });
+    return null;
+  } catch (error) {
+    return `${projectId}: ${stringifyError(error)}`;
+  }
+}
+
+export async function rebuildVolatileCachesFromStorage(): Promise<RebuildReport> {
   const errors: string[] = [];
   const projectIds = await listRepoProjectIds();
-  const projects: ProjectRestoreResult[] = [];
-  const ai: AiRestoreResult[] = [];
+  const projects: ProjectRebuildResult[] = [];
+  const ai: AiRebuildResult[] = [];
+
+  clearVolatileCacheRows();
 
   for (const projectId of projectIds) {
-    const gitdir = getProjectRepoGitDir(projectId);
-    const headExists = await fs.promises
-      .access(path.join(gitdir, "HEAD"))
-      .then(() => true)
-      .catch(() => false);
-    if (!headExists) {
-      errors.push(`${projectId}: missing repo HEAD`);
+    const validationError = await validateProjectRepo(projectId);
+    if (validationError) {
+      errors.push(validationError);
       continue;
     }
 
-    try {
-      await git.listRefs({ fs, gitdir, filepath: "refs" });
-    } catch (error) {
-      errors.push(`${projectId}: ${stringifyError(error)}`);
-      continue;
-    }
-
-    projects.push(await restoreProjectCache(projectId));
-    ai.push(await restoreAiCache(projectId));
+    projects.push(await rebuildProjectCache(projectId));
+    ai.push(await rebuildAiCache(projectId));
   }
 
   return { projects, ai, errors };

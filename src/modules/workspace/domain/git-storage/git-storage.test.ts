@@ -7,7 +7,11 @@ import { setupMockDatabase } from "@/test/mock-db";
 
 import { aiRunsRef, metaRef, readFileAtRef, resolveRef } from "./git-store";
 import { getProjectWorktreeDir } from "./paths";
-import { restoreAiCache, restoreProjectCache } from "./restore-cache";
+import {
+  rebuildAiCache,
+  rebuildProjectCache,
+  rebuildVolatileCachesFromStorage,
+} from "./restore-cache";
 import {
   createBranchWorkspace,
   createCommit,
@@ -132,10 +136,10 @@ test("project cache can be restored from the metadata custom ref", async () => {
   db.delete(schema.branches).run();
   db.delete(schema.projects).run();
 
-  const result = await restoreProjectCache("git_restore_project");
+  const result = await rebuildProjectCache("git_restore_project");
 
   expect(result.errors).toEqual([]);
-  expect(result.restored).toBe(true);
+  expect(result.rebuilt).toBe(true);
   expect(db.select().from(schema.projects).all()).toHaveLength(1);
   expect(db.select().from(schema.branches).all()).toHaveLength(1);
   const restoredWorkspace = db.select().from(schema.workspaces).get();
@@ -161,14 +165,51 @@ test("AI sidebar and run cache can be restored from the AI custom ref", async ()
   db.delete(schema.agentProjectState).run();
   db.delete(schema.agentThreads).run();
 
-  const result = await restoreAiCache("git_restore_ai");
+  const result = await rebuildAiCache("git_restore_ai");
 
   expect(result.errors).toEqual([]);
-  expect(result.restored).toBe(true);
+  expect(result.rebuilt).toBe(true);
   expect(db.select().from(schema.agentThreads).all()).toHaveLength(1);
   expect(db.select().from(schema.agentProjectState).all()).toHaveLength(1);
   expect(db.select().from(schema.agentRuns).all()).toHaveLength(1);
   const restoredRun = db.select().from(schema.agentRuns).get();
   expect(restoredRun?.id).toBe(run.id);
+  expect(restoredRun?.stepCount).toBe(0);
   expect(getRunTrace(run.id).events.map((event) => event.eventKind)).toEqual(["run-started"]);
+});
+
+test("volatile cache rebuild prunes stale rows and preserves AI catalog", async () => {
+  const workspace = seedProject("git_rebuild_all");
+  await waitForProjectMeta("git_rebuild_all");
+
+  db.insert(schema.aiCatalogProviders)
+    .values({
+      id: "provider_keep",
+      name: "Keep",
+      sdkPackage: "@ai-sdk/openai",
+      apiUrl: null,
+      docsUrl: null,
+      envKeysJson: "[]",
+      rawJson: "{}",
+      isActive: true,
+      lastSeenAt: 1,
+    })
+    .run();
+  db.insert(schema.projects)
+    .values({ id: "stale_project", name: "Stale", description: null, defaultBranchId: null })
+    .run();
+
+  const result = await rebuildVolatileCachesFromStorage();
+
+  expect(result.errors).toEqual([]);
+  expect(
+    db
+      .select()
+      .from(schema.projects)
+      .all()
+      .map((project) => project.id),
+  ).toEqual(["git_rebuild_all"]);
+  expect(db.select().from(schema.workspaces).get()?.id).toBe(workspace.id);
+  expect(db.select().from(schema.aiCatalogProviders).get()?.id).toBe("provider_keep");
+  expect(db.select().from(schema.cacheRebuildState).all().length).toBeGreaterThan(0);
 });

@@ -3,13 +3,13 @@ import { serve } from "bun";
 
 import index from "@/app/client/index.html";
 import { ensureAiCatalogFresh } from "@/modules/ai/domain/catalog";
-import { restoreCachesFromStorage } from "@/modules/workspace/domain/git-storage/restore-cache";
+import { rebuildVolatileCachesFromStorage } from "@/modules/workspace/domain/git-storage/restore-cache";
 import * as api from "@/rpc/router";
 
 import "@/db";
 
-await restoreCachesFromStorage().catch((error) => {
-  console.error("Failed to restore caches from storage:", error);
+await rebuildVolatileCachesFromStorage().catch((error) => {
+  console.error("Failed to rebuild volatile caches from storage:", error);
 });
 
 const server = serve({

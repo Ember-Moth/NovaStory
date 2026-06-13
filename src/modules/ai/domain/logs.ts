@@ -1101,7 +1101,30 @@ function mapRunRow(executor: DatabaseExecutor, row: AgentRunRow): AgentRunView {
   assertRunMode(row.runMode);
   assertRunStatus(row.status);
   void executor;
-  return readRunTraceRowsFromGit(row).run;
+  return {
+    id: row.id,
+    threadId: row.threadId,
+    parentRunId: row.parentRunId,
+    parentEventId: row.parentEventId,
+    triggerNodeId: row.triggerNodeId,
+    baseTipNodeId: row.baseTipNodeId,
+    runMode: row.runMode,
+    status: row.status,
+    agentProfile: row.agentProfile,
+    selectionSnapshot: parseStoredJson<unknown>(row.selectionSnapshotJson) ?? {},
+    contextSnapshot: parseStoredJson<ProjectAssistantContextSnapshot>(row.contextSnapshotJson),
+    inputRefsSnapshot: row.inputRefsSnapshotJson
+      ? parseStoredArray<AssistantInputRefSnapshot>(row.inputRefsSnapshotJson)
+      : null,
+    activeTools: row.activeToolsJson
+      ? parseStoredArray<ProjectAssistantToolName>(row.activeToolsJson)
+      : null,
+    errorArtifactId: row.errorArtifactId,
+    startedAt: row.startedAt,
+    completedAt: row.completedAt,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
 }
 
 function mapRunStepRow(row: AgentRunStepRow): AgentRunStepView {
@@ -1148,6 +1171,36 @@ function normalizeUsageTotalTokens(usage: unknown): number | null {
   }
 
   return null;
+}
+
+function summarizeRunTraceRows(rows: RunTraceRows) {
+  const totalTokens = rows.steps.reduce<number | null>((sum, step) => {
+    const value = normalizeUsageTotalTokens(parseStoredJson(step.usageJson));
+    if (value == null) {
+      return sum;
+    }
+    return (sum ?? 0) + value;
+  }, null);
+  const errorArtifact = rows.run.errorArtifactId
+    ? (rows.artifacts.find((artifact) => artifact.id === rows.run.errorArtifactId) ?? null)
+    : null;
+  const lastStep = rows.steps.at(-1);
+
+  return {
+    selectionSnapshotJson: serializeRequiredJson(rows.run.selectionSnapshot ?? {}, "run 选择快照"),
+    contextSnapshotJson: serializeOptionalJson(rows.run.contextSnapshot),
+    inputRefsSnapshotJson: serializeOptionalJson(rows.run.inputRefsSnapshot ?? null),
+    activeToolsJson: serializeOptionalJson(rows.run.activeTools ?? null),
+    stepCount: rows.steps.length,
+    totalTokens,
+    lastFinishReason: lastStep?.finishReason ?? null,
+    errorSummary: errorArtifact?.summaryText ?? null,
+    traceUpdatedAt: rows.run.updatedAt,
+  } satisfies Partial<typeof schema.agentRuns.$inferInsert>;
+}
+
+export function buildAgentRunCacheFieldsFromTrace(rows: RunTraceRows) {
+  return summarizeRunTraceRows(rows);
 }
 
 function mapRunEventRow(row: AgentRunEventRow): AgentRunEventView {
@@ -1279,7 +1332,7 @@ function scheduleAiRunsIndexPersistForRun(runId: string) {
   }
 }
 
-interface RunTraceRows {
+export interface RunTraceRows {
   run: AgentRunView;
   inputRefs: AgentRunInputRefRow[];
   steps: AgentRunStepRow[];
@@ -1374,6 +1427,10 @@ function writeRunTraceRowsToGit(projectId: string, rows: RunTraceRows, message: 
       [`runs/${rows.run.id}/child-runs.jsonl`]: stringifyJsonl(rows.childRuns),
     },
   });
+  db.update(schema.agentRuns)
+    .set(buildAgentRunCacheFieldsFromTrace(rows))
+    .where(eq(schema.agentRuns.id, rows.run.id))
+    .run();
 }
 
 function updateRunTraceRows(
@@ -1875,23 +1932,14 @@ function buildRunSummaries(threadId: string, activePath: AgentThreadNodeView[]) 
       row.status === "failed" && row.triggerNodeId != null && activeNodeIds.has(row.triggerNodeId)
     );
   });
-  const relevantTraces = relevantRunRows.map((row) => readRunTraceRowsFromGit(row));
-  const relevantRuns = relevantTraces.map((trace) => trace.run);
+  const relevantRuns = relevantRunRows.map((row) => mapRunRow(db, row));
 
   if (relevantRuns.length === 0) {
     return [] as AgentRunSummaryView[];
   }
 
-  const stepsByRunId = new Map<string, AgentRunStepRow[]>();
-  const errorArtifactById = new Map<string, AgentArtifactRow>();
   const continuedByRunId = new Map<string, string>();
 
-  relevantTraces.forEach((trace) => {
-    stepsByRunId.set(trace.run.id, trace.steps);
-    trace.artifacts.forEach((artifact) => {
-      errorArtifactById.set(artifact.id, artifact);
-    });
-  });
   relevantRuns.forEach((row) => {
     if (row.parentRunId && row.runMode === "continue") {
       continuedByRunId.set(row.parentRunId, row.id);
@@ -1907,23 +1955,12 @@ function buildRunSummaries(threadId: string, activePath: AgentThreadNodeView[]) 
         return [];
       }
 
-      const stepEntries = stepsByRunId.get(row.id) ?? [];
-      const totalTokens = stepEntries.reduce<number | null>((sum, step) => {
-        const value = normalizeUsageTotalTokens(parseStoredJson(step.usageJson));
-        if (value == null) {
-          return sum;
-        }
-        return (sum ?? 0) + value;
-      }, null);
-      const errorArtifact = row.errorArtifactId
-        ? (errorArtifactById.get(row.errorArtifactId) ?? null)
-        : null;
-      const lastStep = stepEntries.at(-1);
+      const cachedRun = relevantRunRows.find((entry) => entry.id === row.id)!;
       const continuationReason =
         row.status === "succeeded" &&
         row.activeTools != null &&
-        stepEntries.length >= PROJECT_ASSISTANT_MAX_STEPS &&
-        lastStep?.finishReason === "tool-calls"
+        cachedRun.stepCount >= PROJECT_ASSISTANT_MAX_STEPS &&
+        cachedRun.lastFinishReason === "tool-calls"
           ? "step-limit"
           : null;
 
@@ -1933,14 +1970,14 @@ function buildRunSummaries(threadId: string, activePath: AgentThreadNodeView[]) 
           triggerNodeId: row.triggerNodeId,
           displayNodeId,
           status: row.status,
-          stepCount: stepEntries.length,
-          totalTokens,
+          stepCount: cachedRun.stepCount,
+          totalTokens: cachedRun.totalTokens,
           durationMs:
             typeof row.completedAt === "number"
               ? Math.max(0, row.completedAt - row.startedAt)
               : null,
           errorMessage:
-            row.status === "failed" ? (errorArtifact?.summaryText ?? "AI 回复失败。") : null,
+            row.status === "failed" ? (cachedRun.errorSummary ?? "AI 回复失败。") : null,
           needsContinuation: continuationReason != null && !continuedByRunId.has(row.id),
           continuationReason,
           continuedByRunId: continuedByRunId.get(row.id) ?? null,
@@ -2146,6 +2183,15 @@ export function createRun(input: CreateRunInput) {
         status,
         agentProfile: input.agentProfile,
         errorArtifactId: null,
+        selectionSnapshotJson: serializeRequiredJson(input.selectionSnapshot ?? {}, "run 选择快照"),
+        contextSnapshotJson: serializeOptionalJson(input.contextSnapshot ?? null),
+        inputRefsSnapshotJson: serializeOptionalJson(input.inputRefsSnapshot ?? null),
+        activeToolsJson: serializeOptionalJson(input.activeTools ? [...input.activeTools] : null),
+        stepCount: 0,
+        totalTokens: null,
+        lastFinishReason: null,
+        errorSummary: null,
+        traceUpdatedAt: timestamp,
         startedAt: timestamp,
         completedAt: null,
         createdAt: timestamp,

@@ -7,7 +7,7 @@ import { createId, invariant, now } from "@/shared/lib/domain";
 
 import { toBranchRef } from "./git-storage/git-store";
 import type { BranchIndexRow, ProjectIndexRow } from "./git-storage/types";
-import { getWorkspaceForBranchId, writeProjectMeta } from "./lifecycle";
+import { getWorkspaceForBranchId, writeProjectMeta, writeProjectMetaSync } from "./lifecycle";
 
 export type BranchRow = BranchIndexRow;
 
@@ -52,7 +52,7 @@ export function createBranch(input: {
     .set({ updatedAt: timestamp })
     .where(eq(schema.projects.id, project.id))
     .run();
-  void writeProjectMeta(project.id).catch(() => undefined);
+  writeProjectMetaSync(project.id);
   return getBranch(branchId);
 }
 

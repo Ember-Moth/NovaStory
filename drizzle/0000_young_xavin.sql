@@ -23,6 +23,15 @@ CREATE TABLE `agent_runs` (
 	`status` text NOT NULL,
 	`agent_profile` text NOT NULL,
 	`error_artifact_id` text,
+	`selection_snapshot_json` text DEFAULT '{}' NOT NULL,
+	`context_snapshot_json` text,
+	`input_refs_snapshot_json` text,
+	`active_tools_json` text,
+	`step_count` integer DEFAULT 0 NOT NULL,
+	`total_tokens` integer,
+	`last_finish_reason` text,
+	`error_summary` text,
+	`trace_updated_at` integer,
 	`started_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
 	`completed_at` integer,
 	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
@@ -37,6 +46,8 @@ CREATE INDEX `agent_runs_thread_idx` ON `agent_runs` (`thread_id`);--> statement
 CREATE INDEX `agent_runs_parent_run_idx` ON `agent_runs` (`parent_run_id`);--> statement-breakpoint
 CREATE INDEX `agent_runs_trigger_node_idx` ON `agent_runs` (`trigger_node_id`);--> statement-breakpoint
 CREATE INDEX `agent_runs_thread_status_idx` ON `agent_runs` (`thread_id`,`status`);--> statement-breakpoint
+CREATE INDEX `agent_runs_thread_created_idx` ON `agent_runs` (`thread_id`,`created_at`);--> statement-breakpoint
+CREATE INDEX `agent_runs_thread_trigger_created_idx` ON `agent_runs` (`thread_id`,`trigger_node_id`,`created_at`);--> statement-breakpoint
 CREATE TABLE `agent_thread_nodes` (
 	`id` text PRIMARY KEY NOT NULL,
 	`thread_id` text NOT NULL,
@@ -57,6 +68,7 @@ CREATE TABLE `agent_thread_nodes` (
 --> statement-breakpoint
 CREATE INDEX `agent_thread_nodes_thread_idx` ON `agent_thread_nodes` (`thread_id`);--> statement-breakpoint
 CREATE INDEX `agent_thread_nodes_parent_idx` ON `agent_thread_nodes` (`parent_node_id`);--> statement-breakpoint
+CREATE INDEX `agent_thread_nodes_thread_parent_created_idx` ON `agent_thread_nodes` (`thread_id`,`parent_node_id`,`created_at`);--> statement-breakpoint
 CREATE INDEX `agent_thread_nodes_run_idx` ON `agent_thread_nodes` (`created_by_run_id`);--> statement-breakpoint
 CREATE INDEX `agent_thread_nodes_step_idx` ON `agent_thread_nodes` (`source_step_id`);--> statement-breakpoint
 CREATE TABLE `agent_threads` (
@@ -76,6 +88,7 @@ CREATE TABLE `agent_threads` (
 CREATE INDEX `agent_threads_project_idx` ON `agent_threads` (`project_id`);--> statement-breakpoint
 CREATE INDEX `agent_threads_project_profile_idx` ON `agent_threads` (`project_id`,`agent_profile`);--> statement-breakpoint
 CREATE INDEX `agent_threads_project_archived_idx` ON `agent_threads` (`project_id`,`archived_at`);--> statement-breakpoint
+CREATE INDEX `agent_threads_project_profile_archived_updated_idx` ON `agent_threads` (`project_id`,`agent_profile`,`archived_at`,`updated_at`,`created_at`);--> statement-breakpoint
 CREATE INDEX `agent_threads_active_tip_idx` ON `agent_threads` (`active_tip_node_id`);--> statement-breakpoint
 CREATE TABLE `ai_catalog_models` (
 	`id` text PRIMARY KEY NOT NULL,
@@ -123,63 +136,6 @@ CREATE TABLE `ai_catalog_providers` (
 );
 --> statement-breakpoint
 CREATE INDEX `ai_providers_active_idx` ON `ai_catalog_providers` (`is_active`);--> statement-breakpoint
-CREATE TABLE `ai_connection_catalog_overrides` (
-	`id` text PRIMARY KEY NOT NULL,
-	`connection_id` text NOT NULL,
-	`catalog_model_id` text NOT NULL,
-	`is_enabled` integer NOT NULL,
-	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
-	`updated_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
-	FOREIGN KEY (`connection_id`) REFERENCES `ai_connections`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`catalog_model_id`) REFERENCES `ai_catalog_models`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE UNIQUE INDEX `ai_connection_catalog_override_idx` ON `ai_connection_catalog_overrides` (`connection_id`,`catalog_model_id`);--> statement-breakpoint
-CREATE INDEX `ai_connection_catalog_model_idx` ON `ai_connection_catalog_overrides` (`catalog_model_id`);--> statement-breakpoint
-CREATE TABLE `ai_connection_custom_models` (
-	`id` text PRIMARY KEY NOT NULL,
-	`connection_id` text NOT NULL,
-	`model_id` text NOT NULL,
-	`display_name` text NOT NULL,
-	`context_window` integer,
-	`max_output_tokens` integer,
-	`supports_vision` integer DEFAULT false NOT NULL,
-	`supports_tool_use` integer DEFAULT false NOT NULL,
-	`supports_reasoning` integer DEFAULT false NOT NULL,
-	`supports_temperature` integer DEFAULT false NOT NULL,
-	`input_price_per_1m` real,
-	`output_price_per_1m` real,
-	`is_enabled` integer DEFAULT true NOT NULL,
-	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
-	`updated_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
-	FOREIGN KEY (`connection_id`) REFERENCES `ai_connections`(`id`) ON UPDATE no action ON DELETE cascade,
-	CONSTRAINT "ai_connection_custom_models_model_nonempty" CHECK(length("ai_connection_custom_models"."model_id") > 0),
-	CONSTRAINT "ai_connection_custom_models_name_nonempty" CHECK(length("ai_connection_custom_models"."display_name") > 0)
-);
---> statement-breakpoint
-CREATE UNIQUE INDEX `ai_connection_custom_models_unique_idx` ON `ai_connection_custom_models` (`connection_id`,`model_id`);--> statement-breakpoint
-CREATE INDEX `ai_connection_custom_models_connection_idx` ON `ai_connection_custom_models` (`connection_id`);--> statement-breakpoint
-CREATE TABLE `ai_connections` (
-	`id` text PRIMARY KEY NOT NULL,
-	`kind` text NOT NULL,
-	`name` text NOT NULL,
-	`sdk_package` text NOT NULL,
-	`catalog_provider_id` text,
-	`base_url` text,
-	`api_key` text,
-	`config_json` text DEFAULT '{}' NOT NULL,
-	`is_enabled` integer DEFAULT true NOT NULL,
-	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
-	`updated_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
-	FOREIGN KEY (`catalog_provider_id`) REFERENCES `ai_catalog_providers`(`id`) ON UPDATE no action ON DELETE restrict,
-	CONSTRAINT "ai_connections_name_nonempty" CHECK(length("ai_connections"."name") > 0),
-	CONSTRAINT "ai_connections_package_nonempty" CHECK(length("ai_connections"."sdk_package") > 0),
-	CONSTRAINT "ai_connections_kind_valid" CHECK("ai_connections"."kind" IN ('registry', 'custom')),
-	CONSTRAINT "ai_connections_registry_requires_provider" CHECK("ai_connections"."kind" <> 'registry' OR "ai_connections"."catalog_provider_id" IS NOT NULL)
-);
---> statement-breakpoint
-CREATE INDEX `ai_connections_kind_idx` ON `ai_connections` (`kind`);--> statement-breakpoint
-CREATE INDEX `ai_connections_provider_idx` ON `ai_connections` (`catalog_provider_id`);--> statement-breakpoint
 CREATE TABLE `ai_registry_state` (
 	`id` text PRIMARY KEY NOT NULL,
 	`last_attempt_at` integer,
@@ -195,7 +151,7 @@ CREATE TABLE `branches` (
 	`id` text PRIMARY KEY NOT NULL,
 	`project_id` text NOT NULL,
 	`name` text NOT NULL,
-	`ref` text,
+	`ref` text NOT NULL,
 	`head_commit_id` text,
 	`forked_from_commit_id` text,
 	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
@@ -205,29 +161,24 @@ CREATE TABLE `branches` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `branches_project_name_idx` ON `branches` (`project_id`,`name`);--> statement-breakpoint
+CREATE UNIQUE INDEX `branches_project_ref_idx` ON `branches` (`project_id`,`ref`);--> statement-breakpoint
 CREATE INDEX `branches_project_idx` ON `branches` (`project_id`);--> statement-breakpoint
 CREATE INDEX `branches_head_commit_idx` ON `branches` (`head_commit_id`);--> statement-breakpoint
-CREATE TABLE `global_config_options` (
-	`key` text PRIMARY KEY NOT NULL,
-	`value_json` text NOT NULL,
-	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
-	`updated_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
-	CONSTRAINT "global_config_options_key_nonempty" CHECK(length("global_config_options"."key") > 0)
-);
---> statement-breakpoint
-CREATE TABLE `global_prompts` (
+CREATE TABLE `cache_rebuild_state` (
 	`id` text PRIMARY KEY NOT NULL,
-	`name` text NOT NULL,
-	`description` text,
-	`content` text NOT NULL,
-	`is_enabled` integer DEFAULT true NOT NULL,
+	`domain` text NOT NULL,
+	`project_id` text,
+	`source_ref` text,
+	`source_oid` text,
+	`rebuilt_at` integer,
+	`last_error` text,
 	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
 	`updated_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
-	CONSTRAINT "global_prompts_name_nonempty" CHECK(length("global_prompts"."name") > 0),
-	CONSTRAINT "global_prompts_content_nonempty" CHECK(length("global_prompts"."content") > 0)
+	CONSTRAINT "cache_rebuild_state_domain_valid" CHECK("cache_rebuild_state"."domain" IN ('projects', 'ai-runs'))
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `global_prompts_name_idx` ON `global_prompts` (`name`);--> statement-breakpoint
+CREATE UNIQUE INDEX `cache_rebuild_state_domain_project_idx` ON `cache_rebuild_state` (`domain`,`project_id`);--> statement-breakpoint
+CREATE INDEX `cache_rebuild_state_project_idx` ON `cache_rebuild_state` (`project_id`);--> statement-breakpoint
 CREATE TABLE `projects` (
 	`id` text PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
@@ -246,9 +197,9 @@ CREATE TABLE `workspaces` (
 	`project_id` text NOT NULL,
 	`branch_id` text NOT NULL,
 	`name` text NOT NULL,
-	`worktree_path` text,
-	`content_root_id` text,
-	`aux_root_id` text,
+	`worktree_path` text NOT NULL,
+	`content_root_id` text NOT NULL,
+	`aux_root_id` text NOT NULL,
 	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
 	`updated_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
 	FOREIGN KEY (`project_id`) REFERENCES `projects`(`id`) ON UPDATE no action ON DELETE cascade,
