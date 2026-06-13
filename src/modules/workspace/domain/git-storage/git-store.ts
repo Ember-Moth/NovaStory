@@ -141,16 +141,54 @@ async function writeTreeFromFiles(gitdir: string, files: Record<string, string>)
   return await git.writeTree({ fs, gitdir, tree });
 }
 
+async function readTreeFiles(input: {
+  gitdir: string;
+  treeOid: string;
+  prefix?: string;
+}): Promise<Record<string, string>> {
+  const files: Record<string, string> = {};
+  const { tree } = await git.readTree({ fs, gitdir: input.gitdir, oid: input.treeOid });
+
+  for (const entry of tree) {
+    const filepath = input.prefix ? `${input.prefix}/${entry.path}` : entry.path;
+    if (entry.type === "tree") {
+      Object.assign(
+        files,
+        await readTreeFiles({ gitdir: input.gitdir, treeOid: entry.oid, prefix: filepath }),
+      );
+      continue;
+    }
+    if (entry.type === "blob") {
+      const { blob } = await git.readBlob({
+        fs,
+        gitdir: input.gitdir,
+        oid: entry.oid,
+      });
+      files[filepath] = Buffer.from(blob).toString("utf8");
+    }
+  }
+
+  return files;
+}
+
 export async function commitCustomRef(input: {
   projectId: string;
   ref: string;
   files: Record<string, string>;
   message: string;
+  replace?: boolean;
 }) {
   return withProjectLock(input.projectId, async () => {
     const gitdir = await ensureProjectRepo(input.projectId);
-    const tree = await writeTreeFromFiles(gitdir, input.files);
     const previous = await git.resolveRef({ fs, gitdir, ref: input.ref }).catch(() => undefined);
+    const previousFiles =
+      previous && !input.replace
+        ? await git
+            .readCommit({ fs, gitdir, oid: previous })
+            .then(({ commit }) => readTreeFiles({ gitdir, treeOid: commit.tree }))
+            .catch(() => ({}))
+        : {};
+    const tree = await writeTreeFromFiles(gitdir, { ...previousFiles, ...input.files });
     const timestamp = Math.floor(Date.now() / 1000);
     const oid = await git.writeCommit({
       fs,
@@ -174,6 +212,13 @@ export async function readFileAtRef(input: { projectId: string; ref: string; fil
   const { commit } = await git.readCommit({ fs, gitdir, oid });
   const { blob } = await git.readBlob({ fs, gitdir, oid: commit.tree, filepath: input.filepath });
   return Buffer.from(blob).toString("utf8");
+}
+
+export async function readFilesAtRef(input: { projectId: string; ref: string }) {
+  const gitdir = await ensureProjectRepo(input.projectId);
+  const oid = await git.resolveRef({ fs, gitdir, ref: input.ref });
+  const { commit } = await git.readCommit({ fs, gitdir, oid });
+  return await readTreeFiles({ gitdir, treeOid: commit.tree });
 }
 
 export async function resolveRef(projectId: string, ref: string) {

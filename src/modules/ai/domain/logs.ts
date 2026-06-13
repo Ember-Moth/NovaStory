@@ -8,6 +8,7 @@ import { PROJECT_ASSISTANT_MAX_STEPS, PROJECT_ASSISTANT_TOOL_NAMES } from "./typ
 import { aiRunsRef, commitCustomRef } from "@/modules/workspace/domain/git-storage/git-store";
 import { stringifyJsonl } from "@/modules/workspace/domain/git-storage/jsonl";
 import type {
+  AiRunsMetaPayload,
   AgentArtifactKind,
   AgentArtifactRow,
   AgentArtifactView,
@@ -178,6 +179,11 @@ function parseStoredArray<T>(raw: string | null | undefined): T[] {
 
 function stringifyStoredArray<T>(items: readonly T[]) {
   return serializeRequiredJson(items, "缓存数组");
+}
+
+function logAiGitPersistError(label: string, error: unknown) {
+  if ((error as NodeJS.ErrnoException)?.code === "ENOENT") return;
+  console.error(label, error);
 }
 
 function assertThreadRole(role: string): asserts role is AgentThreadRole {
@@ -1226,6 +1232,71 @@ function mapRunEventRow(row: AgentRunEventRow): AgentRunEventView {
   };
 }
 
+function buildAiRunsIndexPayload(projectId: string): AiRunsMetaPayload {
+  const threads = db
+    .select()
+    .from(schema.agentThreads)
+    .where(eq(schema.agentThreads.projectId, projectId))
+    .orderBy(schema.agentThreads.createdAt)
+    .all() as AgentThreadRow[];
+  const threadIds = threads.map((thread) => thread.id);
+  const projectState = db
+    .select()
+    .from(schema.agentProjectState)
+    .where(eq(schema.agentProjectState.projectId, projectId))
+    .orderBy(schema.agentProjectState.createdAt)
+    .all() as AgentProjectStateRow[];
+  const nodes =
+    threadIds.length > 0
+      ? (db
+          .select()
+          .from(schema.agentThreadNodes)
+          .where(inArray(schema.agentThreadNodes.threadId, threadIds))
+          .orderBy(schema.agentThreadNodes.createdAt)
+          .all() as AgentThreadNodeRow[])
+      : [];
+
+  return { threads, projectState, nodes };
+}
+
+async function persistAiRunsIndexToGit(projectId: string) {
+  const payload = buildAiRunsIndexPayload(projectId);
+  await commitCustomRef({
+    projectId,
+    ref: aiRunsRef(projectId),
+    message: "Update AI run index",
+    files: {
+      "threads.jsonl": stringifyJsonl(payload.threads),
+      "project-state.jsonl": stringifyJsonl(payload.projectState),
+      "nodes.jsonl": stringifyJsonl(payload.nodes),
+    },
+  });
+}
+
+function scheduleAiRunsIndexPersist(projectId: string) {
+  void persistAiRunsIndexToGit(projectId).catch((error) => {
+    logAiGitPersistError("Failed to persist AI run index to Git:", error);
+  });
+}
+
+function scheduleAiRunsIndexPersistForThread(threadId: string) {
+  try {
+    const thread = getThreadOrThrow(db, threadId);
+    scheduleAiRunsIndexPersist(thread.projectId);
+  } catch (error) {
+    logAiGitPersistError("Failed to schedule AI run index persistence:", error);
+  }
+}
+
+function scheduleAiRunsIndexPersistForRun(runId: string) {
+  try {
+    const run = getRunOrThrow(db, runId);
+    scheduleAiRunsIndexPersistForThread(run.threadId);
+  } catch (error) {
+    logAiGitPersistError("Failed to schedule AI run index persistence:", error);
+  }
+}
+
 function upsertProjectState(
   executor: DatabaseExecutor,
   projectId: string,
@@ -1508,7 +1579,7 @@ export function resolveActiveThread(
 }
 
 export function createThread(input: CreateThreadInput) {
-  return db.transaction((tx) => {
+  const result = db.transaction((tx) => {
     getProjectOrThrow(tx, input.projectId);
     const agentProfile = trimOptionalString(input.agentProfile) ?? PROJECT_ASSISTANT_AGENT_PROFILE;
     const existingCount = tx
@@ -1539,10 +1610,12 @@ export function createThread(input: CreateThreadInput) {
     touchProject(tx, input.projectId);
     return mapThreadRow(getThreadOrThrow(tx, id));
   });
+  scheduleAiRunsIndexPersist(result.projectId);
+  return result;
 }
 
 export function renameThread(threadId: string, title: string) {
-  return db.transaction((tx) => {
+  const result = db.transaction((tx) => {
     const thread = getThreadOrThrow(tx, threadId);
     const normalizedTitle = trimOptionalString(title);
     invariant(normalizedTitle, "名称不能为空。");
@@ -1556,20 +1629,24 @@ export function renameThread(threadId: string, title: string) {
     touchProject(tx, thread.projectId);
     return mapThreadRow(getThreadOrThrow(tx, threadId));
   });
+  scheduleAiRunsIndexPersist(result.projectId);
+  return result;
 }
 
 export function setActiveThread(projectId: string, threadId: string) {
-  return db.transaction((tx) => {
+  const result = db.transaction((tx) => {
     const thread = getThreadOrThrow(tx, threadId);
     invariant(thread.projectId === projectId, "thread 不属于当前项目。");
     invariant(thread.archivedAt == null, "不能激活已归档 thread。");
     upsertProjectState(tx, projectId, thread.agentProfile, thread.id);
     return mapThreadRow(thread);
   });
+  scheduleAiRunsIndexPersist(projectId);
+  return result;
 }
 
 export function archiveThread(threadId: string, archived: boolean) {
-  return db.transaction((tx) => {
+  const result = db.transaction((tx) => {
     const thread = getThreadOrThrow(tx, threadId);
     tx.update(schema.agentThreads)
       .set({
@@ -1590,6 +1667,8 @@ export function archiveThread(threadId: string, archived: boolean) {
     touchProject(tx, thread.projectId);
     return mapThreadRow(updated);
   });
+  scheduleAiRunsIndexPersist(result.projectId);
+  return result;
 }
 
 export function resolveThreadPath(threadId: string, tipNodeId?: string | null) {
@@ -1855,7 +1934,7 @@ export function hasPendingRun(threadId: string) {
 }
 
 export function selectActiveTip(threadId: string, tipNodeId: string) {
-  return db.transaction((tx) => {
+  const result = db.transaction((tx) => {
     const thread = getThreadOrThrow(tx, threadId);
     const node = getNodeOrThrow(tx, tipNodeId);
     invariant(node.threadId === thread.id, "候选节点不属于当前 thread。");
@@ -1869,6 +1948,8 @@ export function selectActiveTip(threadId: string, tipNodeId: string) {
     touchProject(tx, thread.projectId);
     return mapThreadRow(getThreadOrThrow(tx, thread.id));
   });
+  scheduleAiRunsIndexPersist(result.projectId);
+  return result;
 }
 
 export function appendUserNode(input: {
@@ -1878,7 +1959,7 @@ export function appendUserNode(input: {
   sourceKind?: Extract<AgentThreadNodeSourceKind, "user_input" | "edit_rewrite">;
   extraParts?: CreateNodeExtraPartInput[];
 }) {
-  return db.transaction((tx) => {
+  const result = db.transaction((tx) => {
     const node = insertNode(tx, {
       threadId: input.threadId,
       parentNodeId: input.parentNodeId,
@@ -1895,6 +1976,8 @@ export function appendUserNode(input: {
       .run();
     return node;
   });
+  scheduleAiRunsIndexPersistForThread(input.threadId);
+  return result;
 }
 
 export function createReplacementNode(input: {
@@ -1903,7 +1986,7 @@ export function createReplacementNode(input: {
   message: ModelMessage;
   extraParts?: CreateNodeExtraPartInput[];
 }) {
-  return db.transaction((tx) => {
+  const result = db.transaction((tx) => {
     const node = getNodeOrThrow(tx, input.nodeId);
     invariant(node.threadId === input.threadId, "待修改节点不属于当前 thread。");
     const replacement = insertNode(tx, {
@@ -1922,10 +2005,12 @@ export function createReplacementNode(input: {
       .run();
     return replacement;
   });
+  scheduleAiRunsIndexPersistForThread(input.threadId);
+  return result;
 }
 
 export function createRun(input: CreateRunInput) {
-  return db.transaction((tx) => {
+  const result = db.transaction((tx) => {
     const thread = getThreadOrThrow(tx, input.threadId);
     const status = input.status ?? "running";
     if (input.parentRunId) {
@@ -1993,10 +2078,12 @@ export function createRun(input: CreateRunInput) {
     touchProject(tx, thread.projectId);
     return mapRunRow(tx, getRunOrThrow(tx, id));
   });
+  scheduleAiRunsIndexPersistForThread(result.threadId);
+  return result;
 }
 
 export function createArtifact(input: CreateArtifactInput) {
-  return db.transaction((tx) => {
+  const result = db.transaction((tx) => {
     invariant(input.runId || input.stepId, "artifact 必须关联 run 或 step。");
     const runId = trimOptionalString(input.runId) ?? getStepOrThrow(tx, input.stepId!).runId;
     const run = getRunOrThrow(tx, runId);
@@ -2026,10 +2113,14 @@ export function createArtifact(input: CreateArtifactInput) {
       .run();
     return mapArtifactRow(artifact);
   });
+  if (result.runId) {
+    scheduleAiRunsIndexPersistForRun(result.runId);
+  }
+  return result;
 }
 
 export function createRunStep(input: CreateRunStepInput) {
-  return db.transaction((tx) => {
+  const result = db.transaction((tx) => {
     const run = getRunOrThrow(tx, input.runId);
     const id = createId("agent_step");
     const timestamp = now();
@@ -2063,6 +2154,8 @@ export function createRunStep(input: CreateRunStepInput) {
       .run();
     return mapRunStepRow(step);
   });
+  scheduleAiRunsIndexPersistForRun(result.runId);
+  return result;
 }
 
 function nextRunEventSeq(executor: DatabaseExecutor, runId: string) {
@@ -2113,8 +2206,7 @@ export function appendRunEvent(input: CreateRunEventInput) {
     return mapRunEventRow(event);
   });
   void persistRunTraceEventToGit(input.runId).catch((error) => {
-    if ((error as NodeJS.ErrnoException)?.code === "ENOENT") return;
-    console.error("Failed to persist AI run event to Git:", error);
+    logAiGitPersistError("Failed to persist AI run event to Git:", error);
   });
   return result;
 }
@@ -2123,22 +2215,27 @@ async function persistRunTraceEventToGit(runId: string) {
   const run = getRunOrThrow(db, runId);
   const thread = getThreadOrThrow(db, run.threadId);
   const trace = getRunTrace(runId);
+  const inputRefs = parseStoredArray<AgentRunInputRefRow>(run.inputRefsJson);
+  const steps = parseStoredArray<AgentRunStepRow>(run.stepsJson);
+  const events = parseStoredArray<AgentRunEventRow>(run.eventsJson);
+  const artifacts = parseStoredArray<AgentArtifactRow>(run.artifactsJson);
   await commitCustomRef({
     projectId: thread.projectId,
     ref: aiRunsRef(thread.projectId),
     message: `Append AI run event ${runId}`,
     files: {
       [`runs/${runId}/run.json`]: `${JSON.stringify(trace.run, null, 2)}\n`,
-      [`runs/${runId}/steps.jsonl`]: stringifyJsonl(trace.steps),
-      [`runs/${runId}/events.jsonl`]: stringifyJsonl(trace.events),
-      [`runs/${runId}/artifacts.jsonl`]: stringifyJsonl(trace.artifacts),
+      [`runs/${runId}/input-refs.jsonl`]: stringifyJsonl(inputRefs),
+      [`runs/${runId}/steps.jsonl`]: stringifyJsonl(steps),
+      [`runs/${runId}/events.jsonl`]: stringifyJsonl(events),
+      [`runs/${runId}/artifacts.jsonl`]: stringifyJsonl(artifacts),
       [`runs/${runId}/child-runs.jsonl`]: stringifyJsonl(trace.childRuns),
     },
   });
 }
 
 export function materializeResponseMessages(input: MaterializeResponseMessagesInput) {
-  return db.transaction((tx) => {
+  const result = db.transaction((tx) => {
     const thread = getThreadOrThrow(tx, input.threadId);
     let parentNodeId = input.parentNodeId;
     const nodes: AgentThreadNodeView[] = [];
@@ -2161,6 +2258,8 @@ export function materializeResponseMessages(input: MaterializeResponseMessagesIn
       tipNodeId: parentNodeId,
     };
   });
+  scheduleAiRunsIndexPersistForThread(input.threadId);
+  return result;
 }
 
 export function createStreamingAssistantNode(input: {
@@ -2169,7 +2268,7 @@ export function createStreamingAssistantNode(input: {
   runId: string;
   stepId?: string | null;
 }) {
-  return db.transaction((tx) => {
+  const result = db.transaction((tx) => {
     const node = insertNode(tx, {
       threadId: input.threadId,
       parentNodeId: input.parentNodeId,
@@ -2191,10 +2290,12 @@ export function createStreamingAssistantNode(input: {
       .run();
     return node;
   });
+  scheduleAiRunsIndexPersistForThread(input.threadId);
+  return result;
 }
 
 export function appendAssistantTextDelta(input: { nodeId: string; delta: string }) {
-  return db.transaction((tx) => {
+  const result = db.transaction((tx) => {
     const node = getNodeOrThrow(tx, input.nodeId);
     invariant(node.role === "assistant", "只能向 assistant 节点追加文本。");
     const message = getNodeModelMessage(tx, node);
@@ -2245,13 +2346,15 @@ export function appendAssistantTextDelta(input: { nodeId: string; delta: string 
     );
     return mapNodeRow(tx, getNodeOrThrow(tx, node.id));
   });
+  scheduleAiRunsIndexPersistForThread(result.threadId);
+  return result;
 }
 
 export function appendAssistantReasoningPart(input: {
   nodeId: string;
   providerMetadata?: unknown;
 }) {
-  return db.transaction((tx) => {
+  const result = db.transaction((tx) => {
     const node = getNodeOrThrow(tx, input.nodeId);
     invariant(node.role === "assistant", "只能向 assistant 节点追加 reasoning。");
     const message = getNodeModelMessage(tx, node);
@@ -2276,6 +2379,8 @@ export function appendAssistantReasoningPart(input: {
       partIndex,
     };
   });
+  scheduleAiRunsIndexPersistForThread(result.node.threadId);
+  return result;
 }
 
 export function appendAssistantReasoningDelta(input: {
@@ -2284,7 +2389,7 @@ export function appendAssistantReasoningDelta(input: {
   delta: string;
   providerMetadata?: unknown;
 }) {
-  return db.transaction((tx) => {
+  const result = db.transaction((tx) => {
     const node = getNodeOrThrow(tx, input.nodeId);
     invariant(node.role === "assistant", "只能向 assistant 节点追加 reasoning。");
     const message = getNodeModelMessage(tx, node);
@@ -2312,13 +2417,15 @@ export function appendAssistantReasoningDelta(input: {
     });
     return mapNodeRow(tx, getNodeOrThrow(tx, node.id));
   });
+  scheduleAiRunsIndexPersistForThread(result.threadId);
+  return result;
 }
 
 export function appendAssistantToolCallPart(input: {
   nodeId: string;
   toolCall: Record<string, unknown>;
 }) {
-  return db.transaction((tx) => {
+  const result = db.transaction((tx) => {
     const node = getNodeOrThrow(tx, input.nodeId);
     invariant(node.role === "assistant", "只能向 assistant 节点追加工具调用。");
     const message = getNodeModelMessage(tx, node);
@@ -2341,6 +2448,8 @@ export function appendAssistantToolCallPart(input: {
     );
     return mapNodeRow(tx, getNodeOrThrow(tx, node.id));
   });
+  scheduleAiRunsIndexPersistForThread(result.threadId);
+  return result;
 }
 
 export function createStreamingToolResultNode(input: {
@@ -2350,7 +2459,7 @@ export function createStreamingToolResultNode(input: {
   stepId?: string | null;
   toolResult: Record<string, unknown>;
 }) {
-  return db.transaction((tx) => {
+  const result = db.transaction((tx) => {
     const node = insertNode(tx, {
       threadId: input.threadId,
       parentNodeId: input.parentNodeId,
@@ -2371,10 +2480,12 @@ export function createStreamingToolResultNode(input: {
       .run();
     return node;
   });
+  scheduleAiRunsIndexPersistForThread(input.threadId);
+  return result;
 }
 
 export function markThreadNodePartsDone(nodeId: string) {
-  return db.transaction((tx) => {
+  const result = db.transaction((tx) => {
     const node = getNodeOrThrow(tx, nodeId);
     const message = getNodeModelMessage(tx, node);
     const parts = parseStoredArray<AgentMessagePartRow>(node.partsJson);
@@ -2400,6 +2511,8 @@ export function markThreadNodePartsDone(nodeId: string) {
     updateNodeSummary(tx, node.id, buildMessageSummary(message));
     return mapNodeRow(tx, getNodeOrThrow(tx, node.id));
   });
+  scheduleAiRunsIndexPersistForThread(result.threadId);
+  return result;
 }
 
 export function assignThreadNodeSourceStepIds(nodeIds: string[], stepId: string) {
@@ -2407,16 +2520,20 @@ export function assignThreadNodeSourceStepIds(nodeIds: string[], stepId: string)
     return;
   }
 
-  db.transaction((tx) => {
+  const threadIds = db.transaction((tx) => {
     getStepOrThrow(tx, stepId);
+    const touchedThreadIds = new Set<string>();
     nodeIds.forEach((nodeId) => {
-      getNodeOrThrow(tx, nodeId);
+      const node = getNodeOrThrow(tx, nodeId);
+      touchedThreadIds.add(node.threadId);
       tx.update(schema.agentThreadNodes)
         .set({ sourceStepId: stepId })
         .where(eq(schema.agentThreadNodes.id, nodeId))
         .run();
     });
+    return [...touchedThreadIds];
   });
+  threadIds.forEach(scheduleAiRunsIndexPersistForThread);
 }
 
 export function updateRunStep(input: {
@@ -2430,7 +2547,7 @@ export function updateRunStep(input: {
   providerMetadataArtifactId?: string | null;
   usage?: unknown;
 }) {
-  return db.transaction((tx) => {
+  const result = db.transaction((tx) => {
     const step = getStepOrThrow(tx, input.stepId);
     const run = getRunOrThrow(tx, step.runId);
     const steps = parseStoredArray<AgentRunStepRow>(run.stepsJson);
@@ -2458,10 +2575,12 @@ export function updateRunStep(input: {
       .run();
     return mapRunStepRow(nextStep);
   });
+  scheduleAiRunsIndexPersistForRun(result.runId);
+  return result;
 }
 
 export function markRunSucceeded(runId: string) {
-  return db.transaction((tx) => {
+  const result = db.transaction((tx) => {
     const run = getRunOrThrow(tx, runId);
     tx.update(schema.agentRuns)
       .set({
@@ -2473,10 +2592,12 @@ export function markRunSucceeded(runId: string) {
       .run();
     return mapRunRow(tx, getRunOrThrow(tx, run.id));
   });
+  scheduleAiRunsIndexPersistForRun(result.id);
+  return result;
 }
 
 export function markRunFailed(runId: string, errorArtifactId?: string | null) {
-  return db.transaction((tx) => {
+  const result = db.transaction((tx) => {
     const run = getRunOrThrow(tx, runId);
     if (errorArtifactId) {
       getArtifactOrThrow(tx, errorArtifactId);
@@ -2492,10 +2613,12 @@ export function markRunFailed(runId: string, errorArtifactId?: string | null) {
       .run();
     return mapRunRow(tx, getRunOrThrow(tx, run.id));
   });
+  scheduleAiRunsIndexPersistForRun(result.id);
+  return result;
 }
 
 export function markRunCancelled(runId: string) {
-  return db.transaction((tx) => {
+  const result = db.transaction((tx) => {
     const run = getRunOrThrow(tx, runId);
     tx.update(schema.agentRuns)
       .set({
@@ -2507,13 +2630,15 @@ export function markRunCancelled(runId: string) {
       .run();
     return mapRunRow(tx, getRunOrThrow(tx, run.id));
   });
+  scheduleAiRunsIndexPersistForRun(result.id);
+  return result;
 }
 
 export function updateRunContextSnapshot(
   runId: string,
   contextSnapshot: ProjectAssistantContextSnapshot | null,
 ) {
-  return db.transaction((tx) => {
+  const result = db.transaction((tx) => {
     const run = getRunOrThrow(tx, runId);
     tx.update(schema.agentRuns)
       .set({
@@ -2524,6 +2649,8 @@ export function updateRunContextSnapshot(
       .run();
     return mapRunRow(tx, getRunOrThrow(tx, run.id));
   });
+  scheduleAiRunsIndexPersistForRun(result.id);
+  return result;
 }
 
 export function getRunTrace(runId: string): AgentRunTraceView {

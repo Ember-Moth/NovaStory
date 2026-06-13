@@ -18,6 +18,12 @@ export type AgentProjectStateRow = InferSelectModel<typeof schema.agentProjectSt
 export type AgentThreadNodeRow = InferSelectModel<typeof schema.agentThreadNodes>;
 export type AgentRunRow = InferSelectModel<typeof schema.agentRuns>;
 
+export interface AiRunsMetaPayload {
+  threads: AgentThreadRow[];
+  projectState: AgentProjectStateRow[];
+  nodes: AgentThreadNodeRow[];
+}
+
 export interface AgentRunInputRow {
   id: string;
   runId: string;

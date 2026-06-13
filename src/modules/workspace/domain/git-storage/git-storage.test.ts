@@ -1,10 +1,13 @@
 import { expect, test } from "bun:test";
+import { eq } from "drizzle-orm";
 
 import { db, schema } from "@/db";
 import { appendRunEvent, createRun, createThread } from "@/modules/ai/domain/logs";
 import { setupMockDatabase } from "@/test/mock-db";
 
 import { aiRunsRef, metaRef, readFileAtRef, resolveRef } from "./git-store";
+import { getProjectWorktreeDir } from "./paths";
+import { restoreAiCache, restoreProjectCache } from "./restore-cache";
 import {
   createBranchWorkspace,
   createCommit,
@@ -43,6 +46,22 @@ async function waitForProjectMeta(projectId: string) {
       });
       const parsed = JSON.parse(projectJson) as { defaultBranchId: string | null };
       if (parsed.defaultBranchId) return parsed;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  return null;
+}
+
+async function waitForAiIndex(projectId: string) {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    const oid = await resolveRef(projectId, aiRunsRef(projectId));
+    if (oid) {
+      const threads = await readFileAtRef({
+        projectId,
+        ref: aiRunsRef(projectId),
+        filepath: "threads.jsonl",
+      }).catch(() => null);
+      if (threads?.includes("agent_thread")) return threads;
     }
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
@@ -100,4 +119,55 @@ test("AI run events are mirrored into an AI custom ref", async () => {
     filepath: `runs/${run.id}/events.jsonl`,
   });
   expect(events).toContain("run-started");
+});
+
+test("project cache can be restored from the metadata custom ref", async () => {
+  const workspace = seedProject("git_restore_project");
+  await waitForProjectMeta("git_restore_project");
+  db.update(schema.workspaces)
+    .set({ worktreePath: "/old/machine/path" })
+    .where(eq(schema.workspaces.id, workspace.id))
+    .run();
+  db.delete(schema.workspaces).run();
+  db.delete(schema.branches).run();
+  db.delete(schema.projects).run();
+
+  const result = await restoreProjectCache("git_restore_project");
+
+  expect(result.errors).toEqual([]);
+  expect(result.restored).toBe(true);
+  expect(db.select().from(schema.projects).all()).toHaveLength(1);
+  expect(db.select().from(schema.branches).all()).toHaveLength(1);
+  const restoredWorkspace = db.select().from(schema.workspaces).get();
+  expect(restoredWorkspace?.id).toBe(workspace.id);
+  expect(restoredWorkspace?.worktreePath).toBe(
+    getProjectWorktreeDir("git_restore_project", workspace.id),
+  );
+});
+
+test("AI sidebar and run cache can be restored from the AI custom ref", async () => {
+  seedProject("git_restore_ai");
+  const thread = createThread({ projectId: "git_restore_ai", title: "Trace" });
+  const run = createRun({
+    threadId: thread.id,
+    runMode: "send",
+    agentProfile: "project-assistant",
+  });
+  appendRunEvent({ runId: run.id, eventKind: "run-started" });
+  expect(await waitForAiIndex("git_restore_ai")).toContain(thread.id);
+
+  db.delete(schema.agentThreadNodes).run();
+  db.delete(schema.agentRuns).run();
+  db.delete(schema.agentProjectState).run();
+  db.delete(schema.agentThreads).run();
+
+  const result = await restoreAiCache("git_restore_ai");
+
+  expect(result.errors).toEqual([]);
+  expect(result.restored).toBe(true);
+  expect(db.select().from(schema.agentThreads).all()).toHaveLength(1);
+  expect(db.select().from(schema.agentProjectState).all()).toHaveLength(1);
+  expect(db.select().from(schema.agentRuns).all()).toHaveLength(1);
+  const restoredRun = db.select().from(schema.agentRuns).get();
+  expect(restoredRun?.eventsJson).toContain("run-started");
 });
