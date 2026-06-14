@@ -20,6 +20,10 @@ export function useProjectWorkspaceEffects(
   const setPendingContentNodeId = useWorkspaceState((state) => state.setPendingContentNodeId);
   const pendingAuxPath = useWorkspaceState((state) => state.pendingAuxPath);
   const setPendingAuxPath = useWorkspaceState((state) => state.setPendingAuxPath);
+  const pendingAuxTimelinePointId = useWorkspaceState((state) => state.pendingAuxTimelinePointId);
+  const setPendingAuxTimelinePointId = useWorkspaceState(
+    (state) => state.setPendingAuxTimelinePointId,
+  );
   const shouldAutoSelectContent = useWorkspaceState((state) => state.shouldAutoSelectContent);
   const setActiveTimelinePointId = useWorkspaceState((state) => state.setActiveTimelinePointId);
   const setExpandedContentIds = useWorkspaceState((state) => state.setExpandedContentIds);
@@ -167,13 +171,27 @@ export function useProjectWorkspaceEffects(
       if (pendingAuxPath) {
         setPendingAuxPath(null);
       }
+      if (pendingAuxTimelinePointId) {
+        setPendingAuxTimelinePointId(null);
+      }
       setActiveAuxPath(null);
+      return;
+    }
+
+    if (
+      pendingAuxPath &&
+      pendingAuxTimelinePointId &&
+      pendingAuxTimelinePointId !== workspace.selection.activeTimelinePointId
+    ) {
       return;
     }
 
     if (activeAuxPath && auxPathSet.has(activeAuxPath)) {
       if (pendingAuxPath === activeAuxPath) {
         setPendingAuxPath(null);
+        if (pendingAuxTimelinePointId) {
+          setPendingAuxTimelinePointId(null);
+        }
       }
       return;
     }
@@ -183,7 +201,17 @@ export function useProjectWorkspaceEffects(
     }
 
     setActiveAuxPath(null);
-  }, [activeAuxPath, auxPathSet, auxTree, pendingAuxPath, setActiveAuxPath, setPendingAuxPath]);
+  }, [
+    activeAuxPath,
+    auxPathSet,
+    auxTree,
+    pendingAuxPath,
+    pendingAuxTimelinePointId,
+    setActiveAuxPath,
+    setPendingAuxPath,
+    setPendingAuxTimelinePointId,
+    workspace.selection.activeTimelinePointId,
+  ]);
 
   useEffect(() => {
     if (!isAuxSymlinkTargetPickerActive) {

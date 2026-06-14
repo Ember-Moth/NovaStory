@@ -18,6 +18,7 @@ type WorkspaceStateData = {
   activeAuxPath: string | null;
   pendingContentNodeId: string | null;
   pendingAuxPath: string | null;
+  pendingAuxTimelinePointId: string | null;
   shouldAutoSelectContent: boolean;
   activeTimelinePointId: string | null;
   expandedContentIds: Set<string>;
@@ -41,6 +42,7 @@ type WorkspaceStateActions = {
   setActiveAuxPath: (updater: Updater<string | null>) => void;
   setPendingContentNodeId: (updater: Updater<string | null>) => void;
   setPendingAuxPath: (updater: Updater<string | null>) => void;
+  setPendingAuxTimelinePointId: (updater: Updater<string | null>) => void;
   setShouldAutoSelectContent: (updater: Updater<boolean>) => void;
   setActiveTimelinePointId: (updater: Updater<string | null>) => void;
   setExpandedContentIds: (updater: Updater<Set<string>>) => void;
@@ -74,6 +76,7 @@ export function createWorkspaceStore() {
       activeAuxPath: null,
       pendingContentNodeId: null,
       pendingAuxPath: null,
+      pendingAuxTimelinePointId: null,
       shouldAutoSelectContent: false,
       activeTimelinePointId: null,
       expandedContentIds: new Set<string>(),
@@ -92,6 +95,7 @@ export function createWorkspaceStore() {
       setActiveAuxPath: field("activeAuxPath"),
       setPendingContentNodeId: field("pendingContentNodeId"),
       setPendingAuxPath: field("pendingAuxPath"),
+      setPendingAuxTimelinePointId: field("pendingAuxTimelinePointId"),
       setShouldAutoSelectContent: field("shouldAutoSelectContent"),
       setActiveTimelinePointId: field("activeTimelinePointId"),
       setExpandedContentIds: field("expandedContentIds"),

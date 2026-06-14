@@ -62,6 +62,16 @@ export function getAuxRefreshTargetTimelinePointId(event: WorkspaceRefreshReques
     : null;
 }
 
+export function getAuxRefreshTargetPath(event: WorkspaceRefreshRequestedEvent) {
+  if (!event.areas.includes("aux")) {
+    return null;
+  }
+
+  return typeof event.auxPath === "string" && event.auxPath.trim().length > 0
+    ? event.auxPath
+    : null;
+}
+
 export function getContentRefreshTargetTimelinePointId(event: WorkspaceRefreshRequestedEvent) {
   if (!event.areas.includes("content")) {
     return null;

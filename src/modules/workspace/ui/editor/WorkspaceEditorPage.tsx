@@ -22,6 +22,7 @@ import { EditorArea } from "@/modules/workspace/ui/editor/panels/EditorArea";
 import { TimelinePanel } from "@/modules/workspace/ui/editor/panels/TimelinePanel";
 import { useProjectActions } from "@/modules/workspace/ui/editor/state/hooks/useProjectActions";
 import {
+  getAuxRefreshTargetPath,
   getAuxRefreshTargetTimelinePointId,
   getContentRefreshTargetNodeId,
   getContentRefreshTargetTimelinePointId,
@@ -228,6 +229,15 @@ function ProjectWorkspace({
       const auxTargetTimelinePointId = getAuxRefreshTargetTimelinePointId(event);
       if (auxTargetTimelinePointId && auxTargetTimelinePointId !== activeTimelinePointId) {
         workspaceStore.getState().setActiveTimelinePointId(auxTargetTimelinePointId);
+      }
+
+      const auxTargetPath = getAuxRefreshTargetPath(event);
+      if (auxTargetPath) {
+        const state = workspaceStore.getState();
+        state.setActiveContentNodeId(null);
+        state.setPendingAuxPath(auxTargetPath);
+        state.setActiveAuxPath(auxTargetPath);
+        state.setPendingAuxTimelinePointId(auxTargetTimelinePointId);
       }
 
       if (shouldClearActiveContentDraftForRefresh({ event, activeContentNodeId })) {

@@ -4,6 +4,7 @@ import type { WorkspaceRefreshRequestedEvent } from "@/modules/ai/domain/types";
 import type { AuxTreeNodeVM } from "@/modules/workspace/ui/editor/model/types";
 
 import {
+  getAuxRefreshTargetPath,
   getAuxRefreshTargetTimelinePointId,
   getContentRefreshTargetNodeId,
   getContentRefreshTargetTimelinePointId,
@@ -190,6 +191,33 @@ test("getAuxRefreshTargetTimelinePointId returns the aux refresh target when pre
       createWorkspaceRefreshRequestedEvent({
         areas: ["aux"],
         timelinePointId: "",
+      }),
+    ),
+  ).toBeNull();
+});
+
+test("getAuxRefreshTargetPath only returns aux file targets when present", () => {
+  expect(
+    getAuxRefreshTargetPath(
+      createWorkspaceRefreshRequestedEvent({
+        areas: ["aux"],
+        auxPath: "/设定/角色.md",
+      }),
+    ),
+  ).toBe("/设定/角色.md");
+  expect(
+    getAuxRefreshTargetPath(
+      createWorkspaceRefreshRequestedEvent({
+        areas: ["content"],
+        auxPath: "/设定/角色.md",
+      }),
+    ),
+  ).toBeNull();
+  expect(
+    getAuxRefreshTargetPath(
+      createWorkspaceRefreshRequestedEvent({
+        areas: ["aux"],
+        auxPath: "",
       }),
     ),
   ).toBeNull();
