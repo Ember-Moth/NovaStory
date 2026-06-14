@@ -4,6 +4,7 @@ import { buildAuxTreeState, buildContentTreeState } from "./normalize";
 import {
   collectInvalidAuxSymlinkTargetIds,
   collectAuxSubtreeIds,
+  nextAuxFileName,
   nextAuxSymlinkName,
   resolveAuxHierarchyMove,
   resolveContentCreateSiblingPlacement,
@@ -180,6 +181,14 @@ function resolveAux(nodes: RawAuxTreeNode[], nodeId: string, targetId: string | 
 
 test("nextAuxSymlinkName starts with link 1 when there is no conflict", () => {
   expect(nextAuxSymlinkName([auxNode("notes.md")], "notes.md")).toBe("notes.md - 链接 1");
+});
+
+test("nextAuxFileName creates markdown files by default", () => {
+  expect(nextAuxFileName([])).toBe("新文件 1.md");
+});
+
+test("nextAuxFileName increments markdown filenames until unique", () => {
+  expect(nextAuxFileName([auxNode("新文件 1.md"), auxNode("新文件 2.md")])).toBe("新文件 3.md");
 });
 
 test("nextAuxSymlinkName increments until the name is unique", () => {

@@ -440,10 +440,10 @@ export function nextAuxDirName(siblings: AuxTreeNodeVM[]): string {
 export function nextAuxFileName(siblings: AuxTreeNodeVM[]): string {
   const existing = new Set(siblings.map((node) => node.name));
   let index = 1;
-  while (existing.has(`新文件 ${index}`)) {
+  while (existing.has(`新文件 ${index}.md`)) {
     index += 1;
   }
-  return `新文件 ${index}`;
+  return `新文件 ${index}.md`;
 }
 
 export function nextAuxSymlinkName(siblings: AuxTreeNodeVM[], targetName: string): string {

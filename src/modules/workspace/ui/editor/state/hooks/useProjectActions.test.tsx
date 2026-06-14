@@ -62,6 +62,12 @@ function createWorkspaceState(input: {
     path: string;
     targetPath: string;
   }) => Promise<{ path: string }>;
+  writeFileMutate?: (_input: {
+    workspaceId: string;
+    timelinePointId: string;
+    path: string;
+    content: string;
+  }) => Promise<{ path: string }>;
   retargetMutate?: (_input: {
     workspaceId: string;
     timelinePointId: string;
@@ -108,7 +114,10 @@ function createWorkspaceState(input: {
       nodeMap,
       parentMap,
       mkdirAux: { isPending: false, mutate: mock(async () => ({ path: "/aux_dir_new" })) },
-      writeFileAux: { isPending: false, mutate: mock(async () => ({ path: "/aux_file_new" })) },
+      writeFileAux: {
+        isPending: false,
+        mutate: input.writeFileMutate ?? mock(async () => ({ path: "/aux_file_new" })),
+      },
       linkAux: {
         isPending: false,
         mutate:
@@ -258,6 +267,29 @@ test("handleAuxCreateSymlink links to the symlink node itself when invoked on a 
     path: "/角色入口 - 链接 1",
     targetPath: "/角色入口",
   });
+});
+
+test("handleAuxCreateSiblingFile creates markdown files by default", async () => {
+  const workspace = createWorkspaceState({
+    auxTree: [
+      createAuxNode({ id: "/新文件 1.md", name: "新文件 1.md" }),
+      createAuxNode({ id: "/新文件 2.md", name: "新文件 2.md" }),
+    ],
+    writeFileMutate: mock(async () => ({ path: "/新文件 3.md" })),
+  });
+  const { actions, store } = renderActions(workspace);
+
+  store.getState().setActiveTimelinePointId("timeline_1");
+  await actions.handleAuxCreateSiblingFile("aux:add-file:root");
+
+  expect(workspace.aux.writeFileAux.mutate).toHaveBeenCalledWith({
+    workspaceId: "workspace_1",
+    timelinePointId: "timeline_1",
+    path: "/新文件 3.md",
+    content: "",
+  });
+  expect(store.getState().activeAuxPath).toBe("/新文件 3.md");
+  expect(store.getState().pendingAuxPath).toBe("/新文件 3.md");
 });
 
 test("handleAuxMove moves a node into a directory and keeps its current name", async () => {
