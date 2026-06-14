@@ -412,15 +412,36 @@
 
 .ai-markdown [data-streamdown="table"] {
   min-width: 100%;
-  border-collapse: collapse;
-  border: 1px solid var(--color-border);
+  border-collapse: separate;
+  border-spacing: 0;
+  border: none;
 }
 
 .ai-markdown [data-streamdown="table-header-cell"],
 .ai-markdown [data-streamdown="table-cell"] {
-  border: 1px solid var(--color-border);
   padding: 0.4rem 0.5rem;
   vertical-align: top;
+}
+
+.ai-markdown [data-streamdown="table-header-cell"],
+.ai-markdown [data-streamdown="table-cell"] {
+  border-right: 1px solid var(--color-border);
+}
+
+.ai-markdown [data-streamdown="table-header-cell"]:last-child,
+.ai-markdown [data-streamdown="table-cell"]:last-child {
+  border-right: none;
+}
+
+.ai-markdown [data-streamdown="table-header-cell"] {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ai-markdown
+  [data-streamdown="table-body"]
+  [data-streamdown="table-row"]:not(:last-child)
+  [data-streamdown="table-cell"] {
+  border-bottom: 1px solid var(--color-border);
 }
 
 .ai-markdown [data-streamdown="table-header-cell"] {

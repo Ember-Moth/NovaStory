@@ -13,11 +13,14 @@ export function MarkdownTable({
   node?: unknown;
 }) {
   return (
-    <div className="my-4" data-streamdown="table-wrapper">
+    <div
+      className="my-4 overflow-hidden rounded-md border border-border bg-editor-background"
+      data-streamdown="table-wrapper"
+    >
       <OverlayScrollbar variant="inline" className="ai-table-scrollbar">
         <table
           {...props}
-          className={cn("w-full min-w-full border-collapse divide-y divide-border", className)}
+          className={cn("w-full min-w-full border-separate border-spacing-0", className)}
           data-streamdown="table"
         >
           {children}
