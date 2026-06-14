@@ -44,12 +44,12 @@ export function WorkspaceMarkdownPreview({
             controls={false}
             rehypePlugins={WORKSPACE_MARKDOWN_REHYPE_PLUGINS}
             components={WORKSPACE_MARKDOWN_COMPONENTS}
-            className="ai-markdown max-w-4xl text-[14px] leading-7 break-words text-foreground"
+            className="ai-markdown max-w-4xl text-[14px] leading-7 wrap-break-word text-foreground"
           >
             {content}
           </Streamdown>
         ) : (
-          <div className="flex min-h-[12rem] items-center justify-center text-sm text-foreground-muted">
+          <div className="flex min-h-48 items-center justify-center text-sm text-foreground-muted">
             {emptyLabel}
           </div>
         )}

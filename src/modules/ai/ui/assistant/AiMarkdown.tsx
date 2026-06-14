@@ -21,7 +21,7 @@ const AI_MARKDOWN_REHYPE_PLUGINS: NonNullable<StreamdownProps["rehypePlugins"]> 
 ];
 
 const MARKDOWN_ROOT_CLASS_NAME =
-  "ai-markdown overflow-hidden break-words text-foreground [&_[data-streamdown='table-wrapper']]:my-2";
+  "ai-markdown overflow-hidden wrap-break-word text-foreground [&_[data-streamdown='table-wrapper']]:my-2";
 
 const MARKDOWN_VARIANT_CLASS_NAMES = {
   assistant: "text-[13px] leading-5",
