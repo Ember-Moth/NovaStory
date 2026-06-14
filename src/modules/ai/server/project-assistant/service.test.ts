@@ -1299,6 +1299,166 @@ test("submitProjectAssistantToolInput resumes the same waiting run with continuo
   expect(resumed.state.activePath.at(-1)?.summaryText).toContain("按安静的气质继续");
 });
 
+test("submitProjectAssistantToolInput resumes with custom single_choice text answers", async () => {
+  seedProject("assistant_submit_tool_input_custom");
+  const seeded = seedCustomConnection({
+    connectionId: "conn_submit_tool_input_custom",
+    modelId: "story-model",
+    modelRowId: "cmodel_submit_tool_input_custom",
+    supportsToolUse: true,
+  });
+  const questionInput = {
+    title: "确认写法",
+    questions: [
+      {
+        id: "tone",
+        prompt: "这一段偏什么气质？",
+        kind: "single_choice",
+        options: [
+          { id: "quiet", label: "安静" },
+          { id: "sharp", label: "锋利" },
+        ],
+      },
+    ],
+  };
+  let streamCallCount = 0;
+  const service = createProjectAssistantService({
+    readStoredSelection: () => seeded.selection,
+    streamAssistantText: ((input: { messages: unknown[] }) => {
+      streamCallCount += 1;
+      if (streamCallCount === 1) {
+        return createMockStream({
+          chunks: [
+            { type: "start-step", stepNumber: 0 },
+            {
+              type: "tool-call",
+              stepNumber: 0,
+              toolCall: {
+                type: "tool-call",
+                toolCallId: "tool_ask_custom",
+                toolName: "ask_user",
+                input: questionInput,
+              },
+            },
+            {
+              type: "finish-step",
+              stepNumber: 0,
+              finishReason: "tool-calls",
+              usage: { totalTokens: 3 },
+            },
+          ],
+          text: "",
+          finishReason: "tool-calls",
+          usage: { totalTokens: 3 },
+          steps: [
+            {
+              stepNumber: 0,
+              preparedMessages: input.messages,
+              model: { provider: "openai", modelId: "story-model" },
+              finishReason: "tool-calls",
+              rawFinishReason: "tool_calls",
+              usage: { totalTokens: 3 },
+              request: { body: { step: 0 } },
+              response: {
+                body: { id: "resp_ask_custom" },
+                messages: [
+                  {
+                    role: "assistant",
+                    content: [
+                      {
+                        type: "tool-call",
+                        toolCallId: "tool_ask_custom",
+                        toolName: "ask_user",
+                        input: questionInput,
+                      },
+                    ],
+                  },
+                ],
+              },
+              providerMetadata: {},
+              toolCalls: [
+                {
+                  type: "tool-call",
+                  toolCallId: "tool_ask_custom",
+                  toolName: "ask_user",
+                  input: questionInput,
+                },
+              ],
+              toolResults: [],
+            },
+          ],
+        })();
+      }
+
+      const resumedMessages = input.messages as Array<{ role?: string; content?: unknown }>;
+      expect(
+        resumedMessages.some(
+          (message) =>
+            message.role === "tool" &&
+            JSON.stringify(message.content).includes('"toolCallId":"tool_ask_custom"') &&
+            JSON.stringify(message.content).includes('"text":"更梦幻一点"'),
+        ),
+      ).toBe(true);
+      return createMockStream({
+        chunks: [
+          { type: "start-step", stepNumber: 0 },
+          { type: "text-delta", stepNumber: 0, delta: "按梦幻一点的气质继续。" },
+          {
+            type: "finish-step",
+            stepNumber: 0,
+            finishReason: "stop",
+            usage: { totalTokens: 5 },
+          },
+        ],
+        text: "按梦幻一点的气质继续。",
+        finishReason: "stop",
+        usage: { totalTokens: 5 },
+        steps: [
+          {
+            stepNumber: 0,
+            preparedMessages: input.messages,
+            model: { provider: "openai", modelId: "story-model" },
+            finishReason: "stop",
+            rawFinishReason: "stop",
+            usage: { totalTokens: 5 },
+            request: { body: { step: 1 } },
+            response: {
+              body: { id: "resp_answered_custom" },
+              messages: [
+                {
+                  role: "assistant",
+                  content: [{ type: "text", text: "按梦幻一点的气质继续。" }],
+                },
+              ],
+            },
+            providerMetadata: {},
+            toolCalls: [],
+            toolResults: [],
+          },
+        ],
+      })();
+    }) as any,
+  });
+  const thread = service.createProjectAssistantThread("assistant_submit_tool_input_custom");
+  const waiting = await service.sendProjectAssistantMessage({
+    projectId: "assistant_submit_tool_input_custom",
+    threadId: thread.id,
+    text: "帮我继续写，但先问我关键选择",
+    activeTools: ["ask_user"],
+  });
+
+  const resumed = await service.submitProjectAssistantToolInput({
+    projectId: "assistant_submit_tool_input_custom",
+    threadId: thread.id,
+    runId: waiting.run.id,
+    toolCallId: "tool_ask_custom",
+    answers: [{ questionId: "tone", type: "single_choice", text: "更梦幻一点" }],
+  });
+
+  expect(resumed.run.status).toBe("succeeded");
+  expect(resumed.state.activePath.at(-1)?.summaryText).toContain("按梦幻一点的气质继续");
+});
+
 test("cancelProjectAssistantRun aborts the active backend run and marks it cancelled", async () => {
   seedProject("assistant_cancel");
   const seeded = seedCustomConnection({

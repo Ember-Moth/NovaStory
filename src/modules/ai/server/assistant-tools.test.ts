@@ -7,6 +7,8 @@ setupMockDatabase();
 const { db, schema } = await import("@/db");
 const workspaceDomain = await import("@/modules/workspace/domain");
 const { createAssistantTools } = await import("./assistant-tools");
+const { normalizeAskUserAnswers, normalizeAskUserInput, validateAskUserSubmission } =
+  await import("./assistant-tools/ask-user");
 const { PROJECT_ASSISTANT_TOOL_NAMES } = await import("@/modules/ai/domain/types");
 
 function createRuntimeContext(
@@ -144,6 +146,70 @@ test("ask_user is exposed as an external tool without automatic execution", () =
   expect((tools.ask_user as { execute?: unknown }).execute).toBeUndefined();
   expect((tools.ask_user as { needsApproval?: unknown }).needsApproval).toBeUndefined();
   expect((tools.ask_user as { inputSchema?: unknown }).inputSchema).toBeDefined();
+});
+
+test("ask_user accepts single_choice custom text answers", () => {
+  const request = normalizeAskUserInput({
+    questions: [
+      {
+        id: "tone",
+        prompt: "偏什么气质？",
+        kind: "single_choice",
+        options: [
+          { id: "quiet", label: "安静" },
+          { id: "sharp", label: "锋利" },
+        ],
+      },
+    ],
+  });
+
+  expect(
+    normalizeAskUserAnswers({
+      request,
+      answers: [{ questionId: "tone", type: "single_choice", text: "更梦幻一点" }],
+    }),
+  ).toEqual([{ questionId: "tone", type: "single_choice", text: "更梦幻一点" }]);
+});
+
+test("ask_user rejects invalid single_choice answer shapes", () => {
+  const request = normalizeAskUserInput({
+    questions: [
+      {
+        id: "tone",
+        prompt: "偏什么气质？",
+        kind: "single_choice",
+        options: [
+          { id: "quiet", label: "安静" },
+          { id: "sharp", label: "锋利" },
+        ],
+      },
+    ],
+  });
+
+  expect(() =>
+    validateAskUserSubmission({
+      request,
+      answers: [{ questionId: "tone", type: "single_choice", optionId: "quiet", text: "别的" }],
+    }),
+  ).toThrow("必须且只能提供 optionId 或 text");
+  expect(() =>
+    validateAskUserSubmission({
+      request,
+      answers: [{ questionId: "tone", type: "single_choice" }],
+    }),
+  ).toThrow("必须且只能提供 optionId 或 text");
+  expect(() =>
+    validateAskUserSubmission({
+      request,
+      answers: [{ questionId: "tone", type: "single_choice", text: "   " }],
+    }),
+  ).toThrow("自定义答案不能为空");
+  expect(() =>
+    validateAskUserSubmission({
+      request,
+      answers: [{ questionId: "tone", type: "single_choice", optionId: "missing" }],
+    }),
+  ).toThrow("选项不存在");
 });
 
 test("list_manuscript_nodes returns structure without bodies by default", async () => {

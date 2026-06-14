@@ -1344,6 +1344,119 @@ test("submitProjectAssistantToolInput invalidates thread and waiting run trace",
   ]);
 });
 
+test("submitProjectAssistantToolInput accepts custom single_choice text answers", async () => {
+  let receivedAnswers: unknown = null;
+  const run = {
+    id: "run_submit_tool_input_custom",
+    threadId: "thread_submit_tool_input_custom",
+    parentRunId: null,
+    parentEventId: null,
+    triggerNodeId: "node_user_submit_tool_input_custom",
+    baseTipNodeId: "node_user_submit_tool_input_custom",
+    runMode: "send" as const,
+    status: "succeeded" as const,
+    agentProfile: "project-assistant",
+    selectionSnapshot: {},
+    contextSnapshot: null,
+    activeTools: ["ask_user"],
+    errorArtifactId: null,
+    startedAt: 1,
+    completedAt: 2,
+    createdAt: 1,
+    updatedAt: 2,
+  };
+  const result = {
+    thread: {
+      id: "thread_submit_tool_input_custom",
+      projectId: "rpc_submit_tool_input_custom",
+      agentProfile: "project-assistant",
+      title: "主会话",
+      activeTipNodeId: "node_assistant_submit_tool_input_custom",
+      archivedAt: null,
+      createdAt: 1,
+      updatedAt: 2,
+    },
+    toolNode: {
+      id: "node_tool_submit_tool_input_custom",
+      threadId: "thread_submit_tool_input_custom",
+      parentNodeId: "node_assistant_waiting_custom",
+      role: "tool" as const,
+      createdByRunId: run.id,
+      sourceStepId: null,
+      sourceKind: "tool_result" as const,
+      summaryText: "用户已回答提问",
+      message: { role: "tool" as const, content: [] },
+      parts: [],
+      createdAt: 2,
+    },
+    assistantNode: null,
+    run,
+    state: {
+      thread: null,
+      activePath: [],
+      candidateGroups: [],
+      latestRuns: [],
+      runSummaries: [],
+    },
+  };
+
+  useService({
+    getProjectAssistantState: () => {
+      throw new Error("unused");
+    },
+    createProjectAssistantThread: () => {
+      throw new Error("unused");
+    },
+    setProjectAssistantActiveThread: () => {
+      throw new Error("unused");
+    },
+    renameProjectAssistantThread: () => {
+      throw new Error("unused");
+    },
+    archiveProjectAssistantThread: () => {
+      throw new Error("unused");
+    },
+    getThreadView: () => {
+      throw new Error("unused");
+    },
+    getRunTrace: () => ({
+      run,
+      steps: [],
+      events: [],
+      artifacts: [],
+      childRuns: [],
+    }),
+    getNodeCandidates: () => {
+      throw new Error("unused");
+    },
+    getChildRuns: () => {
+      throw new Error("unused");
+    },
+    selectThreadTip: () => {
+      throw new Error("unused");
+    },
+    submitProjectAssistantToolInput: async (input: unknown) => {
+      receivedAnswers = (input as { answers?: unknown }).answers;
+      return result;
+    },
+  } as unknown as ProjectAssistantService);
+
+  await handlers.submitProjectAssistantToolInput.handler(
+    {
+      projectId: "rpc_submit_tool_input_custom",
+      threadId: "thread_submit_tool_input_custom",
+      runId: run.id,
+      toolCallId: "tool_ask_custom",
+      answers: [{ questionId: "tone", type: "single_choice", text: "更梦幻一点" }],
+    },
+    requestCtx,
+  );
+
+  expect(receivedAnswers).toEqual([
+    { questionId: "tone", type: "single_choice", text: "更梦幻一点" },
+  ]);
+});
+
 test("submitProjectAssistantToolInputStream emits resume deltas before completion", async () => {
   let receivedToolCallId: unknown = null;
   const run = {

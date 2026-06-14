@@ -262,6 +262,126 @@ test("getAssistantAskUserEntries reads pending requests and submitted answers", 
   ]);
 });
 
+test("getAssistantAskUserEntries parses custom single_choice text answers", () => {
+  const askUserInput = {
+    title: "确认方向",
+    questions: [
+      {
+        id: "tone",
+        prompt: "这段要偏什么语气？",
+        kind: "single_choice",
+        options: [
+          { id: "quiet", label: "克制" },
+          { id: "sharp", label: "锋利" },
+        ],
+      },
+    ],
+  } satisfies { title: string; questions: AssistantAskUserQuestion[] };
+  const answers = [
+    { questionId: "tone", type: "single_choice", text: "更梦幻一点" },
+  ] satisfies AssistantAskUserAnswer[];
+  const assistantNode = {
+    ...baseNode,
+    id: "node_ask_custom",
+    message: {
+      role: "assistant",
+      content: [
+        {
+          type: "tool-call",
+          toolCallId: "tool_ask_custom",
+          toolName: "ask_user",
+          input: askUserInput,
+        },
+      ],
+    },
+    parts: [
+      {
+        id: "part_call_custom",
+        nodeId: "node_ask_custom",
+        partIndex: 0,
+        partKind: "tool-call",
+        visibility: "internal",
+        state: "done",
+        providerOptions: null,
+        providerMetadata: null,
+        payload: {
+          type: "tool-call",
+          toolCallId: "tool_ask_custom",
+          toolName: "ask_user",
+          input: askUserInput,
+        },
+        createdAt: 1,
+      },
+    ],
+  } as unknown as AgentThreadNodeView;
+  const toolNode = {
+    ...baseNode,
+    id: "node_answer_custom",
+    parentNodeId: "node_ask_custom",
+    role: "tool",
+    sourceKind: "tool_result",
+    message: {
+      role: "tool",
+      content: [
+        {
+          type: "tool-result",
+          toolCallId: "tool_ask_custom",
+          toolName: "ask_user",
+          output: {
+            type: "json",
+            value: {
+              ok: true,
+              truncated: false,
+              data: {
+                request: askUserInput,
+                answers,
+              },
+            },
+          },
+        },
+      ],
+    },
+    parts: [
+      {
+        id: "part_result_custom",
+        nodeId: "node_answer_custom",
+        partIndex: 0,
+        partKind: "tool-result",
+        visibility: "internal",
+        state: "done",
+        providerOptions: null,
+        providerMetadata: null,
+        payload: {
+          type: "tool-result",
+          toolCallId: "tool_ask_custom",
+          toolName: "ask_user",
+          output: {
+            type: "json",
+            value: {
+              ok: true,
+              truncated: false,
+              data: {
+                request: askUserInput,
+                answers,
+              },
+            },
+          },
+        },
+        createdAt: 2,
+      },
+    ],
+  } as unknown as AgentThreadNodeView;
+
+  expect(getAssistantAskUserEntries([assistantNode, toolNode], 0)).toEqual([
+    {
+      toolCallId: "tool_ask_custom",
+      title: "确认方向",
+      questions: askUserInput.questions,
+      answers,
+    },
+  ]);
+});
+
 test("buildAssistantToolTraceSummary describes auxiliary file writes", () => {
   expect(
     buildAssistantToolTraceSummary({

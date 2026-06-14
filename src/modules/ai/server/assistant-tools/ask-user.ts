@@ -37,6 +37,11 @@ export type AskUserAnswer =
     }
   | {
       questionId: string;
+      type: "single_choice";
+      text: string;
+    }
+  | {
+      questionId: string;
       type: "free_text";
       text: string;
     };
@@ -175,11 +180,25 @@ export function normalizeAskUserAnswers({
       if (record.type !== "single_choice") {
         throw new Error(`问题 ${questionId} 必须提交 single_choice 答案。`);
       }
-      const optionId = normalizeRequiredString(record.optionId, `问题 ${questionId} 选项 ID`);
-      if (!question.options.some((option) => option.id === optionId)) {
-        throw new Error(`问题 ${questionId} 的选项不存在：${optionId}。`);
+      const hasOptionId = record.optionId != null;
+      const hasText = record.text != null;
+      if (hasOptionId === hasText) {
+        throw new Error(
+          `问题 ${questionId} 的 single_choice 答案必须且只能提供 optionId 或 text。`,
+        );
       }
-      return { questionId, type: "single_choice", optionId };
+      if (hasOptionId) {
+        const optionId = normalizeRequiredString(record.optionId, `问题 ${questionId} 选项 ID`);
+        if (!question.options.some((option) => option.id === optionId)) {
+          throw new Error(`问题 ${questionId} 的选项不存在：${optionId}。`);
+        }
+        return { questionId, type: "single_choice", optionId };
+      }
+      return {
+        questionId,
+        type: "single_choice",
+        text: normalizeRequiredString(record.text, `问题 ${questionId} 自定义答案`),
+      };
     }
 
     if (record.type !== "free_text") {
@@ -205,7 +224,7 @@ export function buildInteractionTools(_ctx: ToolBuildContext) {
   return {
     ask_user: tool({
       description:
-        "当继续写作或修改项目之前必须让用户做选择或补充信息时使用。一次性提出 1 到 8 个问题；每个问题只能是单选或自由文本。不要用普通文本伪装结构化提问。",
+        "当继续写作或修改项目之前必须让用户做选择或补充信息时使用。一次性提出 1 到 8 个问题；每个问题只能是单选或自由文本。单选题会展示预设选项，但用户也可能直接填写自定义回答。不要用普通文本伪装结构化提问。",
       inputSchema: jsonSchema<AskUserInput>({
         type: "object",
         required: ["questions"],

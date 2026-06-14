@@ -912,7 +912,14 @@ function AskUserInlineCard({
       return;
     }
     if (question.kind === "single_choice" && answer.type === "single_choice") {
-      normalizedAnswers.push(answer);
+      if ("optionId" in answer) {
+        normalizedAnswers.push(answer);
+        return;
+      }
+      const text = answer.text.trim();
+      if (text.length > 0) {
+        normalizedAnswers.push({ ...answer, text });
+      }
       return;
     }
     if (question.kind === "free_text" && answer.type === "free_text") {
@@ -924,14 +931,29 @@ function AskUserInlineCard({
   });
   const isComplete = normalizedAnswers.length === entry.questions.length;
 
-  function updateAnswer(question: AssistantAskUserQuestion, nextValue: string) {
+  function updateAnswer(
+    question: AssistantAskUserQuestion,
+    nextValue: string,
+    mode: "option" | "text" = "text",
+  ) {
     if (question.kind === "single_choice") {
+      if (mode === "option") {
+        setDraftAnswers((current) => ({
+          ...current,
+          [question.id]: {
+            questionId: question.id,
+            type: "single_choice",
+            optionId: nextValue,
+          },
+        }));
+        return;
+      }
       setDraftAnswers((current) => ({
         ...current,
         [question.id]: {
           questionId: question.id,
           type: "single_choice",
-          optionId: nextValue,
+          text: nextValue,
         },
       }));
       return;
@@ -964,7 +986,7 @@ function AskUserInlineCard({
               question={question}
               answer={draftAnswers[question.id] ?? null}
               resolved={isResolved}
-              onChange={(value) => updateAnswer(question, value)}
+              onChange={(value, mode) => updateAnswer(question, value, mode)}
             />
           ))}
         </div>
@@ -1002,7 +1024,7 @@ function AskUserQuestionBlock({
   question: AssistantAskUserQuestion;
   answer: AssistantAskUserAnswer | null;
   resolved: boolean;
-  onChange: (_value: string) => void;
+  onChange: (_value: string, _mode?: "option" | "text") => void;
 }) {
   return (
     <section className="py-2.5 first:pt-2 last:pb-2">
@@ -1017,12 +1039,15 @@ function AskUserQuestionBlock({
       ) : question.kind === "single_choice" ? (
         <div className="mt-2 flex flex-col gap-1.5">
           {question.options.map((option) => {
-            const selected = answer?.type === "single_choice" && answer.optionId === option.id;
+            const selected =
+              answer?.type === "single_choice" &&
+              "optionId" in answer &&
+              answer.optionId === option.id;
             return (
               <button
                 key={option.id}
                 type="button"
-                onClick={() => onChange(option.id)}
+                onClick={() => onChange(option.id, "option")}
                 className={`flex items-start gap-2 rounded-md border px-2 py-2 text-left text-[12px] leading-5 transition ${
                   selected
                     ? "border-accent-foreground/40 bg-accent-foreground/10 text-foreground"
@@ -1047,6 +1072,13 @@ function AskUserQuestionBlock({
               </button>
             );
           })}
+          <textarea
+            value={answer?.type === "single_choice" && "text" in answer ? answer.text : ""}
+            onChange={(event) => onChange(event.target.value, "text")}
+            rows={2}
+            className="mt-1 w-full resize-y rounded-md border border-border bg-editor-background px-2.5 py-2 text-[12px] leading-5 text-foreground outline-none focus:border-accent-foreground"
+            placeholder="或输入自定义回答..."
+          />
         </div>
       ) : (
         <textarea
@@ -1078,8 +1110,12 @@ function formatAskUserAnswer(
     return "未回答";
   }
   if (question.kind === "single_choice") {
+    if (answer.type === "single_choice" && "text" in answer) {
+      return answer.text;
+    }
     const matched = question.options.find(
-      (option) => answer.type === "single_choice" && option.id === answer.optionId,
+      (option) =>
+        answer.type === "single_choice" && "optionId" in answer && option.id === answer.optionId,
     );
     return matched?.label ?? "已选择";
   }

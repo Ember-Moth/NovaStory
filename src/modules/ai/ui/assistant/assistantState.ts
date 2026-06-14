@@ -86,6 +86,11 @@ export type AssistantAskUserAnswer =
     }
   | {
       questionId: string;
+      type: "single_choice";
+      text: string;
+    }
+  | {
+      questionId: string;
       type: "free_text";
       text: string;
     };
@@ -554,13 +559,21 @@ function parseAskUserAnswer(input: unknown): AssistantAskUserAnswer | null {
   }
   if (type === "single_choice") {
     const optionId = getRecordString(input, "optionId");
+    const text = getRecordString(input, "text");
+    if ((optionId ? 1 : 0) + (text ? 1 : 0) !== 1) {
+      return null;
+    }
     return optionId
       ? {
           questionId,
           type,
           optionId,
         }
-      : null;
+      : {
+          questionId,
+          type,
+          text: text!,
+        };
   }
   const text = getRecordString(input, "text");
   return text
