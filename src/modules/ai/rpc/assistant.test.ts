@@ -1344,6 +1344,201 @@ test("submitProjectAssistantToolInput invalidates thread and waiting run trace",
   ]);
 });
 
+test("submitProjectAssistantToolInputStream emits resume deltas before completion", async () => {
+  let receivedToolCallId: unknown = null;
+  const run = {
+    id: "run_submit_tool_input_stream",
+    threadId: "thread_submit_tool_input_stream",
+    parentRunId: null,
+    parentEventId: null,
+    triggerNodeId: "node_user_submit_tool_input_stream",
+    baseTipNodeId: "node_user_submit_tool_input_stream",
+    runMode: "send" as const,
+    status: "running" as const,
+    agentProfile: "project-assistant",
+    selectionSnapshot: {},
+    contextSnapshot: null,
+    activeTools: ["ask_user"],
+    errorArtifactId: null,
+    startedAt: 1,
+    completedAt: null,
+    createdAt: 1,
+    updatedAt: 1,
+  };
+  const finalResult = {
+    thread: {
+      id: "thread_submit_tool_input_stream",
+      projectId: "rpc_submit_tool_input_stream",
+      agentProfile: "project-assistant",
+      title: "主会话",
+      activeTipNodeId: "node_assistant_submit_tool_input_stream",
+      archivedAt: null,
+      createdAt: 1,
+      updatedAt: 2,
+    },
+    toolNode: {
+      id: "node_tool_submit_tool_input_stream",
+      threadId: "thread_submit_tool_input_stream",
+      parentNodeId: "node_assistant_waiting_stream",
+      role: "tool" as const,
+      createdByRunId: run.id,
+      sourceStepId: null,
+      sourceKind: "tool_result" as const,
+      summaryText: "用户已回答提问",
+      message: { role: "tool" as const, content: [] },
+      parts: [],
+      createdAt: 2,
+    },
+    assistantNode: {
+      id: "node_assistant_submit_tool_input_stream",
+      threadId: "thread_submit_tool_input_stream",
+      parentNodeId: "node_tool_submit_tool_input_stream",
+      role: "assistant" as const,
+      createdByRunId: run.id,
+      sourceStepId: null,
+      sourceKind: "model_response" as const,
+      summaryText: "继续写。",
+      message: {
+        role: "assistant" as const,
+        content: [{ type: "text" as const, text: "继续写。" }],
+      },
+      parts: [],
+      createdAt: 3,
+    },
+    run: {
+      ...run,
+      status: "succeeded" as const,
+      completedAt: 3,
+      updatedAt: 3,
+    },
+    state: {
+      thread: null,
+      activePath: [],
+      candidateGroups: [],
+      latestRuns: [],
+      runSummaries: [],
+    },
+  };
+
+  useService({
+    getProjectAssistantState: () => {
+      throw new Error("unused");
+    },
+    createProjectAssistantThread: () => {
+      throw new Error("unused");
+    },
+    setProjectAssistantActiveThread: () => {
+      throw new Error("unused");
+    },
+    renameProjectAssistantThread: () => {
+      throw new Error("unused");
+    },
+    archiveProjectAssistantThread: () => {
+      throw new Error("unused");
+    },
+    getThreadView: () => {
+      throw new Error("unused");
+    },
+    getRunTrace: () => ({
+      run: finalResult.run,
+      steps: [],
+      events: [],
+      artifacts: [],
+      childRuns: [],
+    }),
+    getNodeCandidates: () => {
+      throw new Error("unused");
+    },
+    getChildRuns: () => {
+      throw new Error("unused");
+    },
+    selectThreadTip: () => {
+      throw new Error("unused");
+    },
+    submitProjectAssistantToolInputStream: (input: unknown) => {
+      receivedToolCallId = (input as { toolCallId?: unknown }).toolCallId;
+      return {
+        initialResult: {
+          ...finalResult,
+          run,
+          assistantNode: null,
+        },
+        finalResult: Promise.resolve(finalResult),
+        subscribe: (listener: (_event: unknown) => void) => {
+          listener({
+            type: "run-started",
+            run,
+            threadId: "thread_submit_tool_input_stream",
+            triggerNodeId: "node_user_submit_tool_input_stream",
+          });
+          listener({
+            type: "assistant-message-started",
+            nodeId: "node_assistant_submit_tool_input_stream",
+            parentNodeId: "node_tool_submit_tool_input_stream",
+            stepIndex: 1,
+          });
+          listener({
+            type: "assistant-text-delta",
+            nodeId: "node_assistant_submit_tool_input_stream",
+            delta: "继续写。",
+            accumulatedText: "继续写。",
+          });
+          return () => {
+            return;
+          };
+        },
+      };
+    },
+  } as unknown as ProjectAssistantService);
+
+  const emitted: unknown[] = [];
+  const execution = await handlers.submitProjectAssistantToolInputStream.handler(
+    {
+      projectId: "rpc_submit_tool_input_stream",
+      threadId: "thread_submit_tool_input_stream",
+      runId: run.id,
+      toolCallId: "tool_ask_stream",
+      answers: [{ questionId: "tone", type: "single_choice", optionId: "quiet" }],
+    },
+    streamRequestCtx,
+    {
+      emit(event) {
+        emitted.push(event);
+      },
+    },
+  );
+
+  expect(receivedToolCallId).toBe("tool_ask_stream");
+  expect(emitted).toEqual([
+    {
+      type: "run-started",
+      run,
+      threadId: "thread_submit_tool_input_stream",
+      triggerNodeId: "node_user_submit_tool_input_stream",
+    },
+    {
+      type: "assistant-message-started",
+      nodeId: "node_assistant_submit_tool_input_stream",
+      parentNodeId: "node_tool_submit_tool_input_stream",
+      stepIndex: 1,
+    },
+    {
+      type: "assistant-text-delta",
+      nodeId: "node_assistant_submit_tool_input_stream",
+      delta: "继续写。",
+      accumulatedText: "继续写。",
+    },
+  ]);
+  expect(execution.invalidate).toEqual([
+    rpcTags.aiProjectAssistantOverview("rpc_submit_tool_input_stream"),
+    rpcTags.aiProjectThreads("rpc_submit_tool_input_stream"),
+    rpcTags.aiThreadView("thread_submit_tool_input_stream"),
+    rpcTags.aiNodeCandidates("node_assistant_waiting_stream"),
+    rpcTags.aiRunTrace(run.id),
+    rpcTags.aiChildRuns(run.id),
+  ]);
+});
+
 test("cancelProjectAssistantRun invalidates thread and run state", async () => {
   let received: unknown = null;
   useService({

@@ -179,6 +179,12 @@ export function createStreamOverlay({
   };
 }
 
+export function shouldRenderPendingStreamBlocks(
+  overlay: AssistantStreamOverlay | null,
+): overlay is AssistantStreamOverlay & { kind: "send" | "continue" | "tool-input" } {
+  return overlay?.kind === "send" || overlay?.kind === "continue" || overlay?.kind === "tool-input";
+}
+
 export function buildProjectAssistantSendActiveTools({
   allowWrites,
 }: {

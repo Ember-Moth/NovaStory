@@ -14,6 +14,7 @@ import {
   createStreamOverlay,
   DEFAULT_ALLOW_WRITES_FOR_NEXT_SEND,
   resolveExpectedActiveThreadAfterArchiveToggle,
+  shouldRenderPendingStreamBlocks,
 } from "./useAiAssistantController";
 
 const baseThread = {
@@ -114,6 +115,28 @@ test("applyStreamEvent accumulates usage tokens as steps finish", () => {
 
   expect(afterSecondStep.stepCount).toBe(2);
   expect(afterSecondStep.totalTokens).toBe(81);
+});
+
+test("tool input streams render in the pending stream area", () => {
+  expect(
+    shouldRenderPendingStreamBlocks(
+      createStreamOverlay({
+        kind: "tool-input",
+        threadId: "thread_a",
+        triggerNodeId: "user_1",
+      }),
+    ),
+  ).toBe(true);
+  expect(
+    shouldRenderPendingStreamBlocks(
+      createStreamOverlay({
+        kind: "retry",
+        threadId: "thread_a",
+        triggerNodeId: "assistant_1",
+      }),
+    ),
+  ).toBe(false);
+  expect(shouldRenderPendingStreamBlocks(null)).toBe(false);
 });
 
 test("applyStreamEvent keeps reasoning, text, and tool traces aligned in one stream block", () => {

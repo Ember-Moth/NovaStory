@@ -31,7 +31,11 @@ import {
   getMessageText,
   getRunSummaryByDisplayNode,
 } from "./assistantState";
-import { type AssistantStreamOverlay, useAiAssistantController } from "./useAiAssistantController";
+import {
+  type AssistantStreamOverlay,
+  shouldRenderPendingStreamBlocks,
+  useAiAssistantController,
+} from "./useAiAssistantController";
 import { getMessagesViewportSessionKey, shouldAnimateMessageMount } from "./aiSidebarModel";
 import { useAssistantSheetLayout } from "./useAssistantSheetLayout";
 import { OverlayScrollbar } from "@/shared/ui/OverlayScrollbar";
@@ -778,8 +782,7 @@ function AiSidebarMessagesContent({
                 />
               </div>
             ) : null}
-            {controller.activeStream?.kind === "send" ||
-            controller.activeStream?.kind === "continue"
+            {shouldRenderPendingStreamBlocks(controller.activeStream)
               ? controller.activeStream.blocks.map((block, blockIndex) => (
                   <motion.div
                     key={`${controller.activeStream?.kind}-stream-block:${block.assistantNodeId}:${blockIndex}`}
