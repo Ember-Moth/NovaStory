@@ -10,6 +10,7 @@ import type {
 } from "@/modules/workspace/ui/editor/model/types";
 
 import { WorkspaceMarkdownPreview } from "./WorkspaceMarkdownPreview";
+import { AutoTransition } from "auto-transition";
 
 const EDITOR_HEADER_CLASS =
   "flex h-10 shrink-0 items-center gap-2 border-b border-border bg-title-bar-background px-4";
@@ -24,18 +25,34 @@ function SaveStatus({
   isPending?: boolean;
 }) {
   if (saveState.error) {
-    return <span className="ml-auto shrink-0 text-[11px] text-red-300">{saveState.error}</span>;
+    return (
+      <span key={`error:${saveState.error}`} className="ml-auto shrink-0 text-[11px] text-red-300">
+        {saveState.error}
+      </span>
+    );
   }
 
   if (saveState.isSaving || isPending) {
-    return <span className={STATUS_LABEL_CLASS}>保存中</span>;
+    return (
+      <span key="saving" className={STATUS_LABEL_CLASS}>
+        保存中
+      </span>
+    );
   }
 
   if (saveState.isDirty) {
-    return <span className={STATUS_LABEL_CLASS}>待保存</span>;
+    return (
+      <span key="dirty" className={STATUS_LABEL_CLASS}>
+        待保存
+      </span>
+    );
   }
 
-  return <span className={STATUS_LABEL_CLASS}>已同步</span>;
+  return (
+    <span key="synced" className={STATUS_LABEL_CLASS}>
+      已同步
+    </span>
+  );
 }
 
 function PendingStatus({ isPending }: { isPending: boolean }) {
@@ -172,8 +189,8 @@ export function EditorArea({
 
     if (auxNode.nodeType === "file") {
       return (
-        <div className="flex h-full flex-col">
-          <div className={EDITOR_HEADER_CLASS}>
+        <AutoTransition as="div" className="flex h-full flex-col">
+          <AutoTransition as="div" className={EDITOR_HEADER_CLASS}>
             <AuxNodeIcon nodeType="file" />
             <span className="min-w-0 truncate text-[14px] text-foreground">{auxNode.path}</span>
             <SaveStatus saveState={auxSaveState} isPending={auxPending} />
@@ -181,7 +198,7 @@ export function EditorArea({
             <span className="shrink-0 text-[11px] text-accent-foreground">
               时间点: {timelineLabel}
             </span>
-          </div>
+          </AutoTransition>
           {isPreviewMode ? (
             <WorkspaceMarkdownPreview content={auxContent} emptyLabel="暂无辅助信息可预览" />
           ) : (
@@ -192,7 +209,7 @@ export function EditorArea({
               variant="aux"
             />
           )}
-        </div>
+        </AutoTransition>
       );
     }
 
