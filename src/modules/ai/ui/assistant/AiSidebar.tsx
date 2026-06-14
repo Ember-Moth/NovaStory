@@ -21,7 +21,11 @@ import {
 import { AssistantComposer } from "./AssistantComposer";
 import { AiAssistantSheetLayout } from "./AiAssistantSheetLayout";
 import {
+  type AssistantAskUserAnswer,
+  type AssistantAskUserEntry,
+  type AssistantAskUserQuestion,
   getAssistantContentBlocks,
+  getAssistantAskUserEntries,
   getAssistantRefDisplays,
   getAssistantToolTrace,
   getMessageText,
@@ -56,7 +60,9 @@ export function AiSidebar({
   const [shouldStickToBottom, setShouldStickToBottom] = useState(true);
   const streamedAssistantMessageIdsRef = useRef<Set<string>>(new Set());
   const pendingSendSummary =
-    controller.activeStream?.kind === "send" || controller.activeStream?.kind === "continue"
+    controller.activeStream?.kind === "send" ||
+    controller.activeStream?.kind === "continue" ||
+    controller.activeStream?.kind === "tool-input"
       ? buildStreamRunSummary(controller.activeStream)
       : null;
   const messagesViewportSessionKey = getMessagesViewportSessionKey(controller.activeThreadId);
@@ -266,11 +272,13 @@ export function AiSidebar({
                     controller.isThreadBusy
                   }
                   placeholder={
-                    controller.isLoadingSelection
-                      ? "加载模型选择中..."
-                      : controller.selectedConnectionId && controller.selectedModelId
-                        ? "输入消息..."
-                        : "选择可用模型后输入..."
+                    controller.isWaitingForInput
+                      ? "等待回答，可继续编辑草稿..."
+                      : controller.isLoadingSelection
+                        ? "加载模型选择中..."
+                        : controller.selectedConnectionId && controller.selectedModelId
+                          ? "输入消息..."
+                          : "选择可用模型后输入..."
                   }
                   isBusy={controller.isBusy}
                   initialValue={controller.draft}
@@ -288,12 +296,12 @@ export function AiSidebar({
                     onSelectionChange={controller.handleSelectionChange}
                     onSelectionCommit={controller.handleSelectionCommit}
                   />
-                  {controller.isGenerating ? (
+                  {controller.isGenerating || controller.isWaitingForInput ? (
                     <button
                       type="button"
                       onClick={controller.handleAbort}
-                      title="终止生成"
-                      aria-label="终止生成"
+                      title={controller.isWaitingForInput ? "停止等待" : "终止生成"}
+                      aria-label={controller.isWaitingForInput ? "停止等待" : "终止生成"}
                       className="bg-destructive flex size-7 shrink-0 items-center justify-center rounded-md text-white transition hover:brightness-110"
                     >
                       <span className="icon-[material-symbols--stop] text-base" />
@@ -482,7 +490,10 @@ function AiSidebarMessagesContent({
           const text = getMessageText(message);
           const refDisplays = getAssistantRefDisplays(message);
           const assistantContentBlocks = getAssistantContentBlocks(message);
-          const toolTrace = getAssistantToolTrace(controller.messages, index);
+          const askUserEntries = getAssistantAskUserEntries(controller.messages, index);
+          const toolTrace = getAssistantToolTrace(controller.messages, index).filter(
+            (entry) => entry.toolName !== "ask_user",
+          );
           const isUser = message.role === "user";
           const showMessageBubble = isUser || text.trim().length > 0 || refDisplays.length > 0;
           const candidateGroup = controller.getCandidateGroupForNode(message);
@@ -537,6 +548,33 @@ function AiSidebarMessagesContent({
                     ),
                   )
                 : null}
+
+              {!isUser && askUserEntries.length > 0 ? (
+                <div className="flex flex-col gap-1.5">
+                  {askUserEntries.map((entry) => {
+                    const submittedAnswers =
+                      entry.answers ??
+                      controller.submittedToolInputAnswers[entry.approvalId] ??
+                      null;
+                    return (
+                      <AskUserInlineCard
+                        key={entry.approvalId}
+                        entry={entry}
+                        submittedAnswers={submittedAnswers}
+                        isSubmitting={controller.submittingToolInputApprovalId === entry.approvalId}
+                        canSubmit={
+                          controller.isWaitingForInput &&
+                          submittedAnswers == null &&
+                          controller.pendingRun?.id != null
+                        }
+                        onSubmit={(answers) =>
+                          void controller.handleSubmitToolInput(entry.approvalId, answers)
+                        }
+                      />
+                    );
+                  })}
+                </div>
+              ) : null}
 
               {streamOverlayForMessage ? (
                 <div className="flex flex-col gap-1.5">
@@ -717,9 +755,16 @@ function AiSidebarMessagesContent({
 
       <AnimatePresence initial={false}>
         {controller.pendingAction?.kind === "send" ||
-        controller.pendingAction?.kind === "continue" ? (
+        controller.pendingAction?.kind === "continue" ||
+        controller.pendingAction?.kind === "tool-input" ? (
           <motion.div
-            key={controller.pendingAction.kind === "send" ? "pending-send" : "pending-continue"}
+            key={
+              controller.pendingAction.kind === "send"
+                ? "pending-send"
+                : controller.pendingAction.kind === "continue"
+                  ? "pending-continue"
+                  : "pending-tool-input"
+            }
             className="flex flex-col gap-1.5"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -834,6 +879,207 @@ function UserMessageBubble({
       {text.length > 0 ? <span className="whitespace-pre-wrap">{text}</span> : null}
     </div>
   );
+}
+
+function AskUserInlineCard({
+  entry,
+  submittedAnswers,
+  isSubmitting,
+  canSubmit,
+  onSubmit,
+}: {
+  entry: AssistantAskUserEntry;
+  submittedAnswers: AssistantAskUserAnswer[] | null;
+  isSubmitting: boolean;
+  canSubmit: boolean;
+  onSubmit: (_answers: AssistantAskUserAnswer[]) => void;
+}) {
+  const [draftAnswers, setDraftAnswers] = useState<Record<string, AssistantAskUserAnswer>>(() =>
+    indexAskUserAnswers(submittedAnswers),
+  );
+  const isResolved = submittedAnswers != null;
+
+  useEffect(() => {
+    if (submittedAnswers == null) {
+      return;
+    }
+    setDraftAnswers(indexAskUserAnswers(submittedAnswers));
+  }, [submittedAnswers]);
+
+  const normalizedAnswers: AssistantAskUserAnswer[] = [];
+  entry.questions.forEach((question) => {
+    const answer = draftAnswers[question.id];
+    if (!answer) {
+      return;
+    }
+    if (question.kind === "single_choice" && answer.type === "single_choice") {
+      normalizedAnswers.push(answer);
+      return;
+    }
+    if (question.kind === "free_text" && answer.type === "free_text") {
+      const text = answer.text.trim();
+      if (text.length > 0) {
+        normalizedAnswers.push({ ...answer, text });
+      }
+    }
+  });
+  const isComplete = normalizedAnswers.length === entry.questions.length;
+
+  function updateAnswer(question: AssistantAskUserQuestion, nextValue: string) {
+    if (question.kind === "single_choice") {
+      setDraftAnswers((current) => ({
+        ...current,
+        [question.id]: {
+          questionId: question.id,
+          type: "single_choice",
+          optionId: nextValue,
+        },
+      }));
+      return;
+    }
+    setDraftAnswers((current) => ({
+      ...current,
+      [question.id]: {
+        questionId: question.id,
+        type: "free_text",
+        text: nextValue,
+      },
+    }));
+  }
+
+  return (
+    <div className="overflow-hidden rounded-md border border-border bg-editor-background">
+      <div className="flex items-center gap-2 border-b border-border/70 px-2.5 py-2 text-[11px] leading-4 text-foreground-muted">
+        <span className="icon-[material-symbols--help-outline] shrink-0 text-[14px] text-accent-foreground" />
+        <span className="min-w-0 flex-1 truncate">
+          {entry.title ?? (isResolved ? "已提交回答" : "等待回答")}
+        </span>
+        {isSubmitting ? <span className="text-accent-foreground">提交中</span> : null}
+      </div>
+
+      <div className="flex flex-col gap-2 p-2">
+        {entry.questions.map((question) => (
+          <AskUserQuestionBlock
+            key={question.id}
+            question={question}
+            answer={draftAnswers[question.id] ?? null}
+            resolved={isResolved}
+            onChange={(value) => updateAnswer(question, value)}
+          />
+        ))}
+
+        {!isResolved ? (
+          <div className="flex justify-end pt-0.5">
+            <button
+              type="button"
+              disabled={!canSubmit || !isComplete || isSubmitting}
+              onClick={() => onSubmit(normalizedAnswers)}
+              className="inline-flex h-8 items-center gap-1 rounded-md bg-accent-foreground px-3 text-[12px] font-medium text-sidebar-background transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <span
+                className={`text-sm ${
+                  isSubmitting
+                    ? "icon-[material-symbols--progress-activity] animate-spin"
+                    : "icon-[material-symbols--check]"
+                }`}
+              />
+              <span>提交</span>
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function AskUserQuestionBlock({
+  question,
+  answer,
+  resolved,
+  onChange,
+}: {
+  question: AssistantAskUserQuestion;
+  answer: AssistantAskUserAnswer | null;
+  resolved: boolean;
+  onChange: (_value: string) => void;
+}) {
+  return (
+    <section className="rounded-md border border-border/70 bg-sidebar-background px-2.5 py-2">
+      <div className="text-[12px] leading-5 text-foreground">{question.prompt}</div>
+      {resolved ? (
+        <div className="mt-2 rounded-md border border-border/70 bg-editor-background px-2 py-1.5 text-[12px] leading-5 text-foreground-muted">
+          {formatAskUserAnswer(question, answer)}
+        </div>
+      ) : question.kind === "single_choice" ? (
+        <div className="mt-2 flex flex-col gap-1.5">
+          {question.options.map((option) => {
+            const selected = answer?.type === "single_choice" && answer.optionId === option.id;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => onChange(option.id)}
+                className={`flex items-start gap-2 rounded-md border px-2 py-2 text-left text-[12px] leading-5 transition ${
+                  selected
+                    ? "border-accent-foreground/40 bg-accent-foreground/10 text-foreground"
+                    : "border-border bg-editor-background text-foreground-muted hover:text-foreground"
+                }`}
+              >
+                <span
+                  className={`mt-0.5 shrink-0 text-[16px] ${
+                    selected
+                      ? "icon-[material-symbols--radio-button-checked] text-accent-foreground"
+                      : "icon-[material-symbols--radio-button-unchecked]"
+                  }`}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-foreground">{option.label}</span>
+                  {option.description ? (
+                    <span className="mt-0.5 block text-[11px] leading-4 text-foreground-muted">
+                      {option.description}
+                    </span>
+                  ) : null}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <textarea
+          value={answer?.type === "free_text" ? answer.text : ""}
+          onChange={(event) => onChange(event.target.value)}
+          rows={3}
+          className="mt-2 w-full resize-y rounded-md border border-border bg-editor-background px-2.5 py-2 text-[12px] leading-5 text-foreground outline-none focus:border-accent-foreground"
+          placeholder="输入回答..."
+        />
+      )}
+    </section>
+  );
+}
+
+function indexAskUserAnswers(
+  answers: AssistantAskUserAnswer[] | null,
+): Record<string, AssistantAskUserAnswer> {
+  if (answers == null) {
+    return {};
+  }
+  return Object.fromEntries(answers.map((answer) => [answer.questionId, answer]));
+}
+
+function formatAskUserAnswer(
+  question: AssistantAskUserQuestion,
+  answer: AssistantAskUserAnswer | null,
+) {
+  if (!answer) {
+    return "未回答";
+  }
+  if (question.kind === "single_choice") {
+    const matched = question.options.find(
+      (option) => answer.type === "single_choice" && option.id === answer.optionId,
+    );
+    return matched?.label ?? "已选择";
+  }
+  return answer.type === "free_text" ? answer.text : "已填写";
 }
 
 function getAssistantMentionDisplayKey(mention: AssistantMentionInput | AssistantInputRefDisplay) {

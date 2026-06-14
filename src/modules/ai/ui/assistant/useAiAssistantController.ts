@@ -20,6 +20,7 @@ import {
   EMPTY_ASSISTANT_STATE,
   EMPTY_THREADS,
   type AssistantToolTraceEntry,
+  type AssistantAskUserAnswer,
   type EditingThreadState,
   getCandidateGroupForNode,
   getRunErrorMessage,
@@ -44,7 +45,7 @@ export type SessionListRow =
     };
 
 export interface AssistantStreamOverlay {
-  kind: "send" | "retry" | "continue";
+  kind: "send" | "retry" | "continue" | "tool-input";
   threadId: string;
   triggerNodeId: string | null;
   runId: string | null;
@@ -158,7 +159,7 @@ export function createStreamOverlay({
   threadId,
   triggerNodeId,
 }: {
-  kind: "send" | "retry" | "continue";
+  kind: "send" | "retry" | "continue" | "tool-input";
   threadId: string;
   triggerNodeId: string | null;
 }): AssistantStreamOverlay {
@@ -392,6 +393,34 @@ export function applyStreamEvent(
     };
   }
 
+  if (event.type === "user-input-requested") {
+    const nextOverlay = ensureStreamBlock(overlay, event.assistantNodeId);
+    return {
+      ...nextOverlay,
+      activeAssistantNodeId: event.assistantNodeId,
+      blocks: nextOverlay.blocks.map((block) =>
+        block.assistantNodeId === event.assistantNodeId
+          ? {
+              ...block,
+              toolTrace: [
+                ...block.toolTrace,
+                {
+                  toolCallId: event.toolCallId,
+                  toolName: event.toolName,
+                  status: "pending",
+                  summary: "等待回答",
+                  nodeId: event.assistantNodeId,
+                  runId: overlay.runId,
+                  requestPayload: event.input,
+                  responsePayload: null,
+                },
+              ],
+            }
+          : block,
+      ),
+    };
+  }
+
   if (event.type === "step-finished") {
     const tokens = getUsageTotalTokens(event.usage);
     return {
@@ -471,6 +500,13 @@ export function useAiAssistantController(
   const sendMessageStream = rpc.useStreamMutation("ai.sendProjectAssistantMessageStream");
   const retryMessageStream = rpc.useStreamMutation("ai.retryProjectAssistantMessageStream");
   const continueRunStream = rpc.useStreamMutation("ai.continueProjectAssistantRunStream");
+  const submitToolInputStream = rpc.useStreamMutation("ai.submitProjectAssistantToolInputStream");
+  const [submittingToolInputApprovalId, setSubmittingToolInputApprovalId] = useState<string | null>(
+    null,
+  );
+  const [submittedToolInputAnswers, setSubmittedToolInputAnswers] = useState<
+    Record<string, AssistantAskUserAnswer[]>
+  >({});
 
   const isLoadingSelection = !selectionHydrated;
   const overview = assistantOverviewQuery.data ?? {
@@ -515,7 +551,9 @@ export function useAiAssistantController(
   const isGenerating =
     sendMessageStream.isStreaming ||
     retryMessageStream.isStreaming ||
-    continueRunStream.isStreaming;
+    continueRunStream.isStreaming ||
+    submitToolInputStream.isStreaming;
+  const isWaitingForInput = pendingRun?.status === "waiting_for_input";
   const isThreadMutating =
     createThread.isPending ||
     setActiveThread.isPending ||
@@ -549,6 +587,11 @@ export function useAiAssistantController(
       setExpectedActiveThreadId(null);
     }
   }, [activeThreadId, expectedActiveThreadId]);
+
+  useEffect(() => {
+    setSubmittingToolInputApprovalId(null);
+    setSubmittedToolInputAnswers({});
+  }, [activeThreadId]);
 
   useEffect(() => {
     if (selectionHydrated) {
@@ -902,6 +945,95 @@ export function useAiAssistantController(
     ],
   );
 
+  const handleSubmitToolInput = useCallback(
+    async (approvalId: string, answers: AssistantAskUserAnswer[]) => {
+      if (!activeThreadId || !pendingRun || pendingRun.status !== "waiting_for_input") {
+        return;
+      }
+
+      setComposerError(null);
+      setSubmittingToolInputApprovalId(approvalId);
+      setSubmittedToolInputAnswers((current) => ({
+        ...current,
+        [approvalId]: answers,
+      }));
+      setPendingAction({ kind: "tool-input", runId: pendingRun.id, approvalId });
+      setActiveStream(
+        createStreamOverlay({
+          kind: "tool-input",
+          threadId: activeThreadId,
+          triggerNodeId: pendingRun.triggerNodeId,
+        }),
+      );
+
+      try {
+        const result = await submitToolInputStream.startAsync(
+          {
+            projectId,
+            threadId: activeThreadId,
+            runId: pendingRun.id,
+            approvalId,
+            answers,
+          },
+          {
+            onEvent: (event) => {
+              if (
+                event.type === "workspace-refresh-requested" ||
+                event.type === "timeline-selection-updated"
+              ) {
+                onWorkspaceRefreshRequested?.(event);
+              }
+              setActiveStream((current) =>
+                current == null ? current : applyStreamEvent(current, event),
+              );
+            },
+          },
+        );
+        patchAssistantOverviewState({
+          projectId,
+          thread: result.thread,
+          state: result.state,
+        });
+        setActiveStream(null);
+      } catch (error) {
+        if (error instanceof Error && error.name === "RpcStreamAborted") {
+          void assistantOverviewQuery.refetch();
+          setActiveStream(null);
+          return;
+        }
+        setSubmittedToolInputAnswers((current) => {
+          const next = { ...current };
+          delete next[approvalId];
+          return next;
+        });
+        const message = error instanceof Error ? error.message : "提交回答失败。";
+        setComposerError(message);
+        setActiveStream((current) =>
+          current == null
+            ? current
+            : {
+                ...current,
+                status: "failed",
+                completedAt: Date.now(),
+                errorMessage: message || getRunErrorMessage(),
+              },
+        );
+        void assistantOverviewQuery.refetch();
+      } finally {
+        setSubmittingToolInputApprovalId(null);
+        setPendingAction(null);
+      }
+    },
+    [
+      activeThreadId,
+      assistantOverviewQuery,
+      onWorkspaceRefreshRequested,
+      pendingRun,
+      projectId,
+      submitToolInputStream,
+    ],
+  );
+
   const handleCreateThread = useCallback(async () => {
     setComposerError(null);
     setEditingThread(null);
@@ -1005,6 +1137,8 @@ export function useAiAssistantController(
         retryMessageStream.abort();
       } else if (continueRunStream.isStreaming) {
         continueRunStream.abort();
+      } else if (submitToolInputStream.isStreaming) {
+        submitToolInputStream.abort();
       }
       return;
     }
@@ -1022,6 +1156,8 @@ export function useAiAssistantController(
         retryMessageStream.abort();
       } else if (continueRunStream.isStreaming) {
         continueRunStream.abort();
+      } else if (submitToolInputStream.isStreaming) {
+        submitToolInputStream.abort();
       }
       void assistantOverviewQuery.refetch();
     }
@@ -1035,6 +1171,7 @@ export function useAiAssistantController(
     projectId,
     retryMessageStream,
     sendMessageStream,
+    submitToolInputStream,
   ]);
 
   const handleSelectCandidate = useCallback(
@@ -1080,9 +1217,11 @@ export function useAiAssistantController(
     handleSelectionCommit,
     handleSubmit,
     handleAbort,
+    handleSubmitToolInput,
     allowWritesForNextSend,
     isBusy,
     isGenerating,
+    isWaitingForInput,
     isLoadingSelection,
     isRetrying: retryMessageStream.isStreaming,
     isContinuing: continueRunStream.isStreaming,
@@ -1102,6 +1241,8 @@ export function useAiAssistantController(
     setAllowWritesForNextSend,
     setDraft,
     setDraftMentionCount,
+    submittedToolInputAnswers,
+    submittingToolInputApprovalId,
     showArchivedThreads,
     setShowArchivedThreads,
     showEmptyState,

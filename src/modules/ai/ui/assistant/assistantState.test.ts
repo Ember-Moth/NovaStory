@@ -3,13 +3,34 @@ import { expect, test } from "bun:test";
 import {
   buildAssistantToolTraceSummary,
   getAssistantContentBlocks,
+  getAssistantAskUserEntries,
   getAssistantReasoning,
   getRunSummaryByDisplayNode,
   getAssistantToolTrace,
   getUsageTotalTokens,
   listAssistantContextDetails,
   canSendAssistantMessage,
+  type AssistantAskUserAnswer,
+  type AssistantAskUserQuestion,
 } from "./assistantState";
+import type { AgentThreadNodeView } from "@/modules/ai/domain/types";
+
+const baseNode = {
+  id: "node_base",
+  threadId: "thread_1",
+  parentNodeId: null,
+  role: "assistant",
+  createdByRunId: "run_1",
+  sourceStepId: "step_1",
+  sourceKind: "model_response",
+  summaryText: null,
+  message: {
+    role: "assistant",
+    content: [],
+  },
+  parts: [],
+  createdAt: 1,
+} as const;
 
 test("getAssistantToolTrace merges tool call and tool result into one trace entry", () => {
   expect(
@@ -103,6 +124,143 @@ test("getAssistantToolTrace merges tool call and tool result into one trace entr
       runId: "run_1",
       requestPayload: {},
       responsePayload: { type: "json", value: { ok: true, data: { answer: 42 } } },
+    },
+  ]);
+});
+
+test("getAssistantAskUserEntries reads pending requests and submitted answers", () => {
+  const askUserInput = {
+    title: "确认方向",
+    questions: [
+      {
+        id: "tone",
+        prompt: "这段要偏什么语气？",
+        kind: "single_choice",
+        options: [
+          { id: "quiet", label: "克制" },
+          { id: "sharp", label: "锋利", description: "冲突更强" },
+        ],
+      },
+      {
+        id: "note",
+        prompt: "还有什么必须保留？",
+        kind: "free_text",
+      },
+    ],
+  } satisfies { title: string; questions: AssistantAskUserQuestion[] };
+  const answers = [
+    { questionId: "tone", type: "single_choice", optionId: "sharp" },
+    { questionId: "note", type: "free_text", text: "保留雨声。" },
+  ] satisfies AssistantAskUserAnswer[];
+  const assistantNode = {
+    ...baseNode,
+    id: "node_ask",
+    message: {
+      role: "assistant",
+      content: [
+        {
+          type: "tool-call",
+          toolCallId: "tool_ask",
+          toolName: "ask_user",
+          input: askUserInput,
+        },
+        {
+          type: "tool-approval-request",
+          approvalId: "approval_ask",
+          toolCallId: "tool_ask",
+        },
+      ],
+    },
+    parts: [
+      {
+        id: "part_call",
+        nodeId: "node_ask",
+        partIndex: 0,
+        partKind: "tool-call",
+        visibility: "internal",
+        state: "done",
+        providerOptions: null,
+        providerMetadata: null,
+        payload: {
+          type: "tool-call",
+          toolCallId: "tool_ask",
+          toolName: "ask_user",
+          input: askUserInput,
+        },
+        createdAt: 1,
+      },
+      {
+        id: "part_request",
+        nodeId: "node_ask",
+        partIndex: 1,
+        partKind: "tool-approval-request",
+        visibility: "internal",
+        state: "done",
+        providerOptions: null,
+        providerMetadata: null,
+        payload: {
+          type: "tool-approval-request",
+          approvalId: "approval_ask",
+          toolCallId: "tool_ask",
+        },
+        createdAt: 1,
+      },
+    ],
+  } as AgentThreadNodeView;
+  const toolNode = {
+    ...baseNode,
+    id: "node_answer",
+    parentNodeId: "node_ask",
+    role: "tool",
+    sourceKind: "tool_result",
+    message: {
+      role: "tool",
+      content: [
+        {
+          type: "tool-approval-response",
+          approvalId: "approval_ask",
+          approved: true,
+          reason: JSON.stringify({ answers }),
+        },
+      ],
+    },
+    parts: [
+      {
+        id: "part_response",
+        nodeId: "node_answer",
+        partIndex: 0,
+        partKind: "tool-approval-response",
+        visibility: "internal",
+        state: "done",
+        providerOptions: null,
+        providerMetadata: null,
+        payload: {
+          type: "tool-approval-response",
+          approvalId: "approval_ask",
+          approved: true,
+          reason: JSON.stringify({ answers }),
+        },
+        createdAt: 2,
+      },
+    ],
+  } as AgentThreadNodeView;
+
+  expect(getAssistantAskUserEntries([assistantNode], 0)).toEqual([
+    {
+      approvalId: "approval_ask",
+      toolCallId: "tool_ask",
+      title: "确认方向",
+      questions: askUserInput.questions,
+      answers: null,
+    },
+  ]);
+  expect(getAssistantAskUserEntries([assistantNode, toolNode], 0)).toEqual([
+    {
+      approvalId: "approval_ask",
+      toolCallId: "tool_ask",
+      title: "确认方向",
+      questions: askUserInput.questions,
+      answers,
     },
   ]);
 });
