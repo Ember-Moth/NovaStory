@@ -956,19 +956,21 @@ function AskUserInlineCard({
         {isSubmitting ? <span className="text-accent-foreground">提交中</span> : null}
       </div>
 
-      <div className="flex flex-col gap-2 p-2">
-        {entry.questions.map((question) => (
-          <AskUserQuestionBlock
-            key={question.id}
-            question={question}
-            answer={draftAnswers[question.id] ?? null}
-            resolved={isResolved}
-            onChange={(value) => updateAnswer(question, value)}
-          />
-        ))}
+      <div className="px-2.5">
+        <div className="divide-y divide-border/60">
+          {entry.questions.map((question) => (
+            <AskUserQuestionBlock
+              key={question.id}
+              question={question}
+              answer={draftAnswers[question.id] ?? null}
+              resolved={isResolved}
+              onChange={(value) => updateAnswer(question, value)}
+            />
+          ))}
+        </div>
 
         {!isResolved ? (
-          <div className="flex justify-end pt-0.5">
+          <div className="flex justify-end border-t border-border/60 py-2">
             <button
               type="button"
               disabled={!canSubmit || !isComplete || isSubmitting}
@@ -1003,11 +1005,14 @@ function AskUserQuestionBlock({
   onChange: (_value: string) => void;
 }) {
   return (
-    <section className="rounded-md border border-border/70 bg-sidebar-background px-2.5 py-2">
+    <section className="py-2.5 first:pt-2 last:pb-2">
       <div className="text-[12px] leading-5 text-foreground">{question.prompt}</div>
       {resolved ? (
-        <div className="mt-2 rounded-md border border-border/70 bg-editor-background px-2 py-1.5 text-[12px] leading-5 text-foreground-muted">
-          {formatAskUserAnswer(question, answer)}
+        <div className="mt-1.5 flex items-start gap-1.5 text-[12px] leading-5 text-foreground-muted">
+          <span className="mt-0.5 icon-[material-symbols--subdirectory-arrow-right] shrink-0 text-[14px] text-accent-foreground" />
+          <span className="min-w-0 flex-1 wrap-break-word whitespace-pre-wrap">
+            {formatAskUserAnswer(question, answer)}
+          </span>
         </div>
       ) : question.kind === "single_choice" ? (
         <div className="mt-2 flex flex-col gap-1.5">
