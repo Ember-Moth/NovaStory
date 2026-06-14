@@ -35,7 +35,7 @@ export type PendingAssistantAction =
   | {
       kind: "tool-input";
       runId: string;
-      approvalId: string;
+      toolCallId: string;
     };
 
 export const EMPTY_ASSISTANT_STATE: AssistantState = {
@@ -91,7 +91,6 @@ export type AssistantAskUserAnswer =
     };
 
 export interface AssistantAskUserEntry {
-  approvalId: string;
   toolCallId: string;
   title: string | null;
   questions: AssistantAskUserQuestion[];
@@ -573,21 +572,29 @@ function parseAskUserAnswer(input: unknown): AssistantAskUserAnswer | null {
     : null;
 }
 
-function parseAskUserAnswersFromReason(reason: string): AssistantAskUserAnswer[] | null {
-  try {
-    const parsed = JSON.parse(reason) as unknown;
-    if (!isRecord(parsed)) {
-      return null;
-    }
-    const rawAnswers = getRecordField(parsed, "answers");
-    if (!Array.isArray(rawAnswers)) {
-      return null;
-    }
-    const answers = rawAnswers.map(parseAskUserAnswer).filter(isNonNullable);
-    return answers.length === rawAnswers.length ? answers : null;
-  } catch {
+function unwrapToolOutput(output: unknown) {
+  if (!isRecord(output)) {
     return null;
   }
+  if (getRecordField(output, "type") === "json") {
+    const value = getRecordField(output, "value");
+    return isRecord(value) ? value : null;
+  }
+  return output;
+}
+
+function parseAskUserAnswersFromOutput(output: unknown): AssistantAskUserAnswer[] | null {
+  const unwrapped = unwrapToolOutput(output);
+  const data = unwrapped ? getRecordField(unwrapped, "data") : null;
+  if (!isRecord(data)) {
+    return null;
+  }
+  const rawAnswers = getRecordField(data, "answers");
+  if (!Array.isArray(rawAnswers)) {
+    return null;
+  }
+  const answers = rawAnswers.map(parseAskUserAnswer).filter(isNonNullable);
+  return answers.length === rawAnswers.length ? answers : null;
 }
 
 function getToolResultStatus(payload: unknown, partKind: "tool-result" | "tool-error") {
@@ -719,49 +726,24 @@ export function getAssistantAskUserEntries(
     return [];
   }
 
-  const requestByToolCallId = new Map<
-    string,
-    {
-      title: string | null;
-      questions: AssistantAskUserQuestion[];
-    }
-  >();
-
-  node.parts.forEach((part) => {
+  const entries: AssistantAskUserEntry[] = node.parts.flatMap((part) => {
     if (part.partKind !== "tool-call") {
-      return;
+      return [];
     }
     const toolName = getToolPayloadString(part.payload, "toolName");
     const toolCallId = getToolPayloadString(part.payload, "toolCallId");
     if (toolName !== "ask_user" || !toolCallId) {
-      return;
+      return [];
     }
     const input = parseAskUserInput(getToolPayloadField(part.payload, "input"));
     if (!input) {
-      return;
-    }
-    requestByToolCallId.set(toolCallId, input);
-  });
-
-  const entries: AssistantAskUserEntry[] = node.parts.flatMap((part) => {
-    if (part.partKind !== "tool-approval-request") {
-      return [];
-    }
-    const approvalId = getToolPayloadString(part.payload, "approvalId");
-    const toolCallId = getToolPayloadString(part.payload, "toolCallId");
-    if (!approvalId || !toolCallId) {
-      return [];
-    }
-    const request = requestByToolCallId.get(toolCallId);
-    if (!request) {
       return [];
     }
     return [
       {
-        approvalId,
         toolCallId,
-        title: request.title,
-        questions: request.questions,
+        title: input.title,
+        questions: input.questions,
         answers: null,
       } satisfies AssistantAskUserEntry,
     ];
@@ -771,27 +753,26 @@ export function getAssistantAskUserEntries(
     return entries;
   }
 
-  const entryByApprovalId = new Map(entries.map((entry) => [entry.approvalId, entry]));
+  const entryByToolCallId = new Map(entries.map((entry) => [entry.toolCallId, entry]));
   for (let index = messageIndex + 1; index < messages.length; index += 1) {
     const toolNode = messages[index];
     if (!toolNode || toolNode.role !== "tool") {
       break;
     }
     toolNode.parts.forEach((part) => {
-      if (part.partKind !== "tool-approval-response") {
+      if (part.partKind !== "tool-result") {
         return;
       }
-      const approvalId = getToolPayloadString(part.payload, "approvalId");
-      const approved = getRecordField(part.payload, "approved");
-      const reason = getToolPayloadString(part.payload, "reason");
-      if (!approvalId || approved !== true || !reason) {
+      const toolName = getToolPayloadString(part.payload, "toolName");
+      const toolCallId = getToolPayloadString(part.payload, "toolCallId");
+      if (toolName !== "ask_user" || !toolCallId) {
         return;
       }
-      const entry = entryByApprovalId.get(approvalId);
+      const entry = entryByToolCallId.get(toolCallId);
       if (!entry || entry.answers != null) {
         return;
       }
-      entry.answers = parseAskUserAnswersFromReason(reason);
+      entry.answers = parseAskUserAnswersFromOutput(getToolPayloadField(part.payload, "output"));
     });
   }
 

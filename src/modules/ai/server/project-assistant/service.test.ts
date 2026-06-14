@@ -1124,21 +1124,6 @@ test("submitProjectAssistantToolInput resumes the same waiting run with continuo
               },
             },
             {
-              type: "tool-approval-request",
-              stepNumber: 0,
-              approvalRequest: {
-                type: "tool-approval-request",
-                approvalId: "approval_ask",
-                toolCallId: "tool_ask",
-                toolCall: {
-                  type: "tool-call",
-                  toolCallId: "tool_ask",
-                  toolName: "ask_user",
-                  input: questionInput,
-                },
-              },
-            },
-            {
               type: "finish-step",
               stepNumber: 0,
               finishReason: "tool-calls",
@@ -1169,11 +1154,6 @@ test("submitProjectAssistantToolInput resumes the same waiting run with continuo
                         toolName: "ask_user",
                         input: questionInput,
                       },
-                      {
-                        type: "tool-approval-request",
-                        approvalId: "approval_ask",
-                        toolCallId: "tool_ask",
-                      },
                     ],
                   },
                 ],
@@ -1194,39 +1174,28 @@ test("submitProjectAssistantToolInput resumes the same waiting run with continuo
       }
 
       const resumedMessages = input.messages as Array<{ role?: string; content?: unknown }>;
-      expect(JSON.stringify(resumedMessages)).toContain("tool-approval-response");
-      expect(resumedMessages.at(-1)?.role).toBe("tool");
-      expect(JSON.stringify(resumedMessages.at(-1))).toContain("tool-approval-response");
-      const approvalAssistantIndex = resumedMessages.findIndex(
+      expect(JSON.stringify(resumedMessages)).toContain("tool-result");
+      expect(JSON.stringify(resumedMessages)).not.toContain("tool-approval");
+      expect(
+        resumedMessages.some(
+          (message) =>
+            message.role === "tool" &&
+            JSON.stringify(message.content).includes('"toolCallId":"tool_ask"') &&
+            JSON.stringify(message.content).includes('"optionId":"quiet"'),
+        ),
+      ).toBe(true);
+      const askAssistantIndex = resumedMessages.findIndex(
         (message) =>
-          message.role === "assistant" &&
-          JSON.stringify(message.content).includes("tool-approval-request"),
+          message.role === "assistant" && JSON.stringify(message.content).includes("ask_user"),
       );
       const contextMessageIndex = resumedMessages.findIndex(
         (message) =>
           message.role === "user" && JSON.stringify(message.content).includes("当前编辑器"),
       );
       expect(contextMessageIndex).toBeGreaterThan(-1);
-      expect(approvalAssistantIndex).toBeGreaterThan(contextMessageIndex);
+      expect(askAssistantIndex).toBeGreaterThan(-1);
       return createMockStream({
         chunks: [
-          {
-            type: "tool-result",
-            stepNumber: 0,
-            toolResult: {
-              type: "tool-result",
-              toolCallId: "tool_ask",
-              toolName: "ask_user",
-              input: questionInput,
-              output: {
-                ok: true,
-                truncated: false,
-                data: {
-                  answers: [{ questionId: "tone", type: "single_choice", optionId: "quiet" }],
-                },
-              },
-            },
-          },
           { type: "start-step", stepNumber: 0 },
           { type: "text-delta", stepNumber: 0, delta: "按安静的气质继续。" },
           {
@@ -1259,21 +1228,7 @@ test("submitProjectAssistantToolInput resumes the same waiting run with continuo
             },
             providerMetadata: {},
             toolCalls: [],
-            toolResults: [
-              {
-                type: "tool-result",
-                toolCallId: "tool_ask",
-                toolName: "ask_user",
-                input: questionInput,
-                output: {
-                  ok: true,
-                  truncated: false,
-                  data: {
-                    answers: [{ questionId: "tone", type: "single_choice", optionId: "quiet" }],
-                  },
-                },
-              },
-            ],
+            toolResults: [],
           },
         ],
       })();
@@ -1297,14 +1252,20 @@ test("submitProjectAssistantToolInput resumes the same waiting run with continuo
 
   expect(waiting.run.status).toBe("waiting_for_input");
   expect(
-    waiting.assistantNode?.parts.some((part) => part.partKind === "tool-approval-request"),
+    waiting.assistantNode?.parts.some(
+      (part) =>
+        part.partKind === "tool-call" &&
+        part.payload != null &&
+        typeof part.payload === "object" &&
+        Reflect.get(part.payload, "toolName") === "ask_user",
+    ),
   ).toBe(true);
 
   const resumed = await service.submitProjectAssistantToolInput({
     projectId: "assistant_submit_tool_input",
     threadId: thread.id,
     runId: waiting.run.id,
-    approvalId: "approval_ask",
+    toolCallId: "tool_ask",
     answers: [{ questionId: "tone", type: "single_choice", optionId: "quiet" }],
   });
   const trace = service.getRunTrace(waiting.run.id);
@@ -1316,17 +1277,23 @@ test("submitProjectAssistantToolInput resumes the same waiting run with continuo
     "user",
     "assistant",
     "tool",
-    "tool",
     "assistant",
   ]);
   expect(
     resumed.state.activePath.some((node) =>
       node.parts.some((part) => part.partKind === "tool-approval-request"),
     ),
-  ).toBe(true);
+  ).toBe(false);
   expect(
     resumed.state.activePath.some((node) =>
-      node.parts.some((part) => part.partKind === "tool-approval-response"),
+      node.parts.some(
+        (part) =>
+          part.partKind === "tool-result" &&
+          part.payload != null &&
+          typeof part.payload === "object" &&
+          Reflect.get(part.payload, "toolName") === "ask_user" &&
+          Reflect.get(part.payload, "toolCallId") === "tool_ask",
+      ),
     ),
   ).toBe(true);
   expect(resumed.state.activePath.at(-1)?.summaryText).toContain("按安静的气质继续");

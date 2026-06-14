@@ -2,7 +2,6 @@ import {
   appendAssistantReasoningDelta,
   appendAssistantReasoningPart,
   appendAssistantTextDelta,
-  appendAssistantToolApprovalRequestPart,
   appendAssistantToolCallPart,
   appendRunEvent,
   assignThreadNodeSourceStepIds,
@@ -31,7 +30,7 @@ import type {
 import { PROJECT_ASSISTANT_WRITE_TOOL_NAMES } from "@/modules/ai/domain/types";
 import { getDefaultWorkspace } from "@/modules/workspace/domain";
 
-import { ASK_USER_TOOL_NAME } from "../assistant-tools/ask-user";
+import { ASK_USER_TOOL_NAME, normalizeAskUserInput } from "../assistant-tools/ask-user";
 import { normalizeError } from "./runtime";
 import type {
   GeneratedAssistantStep,
@@ -480,7 +479,6 @@ export async function executeProjectAssistantRun<TResult>({
   const stepIndexOffset = prepared.stepIndexOffset ?? 0;
   let pendingUserInputRequest: {
     assistantNodeId: string;
-    approvalId: string;
     toolCallId: string;
     input: unknown;
   } | null = null;
@@ -635,6 +633,19 @@ export async function executeProjectAssistantRun<TResult>({
       }
 
       if (chunk.type === "tool-call") {
+        const toolCallId =
+          typeof Reflect.get(chunk.toolCall, "toolCallId") === "string"
+            ? (Reflect.get(chunk.toolCall, "toolCallId") as string)
+            : null;
+        const toolName =
+          typeof Reflect.get(chunk.toolCall, "toolName") === "string"
+            ? (Reflect.get(chunk.toolCall, "toolName") as string)
+            : "tool";
+
+        if (pendingUserInputRequest) {
+          throw new Error("提问工具正在等待用户回答，不能继续调用其他工具。");
+        }
+
         if (!currentAssistantNode) {
           currentAssistantNode = ensureCurrentAssistantNode({
             prepared,
@@ -646,6 +657,59 @@ export async function executeProjectAssistantRun<TResult>({
           });
           currentParentId = currentAssistantNode.id;
           lastAssistantNode = currentAssistantNode;
+        }
+
+        if (toolName === ASK_USER_TOOL_NAME) {
+          if (!toolCallId) {
+            throw new Error("提问工具缺少 toolCallId。");
+          }
+          if (
+            currentStepRuntime.toolCalls.length > 0 ||
+            currentStepRuntime.toolResults.length > 0
+          ) {
+            throw new Error("提问工具必须单独调用；请把问题合并到一次 ask_user 调用。");
+          }
+          const request = normalizeAskUserInput(Reflect.get(chunk.toolCall, "input"));
+          appendAssistantToolCallPart({
+            nodeId: currentAssistantNode.id,
+            toolCall: chunk.toolCall,
+          });
+          currentStepRuntime.toolCalls.push(chunk.toolCall);
+          pendingUserInputRequest = {
+            assistantNodeId: currentAssistantNode.id,
+            toolCallId,
+            input: request,
+          };
+          const payloadArtifact = createArtifact({
+            runId: prepared.run.id,
+            artifactKind: "tool-input",
+            visibility: "internal",
+            content: chunk.toolCall,
+            summaryText: "等待用户回答",
+          });
+          appendRunEvent({
+            runId: prepared.run.id,
+            eventKind: "user-input-requested",
+            nodeId: currentAssistantNode.id,
+            relatedToolCallId: toolCallId,
+            summaryText: "等待用户回答",
+            payloadArtifactId: payloadArtifact.id,
+          });
+          relay.emit({
+            type: "tool-call",
+            assistantNodeId: currentAssistantNode.id,
+            toolCallId,
+            toolName,
+            input: request,
+          });
+          relay.emit({
+            type: "user-input-requested",
+            assistantNodeId: currentAssistantNode.id,
+            toolCallId,
+            toolName: ASK_USER_TOOL_NAME,
+            input: request,
+          });
+          continue;
         }
 
         appendAssistantToolCallPart({
@@ -656,93 +720,21 @@ export async function executeProjectAssistantRun<TResult>({
         relay.emit({
           type: "tool-call",
           assistantNodeId: currentAssistantNode.id,
-          toolCallId:
-            typeof Reflect.get(chunk.toolCall, "toolCallId") === "string"
-              ? (Reflect.get(chunk.toolCall, "toolCallId") as string)
-              : null,
-          toolName:
-            typeof Reflect.get(chunk.toolCall, "toolName") === "string"
-              ? (Reflect.get(chunk.toolCall, "toolName") as string)
-              : "tool",
+          toolCallId,
+          toolName,
           input: Reflect.get(chunk.toolCall, "input") ?? null,
         });
         continue;
       }
 
       if (chunk.type === "tool-approval-request") {
-        if (!currentAssistantNode) {
-          currentAssistantNode = ensureCurrentAssistantNode({
-            prepared,
-            stepRuntime: currentStepRuntime,
-            currentParentId,
-            relay: relay as BufferedEventRelay<unknown>,
-            stepNumber,
-            assistantTextByNodeId,
-          });
-          currentParentId = currentAssistantNode.id;
-          lastAssistantNode = currentAssistantNode;
-        }
-
-        const approvalId = Reflect.get(chunk.approvalRequest, "approvalId");
-        const toolCall = Reflect.get(chunk.approvalRequest, "toolCall");
-        const toolCallRecord =
-          toolCall && typeof toolCall === "object" ? (toolCall as Record<string, unknown>) : null;
-        const toolCallId =
-          typeof Reflect.get(chunk.approvalRequest, "toolCallId") === "string"
-            ? (Reflect.get(chunk.approvalRequest, "toolCallId") as string)
-            : typeof Reflect.get(toolCallRecord ?? {}, "toolCallId") === "string"
-              ? (Reflect.get(toolCallRecord ?? {}, "toolCallId") as string)
-              : null;
-        const toolName =
-          typeof Reflect.get(toolCallRecord ?? {}, "toolName") === "string"
-            ? (Reflect.get(toolCallRecord ?? {}, "toolName") as string)
-            : null;
-        if (typeof approvalId !== "string" || !toolCallId || toolName !== ASK_USER_TOOL_NAME) {
-          throw new Error("收到不支持的工具审批请求。");
-        }
-
-        currentAssistantNode = appendAssistantToolApprovalRequestPart({
-          nodeId: currentAssistantNode.id,
-          approvalRequest: {
-            ...chunk.approvalRequest,
-            approvalId,
-            toolCallId,
-          },
-        });
-        lastAssistantNode = currentAssistantNode;
-        pendingUserInputRequest = {
-          assistantNodeId: currentAssistantNode.id,
-          approvalId,
-          toolCallId,
-          input: Reflect.get(toolCallRecord ?? {}, "input") ?? null,
-        };
-        const payloadArtifact = createArtifact({
-          runId: prepared.run.id,
-          artifactKind: "tool-input",
-          visibility: "internal",
-          content: chunk.approvalRequest,
-          summaryText: "等待用户回答",
-        });
-        appendRunEvent({
-          runId: prepared.run.id,
-          eventKind: "user-input-requested",
-          nodeId: currentAssistantNode.id,
-          relatedToolCallId: toolCallId,
-          summaryText: "等待用户回答",
-          payloadArtifactId: payloadArtifact.id,
-        });
-        relay.emit({
-          type: "user-input-requested",
-          assistantNodeId: currentAssistantNode.id,
-          approvalId,
-          toolCallId,
-          toolName: ASK_USER_TOOL_NAME,
-          input: pendingUserInputRequest.input,
-        });
-        continue;
+        throw new Error("当前项目助手不支持工具审批请求。");
       }
 
       if (chunk.type === "tool-result") {
+        if (pendingUserInputRequest) {
+          throw new Error("提问工具正在等待用户回答，不能继续接收其他工具结果。");
+        }
         const toolNode = createStreamingToolResultNode({
           threadId: prepared.thread.id,
           parentNodeId: currentParentId,

@@ -501,7 +501,7 @@ export function useAiAssistantController(
   const retryMessageStream = rpc.useStreamMutation("ai.retryProjectAssistantMessageStream");
   const continueRunStream = rpc.useStreamMutation("ai.continueProjectAssistantRunStream");
   const submitToolInputStream = rpc.useStreamMutation("ai.submitProjectAssistantToolInputStream");
-  const [submittingToolInputApprovalId, setSubmittingToolInputApprovalId] = useState<string | null>(
+  const [submittingToolInputToolCallId, setSubmittingToolInputToolCallId] = useState<string | null>(
     null,
   );
   const [submittedToolInputAnswers, setSubmittedToolInputAnswers] = useState<
@@ -589,7 +589,7 @@ export function useAiAssistantController(
   }, [activeThreadId, expectedActiveThreadId]);
 
   useEffect(() => {
-    setSubmittingToolInputApprovalId(null);
+    setSubmittingToolInputToolCallId(null);
     setSubmittedToolInputAnswers({});
   }, [activeThreadId]);
 
@@ -946,18 +946,18 @@ export function useAiAssistantController(
   );
 
   const handleSubmitToolInput = useCallback(
-    async (approvalId: string, answers: AssistantAskUserAnswer[]) => {
+    async (toolCallId: string, answers: AssistantAskUserAnswer[]) => {
       if (!activeThreadId || !pendingRun || pendingRun.status !== "waiting_for_input") {
         return;
       }
 
       setComposerError(null);
-      setSubmittingToolInputApprovalId(approvalId);
+      setSubmittingToolInputToolCallId(toolCallId);
       setSubmittedToolInputAnswers((current) => ({
         ...current,
-        [approvalId]: answers,
+        [toolCallId]: answers,
       }));
-      setPendingAction({ kind: "tool-input", runId: pendingRun.id, approvalId });
+      setPendingAction({ kind: "tool-input", runId: pendingRun.id, toolCallId });
       setActiveStream(
         createStreamOverlay({
           kind: "tool-input",
@@ -972,7 +972,7 @@ export function useAiAssistantController(
             projectId,
             threadId: activeThreadId,
             runId: pendingRun.id,
-            approvalId,
+            toolCallId,
             answers,
           },
           {
@@ -1003,7 +1003,7 @@ export function useAiAssistantController(
         }
         setSubmittedToolInputAnswers((current) => {
           const next = { ...current };
-          delete next[approvalId];
+          delete next[toolCallId];
           return next;
         });
         const message = error instanceof Error ? error.message : "提交回答失败。";
@@ -1020,7 +1020,7 @@ export function useAiAssistantController(
         );
         void assistantOverviewQuery.refetch();
       } finally {
-        setSubmittingToolInputApprovalId(null);
+        setSubmittingToolInputToolCallId(null);
         setPendingAction(null);
       }
     },
@@ -1242,7 +1242,7 @@ export function useAiAssistantController(
     setDraft,
     setDraftMentionCount,
     submittedToolInputAnswers,
-    submittingToolInputApprovalId,
+    submittingToolInputToolCallId,
     showArchivedThreads,
     setShowArchivedThreads,
     showEmptyState,

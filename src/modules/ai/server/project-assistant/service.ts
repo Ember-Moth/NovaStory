@@ -282,13 +282,13 @@ export function createProjectAssistantService(
       projectId,
       threadId,
       runId,
-      approvalId,
+      toolCallId,
       answers,
     }: {
       projectId: string;
       threadId: string;
       runId: string;
-      approvalId: string;
+      toolCallId: string;
       answers: readonly AskUserAnswer[];
     }) {
       return startExecution(
@@ -296,7 +296,7 @@ export function createProjectAssistantService(
           projectId,
           threadId,
           runId,
-          approvalId,
+          toolCallId,
           answers,
         }),
       );
@@ -386,7 +386,7 @@ export function createProjectAssistantService(
       projectId: string;
       threadId: string;
       runId: string;
-      approvalId: string;
+      toolCallId: string;
       answers: readonly AskUserAnswer[];
     }): Promise<ProjectAssistantSubmitToolInputResult> {
       return this.submitProjectAssistantToolInputStream(args).finalResult;

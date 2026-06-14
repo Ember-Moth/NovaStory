@@ -554,21 +554,21 @@ function AiSidebarMessagesContent({
                   {askUserEntries.map((entry) => {
                     const submittedAnswers =
                       entry.answers ??
-                      controller.submittedToolInputAnswers[entry.approvalId] ??
+                      controller.submittedToolInputAnswers[entry.toolCallId] ??
                       null;
                     return (
                       <AskUserInlineCard
-                        key={entry.approvalId}
+                        key={entry.toolCallId}
                         entry={entry}
                         submittedAnswers={submittedAnswers}
-                        isSubmitting={controller.submittingToolInputApprovalId === entry.approvalId}
+                        isSubmitting={controller.submittingToolInputToolCallId === entry.toolCallId}
                         canSubmit={
                           controller.isWaitingForInput &&
                           submittedAnswers == null &&
                           controller.pendingRun?.id != null
                         }
                         onSubmit={(answers) =>
-                          void controller.handleSubmitToolInput(entry.approvalId, answers)
+                          void controller.handleSubmitToolInput(entry.toolCallId, answers)
                         }
                       />
                     );

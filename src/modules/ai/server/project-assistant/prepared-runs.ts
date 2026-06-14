@@ -4,7 +4,7 @@ import {
   createArtifact,
   createReplacementNode,
   createRun,
-  createToolApprovalResponseNode,
+  createStreamingToolResultNode,
   getLatestRunForTriggerNode,
   getRunTrace,
   getThreadView,
@@ -33,7 +33,7 @@ import type {
 import {
   ASK_USER_TOOL_NAME,
   type AskUserAnswer,
-  validateAskUserApprovalSubmission,
+  validateAskUserSubmission,
 } from "../assistant-tools/ask-user";
 import {
   buildProjectAssistantSystemPrompt,
@@ -72,28 +72,13 @@ function getPayloadRecord(part: AgentThreadNodeView["parts"][number]) {
     : null;
 }
 
-function findAskUserApprovalRequest(input: {
+function findAskUserToolCall(input: {
   activePath: readonly AgentThreadNodeView[];
   runId: string;
-  approvalId: string;
+  toolCallId: string;
 }) {
   for (const node of input.activePath) {
     if (node.role !== "assistant" || node.createdByRunId !== input.runId) {
-      continue;
-    }
-
-    const approvalPart = node.parts.find((part) => {
-      const payload = getPayloadRecord(part);
-      return (
-        part.partKind === "tool-approval-request" &&
-        payload?.type === "tool-approval-request" &&
-        payload.approvalId === input.approvalId
-      );
-    });
-    const approvalPayload = approvalPart ? getPayloadRecord(approvalPart) : null;
-    const toolCallId =
-      typeof approvalPayload?.toolCallId === "string" ? approvalPayload.toolCallId : null;
-    if (!toolCallId) {
       continue;
     }
 
@@ -102,7 +87,7 @@ function findAskUserApprovalRequest(input: {
       return (
         part.partKind === "tool-call" &&
         payload?.type === "tool-call" &&
-        payload.toolCallId === toolCallId &&
+        payload.toolCallId === input.toolCallId &&
         payload.toolName === ASK_USER_TOOL_NAME
       );
     });
@@ -113,7 +98,7 @@ function findAskUserApprovalRequest(input: {
 
     return {
       assistantNode: node,
-      toolCallId,
+      toolCallId: input.toolCallId,
       request: toolCallPayload.input,
     };
   }
@@ -121,17 +106,18 @@ function findAskUserApprovalRequest(input: {
   return null;
 }
 
-function assertApprovalNotAnswered(input: {
+function assertToolCallNotAnswered(input: {
   activePath: readonly AgentThreadNodeView[];
-  approvalId: string;
+  toolCallId: string;
 }) {
   const answered = input.activePath.some((node) =>
     node.parts.some((part) => {
       const payload = getPayloadRecord(part);
       return (
-        part.partKind === "tool-approval-response" &&
-        payload?.type === "tool-approval-response" &&
-        payload.approvalId === input.approvalId
+        part.partKind === "tool-result" &&
+        payload?.type === "tool-result" &&
+        payload.toolCallId === input.toolCallId &&
+        payload.toolName === ASK_USER_TOOL_NAME
       );
     }),
   );
@@ -448,13 +434,13 @@ export function buildSubmitToolInputRun({
   projectId,
   threadId,
   runId,
-  approvalId,
+  toolCallId,
   answers,
 }: {
   projectId: string;
   threadId: string;
   runId: string;
-  approvalId: string;
+  toolCallId: string;
   answers: readonly AskUserAnswer[];
 }): PreparedProjectAssistantRun<ProjectAssistantSubmitToolInputResult> {
   const threadView = getThreadView(threadId);
@@ -473,28 +459,32 @@ export function buildSubmitToolInputRun({
   const activeTip = threadView.activePath.at(-1);
   invariant(activeTip?.id === activeTipNodeId, "当前 active tip 不在 active path 上。");
   invariant(activeTip.createdByRunId === waitingRun.id, "只能回答当前 active path 上的提问。");
-  assertApprovalNotAnswered({ activePath: threadView.activePath, approvalId });
+  assertToolCallNotAnswered({ activePath: threadView.activePath, toolCallId });
 
-  const pending = findAskUserApprovalRequest({
+  const pending = findAskUserToolCall({
     activePath: threadView.activePath,
     runId: waitingRun.id,
-    approvalId,
+    toolCallId,
   });
   invariant(pending, "未找到待回答的提问工具调用。");
   invariant(pending.assistantNode.id === activeTipNodeId, "只能回答当前最新的提问。");
 
-  const validated = validateAskUserApprovalSubmission({
+  const validated = validateAskUserSubmission({
     request: pending.request,
     answers,
   });
-  const responseNode = createToolApprovalResponseNode({
+  const responseNode = createStreamingToolResultNode({
     threadId: thread.id,
     parentNodeId: activeTipNodeId,
     runId: waitingRun.id,
-    approvalResponse: {
-      approvalId,
-      approved: true,
-      reason: validated.reason,
+    toolResult: {
+      type: "tool-result",
+      toolCallId,
+      toolName: ASK_USER_TOOL_NAME,
+      output: {
+        type: "json",
+        value: validated.output,
+      },
     },
   });
   const payloadArtifact = createArtifact({
@@ -502,7 +492,7 @@ export function buildSubmitToolInputRun({
     artifactKind: "tool-output",
     visibility: "internal",
     content: {
-      approvalId,
+      toolCallId,
       answers: validated.answers,
     },
     summaryText: "用户已回答提问",
@@ -559,7 +549,7 @@ export function buildSubmitToolInputRun({
     runStartedEvent: {
       type: "user-input-submitted",
       toolNodeId: responseNode.id,
-      approvalId,
+      toolCallId,
     },
     buildFinalResult: ({ run: completedRun, lastAssistantNode }) => ({
       thread: getThreadView(thread.id).thread!,

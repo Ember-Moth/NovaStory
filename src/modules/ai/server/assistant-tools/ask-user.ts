@@ -1,7 +1,6 @@
-import { jsonSchema, tool, type ModelMessage } from "ai";
+import { jsonSchema, tool } from "ai";
 
 import type { ToolBuildContext } from "./context";
-import { withEnvelope } from "./envelope";
 import type { InteractionToolName } from "./tool-names";
 
 export const ASK_USER_TOOL_NAME = "ask_user";
@@ -42,7 +41,8 @@ export type AskUserAnswer =
       text: string;
     };
 
-export interface AskUserAnswerPayload {
+export interface AskUserOutput {
+  request: AskUserInput;
   answers: AskUserAnswer[];
 }
 
@@ -201,96 +201,11 @@ export function normalizeAskUserAnswers({
   return normalized;
 }
 
-export function encodeAskUserApprovalReason(payload: AskUserAnswerPayload) {
-  return JSON.stringify(payload);
-}
-
-export function decodeAskUserApprovalReason(reason: string): AskUserAnswerPayload {
-  const parsed = JSON.parse(reason) as unknown;
-  const record = requireRecord(parsed, "提问答案");
-  if (!Array.isArray(record.answers)) {
-    throw new Error("提问答案缺少 answers。");
-  }
-  return { answers: record.answers as AskUserAnswer[] };
-}
-
-function getMessageParts(message: ModelMessage): unknown[] {
-  const content = (message as { content?: unknown }).content;
-  return Array.isArray(content) ? content : [];
-}
-
-function findApprovalIdForToolCall(messages: readonly ModelMessage[], toolCallId: string) {
-  for (const message of messages) {
-    if (message.role !== "assistant") {
-      continue;
-    }
-    for (const part of getMessageParts(message)) {
-      if (!part || typeof part !== "object") {
-        continue;
-      }
-      if (
-        Reflect.get(part, "type") === "tool-approval-request" &&
-        Reflect.get(part, "toolCallId") === toolCallId
-      ) {
-        const approvalId = Reflect.get(part, "approvalId");
-        if (typeof approvalId === "string") {
-          return approvalId;
-        }
-      }
-    }
-  }
-  return null;
-}
-
-function findApprovalReason(messages: readonly ModelMessage[], approvalId: string) {
-  for (const message of [...messages].reverse()) {
-    if (message.role !== "tool") {
-      continue;
-    }
-    for (const part of [...getMessageParts(message)].reverse()) {
-      if (!part || typeof part !== "object") {
-        continue;
-      }
-      if (
-        Reflect.get(part, "type") === "tool-approval-response" &&
-        Reflect.get(part, "approvalId") === approvalId &&
-        Reflect.get(part, "approved") === true
-      ) {
-        const reason = Reflect.get(part, "reason");
-        return typeof reason === "string" ? reason : null;
-      }
-    }
-  }
-  return null;
-}
-
-export function extractAskUserAnswersFromMessages({
-  messages,
-  toolCallId,
-  request,
-}: {
-  messages: readonly ModelMessage[];
-  toolCallId: string;
-  request: AskUserInput;
-}) {
-  const approvalId = findApprovalIdForToolCall(messages, toolCallId);
-  if (!approvalId) {
-    throw new Error("未找到提问工具的 approval request。");
-  }
-  const reason = findApprovalReason(messages, approvalId);
-  if (!reason) {
-    throw new Error("未找到用户提交的提问答案。");
-  }
-  const decoded = decodeAskUserApprovalReason(reason);
-  return normalizeAskUserAnswers({ request, answers: decoded.answers });
-}
-
 export function buildInteractionTools(_ctx: ToolBuildContext) {
   return {
     ask_user: tool({
       description:
         "当继续写作或修改项目之前必须让用户做选择或补充信息时使用。一次性提出 1 到 8 个问题；每个问题只能是单选或自由文本。不要用普通文本伪装结构化提问。",
-      needsApproval: true,
       inputSchema: jsonSchema<AskUserInput>({
         type: "object",
         required: ["questions"],
@@ -348,42 +263,27 @@ export function buildInteractionTools(_ctx: ToolBuildContext) {
           },
         },
       }),
-      execute: async (rawInput, options) => {
-        const request = normalizeAskUserInput(rawInput);
-        return withEnvelope(
-          () => {
-            const toolCallId = options?.toolCallId;
-            const messages = options?.messages;
-            if (!toolCallId || !messages) {
-              throw new Error("提问工具缺少恢复上下文。");
-            }
-            const answers = extractAskUserAnswersFromMessages({
-              messages,
-              toolCallId,
-              request,
-            });
-            return {
-              ok: true,
-              truncated: false,
-              data: {
-                request,
-                answers,
-              },
-            };
-          },
-          () => ({ toolName: ASK_USER_TOOL_NAME }),
-        );
-      },
     }),
   } satisfies Record<InteractionToolName, unknown>;
 }
 
-export function validateAskUserApprovalSubmission(input: { request: unknown; answers: unknown }) {
+export function buildAskUserAnswerOutput(input: AskUserOutput) {
+  return {
+    ok: true,
+    truncated: false,
+    data: {
+      request: input.request,
+      answers: [...input.answers],
+    },
+  };
+}
+
+export function validateAskUserSubmission(input: { request: unknown; answers: unknown }) {
   const request = normalizeAskUserInput(input.request);
   const answers = normalizeAskUserAnswers({ request, answers: input.answers });
   return {
     request,
     answers,
-    reason: encodeAskUserApprovalReason({ answers }),
+    output: buildAskUserAnswerOutput({ request, answers }),
   };
 }

@@ -519,7 +519,6 @@ export type ProjectAssistantStreamEvent =
   | {
       type: "user-input-requested";
       assistantNodeId: string;
-      approvalId: string;
       toolCallId: string;
       toolName: "ask_user";
       input: unknown;
@@ -527,7 +526,7 @@ export type ProjectAssistantStreamEvent =
   | {
       type: "user-input-submitted";
       toolNodeId: string;
-      approvalId: string;
+      toolCallId: string;
     }
   | {
       type: "step-finished";

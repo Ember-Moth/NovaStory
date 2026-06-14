@@ -164,11 +164,6 @@ test("getAssistantAskUserEntries reads pending requests and submitted answers", 
           toolName: "ask_user",
           input: askUserInput,
         },
-        {
-          type: "tool-approval-request",
-          approvalId: "approval_ask",
-          toolCallId: "tool_ask",
-        },
       ],
     },
     parts: [
@@ -189,24 +184,8 @@ test("getAssistantAskUserEntries reads pending requests and submitted answers", 
         },
         createdAt: 1,
       },
-      {
-        id: "part_request",
-        nodeId: "node_ask",
-        partIndex: 1,
-        partKind: "tool-approval-request",
-        visibility: "internal",
-        state: "done",
-        providerOptions: null,
-        providerMetadata: null,
-        payload: {
-          type: "tool-approval-request",
-          approvalId: "approval_ask",
-          toolCallId: "tool_ask",
-        },
-        createdAt: 1,
-      },
     ],
-  } as AgentThreadNodeView;
+  } as unknown as AgentThreadNodeView;
   const toolNode = {
     ...baseNode,
     id: "node_answer",
@@ -217,37 +196,56 @@ test("getAssistantAskUserEntries reads pending requests and submitted answers", 
       role: "tool",
       content: [
         {
-          type: "tool-approval-response",
-          approvalId: "approval_ask",
-          approved: true,
-          reason: JSON.stringify({ answers }),
+          type: "tool-result",
+          toolCallId: "tool_ask",
+          toolName: "ask_user",
+          output: {
+            type: "json",
+            value: {
+              ok: true,
+              truncated: false,
+              data: {
+                request: askUserInput,
+                answers,
+              },
+            },
+          },
         },
       ],
     },
     parts: [
       {
-        id: "part_response",
+        id: "part_result",
         nodeId: "node_answer",
         partIndex: 0,
-        partKind: "tool-approval-response",
+        partKind: "tool-result",
         visibility: "internal",
         state: "done",
         providerOptions: null,
         providerMetadata: null,
         payload: {
-          type: "tool-approval-response",
-          approvalId: "approval_ask",
-          approved: true,
-          reason: JSON.stringify({ answers }),
+          type: "tool-result",
+          toolCallId: "tool_ask",
+          toolName: "ask_user",
+          output: {
+            type: "json",
+            value: {
+              ok: true,
+              truncated: false,
+              data: {
+                request: askUserInput,
+                answers,
+              },
+            },
+          },
         },
         createdAt: 2,
       },
     ],
-  } as AgentThreadNodeView;
+  } as unknown as AgentThreadNodeView;
 
   expect(getAssistantAskUserEntries([assistantNode], 0)).toEqual([
     {
-      approvalId: "approval_ask",
       toolCallId: "tool_ask",
       title: "确认方向",
       questions: askUserInput.questions,
@@ -256,7 +254,6 @@ test("getAssistantAskUserEntries reads pending requests and submitted answers", 
   ]);
   expect(getAssistantAskUserEntries([assistantNode, toolNode], 0)).toEqual([
     {
-      approvalId: "approval_ask",
       toolCallId: "tool_ask",
       title: "确认方向",
       questions: askUserInput.questions,

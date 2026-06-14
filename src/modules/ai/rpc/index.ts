@@ -183,7 +183,7 @@ interface SubmitProjectAssistantToolInputInput {
   projectId: string;
   threadId: string;
   runId: string;
-  approvalId: string;
+  toolCallId: string;
   answers: AskUserAnswer[];
 }
 
@@ -1193,13 +1193,13 @@ export const submitProjectAssistantToolInput = mutation<
   SubmitProjectAssistantToolInputInput,
   ProjectAssistantSubmitToolInputResult,
   RpcTagList
->(async ({ projectId, threadId, runId, approvalId, answers }, ctx) => {
+>(async ({ projectId, threadId, runId, toolCallId, answers }, ctx) => {
   try {
     const result = await getProjectAssistantService().submitProjectAssistantToolInput({
       projectId,
       threadId,
       runId,
-      approvalId,
+      toolCallId,
       answers,
     });
     invalidateProjectAiState(ctx, projectId, {
@@ -1222,12 +1222,12 @@ export const submitProjectAssistantToolInputStream = stream<
   ProjectAssistantSubmitToolInputResult,
   RpcTagList
 >({
-  handler: async ({ projectId, threadId, runId, approvalId, answers }, ctx) => {
+  handler: async ({ projectId, threadId, runId, toolCallId, answers }, ctx) => {
     const execution = getProjectAssistantService().submitProjectAssistantToolInputStream({
       projectId,
       threadId,
       runId,
-      approvalId,
+      toolCallId,
       answers,
     });
     const unsubscribe = execution.subscribe((event) => {

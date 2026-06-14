@@ -133,85 +133,17 @@ test("createAssistantTools always exposes the full tool set", () => {
   expect(tools.write_file).toBeDefined();
 });
 
-test("ask_user returns approved answers when resumed with approval response", async () => {
+test("ask_user is exposed as an external tool without automatic execution", () => {
   seedProject("assistant_tools_ask_user");
   const tools = createAssistantTools({
     projectId: "assistant_tools_ask_user",
     runtimeContext: createRuntimeContext(),
   });
-  const input = {
-    title: "确认方向",
-    questions: [
-      {
-        id: "tone",
-        prompt: "这一段偏什么气质？",
-        kind: "single_choice",
-        options: [
-          { id: "quiet", label: "安静" },
-          { id: "sharp", label: "锋利" },
-        ],
-      },
-      {
-        id: "note",
-        prompt: "还有什么要补充？",
-        kind: "free_text",
-      },
-    ],
-  };
-  const execute = (
-    tools.ask_user as {
-      execute?: (_args: unknown, _options: unknown) => Promise<unknown>;
-    }
-  ).execute;
-  expect(execute).toBeDefined();
 
-  const result = await execute!(input, {
-    toolCallId: "tool_ask",
-    messages: [
-      {
-        role: "assistant",
-        content: [
-          {
-            type: "tool-call",
-            toolCallId: "tool_ask",
-            toolName: "ask_user",
-            input,
-          },
-          {
-            type: "tool-approval-request",
-            approvalId: "approval_ask",
-            toolCallId: "tool_ask",
-          },
-        ],
-      },
-      {
-        role: "tool",
-        content: [
-          {
-            type: "tool-approval-response",
-            approvalId: "approval_ask",
-            approved: true,
-            reason: JSON.stringify({
-              answers: [
-                { questionId: "tone", type: "single_choice", optionId: "quiet" },
-                { questionId: "note", type: "free_text", text: "保留一点余味" },
-              ],
-            }),
-          },
-        ],
-      },
-    ],
-  });
-
-  expect(result).toMatchObject({
-    ok: true,
-    data: {
-      answers: [
-        { questionId: "tone", type: "single_choice", optionId: "quiet" },
-        { questionId: "note", type: "free_text", text: "保留一点余味" },
-      ],
-    },
-  });
+  expect(tools.ask_user).toBeDefined();
+  expect((tools.ask_user as { execute?: unknown }).execute).toBeUndefined();
+  expect((tools.ask_user as { needsApproval?: unknown }).needsApproval).toBeUndefined();
+  expect((tools.ask_user as { inputSchema?: unknown }).inputSchema).toBeDefined();
 });
 
 test("list_manuscript_nodes returns structure without bodies by default", async () => {
