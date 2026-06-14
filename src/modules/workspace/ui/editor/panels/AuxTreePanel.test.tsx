@@ -184,6 +184,8 @@ test("AuxTreePanel renders deleted rows as restore-only tombstones", () => {
   );
 
   expect(html).toContain("text-deleted-foreground/65");
+  expect(html).toContain("line-through");
+  expect(html).toContain("decoration-deleted-foreground/65");
   expect(html).not.toContain("text-icon-folder");
   expect(html).toContain('data-action-anchor="aux:restore-deleted:/旧设定"');
   expect(html).not.toContain('data-action-anchor="aux:create-symlink:/旧设定"');

@@ -96,12 +96,15 @@ function AuxTreeNodeRow({
   const isSymlinkTargetDisabled = symlinkTargetPicker.invalidTargetNodeIds.has(node.id);
   const dragDisabled = isBusy || isEditing || isSymlinkTargetPickerActive || isDeleted;
   const dragHandleId = !isSymlinkTargetPickerActive && !isDeleted ? node.id : undefined;
-  const contentStateClass =
-    node.overlayStatus === "deleted"
-      ? "text-deleted-foreground/65"
-      : showTimelineChanges && !node.hasTimelineChange
-        ? "opacity-55"
-        : "opacity-100";
+  const contentStateClass = isDeleted
+    ? "text-deleted-foreground/65"
+    : showTimelineChanges && !node.hasTimelineChange
+      ? "opacity-55"
+      : "opacity-100";
+  const labelStateClass = cn(
+    contentStateClass,
+    isDeleted ? "line-through decoration-deleted-foreground/65 decoration-1" : "",
+  );
   const rowAnchorId = actionAnchorId("aux", "row", node.id);
   const addDirAnchorId = actionAnchorId("aux", "add-dir", node.id);
   const addFileAnchorId = actionAnchorId("aux", "add-file", node.id);
@@ -164,7 +167,7 @@ function AuxTreeNodeRow({
   );
 
   const label = (
-    <span className={`min-w-0 flex-1 ${contentStateClass}`} {...labelHitAreaProps}>
+    <span className={cn("min-w-0 flex-1", labelStateClass)} {...labelHitAreaProps}>
       <InlineEditableText
         value={node.name}
         disabled={isBusy || isSymlinkTargetPickerActive || isDeleted}
