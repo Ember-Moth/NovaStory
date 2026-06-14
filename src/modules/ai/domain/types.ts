@@ -502,6 +502,20 @@ export type ProjectAssistantStreamEvent =
       accumulatedText: string;
     }
   | {
+      type: "tool-call-streaming-start";
+      assistantNodeId: string;
+      toolCallId: string;
+      toolName: string;
+    }
+  | {
+      type: "tool-call-delta";
+      assistantNodeId: string;
+      toolCallId: string;
+      toolName: string;
+      inputTextDelta: string;
+      inputText: string;
+    }
+  | {
       type: "tool-call";
       assistantNodeId: string;
       toolCallId: string | null;

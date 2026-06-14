@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 
 import {
   buildAssistantToolTraceSummary,
+  buildStreamingAssistantToolTraceSummary,
   getAssistantContentBlocks,
   getAssistantAskUserEntries,
   getAssistantReasoning,
@@ -412,6 +413,21 @@ test("buildAssistantToolTraceSummary falls back for unknown tools", () => {
       status: "error",
     }),
   ).toBe("lookup 执行失败");
+});
+
+test("buildStreamingAssistantToolTraceSummary keeps only short tool hints", () => {
+  expect(
+    buildStreamingAssistantToolTraceSummary({
+      toolName: "write_file",
+      inputText: '{"path":"/世界观/核心设定.md","content":"这段大文本不应该进入折叠摘要。"}',
+    }),
+  ).toBe("正在写入辅助信息 /世界观/核心设定.md");
+  expect(
+    buildStreamingAssistantToolTraceSummary({
+      toolName: "unknown_tool",
+      inputText: '{"content":"很长的正文"}',
+    }),
+  ).toBe("正在调用 unknown_tool");
 });
 
 test("buildAssistantToolTraceSummary prefers returned manuscript titles", () => {

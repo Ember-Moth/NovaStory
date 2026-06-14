@@ -16,6 +16,7 @@ import { rpc } from "@/rpc/client";
 
 import {
   buildAssistantToolTraceSummary,
+  buildStreamingAssistantToolTraceSummary,
   canSendAssistantMessage,
   EMPTY_ASSISTANT_STATE,
   EMPTY_THREADS,
@@ -193,6 +194,8 @@ export function isToolInputResumeEvent(event: ProjectAssistantStreamEvent): bool
     event.type === "assistant-message-started" ||
     event.type === "assistant-text-delta" ||
     event.type === "assistant-reasoning-delta" ||
+    event.type === "tool-call-streaming-start" ||
+    event.type === "tool-call-delta" ||
     event.type === "tool-call" ||
     event.type === "tool-result" ||
     event.type === "step-started" ||
@@ -216,9 +219,107 @@ export function buildProjectAssistantRetryActiveTools(): ProjectAssistantToolNam
 
 function updateStreamToolTrace(
   current: AssistantToolTraceEntry[],
-  event: Extract<ProjectAssistantStreamEvent, { type: "tool-call" | "tool-result" }>,
+  event: Extract<
+    ProjectAssistantStreamEvent,
+    { type: "tool-call-streaming-start" | "tool-call-delta" | "tool-call" | "tool-result" }
+  >,
 ) {
+  if (event.type === "tool-call-streaming-start") {
+    const index = current.findIndex(
+      (entry) => entry.toolCallId === event.toolCallId || entry.toolName === event.toolName,
+    );
+    if (index >= 0) {
+      return current.map((entry, entryIndex) =>
+        entryIndex === index
+          ? {
+              ...entry,
+              toolCallId: event.toolCallId,
+              toolName: event.toolName,
+              nodeId: event.assistantNodeId,
+              summary: buildStreamingAssistantToolTraceSummary({
+                toolName: event.toolName,
+                inputText: entry.streamingInputText ?? "",
+              }),
+            }
+          : entry,
+      );
+    }
+
+    return [
+      ...current,
+      {
+        toolCallId: event.toolCallId,
+        toolName: event.toolName,
+        status: "pending" as const,
+        summary: buildStreamingAssistantToolTraceSummary({
+          toolName: event.toolName,
+          inputText: "",
+        }),
+        nodeId: event.assistantNodeId,
+        runId: null,
+        requestPayload: null,
+        responsePayload: null,
+        streamingInputText: "",
+      },
+    ];
+  }
+
+  if (event.type === "tool-call-delta") {
+    const index = current.findIndex(
+      (entry) => entry.toolCallId === event.toolCallId || entry.toolName === event.toolName,
+    );
+    if (index < 0) {
+      return current;
+    }
+
+    return current.map((entry, entryIndex) =>
+      entryIndex === index
+        ? {
+            ...entry,
+            toolCallId: event.toolCallId,
+            toolName: event.toolName,
+            nodeId: event.assistantNodeId,
+            summary: buildStreamingAssistantToolTraceSummary({
+              toolName: event.toolName,
+              inputText: event.inputText,
+            }),
+            streamingInputText: event.inputText,
+          }
+        : entry,
+    );
+  }
+
   if (event.type === "tool-call") {
+    const index = current.findIndex(
+      (entry) =>
+        (entry.toolCallId != null &&
+          event.toolCallId != null &&
+          entry.toolCallId === event.toolCallId) ||
+        (event.toolCallId == null &&
+          entry.toolName === event.toolName &&
+          entry.status === "pending"),
+    );
+    if (index >= 0) {
+      return current.map((entry, entryIndex) =>
+        entryIndex === index
+          ? {
+              ...entry,
+              toolCallId: event.toolCallId,
+              toolName: event.toolName,
+              status: "pending" as const,
+              summary: buildAssistantToolTraceSummary({
+                toolName: event.toolName,
+                requestPayload: event.input,
+              }),
+              nodeId: event.assistantNodeId,
+              requestPayload: event.input,
+              responsePayload: null,
+              streamingInputText: null,
+            }
+          : entry,
+      );
+    }
+
     return [
       ...current,
       {
@@ -233,6 +334,7 @@ function updateStreamToolTrace(
         runId: null,
         requestPayload: event.input,
         responsePayload: null,
+        streamingInputText: null,
       },
     ];
   }
@@ -258,6 +360,7 @@ function updateStreamToolTrace(
         runId: null,
         requestPayload: null,
         responsePayload: event.output,
+        streamingInputText: null,
       },
     ];
   }
@@ -274,6 +377,7 @@ function updateStreamToolTrace(
             status: event.status,
           }),
           responsePayload: event.output,
+          streamingInputText: null,
         }
       : entry,
   );
@@ -386,8 +490,15 @@ export function applyStreamEvent(
     };
   }
 
-  if (event.type === "tool-call" || event.type === "tool-result") {
+  if (
+    event.type === "tool-call-streaming-start" ||
+    event.type === "tool-call-delta" ||
+    event.type === "tool-call" ||
+    event.type === "tool-result"
+  ) {
     const blockIndex =
+      event.type === "tool-call-streaming-start" ||
+      event.type === "tool-call-delta" ||
       event.type === "tool-call"
         ? overlay.blocks.findIndex((block) => block.assistantNodeId === event.assistantNodeId)
         : overlay.blocks.findIndex((block) =>

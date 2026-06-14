@@ -57,6 +57,7 @@ export interface AssistantToolTraceEntry {
   runId: string | null;
   requestPayload: unknown | null;
   responsePayload: unknown | null;
+  streamingInputText?: string | null;
 }
 
 export interface AssistantAskUserOption {
@@ -307,6 +308,107 @@ function formatToolTarget(value: string | null, fallback: string) {
   }
 
   return `${normalized.slice(0, 79)}…`;
+}
+
+function normalizeStreamingSummaryValue(value: string | null) {
+  if (value == null) {
+    return null;
+  }
+  const normalized = value
+    .replace(/\\(["\\/bfnrt])/g, "$1")
+    .replace(/\\u([0-9a-fA-F]{4})/g, (_, code: string) =>
+      String.fromCharCode(Number.parseInt(code, 16)),
+    )
+    .trim()
+    .replace(/\s+/g, " ");
+  if (normalized.length === 0) {
+    return null;
+  }
+  return normalized.length <= 80 ? normalized : `${normalized.slice(0, 79)}…`;
+}
+
+function getStreamingToolField(inputText: string, key: string) {
+  const quotedPattern = new RegExp(`"${key}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`, "u");
+  const quotedMatch = quotedPattern.exec(inputText);
+  if (quotedMatch) {
+    return normalizeStreamingSummaryValue(quotedMatch[1] ?? null);
+  }
+
+  const barePattern = new RegExp(`"${key}"\\s*:\\s*([^,}\\]]+)`, "u");
+  const bareMatch = barePattern.exec(inputText);
+  if (!bareMatch) {
+    return null;
+  }
+
+  return normalizeStreamingSummaryValue((bareMatch[1] ?? "").replace(/^"+|"+$/g, ""));
+}
+
+export function buildStreamingAssistantToolTraceSummary({
+  toolName,
+  inputText,
+}: {
+  toolName: string;
+  inputText: string;
+}) {
+  const fallback = `正在调用 ${toolName}`;
+  const path = getStreamingToolField(inputText, "path");
+  const newPath = getStreamingToolField(inputText, "newPath");
+  const targetPath = getStreamingToolField(inputText, "targetPath");
+  const nodeId = getStreamingToolField(inputText, "nodeId");
+  const title = getStreamingToolField(inputText, "title");
+  const timelinePointId = getStreamingToolField(inputText, "timelinePointId");
+  const label = getStreamingToolField(inputText, "label");
+
+  switch (toolName) {
+    case "list_files":
+      return `正在查看辅助信息 ${formatToolTarget(path, "/")}`;
+    case "read_file":
+      return `正在读取辅助信息 ${formatToolTarget(path, "当前选中")}`;
+    case "create_dir":
+      return path ? `正在创建辅助目录 ${formatToolTarget(path, "")}` : fallback;
+    case "write_file":
+      return path ? `正在写入辅助信息 ${formatToolTarget(path, "")}` : fallback;
+    case "move_path":
+      return path && newPath
+        ? `正在移动辅助信息 ${formatToolTarget(path, "")} -> ${formatToolTarget(newPath, "")}`
+        : fallback;
+    case "delete_path":
+      return path ? `正在删除辅助信息 ${formatToolTarget(path, "")}` : fallback;
+    case "create_symlink":
+      return path && targetPath
+        ? `正在创建辅助链接 ${formatToolTarget(path, "")} -> ${formatToolTarget(targetPath, "")}`
+        : fallback;
+    case "retarget_symlink":
+      return path && targetPath
+        ? `正在重定向辅助链接 ${formatToolTarget(path, "")} -> ${formatToolTarget(targetPath, "")}`
+        : fallback;
+    case "read_manuscript_node":
+      return (title ?? nodeId) ? `正在读取正文 ${formatToolTarget(title ?? nodeId, "")}` : fallback;
+    case "update_manuscript_node":
+      return (title ?? nodeId) ? `正在更新正文 ${formatToolTarget(title ?? nodeId, "")}` : fallback;
+    case "move_manuscript_node":
+      return (title ?? nodeId) ? `正在移动正文 ${formatToolTarget(title ?? nodeId, "")}` : fallback;
+    case "set_current_timeline":
+      return (label ?? timelinePointId)
+        ? `正在切换时间点 ${formatToolTarget(label ?? timelinePointId, "")}`.trim()
+        : fallback;
+    case "create_story_timeline_points":
+      return label ? `正在创建时间点 ${formatToolTarget(label, "")}` : fallback;
+    case "update_story_timeline_point":
+      return (label ?? timelinePointId)
+        ? `正在更新时间点 ${formatToolTarget(label ?? timelinePointId, "")}`.trim()
+        : fallback;
+    case "move_story_timeline_point":
+      return (label ?? timelinePointId)
+        ? `正在移动时间点 ${formatToolTarget(label ?? timelinePointId, "")}`.trim()
+        : fallback;
+    case "delete_story_timeline_point":
+      return (label ?? timelinePointId)
+        ? `正在删除时间点 ${formatToolTarget(label ?? timelinePointId, "")}`.trim()
+        : fallback;
+    default:
+      return fallback;
+  }
 }
 
 function getTimelinePointCount(input: unknown) {

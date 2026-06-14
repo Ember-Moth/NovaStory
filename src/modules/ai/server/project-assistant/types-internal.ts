@@ -88,6 +88,18 @@ export type GeneratedAssistantChunk =
       delta: string;
     }
   | {
+      type: "tool-input-start";
+      stepNumber: number;
+      toolCallId: string;
+      toolName: string;
+    }
+  | {
+      type: "tool-input-delta";
+      stepNumber: number;
+      toolCallId: string;
+      inputTextDelta: string;
+    }
+  | {
       type: "tool-call";
       stepNumber: number;
       toolCall: Record<string, unknown>;

@@ -107,6 +107,26 @@ export function defaultStreamAssistantText({
         continue;
       }
 
+      if (type === "tool-input-start") {
+        yield {
+          type: "tool-input-start",
+          stepNumber: getCurrentStepNumber(),
+          toolCallId: String(Reflect.get(rawPart, "toolCallId") ?? ""),
+          toolName: String(Reflect.get(rawPart, "toolName") ?? "tool"),
+        };
+        continue;
+      }
+
+      if (type === "tool-input-delta") {
+        yield {
+          type: "tool-input-delta",
+          stepNumber: getCurrentStepNumber(),
+          toolCallId: String(Reflect.get(rawPart, "toolCallId") ?? ""),
+          inputTextDelta: String(Reflect.get(rawPart, "inputTextDelta") ?? ""),
+        };
+        continue;
+      }
+
       if (type === "tool-call") {
         yield {
           type: "tool-call",

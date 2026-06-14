@@ -249,10 +249,60 @@ test("applyStreamEvent keeps reasoning, text, and tool traces aligned in one str
               title: "雨夜重逢",
             },
           },
+          streamingInputText: null,
         },
       ],
     },
   ]);
+});
+
+test("applyStreamEvent reuses one tool trace across streaming start delta and final tool call", () => {
+  const overlay = createStreamOverlay({
+    kind: "send",
+    threadId: "thread_a",
+    triggerNodeId: null,
+  });
+
+  const nextOverlay = [
+    {
+      type: "assistant-message-started" as const,
+      nodeId: "assistant_1",
+      parentNodeId: "user_1",
+      stepIndex: 0,
+    },
+    {
+      type: "tool-call-streaming-start" as const,
+      assistantNodeId: "assistant_1",
+      toolCallId: "tool_stream_1",
+      toolName: "write_file",
+    },
+    {
+      type: "tool-call-delta" as const,
+      assistantNodeId: "assistant_1",
+      toolCallId: "tool_stream_1",
+      toolName: "write_file",
+      inputTextDelta: '{"path":"/设定/角色.md"',
+      inputText: '{"path":"/设定/角色.md"',
+    },
+    {
+      type: "tool-call" as const,
+      assistantNodeId: "assistant_1",
+      toolCallId: "tool_stream_1",
+      toolName: "write_file",
+      input: { path: "/设定/角色.md", content: "主角：林舟" },
+    },
+  ].reduce(applyStreamEvent, overlay);
+
+  expect(nextOverlay.blocks).toHaveLength(1);
+  expect(nextOverlay.blocks[0]?.toolTrace).toHaveLength(1);
+  expect(nextOverlay.blocks[0]?.toolTrace[0]).toMatchObject({
+    toolCallId: "tool_stream_1",
+    toolName: "write_file",
+    status: "pending",
+    summary: "写入辅助信息 /设定/角色.md",
+    requestPayload: { path: "/设定/角色.md", content: "主角：林舟" },
+    streamingInputText: null,
+  });
 });
 
 test("shouldAnimateMessageMount skips enter animation for streamed assistant messages", () => {

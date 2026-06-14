@@ -476,6 +476,10 @@ export async function executeProjectAssistantRun<TResult>({
   const stepRuntime = new Map<number, StepRuntimeState>();
   const assistantTextByNodeId = new Map<string, string>();
   const reasoningPartsByStreamId = new Map<string, { nodeId: string; partIndex: number }>();
+  const streamingToolInputs = new Map<
+    string,
+    { assistantNodeId: string; toolName: string; text: string }
+  >();
   const stepIndexOffset = prepared.stepIndexOffset ?? 0;
   let pendingUserInputRequest: {
     assistantNodeId: string;
@@ -632,6 +636,52 @@ export async function executeProjectAssistantRun<TResult>({
         continue;
       }
 
+      if (chunk.type === "tool-input-start") {
+        if (!currentAssistantNode) {
+          currentAssistantNode = ensureCurrentAssistantNode({
+            prepared,
+            stepRuntime: currentStepRuntime,
+            currentParentId,
+            relay: relay as BufferedEventRelay<unknown>,
+            stepNumber,
+            assistantTextByNodeId,
+          });
+          currentParentId = currentAssistantNode.id;
+          lastAssistantNode = currentAssistantNode;
+        }
+
+        streamingToolInputs.set(chunk.toolCallId, {
+          assistantNodeId: currentAssistantNode.id,
+          toolName: chunk.toolName,
+          text: "",
+        });
+        relay.emit({
+          type: "tool-call-streaming-start",
+          assistantNodeId: currentAssistantNode.id,
+          toolCallId: chunk.toolCallId,
+          toolName: chunk.toolName,
+        });
+        continue;
+      }
+
+      if (chunk.type === "tool-input-delta") {
+        const currentStreaming = streamingToolInputs.get(chunk.toolCallId);
+        if (!currentStreaming) {
+          continue;
+        }
+
+        currentStreaming.text = `${currentStreaming.text}${chunk.inputTextDelta}`;
+        relay.emit({
+          type: "tool-call-delta",
+          assistantNodeId: currentStreaming.assistantNodeId,
+          toolCallId: chunk.toolCallId,
+          toolName: currentStreaming.toolName,
+          inputTextDelta: chunk.inputTextDelta,
+          inputText: currentStreaming.text,
+        });
+        continue;
+      }
+
       if (chunk.type === "tool-call") {
         const toolCallId =
           typeof Reflect.get(chunk.toolCall, "toolCallId") === "string"
@@ -717,6 +767,9 @@ export async function executeProjectAssistantRun<TResult>({
           toolCall: chunk.toolCall,
         });
         currentStepRuntime.toolCalls.push(chunk.toolCall);
+        if (toolCallId) {
+          streamingToolInputs.delete(toolCallId);
+        }
         relay.emit({
           type: "tool-call",
           assistantNodeId: currentAssistantNode.id,

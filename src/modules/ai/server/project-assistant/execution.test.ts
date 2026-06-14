@@ -548,6 +548,141 @@ test("sendProjectAssistantMessageStream emits workspace-refresh-requested for co
   });
 });
 
+test("sendProjectAssistantMessageStream emits tool call streaming progress before the final tool call", async () => {
+  seedProject("assistant_tool_call_streaming");
+  const seeded = seedCustomConnection({
+    connectionId: "conn_tool_call_streaming",
+    modelId: "story-model",
+    modelRowId: "cmodel_tool_call_streaming",
+    supportsToolUse: true,
+  });
+  const service = createProjectAssistantService({
+    readStoredSelection: () => seeded.selection,
+    streamAssistantText: createMockStream({
+      chunks: [
+        { type: "start-step", stepNumber: 0 },
+        {
+          type: "tool-input-start",
+          stepNumber: 0,
+          toolCallId: "tool_stream_1",
+          toolName: "write_file",
+        },
+        {
+          type: "tool-input-delta",
+          stepNumber: 0,
+          toolCallId: "tool_stream_1",
+          inputTextDelta: '{"path":"/设定/角色.md"',
+        },
+        {
+          type: "tool-input-delta",
+          stepNumber: 0,
+          toolCallId: "tool_stream_1",
+          inputTextDelta: ',"content":"主角：林舟"}',
+        },
+        {
+          type: "tool-call",
+          stepNumber: 0,
+          toolCall: {
+            toolCallId: "tool_stream_1",
+            toolName: "write_file",
+            input: {
+              path: "/设定/角色.md",
+              content: "主角：林舟",
+            },
+          },
+        },
+        {
+          type: "tool-result",
+          stepNumber: 0,
+          toolResult: {
+            toolCallId: "tool_stream_1",
+            toolName: "write_file",
+            output: {
+              ok: true,
+              data: {
+                action: "created",
+                path: "/设定/角色.md",
+              },
+            },
+          },
+        },
+        { type: "finish-step", stepNumber: 0, finishReason: "stop", usage: { totalTokens: 5 } },
+      ],
+      text: "",
+      usage: { totalTokens: 5 },
+      finishReason: "stop",
+      steps: [
+        {
+          stepNumber: 0,
+          preparedMessages: [],
+          model: { provider: "openai", modelId: "story-model" },
+          finishReason: "stop",
+          rawFinishReason: "stop",
+          usage: { totalTokens: 5 },
+          request: { body: { step: 0 } },
+          response: { body: { id: "resp_tool_call_streaming" }, messages: [] },
+          providerMetadata: {},
+          toolCalls: [
+            {
+              toolCallId: "tool_stream_1",
+              toolName: "write_file",
+              input: {
+                path: "/设定/角色.md",
+                content: "主角：林舟",
+              },
+            },
+          ],
+          toolResults: [
+            {
+              toolCallId: "tool_stream_1",
+              toolName: "write_file",
+              output: {
+                ok: true,
+                data: {
+                  action: "created",
+                  path: "/设定/角色.md",
+                },
+              },
+            },
+          ],
+        },
+      ],
+    }) as any,
+  });
+  const thread = service.createProjectAssistantThread("assistant_tool_call_streaming");
+  const emitted: Array<Record<string, unknown>> = [];
+
+  const handle = service.sendProjectAssistantMessageStream({
+    projectId: "assistant_tool_call_streaming",
+    threadId: thread.id,
+    text: "写入角色资料",
+    activeTools: ["write_file"],
+  });
+  handle.subscribe((event) => {
+    emitted.push(event as Record<string, unknown>);
+  });
+
+  await handle.finalResult;
+
+  expect(emitted.map((event) => event.type)).toContain("tool-call-streaming-start");
+  expect(emitted.filter((event) => event.type === "tool-call-delta")).toHaveLength(2);
+  expect(emitted.find((event) => event.type === "tool-call-delta")).toMatchObject({
+    type: "tool-call-delta",
+    toolCallId: "tool_stream_1",
+    toolName: "write_file",
+    inputText: '{"path":"/设定/角色.md"',
+  });
+  expect(emitted.find((event) => event.type === "tool-call")).toMatchObject({
+    type: "tool-call",
+    toolCallId: "tool_stream_1",
+    toolName: "write_file",
+    input: {
+      path: "/设定/角色.md",
+      content: "主角：林舟",
+    },
+  });
+});
+
 test("sendProjectAssistantMessageStream emits workspace-refresh-requested for aux writes", async () => {
   seedProject("assistant_workspace_refresh_aux");
   const workspace = createDefaultWorkspace("assistant_workspace_refresh_aux");
