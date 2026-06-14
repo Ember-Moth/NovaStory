@@ -13,8 +13,6 @@ import {
 } from "./tree";
 import type { AuxTreeNodeVM, RawAuxTreeNode, RawContentTreeNode } from "./types";
 
-const ROOT_ID = "content_root";
-
 function node(id: string, children: RawContentTreeNode[] = []): RawContentTreeNode {
   return {
     id,
@@ -36,7 +34,6 @@ function resolve(
     tree: state.tree,
     parentMap: state.parentMap,
     nodeMap: state.nodeMap,
-    contentRootId: ROOT_ID,
     nodeId,
     targetId,
     position,
@@ -49,7 +46,7 @@ test("resolveContentMove moves a top-level node before another node", () => {
 
   expect(move).toEqual({
     nodeId: "c",
-    newParentId: ROOT_ID,
+    newParentId: null,
     afterSiblingId: null,
     position: "before",
   });
@@ -61,7 +58,7 @@ test("resolveContentMove moves a top-level node after another node", () => {
 
   expect(move).toEqual({
     nodeId: "a",
-    newParentId: ROOT_ID,
+    newParentId: null,
     afterSiblingId: "c",
     position: "after",
   });
@@ -73,7 +70,7 @@ test("resolveContentMove moves a node across parents", () => {
 
   expect(move).toEqual({
     nodeId: "a1",
-    newParentId: ROOT_ID,
+    newParentId: null,
     afterSiblingId: "b",
     position: "before",
   });
@@ -112,11 +109,10 @@ test("resolveContentCreateSiblingPlacement inserts after the active sibling", ()
     activeNode: state.nodeMap.get("b") ?? null,
     tree: state.tree,
     parentMap: state.parentMap,
-    contentRootId: ROOT_ID,
   });
 
   expect(placement).toEqual({
-    parentId: ROOT_ID,
+    parentId: null,
     afterSiblingId: "b",
   });
 });
@@ -127,11 +123,10 @@ test("resolveContentCreateSiblingPlacement appends to the top level when nothing
     activeNode: null,
     tree: state.tree,
     parentMap: state.parentMap,
-    contentRootId: ROOT_ID,
   });
 
   expect(placement).toEqual({
-    parentId: ROOT_ID,
+    parentId: null,
     afterSiblingId: "c",
   });
 });

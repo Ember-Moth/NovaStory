@@ -60,7 +60,6 @@ export function resolveProjectWorkspaceIdentity({
     projectId,
     requestedWorkspaceId,
     workspaceId,
-    contentRootId: matchedWorkspace?.contentRootId ?? null,
     workspaceInitialLoading: isInitialLoading && !workspace && !queryErrorMessage,
     routeMismatch,
     error: routeMismatch ?? queryErrorMessage,

@@ -42,10 +42,9 @@ function formatTimelineContentAnchorError(
   anchors: ContentTreeNodeVM[],
   contentParentMap: Map<string, string | null>,
   contentNodeMap: Map<string, ContentTreeNodeVM>,
-  contentRootId: string | null,
 ) {
   const paths = anchors.map((node) =>
-    buildContentNodePath(node.id, contentParentMap, contentNodeMap, contentRootId),
+    buildContentNodePath(node.id, contentParentMap, contentNodeMap),
   );
 
   if (paths.length === 1) {
@@ -63,7 +62,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
   const store = useWorkspaceStoreApi();
 
   const {
-    identity: { workspaceId, contentRootId },
+    identity: { workspaceId },
     content: {
       tree: contentTree,
       flatNodes: flatContentNodes,
@@ -720,7 +719,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
   const handleContentCreateSibling = useCallback(
     async (anchorId: string) => {
       const { activeTimelinePointId, setContentError } = store.getState();
-      if (!workspaceId || !contentRootId || !activeTimelinePointId) {
+      if (!workspaceId || !activeTimelinePointId) {
         return;
       }
 
@@ -729,7 +728,6 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         activeNode: activeContentNode,
         tree: contentTree,
         parentMap: contentParentMap,
-        contentRootId,
       });
       const title = `新节点 ${flatContentNodes.length + 1}`;
 
@@ -745,7 +743,9 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         });
         flushDirtyContentBeforeSwitch();
         activateContentNode(node.id, node.anchorTimelinePointId ?? ORIGIN_TIMELINE_POINT_ID);
-        expandContentParent(parentId);
+        if (parentId) {
+          expandContentParent(parentId);
+        }
       } catch (error) {
         setActionError(
           store.getState().setContentError,
@@ -759,7 +759,6 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
       activeContentNode,
       contentTree,
       contentParentMap,
-      contentRootId,
       createContent,
       expandContentParent,
       flatContentNodes.length,
@@ -826,13 +825,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
       const deletedIds = collectContentSubtreeIds(targetNode);
       const shouldReselect = Boolean(activeContentNodeId && deletedIds.has(activeContentNodeId));
       const fallbackNode = shouldReselect
-        ? findContentDeleteFallback(
-            contentTree,
-            contentParentMap,
-            contentRootId,
-            nodeId,
-            deletedIds,
-          )
+        ? findContentDeleteFallback(contentTree, contentParentMap, nodeId, deletedIds)
         : null;
 
       clearActionError(setContentError);
@@ -863,7 +856,6 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
       clearContentNodeLocalState,
       contentNodeMap,
       contentParentMap,
-      contentRootId,
       contentTree,
       deleteContent,
       store,
@@ -930,7 +922,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
 
   const handleContentMove = useCallback(
     async (intent: ContentMoveIntent) => {
-      if (!workspaceId || !contentRootId) {
+      if (!workspaceId) {
         return;
       }
 
@@ -938,7 +930,6 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         tree: contentTree,
         parentMap: contentParentMap,
         nodeMap: contentNodeMap,
-        contentRootId,
         ...intent,
       });
 
@@ -948,7 +939,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
 
       clearActionError(store.getState().setContentError);
 
-      if (move.position === "inside") {
+      if (move.position === "inside" && move.newParentId) {
         expandContentParent(move.newParentId);
       }
 
@@ -970,7 +961,6 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
     [
       contentNodeMap,
       contentParentMap,
-      contentRootId,
       contentTree,
       expandContentParent,
       moveContent,
@@ -1308,12 +1298,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
       if (anchoredNodes.length > 0) {
         setActionError(
           store.getState().setTimelineError,
-          formatTimelineContentAnchorError(
-            anchoredNodes,
-            contentParentMap,
-            contentNodeMap,
-            contentRootId,
-          ),
+          formatTimelineContentAnchorError(anchoredNodes, contentParentMap, contentNodeMap),
           anchorId,
         );
         return;
@@ -1354,7 +1339,6 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
     [
       contentNodeMap,
       contentParentMap,
-      contentRootId,
       deleteTimeline,
       finishTimelineDelete,
       flatContentNodes,

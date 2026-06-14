@@ -30,7 +30,7 @@ test("uncommitted edits before first commit appear as additions", async () => {
   const workspace = seedProject("status_first_commit");
   service.createContentNode({
     workspaceId: workspace.id,
-    parentId: workspace.contentRootId!,
+    parentId: null,
     title: "Chapter 1",
     body: "Once",
   });
@@ -53,7 +53,7 @@ test("uncommitted edits before first commit appear as additions", async () => {
   expect(status.hasChanges).toBe(true);
   expect(status.headCommitId).toBeNull();
   expect(status.areas.content.changes).toContainEqual({
-    label: "manuscript/001-Chapter-1.md",
+    label: expect.stringMatching(/^manuscript\/0001-content_[^/]+\/content\.md$/),
     kind: "added",
   });
   expect(status.areas.timeline.changes).toContainEqual({
@@ -67,7 +67,7 @@ test("committed workspace with no edits reports hasChanges false", async () => {
   const workspace = seedProject("status_clean");
   service.createContentNode({
     workspaceId: workspace.id,
-    parentId: workspace.contentRootId!,
+    parentId: null,
     title: "Chapter 1",
     body: "Once",
   });
@@ -86,7 +86,7 @@ test("content, timeline and aux edits appear in the diff summary", async () => {
   const workspace = seedProject("status_diff");
   const chapter = service.createContentNode({
     workspaceId: workspace.id,
-    parentId: workspace.contentRootId!,
+    parentId: null,
     title: "Chapter 1",
     body: "Once",
   });
@@ -132,7 +132,7 @@ test("content, timeline and aux edits appear in the diff summary", async () => {
 
   expect(status.hasChanges).toBe(true);
   expect(status.areas.content.changes).toContainEqual({
-    label: "manuscript/001-Chapter-1.md",
+    label: expect.stringMatching(/^manuscript\/0001-content_[^/]+\/content\.md$/),
     kind: "modified",
   });
   expect(status.areas.timeline.changes).toContainEqual({
@@ -146,7 +146,7 @@ test("reverting workspace to head clears the diff summary", async () => {
   const workspace = seedProject("status_revert");
   const chapter = service.createContentNode({
     workspaceId: workspace.id,
-    parentId: workspace.contentRootId!,
+    parentId: null,
     title: "Chapter 1",
     body: "Once",
   });

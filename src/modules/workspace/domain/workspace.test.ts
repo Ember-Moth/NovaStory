@@ -28,7 +28,7 @@ function flattenAuxNodes(nodes: ExportedAuxNode[]): ExportedAuxNode[] {
 
 test("content export preserves sibling order and nesting", () => {
   const workspace = seedProject("project_content");
-  const rootId = workspace.contentRootId!;
+  const rootId = null;
 
   const chapter1 = service.createContentNode({
     workspaceId: workspace.id,
@@ -61,7 +61,7 @@ test("content export preserves sibling order and nesting", () => {
 
 test("aux overlay resolves by timeline point and composeWritingContext follows anchor point", () => {
   const workspace = seedProject("project_overlay");
-  const contentRootId = workspace.contentRootId!;
+  const contentRootId = null;
 
   service.mkdirAt({
     workspaceId: workspace.id,
@@ -773,7 +773,7 @@ test("restoreDeletedAuxNodeAt rejects origin and missing whiteouts", () => {
 
 test("content node deletion removes subtree and preserves sibling order", () => {
   const workspace = seedProject("project_content_delete");
-  const rootId = workspace.contentRootId!;
+  const rootId = null;
 
   const chapter1 = service.createContentNode({
     workspaceId: workspace.id,
@@ -800,7 +800,7 @@ test("content node deletion removes subtree and preserves sibling order", () => 
 
 test("deleting a middle content sibling rewires next sibling without violating uniqueness", () => {
   const workspace = seedProject("project_content_delete_middle");
-  const rootId = workspace.contentRootId!;
+  const rootId = null;
 
   const chapter1 = service.createContentNode({
     workspaceId: workspace.id,
@@ -830,7 +830,7 @@ test("deleting a middle content sibling rewires next sibling without violating u
 
 test("content node move can reorder across parents and preserve child order", () => {
   const workspace = seedProject("project_content_move_cross_parent");
-  const rootId = workspace.contentRootId!;
+  const rootId = null;
 
   const chapter1 = service.createContentNode({
     workspaceId: workspace.id,
@@ -880,7 +880,7 @@ test("content node move can reorder across parents and preserve child order", ()
 
 test("content node move rejects moving a node below its own descendant", () => {
   const workspace = seedProject("project_content_move_into_descendant");
-  const rootId = workspace.contentRootId!;
+  const rootId = null;
 
   const chapter = service.createContentNode({
     workspaceId: workspace.id,
@@ -904,7 +904,7 @@ test("content node move rejects moving a node below its own descendant", () => {
 
 test("content node anchor point can be updated", () => {
   const workspace = seedProject("project_anchor_update");
-  const contentRootId = workspace.contentRootId!;
+  const contentRootId = null;
 
   const pointA = service.createTimelinePoint({
     workspaceId: workspace.id,
@@ -935,7 +935,7 @@ test("content node anchor point can be updated", () => {
 
 test("timeline point deletion is blocked when content still anchors to it", () => {
   const workspace = seedProject("project_guard");
-  const contentRootId = workspace.contentRootId!;
+  const contentRootId = null;
   const point = service.createTimelinePoint({
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,

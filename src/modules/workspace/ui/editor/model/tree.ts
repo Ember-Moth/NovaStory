@@ -10,7 +10,7 @@ export interface ContentMoveIntent {
 
 export interface ResolvedContentMove {
   nodeId: string;
-  newParentId: string;
+  newParentId: string | null;
   afterSiblingId: string | null;
   position: ContentDropPosition;
 }
@@ -29,12 +29,11 @@ export function buildContentNodePath(
   nodeId: string,
   contentParentMap: Map<string, string | null>,
   contentNodeMap: Map<string, ContentTreeNodeVM>,
-  contentRootId: string | null,
 ) {
   const segments: string[] = [];
   let currentId: string | null = nodeId;
 
-  while (currentId && currentId !== contentRootId) {
+  while (currentId) {
     const node = contentNodeMap.get(currentId);
     if (!node) {
       break;
@@ -64,9 +63,8 @@ export function collectAncestorIds(
 export function listContentSiblings(
   tree: ContentTreeNodeVM[],
   parentId: string | null,
-  contentRootId: string | null,
 ): ContentTreeNodeVM[] {
-  if (!parentId || parentId === contentRootId) {
+  if (!parentId) {
     return tree;
   }
 
@@ -78,17 +76,16 @@ export function resolveContentCreateSiblingPlacement(input: {
   activeNode: ContentTreeNodeVM | null;
   tree: ContentTreeNodeVM[];
   parentMap: ReadonlyMap<string, string | null>;
-  contentRootId: string;
 }) {
   if (input.activeNode) {
     return {
-      parentId: input.parentMap.get(input.activeNode.id) ?? input.contentRootId,
+      parentId: input.parentMap.get(input.activeNode.id) ?? null,
       afterSiblingId: input.activeNode.id,
     };
   }
 
   return {
-    parentId: input.contentRootId,
+    parentId: null,
     afterSiblingId: input.tree.at(-1)?.id ?? null,
   };
 }
@@ -96,12 +93,11 @@ export function resolveContentCreateSiblingPlacement(input: {
 export function findContentDeleteFallback(
   tree: ContentTreeNodeVM[],
   parentMap: Map<string, string | null>,
-  contentRootId: string | null,
   nodeId: string,
   excludedIds: Set<string>,
 ): ContentTreeNodeVM | null {
-  const parentId = parentMap.get(nodeId) ?? contentRootId;
-  const siblings = listContentSiblings(tree, parentId, contentRootId);
+  const parentId = parentMap.get(nodeId) ?? null;
+  const siblings = listContentSiblings(tree, parentId);
   const nodeIndex = siblings.findIndex((sibling) => sibling.id === nodeId);
 
   if (nodeIndex > 0) {
@@ -111,7 +107,7 @@ export function findContentDeleteFallback(
     }
   }
 
-  if (parentId && parentId !== contentRootId && !excludedIds.has(parentId)) {
+  if (parentId && !excludedIds.has(parentId)) {
     return findContentNode(tree, parentId);
   }
 
@@ -154,7 +150,6 @@ export function resolveContentMove({
   tree,
   parentMap,
   nodeMap,
-  contentRootId,
   nodeId,
   targetId,
   position,
@@ -162,12 +157,11 @@ export function resolveContentMove({
   tree: ContentTreeNodeVM[];
   parentMap: ReadonlyMap<string, string | null>;
   nodeMap: ReadonlyMap<string, ContentTreeNodeVM>;
-  contentRootId: string | null;
   nodeId: string;
   targetId: string;
   position: ContentDropPosition;
 }): ResolvedContentMove | null {
-  if (!contentRootId || nodeId === targetId) {
+  if (nodeId === targetId) {
     return null;
   }
 
@@ -182,7 +176,7 @@ export function resolveContentMove({
     return null;
   }
 
-  const currentParentId = parentMap.get(nodeId) ?? contentRootId;
+  const currentParentId = parentMap.get(nodeId) ?? null;
 
   if (position === "inside") {
     const siblingsWithoutMoved = target.children.filter((child) => child.id !== nodeId);
@@ -200,8 +194,8 @@ export function resolveContentMove({
     };
   }
 
-  const targetParentId = parentMap.get(targetId) ?? contentRootId;
-  const siblings = listContentSiblings(tree, targetParentId, contentRootId);
+  const targetParentId = parentMap.get(targetId) ?? null;
+  const siblings = listContentSiblings(tree, targetParentId);
   const fromIndex = siblings.findIndex((sibling) => sibling.id === nodeId);
   const targetIndex = siblings.findIndex((sibling) => sibling.id === targetId);
 

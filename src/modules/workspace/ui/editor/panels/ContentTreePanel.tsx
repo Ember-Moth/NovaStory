@@ -437,7 +437,6 @@ export function ContentTreePanel({
       tree,
       parentMap: panelParentMap,
       nodeMap: panelNodeMap,
-      contentRootId: "__content_root__",
       ...nextIntent,
     });
 
@@ -480,7 +479,6 @@ export function ContentTreePanel({
       tree,
       parentMap: panelParentMap,
       nodeMap: panelNodeMap,
-      contentRootId: "__content_root__",
       ...nextIntent,
     });
 

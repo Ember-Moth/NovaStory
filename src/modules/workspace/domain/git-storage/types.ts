@@ -24,18 +24,19 @@ export interface WorkspaceIndexRow {
   branchId: string;
   name: string;
   worktreePath: string;
-  contentRootId: string;
   createdAt: number;
   updatedAt: number;
 }
 
-export interface ContentMetaRow {
+export interface ManuscriptNodeDiskState {
   id: string;
   parentId: string | null;
   order: number;
   title: string | null;
-  bodyPath: string | null;
   anchorTimelinePointId: string | null;
+  body: string;
+  dirPath: string;
+  children: ManuscriptNodeDiskState[];
 }
 
 export interface TimelineMetaRow {

@@ -32,7 +32,7 @@ test("creating a branch with workspace invalidates branches and workspaces", asy
   const workspace = seedProject("rpc_branch_create");
   service.createContentNode({
     workspaceId: workspace.id,
-    parentId: workspace.contentRootId!,
+    parentId: null,
     title: "Base",
   });
   const commit = await service.createCommit({ branchId: workspace.branchId, message: "base" });
@@ -80,7 +80,7 @@ test("commit create invalidates history and branch tags", async () => {
   const workspace = seedProject("rpc_commit_create");
   service.createContentNode({
     workspaceId: workspace.id,
-    parentId: workspace.contentRootId!,
+    parentId: null,
     title: "One",
   });
 
@@ -103,7 +103,7 @@ test("commit checkout invalidates the workspace content views", async () => {
   const workspace = seedProject("rpc_commit_checkout");
   service.createContentNode({
     workspaceId: workspace.id,
-    parentId: workspace.contentRootId!,
+    parentId: null,
     title: "One",
   });
   const commit = await await service.createCommit({ branchId: workspace.branchId, message: "one" });
@@ -144,13 +144,13 @@ test("commit history returns the mainline newest first", async () => {
   const workspace = seedProject("rpc_commit_history");
   service.createContentNode({
     workspaceId: workspace.id,
-    parentId: workspace.contentRootId!,
+    parentId: null,
     title: "One",
   });
   const c1 = await await service.createCommit({ branchId: workspace.branchId, message: "one" });
   service.createContentNode({
     workspaceId: workspace.id,
-    parentId: workspace.contentRootId!,
+    parentId: null,
     title: "Two",
   });
   const c2 = await await service.createCommit({ branchId: workspace.branchId, message: "two" });

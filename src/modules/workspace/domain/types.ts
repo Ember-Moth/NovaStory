@@ -21,8 +21,6 @@ export interface ExportedContentNode {
 }
 
 export interface ExportedContentSubtree {
-  rootNodeId: string;
-  isWorkspaceRoot: boolean;
   nodes: ExportedContentNode[];
 }
 
@@ -43,8 +41,6 @@ export interface ManuscriptNodeRead {
 }
 
 export interface ManuscriptNodeList {
-  rootNodeId: string;
-  isWorkspaceRoot: boolean;
   nodes: ManuscriptListNode[];
   truncated: boolean;
 }

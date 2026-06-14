@@ -86,7 +86,6 @@ function createWorkspaceState(input: {
   return {
     identity: {
       workspaceId: "workspace_1",
-      contentRootId: "content_root",
     },
     content: {
       tree: [],

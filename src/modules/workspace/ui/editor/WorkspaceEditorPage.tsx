@@ -143,8 +143,7 @@ function ProjectWorkspace({
   );
   useProjectWorkspaceEffects(workspace, actions.flushBodySave, actions.flushAuxSave);
 
-  const { workspaceId, contentRootId, workspaceQuery, workspaceInitialLoading, routeMismatch } =
-    identity;
+  const { workspaceId, workspaceQuery, workspaceInitialLoading, routeMismatch } = identity;
   const {
     query: contentQuery,
     pending: contentPending,
@@ -370,7 +369,7 @@ function ProjectWorkspace({
                       onClick={() =>
                         actions.handleContentCreateSibling(CONTENT_CREATE_SIBLING_ANCHOR)
                       }
-                      disabled={contentPending || !contentRootId || !activeTimelinePointId}
+                      disabled={contentPending || !activeTimelinePointId}
                       anchorId={CONTENT_CREATE_SIBLING_ANCHOR}
                     />
                   ),

@@ -70,7 +70,7 @@ test("setDefaultBranch invalidates project list and detail tags", async () => {
   const workspace = seedProject("project_default_switch");
   workspaceService.createContentNode({
     workspaceId: workspace.id,
-    parentId: workspace.contentRootId!,
+    parentId: null,
     title: "Base",
   });
   const baseCommit = await workspaceService.createCommit({
@@ -126,7 +126,7 @@ test("delete project cascades content anchored to timeline points", async () => 
   });
   workspaceService.createContentNode({
     workspaceId: workspace.id,
-    parentId: workspace.contentRootId!,
+    parentId: null,
     anchorPointId: point.id,
     title: "Opening",
   });

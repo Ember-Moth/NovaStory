@@ -70,7 +70,6 @@ export const workspaces = sqliteTable(
       .references((): any => branches.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     worktreePath: text("worktree_path").notNull(),
-    contentRootId: text("content_root_id").notNull(),
     ...timestampColumns,
   },
   (table) => [

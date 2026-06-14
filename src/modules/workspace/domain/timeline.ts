@@ -17,6 +17,7 @@ import {
   readWorktreeState,
   writeWorktreeStateSync,
 } from "./git-storage/worktree-state";
+import { listAnchoredTimelinePointIds } from "./content";
 
 function touchWorkspace(workspaceId: string) {
   db.update(schema.workspaces)
@@ -150,7 +151,7 @@ export function deleteTimelinePoint(
   const point = state.timeline.find((item) => item.id === pointId);
   invariant(point, "未找到时间点。");
   invariant(
-    !state.content.some((node) => node.anchorTimelinePointId === pointId),
+    !listAnchoredTimelinePointIds(workspaceId).has(pointId),
     "无法删除：仍有章节锚定到该时间点。",
   );
   if (!options.purgeAuxLayers) {

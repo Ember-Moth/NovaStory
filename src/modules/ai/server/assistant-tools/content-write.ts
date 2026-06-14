@@ -17,12 +17,8 @@ import { getWorkspaceForProject } from "./workspace";
 
 type QueuedCreateAnchor = string | null;
 
-function createManuscriptInsertQueueKey(input: {
-  workspaceId: string;
-  parentId: string;
-  afterSiblingId: string | null;
-}) {
-  return `${input.workspaceId}:${input.parentId}:${input.afterSiblingId ?? "head"}`;
+function createManuscriptInsertQueueKey(input: { workspaceId: string; parentId: string | null }) {
+  return `${input.workspaceId}:${input.parentId ?? "top"}`;
 }
 
 function buildContentAnchorTimelineWarnings(input: {
@@ -92,7 +88,6 @@ export function buildContentWriteTools({ projectId, runtimeContext }: ToolBuildC
         const queueKey = createManuscriptInsertQueueKey({
           workspaceId: workspace.id,
           parentId,
-          afterSiblingId: normalizedAfterSiblingId,
         });
         const previousCreate = createManuscriptNodeQueues.get(queueKey) ?? Promise.resolve(null);
 

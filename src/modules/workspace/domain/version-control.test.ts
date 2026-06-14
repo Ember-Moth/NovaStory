@@ -33,7 +33,7 @@ test("default workspace creates a default branch and links project", async () =>
 
 test("commit then checkout round-trips content, timeline and aux state", async () => {
   const workspace = seedProject("proj_rt");
-  const rootId = workspace.contentRootId!;
+  const rootId = null;
 
   const point = service.createTimelinePoint({
     workspaceId: workspace.id,
@@ -94,7 +94,7 @@ test("identical content across commits shares the same git tree", async () => {
   const workspace = seedProject("proj_dedup");
   service.createContentNode({
     workspaceId: workspace.id,
-    parentId: workspace.contentRootId!,
+    parentId: null,
     title: "Dup",
     body: "shared body text",
   });
@@ -111,7 +111,7 @@ test("branch off a commit shares the same head and forked metadata", async () =>
   const workspace = seedProject("proj_branch");
   service.createContentNode({
     workspaceId: workspace.id,
-    parentId: workspace.contentRootId!,
+    parentId: null,
     title: "Base",
     body: "base",
   });
@@ -181,7 +181,7 @@ test("branch workspace timeline deletion only checks anchors in that workspace",
   });
   service.createContentNode({
     workspaceId: workspace.id,
-    parentId: workspace.contentRootId!,
+    parentId: null,
     title: "Main branch chapter",
     anchorPointId: point.id,
   });
@@ -235,7 +235,7 @@ test("merge metadata records multiple parents without merging", async () => {
   const workspace = seedProject("proj_merge");
   service.createContentNode({
     workspaceId: workspace.id,
-    parentId: workspace.contentRootId!,
+    parentId: null,
     title: "A",
   });
   const base = await await service.createCommit({ branchId: workspace.branchId, message: "base" });
@@ -268,13 +268,13 @@ test("listCommits walks the mainline history newest first", async () => {
   const workspace = seedProject("proj_history");
   service.createContentNode({
     workspaceId: workspace.id,
-    parentId: workspace.contentRootId!,
+    parentId: null,
     title: "One",
   });
   const c1 = await await service.createCommit({ branchId: workspace.branchId, message: "one" });
   service.createContentNode({
     workspaceId: workspace.id,
-    parentId: workspace.contentRootId!,
+    parentId: null,
     title: "Two",
   });
   const c2 = await await service.createCommit({ branchId: workspace.branchId, message: "two" });

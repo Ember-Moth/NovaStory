@@ -83,7 +83,7 @@ test("branch worktrees preserve independent uncommitted edits", async () => {
   const main = seedProject("git_branch_independent");
   const chapter = createContentNode({
     workspaceId: main.id,
-    parentId: main.contentRootId,
+    parentId: null,
     title: "Base",
     body: "base",
   });

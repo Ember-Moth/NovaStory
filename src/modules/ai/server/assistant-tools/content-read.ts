@@ -39,8 +39,6 @@ export function buildContentReadTools({ projectId, runtimeContext }: ToolBuildCo
             ok: true,
             truncated: list.truncated,
             data: {
-              rootNodeId: list.rootNodeId,
-              isWorkspaceRoot: list.isWorkspaceRoot,
               depth: Math.max(1, Math.trunc(depth ?? 2)),
               entries: list.nodes,
             },

@@ -15,6 +15,13 @@
       "when": 1781520000000,
       "tag": "0001_add_waiting_for_input_run_status",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781523600000,
+      "tag": "0002_remove_workspace_content_root",
+      "breakpoints": true
     }
   ]
 }

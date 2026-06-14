@@ -216,7 +216,7 @@ test("list_manuscript_nodes returns structure without bodies by default", async 
   const workspace = seedProject("assistant_tools_list_manuscript_default");
   const chapter = workspaceDomain.createContentNode({
     workspaceId: workspace.id,
-    parentId: workspace.contentRootId!,
+    parentId: null,
     title: "第一章",
     body: "第一章正文",
   });
@@ -243,8 +243,6 @@ test("list_manuscript_nodes returns structure without bodies by default", async 
     ok: true,
     truncated: true,
     data: {
-      rootNodeId: workspace.contentRootId,
-      isWorkspaceRoot: true,
       depth: 2,
       entries: [
         {
@@ -272,7 +270,7 @@ test("list_manuscript_nodes accepts a root node and deeper depth", async () => {
   const workspace = seedProject("assistant_tools_list_manuscript_deep");
   const chapter = workspaceDomain.createContentNode({
     workspaceId: workspace.id,
-    parentId: workspace.contentRootId!,
+    parentId: null,
     title: "第一章",
   });
   const scene = workspaceDomain.createContentNode({
@@ -299,8 +297,6 @@ test("list_manuscript_nodes accepts a root node and deeper depth", async () => {
     ok: true,
     truncated: false,
     data: {
-      rootNodeId: chapter.id,
-      isWorkspaceRoot: false,
       depth: 3,
       entries: [
         {
@@ -332,7 +328,7 @@ test("read_manuscript_node returns one full node with child structure summaries"
   const workspace = seedProject("assistant_tools_read_manuscript_node");
   const chapter = workspaceDomain.createContentNode({
     workspaceId: workspace.id,
-    parentId: workspace.contentRootId!,
+    parentId: null,
     title: "第一章",
     body: "第一章完整正文",
   });
@@ -382,7 +378,7 @@ test("read_manuscript_node defaults to the active content node", async () => {
   const workspace = seedProject("assistant_tools_read_active_manuscript_node");
   const chapter = workspaceDomain.createContentNode({
     workspaceId: workspace.id,
-    parentId: workspace.contentRootId!,
+    parentId: null,
     title: "当前章",
     body: "当前正文",
   });
@@ -448,7 +444,7 @@ test("create_manuscript_node anchors new content to the current timeline point",
   });
 
   const result = await executeTool(tools.create_manuscript_node!, {
-    parentId: workspace.contentRootId!,
+    parentId: null,
     title: "新场景",
     body: "正文",
   });
@@ -458,7 +454,7 @@ test("create_manuscript_node anchors new content to the current timeline point",
     truncated: false,
     data: {
       action: "created",
-      parentId: workspace.contentRootId,
+      parentId: null,
       title: "新场景",
       timelinePointId: timelinePoint.id,
     },
@@ -476,12 +472,12 @@ test("create_manuscript_node preserves call order when parallel calls share an i
   const workspace = seedProject("assistant_tools_create_manuscript_parallel_order");
   const chapter7 = workspaceDomain.createContentNode({
     workspaceId: workspace.id,
-    parentId: workspace.contentRootId!,
+    parentId: null,
     title: "第七章",
   });
   workspaceDomain.createContentNode({
     workspaceId: workspace.id,
-    parentId: workspace.contentRootId!,
+    parentId: null,
     afterSiblingId: chapter7.id,
     title: "终章",
   });
@@ -492,17 +488,17 @@ test("create_manuscript_node preserves call order when parallel calls share an i
 
   await Promise.all([
     executeTool(tools.create_manuscript_node!, {
-      parentId: workspace.contentRootId!,
+      parentId: null,
       afterSiblingId: chapter7.id,
       title: "第八章",
     }),
     executeTool(tools.create_manuscript_node!, {
-      parentId: workspace.contentRootId!,
+      parentId: null,
       afterSiblingId: chapter7.id,
       title: "第九章",
     }),
     executeTool(tools.create_manuscript_node!, {
-      parentId: workspace.contentRootId!,
+      parentId: null,
       afterSiblingId: chapter7.id,
       title: "第十章",
     }),
@@ -510,7 +506,7 @@ test("create_manuscript_node preserves call order when parallel calls share an i
 
   expect(
     workspaceDomain
-      .listManuscriptNodes(workspace.id, workspace.contentRootId!, { depth: 1 })
+      .listManuscriptNodes(workspace.id, undefined, { depth: 1 })
       .nodes.map((node) => node.title),
   ).toEqual(["第七章", "第八章", "第九章", "第十章", "终章"]);
 });
@@ -519,12 +515,12 @@ test("content write tools return manuscript titles for model and UI summaries", 
   const workspace = seedProject("assistant_tools_content_write_titles");
   const chapter = workspaceDomain.createContentNode({
     workspaceId: workspace.id,
-    parentId: workspace.contentRootId!,
+    parentId: null,
     title: "旧标题",
   });
   const parent = workspaceDomain.createContentNode({
     workspaceId: workspace.id,
-    parentId: workspace.contentRootId!,
+    parentId: null,
     title: "第二卷",
   });
   const tools = createAssistantTools({
@@ -587,7 +583,7 @@ test("update_manuscript_node warns when editing body outside the node anchor tim
   });
   const chapter = workspaceDomain.createContentNode({
     workspaceId: workspace.id,
-    parentId: workspace.contentRootId!,
+    parentId: null,
     anchorPointId: anchoredPoint.id,
     title: "章节",
     body: "旧正文",
