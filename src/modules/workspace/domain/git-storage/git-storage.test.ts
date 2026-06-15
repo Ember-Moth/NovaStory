@@ -1,9 +1,11 @@
 import { expect, test } from "bun:test";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { eq } from "drizzle-orm";
 
 import { db, schema } from "@/db";
 import { appendRunEvent, createRun, createThread, getRunTrace } from "@/modules/ai/domain/logs";
 import { setupMockDatabase } from "@/test/mock-db";
+import { getCatalogProviderDir, getCatalogProviderPath } from "@/shared/lib/storage-paths";
 
 import { aiRunsRef, metaRef, readFileAtRef, resolveRef } from "./git-store";
 import { getProjectWorktreeDir } from "./paths";
@@ -182,8 +184,13 @@ test("volatile cache rebuild prunes stale rows and preserves AI catalog", async 
   const workspace = seedProject("git_rebuild_all");
   await waitForProjectMeta("git_rebuild_all");
 
-  db.insert(schema.aiCatalogProviders)
-    .values({
+  // Seed an AI catalog provider as a JSON file (file-based catalog store).
+  const providerDir = getCatalogProviderDir();
+  mkdirSync(providerDir, { recursive: true });
+  const providerPath = getCatalogProviderPath("provider_keep");
+  writeFileSync(
+    providerPath,
+    JSON.stringify({
       id: "provider_keep",
       name: "Keep",
       sdkPackage: "@ai-sdk/openai",
@@ -193,8 +200,11 @@ test("volatile cache rebuild prunes stale rows and preserves AI catalog", async 
       rawJson: "{}",
       isActive: true,
       lastSeenAt: 1,
-    })
-    .run();
+      createdAt: 1,
+      updatedAt: 1,
+    }),
+    "utf8",
+  );
   db.insert(schema.projects)
     .values({ id: "stale_project", name: "Stale", description: null, defaultBranchId: null })
     .run();
@@ -210,6 +220,6 @@ test("volatile cache rebuild prunes stale rows and preserves AI catalog", async 
       .map((project) => project.id),
   ).toEqual(["git_rebuild_all"]);
   expect(db.select().from(schema.workspaces).get()?.id).toBe(workspace.id);
-  expect(db.select().from(schema.aiCatalogProviders).get()?.id).toBe("provider_keep");
+  expect(existsSync(providerPath)).toBe(true);
   expect(db.select().from(schema.cacheState).all().length).toBeGreaterThan(0);
 });

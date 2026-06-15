@@ -1,13 +1,5 @@
 import { sql } from "drizzle-orm";
-import {
-  check,
-  index,
-  integer,
-  real,
-  sqliteTable,
-  text,
-  uniqueIndex,
-} from "drizzle-orm/sqlite-core";
+import { check, index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 const timestampColumns = {
   createdAt: integer("created_at", { mode: "number" })
@@ -92,77 +84,13 @@ export const cacheState = sqliteTable(
   (table) => [index("cache_state_oid_idx").on(table.sourceOid)],
 );
 
-// === AI Catalog (external data cache - keep as is) ===
-
-export const aiCatalogProviders = sqliteTable(
-  "ai_catalog_providers",
-  {
-    id: text("id").primaryKey(),
-    name: text("name").notNull(),
-    sdkPackage: text("sdk_package"),
-    apiUrl: text("api_url"),
-    docsUrl: text("docs_url"),
-    envKeysJson: text("env_keys_json").notNull().default("[]"),
-    rawJson: text("raw_json").notNull(),
-    isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
-    lastSeenAt: integer("last_seen_at", { mode: "number" }).notNull(),
-    ...timestampColumns,
-  },
-  (table) => [
-    check("ai_providers_name_nonempty", sql`length(${table.name}) > 0`),
-    index("ai_providers_active_idx").on(table.isActive),
-  ],
-);
-
-export const aiCatalogModels = sqliteTable(
-  "ai_catalog_models",
-  {
-    id: text("id").primaryKey(),
-    providerId: text("provider_id")
-      .notNull()
-      .references(() => aiCatalogProviders.id, { onDelete: "cascade" }),
-    modelId: text("model_id").notNull(),
-    displayName: text("display_name").notNull(),
-    family: text("family"),
-    inputModalitiesJson: text("input_modalities_json").notNull().default("[]"),
-    outputModalitiesJson: text("output_modalities_json").notNull().default("[]"),
-    contextWindow: integer("context_window"),
-    maxOutputTokens: integer("max_output_tokens"),
-    supportsVision: integer("supports_vision", { mode: "boolean" }).notNull().default(false),
-    supportsToolUse: integer("supports_tool_use", { mode: "boolean" }).notNull().default(false),
-    supportsReasoning: integer("supports_reasoning", { mode: "boolean" }).notNull().default(false),
-    supportsTemperature: integer("supports_temperature", { mode: "boolean" })
-      .notNull()
-      .default(false),
-    inputPricePer1m: real("input_price_per_1m"),
-    outputPricePer1m: real("output_price_per_1m"),
-    costJson: text("cost_json"),
-    rawJson: text("raw_json").notNull(),
-    isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
-    lastSeenAt: integer("last_seen_at", { mode: "number" }).notNull(),
-    ...timestampColumns,
-  },
-  (table) => [
-    check("ai_models_display_name_nonempty", sql`length(${table.displayName}) > 0`),
-    check("ai_models_model_id_nonempty", sql`length(${table.modelId}) > 0`),
-    uniqueIndex("ai_models_provider_model_idx").on(table.providerId, table.modelId),
-    index("ai_models_provider_idx").on(table.providerId),
-    index("ai_models_active_idx").on(table.isActive),
-  ],
-);
-
-export const aiRegistryState = sqliteTable(
-  "ai_registry_state",
-  {
-    id: text("id").primaryKey(),
-    lastAttemptAt: integer("last_attempt_at", { mode: "number" }),
-    lastSuccessAt: integer("last_success_at", { mode: "number" }),
-    lastError: text("last_error"),
-    contentHash: text("content_hash"),
-    ...timestampColumns,
-  },
-  (table) => [check("ai_registry_state_id_nonempty", sql`length(${table.id}) > 0`)],
-);
+// === AI Catalog ===
+// The AI catalog is persisted as JSON files under <dataDir>/catalog/.
+// See `src/modules/ai/domain/catalog-file-store.ts` for the file layout and
+// `src/modules/ai/domain/catalog.ts` for the read/write API. There is no
+// `ai_catalog_providers` / `ai_catalog_models` / `ai_registry_state` table
+// anymore; legacy data will be dropped by the `0003_drop_ai_catalog_tables`
+// migration and re-fetched from models.dev on next refresh.
 
 // === AI Threads & Runs (keep core indexes for performance) ===
 

@@ -1,17 +1,20 @@
-import { expect, test } from "bun:test";
+import { afterAll, beforeEach, expect, test } from "bun:test";
 
-import { setupMockDatabase } from "@/test/mock-db";
+import { cleanupTestDataDir, resetTestDataDir } from "@/test/data-dir";
 
-setupMockDatabase();
+resetTestDataDir();
+afterAll(cleanupTestDataDir);
 
-const { db } = await import("@/db");
 const userConfig = await import("./user-config");
 const {
   assertConnectionSupportsCustomModel,
+  getAiCatalogStatus,
+  listCatalogModelsView,
   listCatalogProvidersView,
   listResolvedModelsForConnection,
   syncAiCatalogFromPayload,
 } = await import("./catalog");
+const { listProviders, readRegistryState } = await import("./catalog-file-store");
 
 const payloadV1 = JSON.stringify({
   openai: {
@@ -88,6 +91,10 @@ const payloadV2 = JSON.stringify({
   },
 });
 
+beforeEach(() => {
+  resetTestDataDir();
+});
+
 test("catalog sync imports only text-to-text models and exposes support metadata", async () => {
   await syncAiCatalogFromPayload(payloadV1);
 
@@ -100,21 +107,40 @@ test("catalog sync imports only text-to-text models and exposes support metadata
   expect(mystery?.isSupported).toBe(false);
   expect(mystery?.modelCount).toBe(1);
 
-  const models = db.query.aiCatalogModels.findMany().sync();
-  expect(models.map((model) => model.modelId).sort()).toEqual(["gpt-4o", "mystery-text"]);
+  const allModels = listProviders().flatMap((provider) =>
+    listCatalogModelsView({ catalogProviderId: provider.id, activeOnly: false }),
+  );
+  expect(allModels.map((model) => model.modelId).sort()).toEqual(["gpt-4o", "mystery-text"]);
+
+  // Registry state should have a non-null contentHash after a successful sync.
+  const state = readRegistryState();
+  expect(state).not.toBeNull();
+  expect(state?.contentHash).not.toBeNull();
+  expect(state?.lastSuccessAt).not.toBeNull();
 });
 
 test("catalog sync marks removed providers and models inactive instead of deleting them", async () => {
   await syncAiCatalogFromPayload(payloadV1);
   await syncAiCatalogFromPayload(payloadV2);
 
-  const providers = db.query.aiCatalogProviders.findMany().sync();
-  const models = db.query.aiCatalogModels.findMany().sync();
+  const providers = listProviders();
+  const openai = providers.find((provider) => provider.id === "openai");
+  const mystery = providers.find((provider) => provider.id === "mystery");
+  expect(openai?.isActive).toBe(true);
+  expect(mystery?.isActive).toBe(false);
 
-  expect(providers.find((provider) => provider.id === "openai")?.isActive).toBe(true);
-  expect(providers.find((provider) => provider.id === "mystery")?.isActive).toBe(false);
-  expect(models.find((model) => model.id === "openai:gpt-4o")?.isActive).toBe(false);
-  expect(models.find((model) => model.id === "openai:gpt-4.1-mini")?.isActive).toBe(true);
+  const openaiModels = listCatalogModelsView({
+    catalogProviderId: "openai",
+    activeOnly: false,
+  });
+  const modelIds = openaiModels.map((model) => model.modelId).sort();
+  expect(modelIds).toEqual(["gpt-4.1-mini", "gpt-4o"]);
+
+  const activeModelIds = openaiModels
+    .filter((model) => model.isActive)
+    .map((model) => model.modelId)
+    .sort();
+  expect(activeModelIds).toEqual(["gpt-4.1-mini"]);
 });
 
 test("registry connections resolve active catalog models, apply overrides, and reject custom collisions", async () => {
@@ -185,4 +211,21 @@ test("registry connections resolve active catalog models, apply overrides, and r
   });
   expect(resolvedWithCustom.map((model) => model.modelId)).toEqual(["gpt-4o", "story-specialist"]);
   expect(resolvedWithCustom[1]?.origin).toBe("custom");
+});
+
+test("getAiCatalogStatus reports counts and freshness", async () => {
+  const emptyStatus = getAiCatalogStatus();
+  expect(emptyStatus.providerCount).toBe(0);
+  expect(emptyStatus.modelCount).toBe(0);
+  expect(emptyStatus.lastSuccessAt).toBeNull();
+  expect(emptyStatus.isStale).toBe(true);
+
+  await syncAiCatalogFromPayload(payloadV1);
+  const status = getAiCatalogStatus();
+  expect(status.providerCount).toBeGreaterThanOrEqual(2);
+  expect(status.activeProviderCount).toBeGreaterThanOrEqual(1);
+  expect(status.modelCount).toBeGreaterThanOrEqual(2);
+  expect(status.activeModelCount).toBeGreaterThanOrEqual(2);
+  expect(status.lastSuccessAt).not.toBeNull();
+  expect(status.isStale).toBe(false);
 });

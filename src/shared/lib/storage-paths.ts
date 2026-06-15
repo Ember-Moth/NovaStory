@@ -25,6 +25,36 @@ export function getSqlitePath() {
   return join(ensureStorageRoot(), "sqlite.db");
 }
 
+export function getCatalogDir() {
+  const dir = join(ensureStorageRoot(), "catalog");
+  mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+export function getCatalogRegistryStatePath() {
+  return join(getCatalogDir(), "registry-state.json");
+}
+
+export function getCatalogProviderDir() {
+  const dir = join(getCatalogDir(), "providers");
+  mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+export function getCatalogProviderPath(providerId: string) {
+  return join(getCatalogProviderDir(), `${encodeURIComponent(providerId)}.json`);
+}
+
+export function getCatalogModelDir() {
+  const dir = join(getCatalogDir(), "models");
+  mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+export function getCatalogModelPath(modelId: string) {
+  return join(getCatalogModelDir(), `${encodeURIComponent(modelId)}.json`);
+}
+
 export function ensureProjectStorageRoot() {
   const root = ensureStorageRoot();
   mkdirSync(join(root, "repos"), { recursive: true });

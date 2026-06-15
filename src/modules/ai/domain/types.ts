@@ -3,10 +3,15 @@ import type { InferSelectModel } from "drizzle-orm";
 import type { ModelMessage } from "ai";
 
 import type { schema } from "@/db";
+import type {
+  AiRegistryModelRow as FileRegistryModelRow,
+  AiRegistryProviderRow as FileRegistryProviderRow,
+  AiRegistryStateRow as FileRegistryStateRow,
+} from "./catalog-file-store";
 
-export type AiCatalogProviderRow = InferSelectModel<typeof schema.aiCatalogProviders>;
-export type AiCatalogModelRow = InferSelectModel<typeof schema.aiCatalogModels>;
-export type AiRegistryStateRow = InferSelectModel<typeof schema.aiRegistryState>;
+export type AiCatalogProviderRow = FileRegistryProviderRow;
+export type AiCatalogModelRow = FileRegistryModelRow;
+export type AiRegistryStateRow = FileRegistryStateRow;
 export type AgentThreadRow = InferSelectModel<typeof schema.agentThreads>;
 export type AgentProjectStateRow = InferSelectModel<typeof schema.agentProjectState>;
 export type AgentThreadNodeRow = InferSelectModel<typeof schema.agentThreadNodes>;

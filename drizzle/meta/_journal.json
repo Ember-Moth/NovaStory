@@ -22,6 +22,13 @@
       "when": 1781523600000,
       "tag": "0002_remove_workspace_content_root",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1781691600000,
+      "tag": "0003_drop_ai_catalog_tables",
+      "breakpoints": true
     }
   ]
 }

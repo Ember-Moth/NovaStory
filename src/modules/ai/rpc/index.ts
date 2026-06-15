@@ -1,7 +1,6 @@
 import { mutation, type MutationCtx, query, stream } from "@codehz/rpc/core";
-import { eq } from "drizzle-orm";
 
-import { db, schema } from "@/db";
+import { getModel, getProvider } from "@/modules/ai/domain/catalog-file-store";
 import {
   assertConnectionSupportsCustomModel,
   ensureAiCatalogFresh,
@@ -378,9 +377,7 @@ function buildConnectionInsert(input: CreateConnectionInput): ConnectionInsert {
   const apiKey = sanitizeApiKey(input.apiKey);
 
   if (input.kind === "registry") {
-    const provider = db.query.aiCatalogProviders
-      .findFirst({ where: eq(schema.aiCatalogProviders.id, input.catalogProviderId) })
-      .sync();
+    const provider = getProvider(input.catalogProviderId);
     assertRpcFound(provider, "未找到模型目录服务商。");
     invariant(provider.sdkPackage, "该模型目录服务商没有配置 AI SDK 包。");
 
@@ -611,9 +608,7 @@ export const updateConnection = mutation<UpdateConnectionInput, AiConnectionRow,
     if (nextKind === "registry") {
       const providerId = input.catalogProviderId ?? existing.catalogProviderId;
       invariant(providerId, "模型目录连接必须关联一个服务商。");
-      const provider = db.query.aiCatalogProviders
-        .findFirst({ where: eq(schema.aiCatalogProviders.id, providerId) })
-        .sync();
+      const provider = getProvider(providerId);
       assertRpcFound(provider, "未找到模型目录服务商。");
       invariant(provider.sdkPackage, "该模型目录服务商没有配置 AI SDK 包。");
       const recipe = validateSdkPackageForInput(provider.sdkPackage);
@@ -689,9 +684,7 @@ export const setCatalogModelEnabled = mutation<
   assertRpcFound(connection, "未找到 AI 连接。");
   invariant(connection.kind === "registry", "只有模型目录连接可以启用或停用目录模型。");
 
-  const catalogModel = db.query.aiCatalogModels
-    .findFirst({ where: eq(schema.aiCatalogModels.id, catalogModelId) })
-    .sync();
+  const catalogModel = getModel(catalogModelId);
   assertRpcFound(catalogModel, "未找到目录模型。");
   invariant(catalogModel.providerId === connection.catalogProviderId, "该目录模型不属于当前连接。");
 
