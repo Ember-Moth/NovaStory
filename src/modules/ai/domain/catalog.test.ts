@@ -1,9 +1,8 @@
-import { afterAll, beforeEach, expect, test } from "bun:test";
+import { expect, test } from "bun:test";
 
-import { cleanupTestDataDir, resetTestDataDir } from "@/test/data-dir";
+import { setupTestDataDir } from "@/test/setup";
 
-resetTestDataDir();
-afterAll(cleanupTestDataDir);
+setupTestDataDir();
 
 const userConfig = await import("./user-config");
 const {
@@ -89,10 +88,6 @@ const payloadV2 = JSON.stringify({
       },
     },
   },
-});
-
-beforeEach(() => {
-  resetTestDataDir();
 });
 
 test("catalog sync imports only text-to-text models and exposes support metadata", async () => {

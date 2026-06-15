@@ -1,13 +1,5 @@
-import { afterEach, beforeEach } from "bun:test";
-
-import { cleanupTestDataDir, resetTestDataDir } from "./data-dir";
+import { setupGlobalTestDataDirIsolation } from "./data-dir";
 
 export function setupMockDatabase() {
-  beforeEach(() => {
-    resetTestDataDir();
-  });
-
-  afterEach(() => {
-    cleanupTestDataDir();
-  });
+  setupGlobalTestDataDirIsolation();
 }
