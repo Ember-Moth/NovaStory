@@ -25,7 +25,6 @@ import type {
   AgentArtifactRow,
   AgentArtifactView,
   AgentCandidateGroupView,
-  AgentCandidateNodeView,
   AgentMessagePartRow,
   AgentPartState,
   AgentProjectStateRow,
@@ -50,7 +49,6 @@ import type {
   AgentThreadNodeView,
   AgentThreadRole,
   AgentThreadRow,
-  AgentThreadStateView,
   AgentThreadView,
   AgentVisibility,
   ProjectAssistantContextSnapshot,
@@ -59,13 +57,13 @@ import type {
 
 export const PROJECT_ASSISTANT_AGENT_PROFILE = "project-assistant";
 
-interface CreateThreadInput {
+export interface CreateThreadInput {
   projectId: string;
   agentProfile?: string;
   title?: string | null;
 }
 
-interface CreateNodeInput {
+export interface CreateNodeInput {
   threadId: string;
   parentNodeId: string | null;
   message: ModelMessage;
@@ -76,7 +74,7 @@ interface CreateNodeInput {
   extraParts?: CreateNodeExtraPartInput[];
 }
 
-interface CreateNodeExtraPartInput {
+export interface CreateNodeExtraPartInput {
   partKind: AgentThreadNodePartKind;
   visibility?: AgentVisibility;
   state?: AgentPartState;
@@ -85,7 +83,7 @@ interface CreateNodeExtraPartInput {
   payload: unknown;
 }
 
-interface CreateRunInput {
+export interface CreateRunInput {
   threadId: string;
   parentRunId?: string | null;
   parentEventId?: string | null;
@@ -100,7 +98,7 @@ interface CreateRunInput {
   activeTools?: readonly ProjectAssistantToolName[] | null;
 }
 
-interface CreateArtifactInput {
+export interface CreateArtifactInput {
   runId?: string | null;
   stepId?: string | null;
   artifactKind: AgentArtifactKind;
@@ -110,7 +108,7 @@ interface CreateArtifactInput {
   summaryText?: string | null;
 }
 
-interface CreateRunStepInput {
+export interface CreateRunStepInput {
   runId: string;
   stepIndex: number;
   provider: string;
@@ -126,7 +124,7 @@ interface CreateRunStepInput {
   usage?: unknown;
 }
 
-interface CreateRunEventInput {
+export interface CreateRunEventInput {
   runId: string;
   stepId?: string | null;
   eventKind: AgentRunEventKind;
@@ -137,7 +135,7 @@ interface CreateRunEventInput {
   payloadArtifactId?: string | null;
 }
 
-interface MaterializeResponseMessagesInput {
+export interface MaterializeResponseMessagesInput {
   threadId: string;
   parentNodeId: string | null;
   runId: string;
@@ -145,7 +143,7 @@ interface MaterializeResponseMessagesInput {
   messages: ModelMessage[];
 }
 
-interface ProjectAiStorage {
+export interface ProjectAiStorage {
   index: AiIndexPayload;
   files: Record<string, string>;
 }
@@ -171,26 +169,26 @@ export interface RunTraceRows {
   childRuns: AgentRunView[];
 }
 
-function trimOptionalString(value: string | null | undefined) {
+export function trimOptionalString(value: string | null | undefined) {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
 }
 
-function normalizeThreadTitle(title: string | null | undefined, fallback: string) {
+export function normalizeThreadTitle(title: string | null | undefined, fallback: string) {
   return trimOptionalString(title) ?? fallback;
 }
 
-function normalizeSummaryText(summaryText: string | null | undefined) {
+export function normalizeSummaryText(summaryText: string | null | undefined) {
   return trimOptionalString(summaryText);
 }
 
-function serializeRequiredJson(value: unknown, label: string) {
+export function serializeRequiredJson(value: unknown, label: string) {
   const serialized = JSON.stringify(value);
   invariant(serialized !== undefined, `${label}必须可序列化。`);
   return serialized;
 }
 
-function serializeOptionalJson(value: unknown) {
+export function serializeOptionalJson(value: unknown) {
   if (value === undefined) {
     return null;
   }
@@ -199,14 +197,14 @@ function serializeOptionalJson(value: unknown) {
   return serialized;
 }
 
-function parseStoredJson<T>(raw: string | null): T | null {
+export function parseStoredJson<T>(raw: string | null): T | null {
   if (raw == null) {
     return null;
   }
   return JSON.parse(raw) as T;
 }
 
-function parseStoredArray<T>(raw: string | null | undefined): T[] {
+export function parseStoredArray<T>(raw: string | null | undefined): T[] {
   if (!raw) {
     return [];
   }
@@ -214,7 +212,7 @@ function parseStoredArray<T>(raw: string | null | undefined): T[] {
   return Array.isArray(parsed) ? (parsed as T[]) : [];
 }
 
-function stringifyStoredArray<T>(items: readonly T[]) {
+export function stringifyStoredArray<T>(items: readonly T[]) {
   return serializeRequiredJson(items, "缓存数组");
 }
 
@@ -810,7 +808,7 @@ function isModelMessagePart(part: AgentThreadNodePartView) {
   return part.partKind !== "data-assistant-ref";
 }
 
-function buildModelMessageFromParts(
+export function buildModelMessageFromParts(
   role: AgentThreadRole,
   parts: AgentThreadNodePartView[],
 ): ModelMessage {
@@ -854,7 +852,7 @@ function projectStoredPartPayload(payload: unknown): unknown {
   return record;
 }
 
-function getMessageContentParts(message: ModelMessage): unknown[] {
+export function getMessageContentParts(message: ModelMessage): unknown[] {
   const rawContent = (message as { content?: unknown }).content;
   return typeof rawContent === "string"
     ? [{ type: "text", text: rawContent }]
@@ -887,7 +885,7 @@ function getTextishSummary(message: ModelMessage) {
   return texts.length > 0 ? texts.join(" ").trim() : null;
 }
 
-function buildMessageSummary(message: ModelMessage) {
+export function buildMessageSummary(message: ModelMessage) {
   const textSummary = getTextishSummary(message);
   if (textSummary) {
     const normalized = textSummary.replace(/\s+/g, " ").trim();
@@ -917,7 +915,7 @@ function buildMessageSummary(message: ModelMessage) {
   return message.role === "system" ? "系统消息" : "消息";
 }
 
-function mapProjectStateRow(row: AgentProjectStateRow): AgentProjectStateView {
+export function mapProjectStateRow(row: AgentProjectStateRow): AgentProjectStateView {
   return {
     id: row.id,
     projectId: row.projectId,
@@ -928,7 +926,7 @@ function mapProjectStateRow(row: AgentProjectStateRow): AgentProjectStateView {
   };
 }
 
-function mapThreadRow(row: AgentThreadRow): AgentThreadView {
+export function mapThreadRow(row: AgentThreadRow): AgentThreadView {
   return {
     id: row.id,
     projectId: row.projectId,
@@ -965,7 +963,7 @@ function listNodePartViews(node: AgentThreadNodeRow) {
     .map(mapNodePartRow);
 }
 
-function mapNodeRow(row: AgentThreadNodeRow): AgentThreadNodeView {
+export function mapNodeRow(row: AgentThreadNodeRow): AgentThreadNodeView {
   assertThreadRole(row.role);
   assertSourceKind(row.sourceKind);
   const parts = listNodePartViews(row);
@@ -984,12 +982,12 @@ function mapNodeRow(row: AgentThreadNodeRow): AgentThreadNodeView {
   };
 }
 
-function getNodeModelMessage(node: AgentThreadNodeRow): ModelMessage {
+export function getNodeModelMessage(node: AgentThreadNodeRow): ModelMessage {
   assertThreadRole(node.role);
   return buildModelMessageFromParts(node.role, listNodePartViews(node));
 }
 
-function mapArtifactRow(row: AgentArtifactRow): AgentArtifactView {
+export function mapArtifactRow(row: AgentArtifactRow): AgentArtifactView {
   assertArtifactKind(row.artifactKind);
   assertVisibility(row.visibility);
   return {
@@ -1005,7 +1003,7 @@ function mapArtifactRow(row: AgentArtifactRow): AgentArtifactView {
   };
 }
 
-function mapRunInputRefRow(row: AgentRunInputRefRow): AssistantInputRefSnapshot {
+export function mapRunInputRefRow(row: AgentRunInputRefRow): AssistantInputRefSnapshot {
   invariant(row.kind === "global-prompt", "不支持的 run input ref 类型。");
   invariant(row.mode === "snapshot-ref", "不支持的 run input ref 模式。");
   const display = JSON.parse(row.displayJson) as { refId?: unknown };
@@ -1020,7 +1018,7 @@ function mapRunInputRefRow(row: AgentRunInputRefRow): AssistantInputRefSnapshot 
   };
 }
 
-function mapRunRow(row: AgentRunRow): AgentRunView {
+export function mapRunRow(row: AgentRunRow): AgentRunView {
   assertRunMode(row.runMode);
   assertRunStatus(row.status);
   return {
@@ -1049,7 +1047,7 @@ function mapRunRow(row: AgentRunRow): AgentRunView {
   };
 }
 
-function mapRunStepRow(row: AgentRunStepRow): AgentRunStepView {
+export function mapRunStepRow(row: AgentRunStepRow): AgentRunStepView {
   return {
     id: row.id,
     runId: row.runId,
@@ -1071,7 +1069,7 @@ function mapRunStepRow(row: AgentRunStepRow): AgentRunStepView {
   };
 }
 
-function mapRunEventRow(row: AgentRunEventRow): AgentRunEventView {
+export function mapRunEventRow(row: AgentRunEventRow): AgentRunEventView {
   assertEventKind(row.eventKind);
   return {
     id: row.id,
@@ -1088,11 +1086,11 @@ function mapRunEventRow(row: AgentRunEventRow): AgentRunEventView {
   };
 }
 
-function sortByCreatedAt<T extends { createdAt: number }>(rows: readonly T[]) {
+export function sortByCreatedAt<T extends { createdAt: number }>(rows: readonly T[]) {
   return [...rows].sort((left, right) => left.createdAt - right.createdAt);
 }
 
-function sortByUpdatedDescCreatedDesc<T extends { updatedAt: number; createdAt: number }>(
+export function sortByUpdatedDescCreatedDesc<T extends { updatedAt: number; createdAt: number }>(
   rows: readonly T[],
 ) {
   return [...rows].sort((left, right) => {
@@ -1112,7 +1110,7 @@ function normalizeIndexPayload(index: AiIndexPayload): AiIndexPayload {
   };
 }
 
-function replaceRowById<T extends { id: string }>(rows: T[], nextRow: T) {
+export function replaceRowById<T extends { id: string }>(rows: T[], nextRow: T) {
   const index = rows.findIndex((row) => row.id === nextRow.id);
   if (index >= 0) {
     rows[index] = nextRow;
@@ -1121,11 +1119,11 @@ function replaceRowById<T extends { id: string }>(rows: T[], nextRow: T) {
   }
 }
 
-function getProjectOrThrow(projectId: string) {
+export function getProjectOrThrow(projectId: string) {
   return readProjectMetaSync(projectId).project;
 }
 
-function touchProject(projectId: string) {
+export function touchProject(projectId: string) {
   updateProjectMetaSync(
     projectId,
     (payload) => ({
@@ -1147,7 +1145,7 @@ function readAiRunFilesOrEmpty(projectId: string) {
   }
 }
 
-function readProjectAiStorage(projectId: string): ProjectAiStorage {
+export function readProjectAiStorage(projectId: string): ProjectAiStorage {
   readProjectMetaSync(projectId);
   return {
     index: normalizeIndexPayload(readAiIndexSync(projectId)),
@@ -1177,7 +1175,7 @@ function writeProjectAiStorage(projectId: string, storage: ProjectAiStorage, mes
   } satisfies ProjectAiStorage;
 }
 
-function updateProjectAiStorage<T>(
+export function updateProjectAiStorage<T>(
   projectId: string,
   message: string,
   updater: (_storage: ProjectAiStorage) => T,
@@ -1188,49 +1186,53 @@ function updateProjectAiStorage<T>(
   return result;
 }
 
-function getProjectIdForThreadOrThrow(threadId: string) {
+export function getProjectIdForThreadOrThrow(threadId: string) {
   const projectId = findProjectIdForThreadSync(threadId);
   invariant(projectId, "未找到 agent thread。");
   return projectId;
 }
 
-function getProjectIdForNodeOrThrow(nodeId: string) {
+export function getProjectIdForNodeOrThrow(nodeId: string) {
   const projectId = findProjectIdForNodeSync(nodeId);
   invariant(projectId, "未找到 agent 节点。");
   return projectId;
 }
 
-function getProjectIdForRunOrThrow(runId: string) {
+export function getProjectIdForRunOrThrow(runId: string) {
   const projectId = findProjectIdForRunSync(runId);
   invariant(projectId, "未找到 agent run。");
   return projectId;
 }
 
-function getThreadOrThrow(index: AiIndexPayload, threadId: string) {
+export function getThreadOrThrow(index: AiIndexPayload, threadId: string) {
   const thread = index.threads.find((entry) => entry.id === threadId);
   invariant(thread, "未找到 agent thread。");
   return thread;
 }
 
-function getNodeOrThrow(index: AiIndexPayload, nodeId: string) {
+export function getNodeOrThrow(index: AiIndexPayload, nodeId: string) {
   const node = index.nodes.find((entry) => entry.id === nodeId);
   invariant(node, "未找到 agent 节点。");
   return node;
 }
 
-function getRunOrThrow(index: AiIndexPayload, runId: string) {
+export function getRunOrThrow(index: AiIndexPayload, runId: string) {
   const run = index.runs.find((entry) => entry.id === runId);
   invariant(run, "未找到 agent run。");
   return run;
 }
 
-function getProjectStateRow(index: AiIndexPayload, projectId: string, agentProfile: string) {
+export function getProjectStateRow(index: AiIndexPayload, projectId: string, agentProfile: string) {
   return index.projectState.find(
     (entry) => entry.projectId === projectId && entry.agentProfile === agentProfile,
   );
 }
 
-function getNodeRowsByThread(index: AiIndexPayload, threadId: string, parentNodeId: string | null) {
+export function getNodeRowsByThread(
+  index: AiIndexPayload,
+  threadId: string,
+  parentNodeId: string | null,
+) {
   return sortByCreatedAt(
     index.nodes.filter(
       (entry) => entry.threadId === threadId && entry.parentNodeId === parentNodeId,
@@ -1238,7 +1240,7 @@ function getNodeRowsByThread(index: AiIndexPayload, threadId: string, parentNode
   );
 }
 
-function touchThread(index: AiIndexPayload, threadId: string, timestamp = now()) {
+export function touchThread(index: AiIndexPayload, threadId: string, timestamp = now()) {
   const thread = getThreadOrThrow(index, threadId);
   replaceRowById(index.threads, {
     ...thread,
@@ -1246,7 +1248,7 @@ function touchThread(index: AiIndexPayload, threadId: string, timestamp = now())
   });
 }
 
-function upsertProjectState(
+export function upsertProjectState(
   index: AiIndexPayload,
   projectId: string,
   agentProfile: string,
@@ -1274,7 +1276,7 @@ function upsertProjectState(
   return mapProjectStateRow(next);
 }
 
-function getLatestUnarchivedThreadRow(
+export function getLatestUnarchivedThreadRow(
   index: AiIndexPayload,
   projectId: string,
   agentProfile: string,
@@ -1311,7 +1313,7 @@ function buildStoredMessagePartRows(
   })) satisfies AgentMessagePartRow[];
 }
 
-function insertNode(storage: ProjectAiStorage, input: CreateNodeInput) {
+export function insertNode(storage: ProjectAiStorage, input: CreateNodeInput) {
   const thread = getThreadOrThrow(storage.index, input.threadId);
   if (input.parentNodeId) {
     const parent = getNodeOrThrow(storage.index, input.parentNodeId);
@@ -1349,7 +1351,7 @@ function insertNode(storage: ProjectAiStorage, input: CreateNodeInput) {
   return mapNodeRow(row);
 }
 
-function updateNodePart(
+export function updateNodePart(
   storage: ProjectAiStorage,
   nodeId: string,
   partIndex: number,
@@ -1383,7 +1385,7 @@ function updateNodePart(
   touchThread(storage.index, node.threadId);
 }
 
-function appendNodePart(
+export function appendNodePart(
   storage: ProjectAiStorage,
   nodeId: string,
   part: {
@@ -1417,7 +1419,7 @@ function appendNodePart(
   touchThread(storage.index, node.threadId);
 }
 
-function updateNodeSummary(
+export function updateNodeSummary(
   storage: ProjectAiStorage,
   nodeId: string,
   summaryText: string | null | undefined,
@@ -1430,7 +1432,7 @@ function updateNodeSummary(
   touchThread(storage.index, node.threadId);
 }
 
-function normalizeUsageTotalTokens(usage: unknown): number | null {
+export function normalizeUsageTotalTokens(usage: unknown): number | null {
   if (!usage || typeof usage !== "object") {
     return null;
   }
@@ -1484,7 +1486,9 @@ export function buildAgentRunCacheFieldsFromTrace(rows: RunTraceRows) {
   return summarizeRunTraceRows(rows);
 }
 
-function normalizeGitStepRow(row: AgentRunStepRow | Record<string, unknown>): AgentRunStepRow {
+export function normalizeGitStepRow(
+  row: AgentRunStepRow | Record<string, unknown>,
+): AgentRunStepRow {
   if ("systemJson" in row) return row as AgentRunStepRow;
   return {
     id: String(row.id),
@@ -1512,7 +1516,7 @@ function normalizeGitStepRow(row: AgentRunStepRow | Record<string, unknown>): Ag
   };
 }
 
-function normalizeGitArtifactRow(
+export function normalizeGitArtifactRow(
   row: AgentArtifactRow | AgentArtifactView | Record<string, unknown>,
 ): AgentArtifactRow {
   if ("contentJson" in row) return row as AgentArtifactRow;
@@ -1529,7 +1533,10 @@ function normalizeGitArtifactRow(
   };
 }
 
-function parseRunTraceRowsFromStorage(storage: ProjectAiStorage, run: AgentRunRow): RunTraceRows {
+export function parseRunTraceRowsFromStorage(
+  storage: ProjectAiStorage,
+  run: AgentRunRow,
+): RunTraceRows {
   const runJson = storage.files[`runs/${run.id}/run.json`];
   const runView = runJson ? (JSON.parse(runJson) as AgentRunView) : mapRunRow(run);
   const inputRefs = parseJsonl<AgentRunInputRefRow>(
@@ -1562,7 +1569,7 @@ function parseRunTraceRowsFromStorage(storage: ProjectAiStorage, run: AgentRunRo
   };
 }
 
-function mapTraceRows(rows: RunTraceRows): AgentRunTraceView {
+export function mapTraceRows(rows: RunTraceRows): AgentRunTraceView {
   return {
     run: rows.run,
     steps: rows.steps.map(mapRunStepRow),
@@ -1572,7 +1579,7 @@ function mapTraceRows(rows: RunTraceRows): AgentRunTraceView {
   };
 }
 
-function applyRunTraceRowsToStorage(storage: ProjectAiStorage, rows: RunTraceRows) {
+export function applyRunTraceRowsToStorage(storage: ProjectAiStorage, rows: RunTraceRows) {
   storage.files[`runs/${rows.run.id}/run.json`] = `${JSON.stringify(rows.run, null, 2)}\n`;
   storage.files[`runs/${rows.run.id}/input-refs.jsonl`] = stringifyJsonl(rows.inputRefs);
   storage.files[`runs/${rows.run.id}/steps.jsonl`] = stringifyJsonl(rows.steps);
@@ -1600,7 +1607,7 @@ function applyRunTraceRowsToStorage(storage: ProjectAiStorage, rows: RunTraceRow
   });
 }
 
-function getStepOrThrow(stepId: string) {
+export function getStepOrThrow(stepId: string) {
   for (const project of listProjectRowsSync()) {
     const storage = readProjectAiStorage(project.id);
     for (const run of storage.index.runs) {
@@ -1615,7 +1622,7 @@ function getStepOrThrow(stepId: string) {
   invariant(false, "未找到 run step。");
 }
 
-function getArtifactOrThrow(artifactId: string) {
+export function getArtifactOrThrow(artifactId: string) {
   for (const project of listProjectRowsSync()) {
     const storage = readProjectAiStorage(project.id);
     for (const run of storage.index.runs) {
@@ -1630,7 +1637,11 @@ function getArtifactOrThrow(artifactId: string) {
   invariant(false, "未找到 artifact。");
 }
 
-function resolveCandidateLeafTip(index: AiIndexPayload, threadId: string, candidateNodeId: string) {
+export function resolveCandidateLeafTip(
+  index: AiIndexPayload,
+  threadId: string,
+  candidateNodeId: string,
+) {
   let currentId = candidateNodeId;
   while (true) {
     const children = getNodeRowsByThread(index, threadId, currentId);
@@ -1641,7 +1652,7 @@ function resolveCandidateLeafTip(index: AiIndexPayload, threadId: string, candid
   }
 }
 
-function buildCandidateGroups(
+export function buildCandidateGroups(
   index: AiIndexPayload,
   threadId: string,
   activePath: AgentThreadNodeView[],
@@ -1673,7 +1684,7 @@ function buildCandidateGroups(
   return groups;
 }
 
-function buildRunSummaries(
+export function buildRunSummaries(
   index: AiIndexPayload,
   threadId: string,
   activePath: AgentThreadNodeView[],
@@ -1765,1036 +1776,4 @@ function buildRunSummaries(
       const rightRun = relevantRuns.find((row) => row.id === right.runId)!;
       return leftRun.createdAt - rightRun.createdAt;
     });
-}
-
-export function listThreads(
-  projectId: string,
-  options?: { agentProfile?: string; archived?: boolean },
-) {
-  getProjectOrThrow(projectId);
-  const storage = readProjectAiStorage(projectId);
-  const agentProfile = trimOptionalString(options?.agentProfile);
-  const archived = options?.archived;
-  return sortByUpdatedDescCreatedDesc(
-    storage.index.threads.filter(
-      (row) =>
-        row.projectId === projectId &&
-        (agentProfile ? row.agentProfile === agentProfile : true) &&
-        (archived == null ? true : archived ? row.archivedAt != null : row.archivedAt == null),
-    ),
-  ).map(mapThreadRow);
-}
-
-export function getProjectState(projectId: string, agentProfile = PROJECT_ASSISTANT_AGENT_PROFILE) {
-  getProjectOrThrow(projectId);
-  const row = getProjectStateRow(readProjectAiStorage(projectId).index, projectId, agentProfile);
-  return row ? mapProjectStateRow(row) : null;
-}
-
-export function resolveActiveThread(
-  projectId: string,
-  agentProfile = PROJECT_ASSISTANT_AGENT_PROFILE,
-) {
-  getProjectOrThrow(projectId);
-  const storage = readProjectAiStorage(projectId);
-  const state = getProjectStateRow(storage.index, projectId, agentProfile);
-
-  if (state?.activeThreadId) {
-    const activeThread = storage.index.threads.find((row) => row.id === state.activeThreadId);
-    if (
-      activeThread &&
-      activeThread.projectId === projectId &&
-      activeThread.agentProfile === agentProfile &&
-      activeThread.archivedAt == null
-    ) {
-      return mapThreadRow(activeThread);
-    }
-  }
-
-  const fallback = getLatestUnarchivedThreadRow(storage.index, projectId, agentProfile);
-  updateProjectAiStorage(projectId, "Resolve AI active thread", (mutableStorage) => {
-    upsertProjectState(mutableStorage.index, projectId, agentProfile, fallback?.id ?? null);
-  });
-  return fallback ? mapThreadRow(fallback) : null;
-}
-
-export function createThread(input: CreateThreadInput) {
-  const result = updateProjectAiStorage(input.projectId, "Create AI thread", (storage) => {
-    getProjectOrThrow(input.projectId);
-    const agentProfile = trimOptionalString(input.agentProfile) ?? PROJECT_ASSISTANT_AGENT_PROFILE;
-    const existingCount = storage.index.threads.filter(
-      (row) => row.projectId === input.projectId && row.agentProfile === agentProfile,
-    ).length;
-    const timestamp = now();
-    const row: AgentThreadRow = {
-      id: createId("agent_thread"),
-      projectId: input.projectId,
-      agentProfile,
-      title: normalizeThreadTitle(input.title, `新会话 ${existingCount + 1}`),
-      activeTipNodeId: null,
-      archivedAt: null,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    };
-    storage.index.threads.push(row);
-    upsertProjectState(storage.index, input.projectId, agentProfile, row.id);
-    return mapThreadRow(row);
-  });
-  touchProject(input.projectId);
-  return result;
-}
-
-export function renameThread(threadId: string, title: string) {
-  const projectId = getProjectIdForThreadOrThrow(threadId);
-  const result = updateProjectAiStorage(projectId, `Rename AI thread ${threadId}`, (storage) => {
-    const thread = getThreadOrThrow(storage.index, threadId);
-    const normalizedTitle = trimOptionalString(title);
-    invariant(normalizedTitle, "名称不能为空。");
-    const updated: AgentThreadRow = {
-      ...thread,
-      title: normalizedTitle,
-      updatedAt: now(),
-    };
-    replaceRowById(storage.index.threads, updated);
-    return mapThreadRow(updated);
-  });
-  touchProject(projectId);
-  return result;
-}
-
-export function setActiveThread(projectId: string, threadId: string) {
-  const result = updateProjectAiStorage(projectId, "Set AI active thread", (storage) => {
-    const thread = getThreadOrThrow(storage.index, threadId);
-    invariant(thread.projectId === projectId, "thread 不属于当前项目。");
-    invariant(thread.archivedAt == null, "不能激活已归档 thread。");
-    upsertProjectState(storage.index, projectId, thread.agentProfile, thread.id);
-    return mapThreadRow(thread);
-  });
-  return result;
-}
-
-export function archiveThread(threadId: string, archived: boolean) {
-  const projectId = getProjectIdForThreadOrThrow(threadId);
-  const result = updateProjectAiStorage(projectId, `Archive AI thread ${threadId}`, (storage) => {
-    const thread = getThreadOrThrow(storage.index, threadId);
-    const updated: AgentThreadRow = {
-      ...thread,
-      archivedAt: archived ? now() : null,
-      updatedAt: now(),
-    };
-    replaceRowById(storage.index.threads, updated);
-    const state = getProjectStateRow(storage.index, thread.projectId, thread.agentProfile);
-    if (archived && state?.activeThreadId === threadId) {
-      const fallback = getLatestUnarchivedThreadRow(
-        storage.index,
-        thread.projectId,
-        thread.agentProfile,
-      );
-      upsertProjectState(
-        storage.index,
-        thread.projectId,
-        thread.agentProfile,
-        fallback?.id ?? null,
-      );
-    }
-    if (!archived && !state?.activeThreadId) {
-      upsertProjectState(storage.index, thread.projectId, thread.agentProfile, threadId);
-    }
-    return mapThreadRow(updated);
-  });
-  touchProject(projectId);
-  return result;
-}
-
-export function resolveThreadPath(threadId: string, tipNodeId?: string | null) {
-  const projectId = getProjectIdForThreadOrThrow(threadId);
-  const storage = readProjectAiStorage(projectId);
-  const thread = getThreadOrThrow(storage.index, threadId);
-  const currentTipId = trimOptionalString(tipNodeId) ?? thread.activeTipNodeId;
-  if (!currentTipId) {
-    return [] as AgentThreadNodeView[];
-  }
-
-  const chain: AgentThreadNodeRow[] = [];
-  const seen = new Set<string>();
-  let currentId: string | null = currentTipId;
-
-  while (currentId) {
-    invariant(!seen.has(currentId), "thread 节点链存在循环。");
-    seen.add(currentId);
-    const row = getNodeOrThrow(storage.index, currentId);
-    invariant(row.threadId === thread.id, "thread 引用了其他会话的节点。");
-    chain.push(row);
-    currentId = row.parentNodeId;
-  }
-
-  return chain.reverse().map(mapNodeRow);
-}
-
-export function buildThreadModelMessages(threadId: string, tipNodeId?: string | null) {
-  return resolveThreadPath(threadId, tipNodeId).map((node) => node.message);
-}
-
-export function getNodeCandidates(parentNodeId: string) {
-  const projectId = getProjectIdForNodeOrThrow(parentNodeId);
-  const storage = readProjectAiStorage(projectId);
-  const parent = getNodeOrThrow(storage.index, parentNodeId);
-  return getNodeRowsByThread(storage.index, parent.threadId, parentNodeId).map(
-    (row): AgentCandidateNodeView => ({
-      id: row.id,
-      tipNodeId: resolveCandidateLeafTip(storage.index, row.threadId, row.id),
-      role: row.role as AgentThreadRole,
-      summaryText: row.summaryText,
-      createdAt: row.createdAt,
-      createdByRunId: row.createdByRunId,
-    }),
-  );
-}
-
-export function listLatestRuns(threadId: string, limit = 10) {
-  const projectId = getProjectIdForThreadOrThrow(threadId);
-  const storage = readProjectAiStorage(projectId);
-  getThreadOrThrow(storage.index, threadId);
-  return [...storage.index.runs]
-    .filter((row) => row.threadId === threadId)
-    .sort((left, right) => right.createdAt - left.createdAt)
-    .slice(0, limit)
-    .map(mapRunRow);
-}
-
-export function getLatestRunForTriggerNode(threadId: string, triggerNodeId: string) {
-  const projectId = getProjectIdForThreadOrThrow(threadId);
-  const storage = readProjectAiStorage(projectId);
-  getThreadOrThrow(storage.index, threadId);
-  return (
-    [...storage.index.runs]
-      .filter((row) => row.threadId === threadId && row.triggerNodeId === triggerNodeId)
-      .sort((left, right) => right.createdAt - left.createdAt)
-      .map(mapRunRow)[0] ?? null
-  );
-}
-
-export function getThreadView(threadId: string): AgentThreadStateView {
-  const projectId = getProjectIdForThreadOrThrow(threadId);
-  const storage = readProjectAiStorage(projectId);
-  const thread = getThreadOrThrow(storage.index, threadId);
-  const activePath = resolveThreadPath(thread.id);
-  return {
-    thread: mapThreadRow(thread),
-    activePath,
-    candidateGroups: buildCandidateGroups(storage.index, thread.id, activePath),
-    latestRuns: listLatestRuns(thread.id),
-    runSummaries: buildRunSummaries(storage.index, thread.id, activePath),
-  };
-}
-
-export function hasPendingRun(threadId: string) {
-  const projectId = getProjectIdForThreadOrThrow(threadId);
-  const storage = readProjectAiStorage(projectId);
-  getThreadOrThrow(storage.index, threadId);
-  return storage.index.runs.some(
-    (row) =>
-      row.threadId === threadId &&
-      (row.status === "queued" || row.status === "running" || row.status === "waiting_for_input"),
-  );
-}
-
-export function selectActiveTip(threadId: string, tipNodeId: string) {
-  const projectId = getProjectIdForThreadOrThrow(threadId);
-  const result = updateProjectAiStorage(projectId, "Select AI thread tip", (storage) => {
-    const thread = getThreadOrThrow(storage.index, threadId);
-    const node = getNodeOrThrow(storage.index, tipNodeId);
-    invariant(node.threadId === thread.id, "候选节点不属于当前 thread。");
-    const updated: AgentThreadRow = {
-      ...thread,
-      activeTipNodeId: node.id,
-      updatedAt: now(),
-    };
-    replaceRowById(storage.index.threads, updated);
-    return mapThreadRow(updated);
-  });
-  touchProject(projectId);
-  return result;
-}
-
-export function appendUserNode(input: {
-  threadId: string;
-  parentNodeId: string | null;
-  message: ModelMessage;
-  sourceKind?: Extract<AgentThreadNodeSourceKind, "user_input" | "edit_rewrite">;
-  extraParts?: CreateNodeExtraPartInput[];
-}) {
-  const projectId = getProjectIdForThreadOrThrow(input.threadId);
-  const result = updateProjectAiStorage(projectId, "Append AI user node", (storage) => {
-    const node = insertNode(storage, {
-      threadId: input.threadId,
-      parentNodeId: input.parentNodeId,
-      message: input.message,
-      sourceKind: input.sourceKind ?? "user_input",
-      extraParts: input.extraParts,
-    });
-    const thread = getThreadOrThrow(storage.index, input.threadId);
-    replaceRowById(storage.index.threads, {
-      ...thread,
-      activeTipNodeId: node.id,
-      updatedAt: now(),
-    });
-    return node;
-  });
-  touchProject(projectId);
-  return result;
-}
-
-export function createReplacementNode(input: {
-  threadId: string;
-  nodeId: string;
-  message: ModelMessage;
-  extraParts?: CreateNodeExtraPartInput[];
-}) {
-  const projectId = getProjectIdForThreadOrThrow(input.threadId);
-  const result = updateProjectAiStorage(projectId, "Create AI replacement node", (storage) => {
-    const node = getNodeOrThrow(storage.index, input.nodeId);
-    invariant(node.threadId === input.threadId, "待修改节点不属于当前 thread。");
-    const replacement = insertNode(storage, {
-      threadId: input.threadId,
-      parentNodeId: node.parentNodeId,
-      message: input.message,
-      sourceKind: "edit_rewrite",
-      extraParts: input.extraParts,
-    });
-    const thread = getThreadOrThrow(storage.index, input.threadId);
-    replaceRowById(storage.index.threads, {
-      ...thread,
-      activeTipNodeId: replacement.id,
-      updatedAt: now(),
-    });
-    return replacement;
-  });
-  touchProject(projectId);
-  return result;
-}
-
-export function createRun(input: CreateRunInput) {
-  const projectId = getProjectIdForThreadOrThrow(input.threadId);
-  const result = updateProjectAiStorage(projectId, "Create AI run", (storage) => {
-    const thread = getThreadOrThrow(storage.index, input.threadId);
-    const status = input.status ?? "running";
-    if (input.parentRunId) {
-      const parentRun = getRunOrThrow(storage.index, input.parentRunId);
-      invariant(parentRun.threadId === thread.id, "父 run 不属于当前 thread。");
-    }
-    if (input.triggerNodeId) {
-      const triggerNode = getNodeOrThrow(storage.index, input.triggerNodeId);
-      invariant(triggerNode.threadId === thread.id, "触发节点不属于当前 thread。");
-    }
-    if (input.baseTipNodeId) {
-      const baseTipNode = getNodeOrThrow(storage.index, input.baseTipNodeId);
-      invariant(baseTipNode.threadId === thread.id, "base tip 不属于当前 thread。");
-    }
-    const id = createId("agent_run");
-    const timestamp = now();
-    const row: AgentRunRow = {
-      id,
-      threadId: thread.id,
-      parentRunId: trimOptionalString(input.parentRunId),
-      parentEventId: trimOptionalString(input.parentEventId),
-      triggerNodeId: trimOptionalString(input.triggerNodeId),
-      baseTipNodeId: trimOptionalString(input.baseTipNodeId),
-      runMode: input.runMode,
-      status,
-      agentProfile: input.agentProfile,
-      errorArtifactId: null,
-      selectionSnapshotJson: serializeRequiredJson(input.selectionSnapshot ?? {}, "run 选择快照"),
-      contextSnapshotJson: serializeOptionalJson(input.contextSnapshot ?? null),
-      inputRefsSnapshotJson: serializeOptionalJson(input.inputRefsSnapshot ?? null),
-      activeToolsJson: serializeOptionalJson(input.activeTools ? [...input.activeTools] : null),
-      stepCount: 0,
-      totalTokens: null,
-      lastFinishReason: null,
-      errorSummary: null,
-      traceUpdatedAt: timestamp,
-      startedAt: timestamp,
-      completedAt: null,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    };
-    storage.index.runs.push(row);
-    touchThread(storage.index, thread.id, timestamp);
-    const inputRefs: AgentRunInputRefRow[] = (input.inputRefsSnapshot ?? []).map(
-      (ref, refIndex) => ({
-        id: createId("agent_run_ref"),
-        runId: id,
-        refIndex,
-        kind: ref.kind,
-        mode: ref.mode,
-        label: ref.label,
-        sourceJson: serializeRequiredJson(ref.source, "run ref source"),
-        snapshotJson: serializeRequiredJson(ref.snapshot, "run ref snapshot"),
-        displayJson: serializeRequiredJson(
-          {
-            refId: ref.refId,
-            kind: ref.kind,
-            mode: ref.mode,
-            label: ref.label,
-          },
-          "run ref display",
-        ),
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      }),
-    );
-    const runView: AgentRunView = {
-      id: row.id,
-      threadId: row.threadId,
-      parentRunId: row.parentRunId,
-      parentEventId: row.parentEventId,
-      triggerNodeId: row.triggerNodeId,
-      baseTipNodeId: row.baseTipNodeId,
-      runMode: row.runMode as AgentRunMode,
-      status: row.status as AgentRunStatus,
-      agentProfile: row.agentProfile,
-      selectionSnapshot: input.selectionSnapshot ?? {},
-      contextSnapshot: input.contextSnapshot ?? null,
-      inputRefsSnapshot: inputRefs.map(mapRunInputRefRow),
-      activeTools: input.activeTools ? [...input.activeTools] : null,
-      errorArtifactId: null,
-      startedAt: row.startedAt,
-      completedAt: row.completedAt,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-    };
-    applyRunTraceRowsToStorage(storage, {
-      run: runView,
-      inputRefs,
-      steps: [],
-      events: [],
-      artifacts: [],
-      childRuns: [],
-    });
-    return runView;
-  });
-  touchProject(projectId);
-  return result;
-}
-
-export function createArtifact(input: CreateArtifactInput) {
-  invariant(input.runId || input.stepId, "artifact 必须关联 run 或 step。");
-  const runId = trimOptionalString(input.runId) ?? getStepOrThrow(input.stepId!).runId;
-  const projectId = getProjectIdForRunOrThrow(runId);
-  return updateProjectAiStorage(projectId, `Update AI run ${runId}`, (storage) => {
-    const run = getRunOrThrow(storage.index, runId);
-    if (input.stepId) {
-      const step = getStepOrThrow(input.stepId);
-      invariant(step.runId === run.id, "artifact step 不属于当前 run。");
-    }
-    const artifact: AgentArtifactRow = {
-      id: createId("agent_artifact"),
-      runId: run.id,
-      stepId: trimOptionalString(input.stepId),
-      artifactKind: input.artifactKind,
-      visibility: input.visibility,
-      mimeType: trimOptionalString(input.mimeType),
-      contentJson: serializeRequiredJson(input.content, "artifact 内容"),
-      summaryText: normalizeSummaryText(input.summaryText),
-      createdAt: now(),
-    };
-    const rows = parseRunTraceRowsFromStorage(storage, run);
-    rows.artifacts.push(artifact);
-    rows.run = {
-      ...rows.run,
-      updatedAt: now(),
-    };
-    applyRunTraceRowsToStorage(storage, rows);
-    return mapArtifactRow(artifact);
-  });
-}
-
-export function createRunStep(input: CreateRunStepInput) {
-  const projectId = getProjectIdForRunOrThrow(input.runId);
-  return updateProjectAiStorage(projectId, `Update AI run ${input.runId}`, (storage) => {
-    const run = getRunOrThrow(storage.index, input.runId);
-    const rows = parseRunTraceRowsFromStorage(storage, run);
-    invariant(
-      !rows.steps.some((step) => step.stepIndex === input.stepIndex),
-      "run step 序号已存在。",
-    );
-    const timestamp = now();
-    const step: AgentRunStepRow = {
-      id: createId("agent_step"),
-      runId: run.id,
-      stepIndex: input.stepIndex,
-      provider: input.provider,
-      modelId: input.modelId,
-      finishReason: trimOptionalString(input.finishReason),
-      rawFinishReason: trimOptionalString(input.rawFinishReason),
-      systemJson: serializeOptionalJson(input.system),
-      preparedMessagesArtifactId: trimOptionalString(input.preparedMessagesArtifactId),
-      responseMessagesArtifactId: trimOptionalString(input.responseMessagesArtifactId),
-      requestBodyArtifactId: trimOptionalString(input.requestBodyArtifactId),
-      responseBodyArtifactId: trimOptionalString(input.responseBodyArtifactId),
-      providerMetadataArtifactId: trimOptionalString(input.providerMetadataArtifactId),
-      usageJson: serializeOptionalJson(input.usage),
-      startedAt: timestamp,
-      completedAt: timestamp,
-      createdAt: timestamp,
-    };
-    rows.steps.push(step);
-    rows.run = {
-      ...rows.run,
-      updatedAt: timestamp,
-    };
-    applyRunTraceRowsToStorage(storage, rows);
-    return mapRunStepRow(step);
-  });
-}
-
-export function appendRunEvent(input: CreateRunEventInput) {
-  const projectId = getProjectIdForRunOrThrow(input.runId);
-  return updateProjectAiStorage(projectId, `Append AI run event ${input.runId}`, (storage) => {
-    const run = getRunOrThrow(storage.index, input.runId);
-    if (input.stepId) {
-      const step = getStepOrThrow(input.stepId);
-      invariant(step.runId === run.id, "事件 step 不属于当前 run。");
-    }
-    if (input.nodeId) {
-      const node = getNodeOrThrow(storage.index, input.nodeId);
-      invariant(node.threadId === run.threadId, "事件节点不属于当前 run 所在 thread。");
-    }
-    if (input.relatedRunId) {
-      getRunOrThrow(storage.index, input.relatedRunId);
-    }
-    const rows = parseRunTraceRowsFromStorage(storage, run);
-    const nextSeq = Math.max(0, ...rows.events.map((event) => event.seq)) + 1;
-    const event: AgentRunEventRow = {
-      id: createId("agent_event"),
-      runId: run.id,
-      stepId: trimOptionalString(input.stepId),
-      seq: nextSeq,
-      eventKind: input.eventKind,
-      nodeId: trimOptionalString(input.nodeId),
-      relatedToolCallId: trimOptionalString(input.relatedToolCallId),
-      relatedRunId: trimOptionalString(input.relatedRunId),
-      summaryText: normalizeSummaryText(input.summaryText),
-      payloadArtifactId: trimOptionalString(input.payloadArtifactId),
-      createdAt: now(),
-    };
-    rows.events.push(event);
-    rows.run = {
-      ...rows.run,
-      updatedAt: now(),
-    };
-    applyRunTraceRowsToStorage(storage, rows);
-    return mapRunEventRow(event);
-  });
-}
-
-export function materializeResponseMessages(input: MaterializeResponseMessagesInput) {
-  const projectId = getProjectIdForThreadOrThrow(input.threadId);
-  const result = updateProjectAiStorage(
-    projectId,
-    "Materialize AI response messages",
-    (storage) => {
-      const thread = getThreadOrThrow(storage.index, input.threadId);
-      let parentNodeId = input.parentNodeId;
-      const nodes: AgentThreadNodeView[] = [];
-
-      input.messages.forEach((message) => {
-        const node = insertNode(storage, {
-          threadId: thread.id,
-          parentNodeId,
-          message,
-          sourceKind: message.role === "tool" ? "tool_result" : "model_response",
-          createdByRunId: input.runId,
-          sourceStepId: input.stepId,
-        });
-        parentNodeId = node.id;
-        nodes.push(node);
-      });
-
-      return {
-        nodes,
-        tipNodeId: parentNodeId,
-      };
-    },
-  );
-  touchProject(projectId);
-  return result;
-}
-
-export function createStreamingAssistantNode(input: {
-  threadId: string;
-  parentNodeId: string | null;
-  runId: string;
-  stepId?: string | null;
-}) {
-  const projectId = getProjectIdForThreadOrThrow(input.threadId);
-  const result = updateProjectAiStorage(projectId, "Create streaming assistant node", (storage) => {
-    const node = insertNode(storage, {
-      threadId: input.threadId,
-      parentNodeId: input.parentNodeId,
-      message: {
-        role: "assistant",
-        content: [],
-      } as unknown as ModelMessage,
-      sourceKind: "model_response",
-      createdByRunId: input.runId,
-      sourceStepId: trimOptionalString(input.stepId),
-      summaryText: "助手回复",
-    });
-    const thread = getThreadOrThrow(storage.index, input.threadId);
-    replaceRowById(storage.index.threads, {
-      ...thread,
-      activeTipNodeId: node.id,
-      updatedAt: now(),
-    });
-    return node;
-  });
-  touchProject(projectId);
-  return result;
-}
-
-export function appendAssistantTextDelta(input: { nodeId: string; delta: string }) {
-  const projectId = getProjectIdForNodeOrThrow(input.nodeId);
-  return updateProjectAiStorage(projectId, "Append assistant text delta", (storage) => {
-    const node = getNodeOrThrow(storage.index, input.nodeId);
-    invariant(node.role === "assistant", "只能向 assistant 节点追加文本。");
-    const message = getNodeModelMessage(node);
-    const content = getMessageContentParts(message);
-
-    let textPartIndex = content.findIndex(
-      (part) =>
-        part &&
-        typeof part === "object" &&
-        Reflect.get(part as Record<string, unknown>, "type") === "text",
-    );
-    const hadExistingTextPart = textPartIndex >= 0;
-
-    if (!hadExistingTextPart) {
-      content.push({ type: "text", text: "", state: "streaming" });
-      textPartIndex = content.length - 1;
-    }
-
-    const existingPart = content[textPartIndex] as Record<string, unknown>;
-    const nextPart = {
-      ...existingPart,
-      type: "text",
-      text: `${String(Reflect.get(existingPart, "text") ?? "")}${input.delta}`,
-      state: "streaming",
-    };
-
-    if (hadExistingTextPart) {
-      updateNodePart(storage, node.id, textPartIndex, {
-        payload: nextPart,
-        state: "streaming",
-        providerOptions: Reflect.get(nextPart, "providerOptions"),
-        providerMetadata: Reflect.get(nextPart, "providerMetadata"),
-      });
-    } else {
-      appendNodePart(storage, node.id, {
-        partKind: "text",
-        visibility: "public",
-        state: "streaming",
-        payload: nextPart,
-        providerOptions: Reflect.get(nextPart, "providerOptions"),
-        providerMetadata: Reflect.get(nextPart, "providerMetadata"),
-      });
-    }
-    updateNodeSummary(
-      storage,
-      node.id,
-      buildMessageSummary({ ...message, content: [nextPart] } as ModelMessage),
-    );
-    return mapNodeRow(getNodeOrThrow(storage.index, node.id));
-  });
-}
-
-export function appendAssistantReasoningPart(input: {
-  nodeId: string;
-  providerMetadata?: unknown;
-}) {
-  const projectId = getProjectIdForNodeOrThrow(input.nodeId);
-  return updateProjectAiStorage(projectId, "Append assistant reasoning part", (storage) => {
-    const node = getNodeOrThrow(storage.index, input.nodeId);
-    invariant(node.role === "assistant", "只能向 assistant 节点追加 reasoning。");
-    const message = getNodeModelMessage(node);
-    const partIndex = getMessageContentParts(message).length;
-    const nextPart = {
-      type: "reasoning",
-      text: "",
-      state: "streaming",
-      ...(input.providerMetadata == null ? {} : { providerMetadata: input.providerMetadata }),
-    };
-    appendNodePart(storage, node.id, {
-      partKind: "reasoning",
-      visibility: "hidden",
-      state: "streaming",
-      payload: nextPart,
-      providerOptions: Reflect.get(nextPart, "providerOptions"),
-      providerMetadata: input.providerMetadata,
-    });
-    return {
-      node: mapNodeRow(getNodeOrThrow(storage.index, node.id)),
-      partIndex,
-    };
-  });
-}
-
-export function appendAssistantReasoningDelta(input: {
-  nodeId: string;
-  partIndex: number;
-  delta: string;
-  providerMetadata?: unknown;
-}) {
-  const projectId = getProjectIdForNodeOrThrow(input.nodeId);
-  return updateProjectAiStorage(projectId, "Append assistant reasoning delta", (storage) => {
-    const node = getNodeOrThrow(storage.index, input.nodeId);
-    invariant(node.role === "assistant", "只能向 assistant 节点追加 reasoning。");
-    const message = getNodeModelMessage(node);
-    const content = getMessageContentParts(message);
-    const existingPart = content[input.partIndex];
-    invariant(existingPart && typeof existingPart === "object", "未找到 reasoning part。");
-    invariant(
-      Reflect.get(existingPart as Record<string, unknown>, "type") === "reasoning",
-      "目标 part 不是 reasoning。",
-    );
-    const nextPart = {
-      ...(existingPart as Record<string, unknown>),
-      type: "reasoning",
-      text: `${String(Reflect.get(existingPart as Record<string, unknown>, "text") ?? "")}${input.delta}`,
-      state: "streaming",
-      ...(input.providerMetadata == null ? {} : { providerMetadata: input.providerMetadata }),
-    };
-    updateNodePart(storage, node.id, input.partIndex, {
-      payload: nextPart,
-      state: "streaming",
-      providerOptions: Reflect.get(nextPart, "providerOptions"),
-      providerMetadata: input.providerMetadata ?? Reflect.get(nextPart, "providerMetadata"),
-    });
-    return mapNodeRow(getNodeOrThrow(storage.index, node.id));
-  });
-}
-
-export function appendAssistantToolCallPart(input: {
-  nodeId: string;
-  toolCall: Record<string, unknown>;
-}) {
-  const projectId = getProjectIdForNodeOrThrow(input.nodeId);
-  return updateProjectAiStorage(projectId, "Append assistant tool call part", (storage) => {
-    const node = getNodeOrThrow(storage.index, input.nodeId);
-    invariant(node.role === "assistant", "只能向 assistant 节点追加工具调用。");
-    const message = getNodeModelMessage(node);
-    const nextPart = {
-      type: "tool-call",
-      ...input.toolCall,
-    };
-    appendNodePart(storage, node.id, {
-      partKind: "tool-call",
-      visibility: "internal",
-      state: "done",
-      payload: nextPart,
-      providerOptions: Reflect.get(nextPart, "providerOptions"),
-      providerMetadata: Reflect.get(nextPart, "providerMetadata"),
-    });
-    updateNodeSummary(
-      storage,
-      node.id,
-      buildMessageSummary({ ...message, content: [nextPart] } as ModelMessage),
-    );
-    return mapNodeRow(getNodeOrThrow(storage.index, node.id));
-  });
-}
-
-export function appendAssistantToolApprovalRequestPart(input: {
-  nodeId: string;
-  approvalRequest: Record<string, unknown>;
-}) {
-  const projectId = getProjectIdForNodeOrThrow(input.nodeId);
-  return updateProjectAiStorage(projectId, "Append assistant approval request part", (storage) => {
-    const node = getNodeOrThrow(storage.index, input.nodeId);
-    invariant(node.role === "assistant", "只能向 assistant 节点追加工具审批请求。");
-    const message = getNodeModelMessage(node);
-    const approvalId = Reflect.get(input.approvalRequest, "approvalId");
-    const toolCallId = Reflect.get(input.approvalRequest, "toolCallId");
-    invariant(typeof approvalId === "string", "approvalId 不能为空。");
-    invariant(typeof toolCallId === "string", "toolCallId 不能为空。");
-    const nextPart = {
-      type: "tool-approval-request",
-      approvalId,
-      toolCallId,
-    };
-    appendNodePart(storage, node.id, {
-      partKind: "tool-approval-request",
-      visibility: "internal",
-      state: "done",
-      payload: nextPart,
-      providerOptions: Reflect.get(input.approvalRequest, "providerOptions"),
-      providerMetadata: Reflect.get(input.approvalRequest, "providerMetadata"),
-    });
-    updateNodeSummary(
-      storage,
-      node.id,
-      buildMessageSummary({ ...message, content: [nextPart] } as ModelMessage),
-    );
-    return mapNodeRow(getNodeOrThrow(storage.index, node.id));
-  });
-}
-
-export function createStreamingToolResultNode(input: {
-  threadId: string;
-  parentNodeId: string | null;
-  runId: string;
-  stepId?: string | null;
-  toolResult: Record<string, unknown>;
-}) {
-  const projectId = getProjectIdForThreadOrThrow(input.threadId);
-  const result = updateProjectAiStorage(
-    projectId,
-    "Create streaming tool result node",
-    (storage) => {
-      const node = insertNode(storage, {
-        threadId: input.threadId,
-        parentNodeId: input.parentNodeId,
-        message: {
-          role: "tool",
-          content: [{ type: "tool-result", ...input.toolResult }],
-        } as unknown as ModelMessage,
-        sourceKind: "tool_result",
-        createdByRunId: input.runId,
-        sourceStepId: trimOptionalString(input.stepId),
-      });
-      const thread = getThreadOrThrow(storage.index, input.threadId);
-      replaceRowById(storage.index.threads, {
-        ...thread,
-        activeTipNodeId: node.id,
-        updatedAt: now(),
-      });
-      return node;
-    },
-  );
-  touchProject(projectId);
-  return result;
-}
-
-export function createToolApprovalResponseNode(input: {
-  threadId: string;
-  parentNodeId: string | null;
-  runId: string;
-  approvalResponse: {
-    approvalId: string;
-    approved: boolean;
-    reason?: string;
-  };
-}) {
-  const projectId = getProjectIdForThreadOrThrow(input.threadId);
-  const result = updateProjectAiStorage(
-    projectId,
-    "Create tool approval response node",
-    (storage) => {
-      const node = insertNode(storage, {
-        threadId: input.threadId,
-        parentNodeId: input.parentNodeId,
-        message: {
-          role: "tool",
-          content: [{ type: "tool-approval-response", ...input.approvalResponse }],
-        } as unknown as ModelMessage,
-        sourceKind: "tool_result",
-        createdByRunId: input.runId,
-      });
-      const thread = getThreadOrThrow(storage.index, input.threadId);
-      replaceRowById(storage.index.threads, {
-        ...thread,
-        activeTipNodeId: node.id,
-        updatedAt: now(),
-      });
-      return node;
-    },
-  );
-  touchProject(projectId);
-  return result;
-}
-
-export function markThreadNodePartsDone(nodeId: string) {
-  const projectId = getProjectIdForNodeOrThrow(nodeId);
-  return updateProjectAiStorage(projectId, "Mark thread node parts done", (storage) => {
-    const node = getNodeOrThrow(storage.index, nodeId);
-    const message = getNodeModelMessage(node);
-    const parts = parseStoredArray<AgentMessagePartRow>(node.partsJson);
-    const nextParts = parts.map((part) => {
-      if (part.state !== "streaming") {
-        return part;
-      }
-      const currentPayload = JSON.parse(part.payloadJson) as unknown;
-      const payload =
-        currentPayload && typeof currentPayload === "object"
-          ? { ...(currentPayload as Record<string, unknown>), state: "done" }
-          : currentPayload;
-      return {
-        ...part,
-        state: "done" as const,
-        payloadJson: serializeRequiredJson(payload, "节点 part"),
-      };
-    });
-    replaceRowById(storage.index.nodes, {
-      ...node,
-      partsJson: stringifyStoredArray(nextParts),
-    });
-    updateNodeSummary(storage, node.id, buildMessageSummary(message));
-    return mapNodeRow(getNodeOrThrow(storage.index, node.id));
-  });
-}
-
-export function assignThreadNodeSourceStepIds(nodeIds: string[], stepId: string) {
-  if (nodeIds.length === 0) {
-    return;
-  }
-  const step = getStepOrThrow(stepId);
-  const projectId = getProjectIdForRunOrThrow(step.runId);
-  updateProjectAiStorage(projectId, "Assign thread node source step ids", (storage) => {
-    getRunOrThrow(storage.index, step.runId);
-    nodeIds.forEach((nodeId) => {
-      const node = getNodeOrThrow(storage.index, nodeId);
-      replaceRowById(storage.index.nodes, {
-        ...node,
-        sourceStepId: stepId,
-      });
-    });
-  });
-}
-
-export function updateRunStep(input: {
-  stepId: string;
-  finishReason?: string | null;
-  rawFinishReason?: string | null;
-  preparedMessagesArtifactId?: string | null;
-  responseMessagesArtifactId?: string | null;
-  requestBodyArtifactId?: string | null;
-  responseBodyArtifactId?: string | null;
-  providerMetadataArtifactId?: string | null;
-  usage?: unknown;
-}) {
-  const step = getStepOrThrow(input.stepId);
-  const projectId = getProjectIdForRunOrThrow(step.runId);
-  return updateProjectAiStorage(projectId, `Update AI run ${step.runId}`, (storage) => {
-    const run = getRunOrThrow(storage.index, step.runId);
-    const rows = parseRunTraceRowsFromStorage(storage, run);
-    const index = rows.steps.findIndex((entry) => entry.id === step.id);
-    invariant(index >= 0, "未找到 run step。");
-    const nextStep: AgentRunStepRow = {
-      ...rows.steps[index]!,
-      finishReason: trimOptionalString(input.finishReason),
-      rawFinishReason: trimOptionalString(input.rawFinishReason),
-      preparedMessagesArtifactId: trimOptionalString(input.preparedMessagesArtifactId),
-      responseMessagesArtifactId: trimOptionalString(input.responseMessagesArtifactId),
-      requestBodyArtifactId: trimOptionalString(input.requestBodyArtifactId),
-      responseBodyArtifactId: trimOptionalString(input.responseBodyArtifactId),
-      providerMetadataArtifactId: trimOptionalString(input.providerMetadataArtifactId),
-      usageJson: serializeOptionalJson(input.usage),
-      completedAt: now(),
-    };
-    rows.steps[index] = nextStep;
-    rows.run = {
-      ...rows.run,
-      updatedAt: now(),
-    };
-    applyRunTraceRowsToStorage(storage, rows);
-    return mapRunStepRow(nextStep);
-  });
-}
-
-function updateRunStatus(
-  runId: string,
-  status: AgentRunStatus,
-  {
-    completedAt,
-    errorArtifactId,
-  }: {
-    completedAt: number | null;
-    errorArtifactId?: string | null;
-  },
-) {
-  const projectId = getProjectIdForRunOrThrow(runId);
-  return updateProjectAiStorage(projectId, `Update AI run ${runId}`, (storage) => {
-    const run = getRunOrThrow(storage.index, runId);
-    const rows = parseRunTraceRowsFromStorage(storage, run);
-    rows.run = {
-      ...rows.run,
-      status,
-      errorArtifactId: errorArtifactId === undefined ? rows.run.errorArtifactId : errorArtifactId,
-      completedAt,
-      updatedAt: now(),
-    };
-    applyRunTraceRowsToStorage(storage, rows);
-    return rows.run;
-  });
-}
-
-export function markRunSucceeded(runId: string) {
-  return updateRunStatus(runId, "succeeded", { completedAt: now() });
-}
-
-export function markRunWaitingForInput(runId: string) {
-  return updateRunStatus(runId, "waiting_for_input", { completedAt: null });
-}
-
-export function markRunRunning(runId: string) {
-  return updateRunStatus(runId, "running", { completedAt: null });
-}
-
-export function markRunFailed(runId: string, errorArtifactId?: string | null) {
-  if (errorArtifactId) {
-    getArtifactOrThrow(errorArtifactId);
-  }
-  return updateRunStatus(runId, "failed", {
-    completedAt: now(),
-    errorArtifactId: trimOptionalString(errorArtifactId),
-  });
-}
-
-export function markRunCancelled(runId: string) {
-  return updateRunStatus(runId, "cancelled", { completedAt: now() });
-}
-
-export function updateRunContextSnapshot(
-  runId: string,
-  contextSnapshot: ProjectAssistantContextSnapshot | null,
-) {
-  const projectId = getProjectIdForRunOrThrow(runId);
-  return updateProjectAiStorage(projectId, `Update AI run ${runId}`, (storage) => {
-    const run = getRunOrThrow(storage.index, runId);
-    const rows = parseRunTraceRowsFromStorage(storage, run);
-    rows.run = {
-      ...rows.run,
-      contextSnapshot,
-      updatedAt: now(),
-    };
-    applyRunTraceRowsToStorage(storage, rows);
-    return rows.run;
-  });
-}
-
-export function getRunTrace(runId: string): AgentRunTraceView {
-  const projectId = getProjectIdForRunOrThrow(runId);
-  const storage = readProjectAiStorage(projectId);
-  const run = getRunOrThrow(storage.index, runId);
-  return mapTraceRows(parseRunTraceRowsFromStorage(storage, run));
-}
-
-export function getRunStepResponseBody(stepId: string): unknown | null {
-  const step = getStepOrThrow(stepId);
-  if (!step.responseBodyArtifactId) {
-    return null;
-  }
-  const trace = getRunTrace(step.runId);
-  const artifact = trace.artifacts.find((entry) => entry.id === step.responseBodyArtifactId);
-  invariant(artifact, "未找到 artifact。");
-  return artifact.content;
-}
-
-export function listChildRuns(runId: string) {
-  const projectId = getProjectIdForRunOrThrow(runId);
-  const storage = readProjectAiStorage(projectId);
-  getRunOrThrow(storage.index, runId);
-  return sortByCreatedAt(storage.index.runs.filter((row) => row.parentRunId === runId)).map(
-    mapRunRow,
-  );
 }
