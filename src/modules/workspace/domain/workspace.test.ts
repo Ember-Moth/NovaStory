@@ -26,6 +26,19 @@ function flattenAuxNodes(nodes: ExportedAuxNode[]): ExportedAuxNode[] {
   return nodes.flatMap((node) => [node, ...flattenAuxNodes(node.children)]);
 }
 
+function listManuscriptDirs(worktreePath: string) {
+  const manuscriptRoot = path.join(worktreePath, "manuscript");
+  return fs
+    .readdirSync(manuscriptRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+}
+
+function expectNoTemporaryManuscriptDirs(worktreePath: string) {
+  expect(listManuscriptDirs(worktreePath).filter((name) => name.startsWith("__tmp__"))).toEqual([]);
+}
+
 test("content export preserves sibling order and nesting", () => {
   const workspace = seedProject("project_content");
   const rootId = null;
@@ -935,6 +948,145 @@ test("content node move rejects moving a node below its own descendant", () => {
       newParentId: scene.id,
     }),
   ).toThrow("无法移动：不能把章节移动到自己的子章节下。");
+});
+
+test("content node move rejects invalid targets without corrupting persisted tree", () => {
+  const workspace = seedProject("project_content_move_invalid_target_clean");
+
+  const chapter1 = service.createContentNode({
+    workspaceId: workspace.id,
+    parentId: null,
+    title: "Chapter 1",
+    body: "one",
+  });
+  const chapter2 = service.createContentNode({
+    workspaceId: workspace.id,
+    parentId: null,
+    afterSiblingId: chapter1.id,
+    title: "Chapter 2",
+    body: "two",
+  });
+  const scene = service.createContentNode({
+    workspaceId: workspace.id,
+    parentId: chapter1.id,
+    title: "Scene",
+    body: "scene",
+  });
+  const before = service.exportContentSubtree(workspace.id);
+  const rootDirsBefore = listManuscriptDirs(workspace.worktreePath);
+
+  expect(() =>
+    service.moveContentNode({
+      workspaceId: workspace.id,
+      nodeId: scene.id,
+      newParentId: chapter2.id,
+      afterSiblingId: chapter1.id,
+    }),
+  ).toThrow("无法移动章节：目标位置不在同一个父级下。");
+
+  expect(service.exportContentSubtree(workspace.id)).toEqual(before);
+  expect(listManuscriptDirs(workspace.worktreePath)).toEqual(rootDirsBefore);
+  expectNoTemporaryManuscriptDirs(workspace.worktreePath);
+});
+
+test("content node move rejects self-referential positions without detaching directories", () => {
+  const workspace = seedProject("project_content_move_self_target_clean");
+
+  const chapter = service.createContentNode({
+    workspaceId: workspace.id,
+    parentId: null,
+    title: "Chapter",
+  });
+  service.createContentNode({
+    workspaceId: workspace.id,
+    parentId: chapter.id,
+    title: "Scene",
+  });
+  const before = service.exportContentSubtree(workspace.id);
+
+  expect(() =>
+    service.moveContentNode({
+      workspaceId: workspace.id,
+      nodeId: chapter.id,
+      newParentId: chapter.id,
+    }),
+  ).toThrow("无法移动：不能把章节移动到自己的子章节下。");
+  expect(() =>
+    service.moveContentNode({
+      workspaceId: workspace.id,
+      nodeId: chapter.id,
+      newParentId: null,
+      afterSiblingId: chapter.id,
+    }),
+  ).toThrow("无法移动：目标位置不能是章节自身。");
+
+  expect(service.exportContentSubtree(workspace.id)).toEqual(before);
+  expectNoTemporaryManuscriptDirs(workspace.worktreePath);
+});
+
+test("content node creation rejects foreign after-sibling without writing partial nodes", () => {
+  const workspace = seedProject("project_content_create_invalid_sibling_clean");
+
+  const chapter = service.createContentNode({
+    workspaceId: workspace.id,
+    parentId: null,
+    title: "Chapter",
+  });
+  const scene = service.createContentNode({
+    workspaceId: workspace.id,
+    parentId: chapter.id,
+    title: "Scene",
+  });
+  const before = service.exportContentSubtree(workspace.id);
+
+  expect(() =>
+    service.createContentNode({
+      workspaceId: workspace.id,
+      parentId: null,
+      afterSiblingId: scene.id,
+      title: "Should not persist",
+      body: "partial",
+    }),
+  ).toThrow("无法创建章节：目标位置不在同一个父级下。");
+
+  expect(service.exportContentSubtree(workspace.id)).toEqual(before);
+  expectNoTemporaryManuscriptDirs(workspace.worktreePath);
+});
+
+test("content body updates preserve front matter delimiters and normalize newlines", () => {
+  const workspace = seedProject("project_content_body_roundtrip");
+  const point = service.createTimelinePoint({
+    workspaceId: workspace.id,
+    afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
+    label: "Draft",
+  });
+  const body = "---\nnot front matter inside body\n---\r\nLine 1\r\nLine 2\n";
+
+  const chapter = service.createContentNode({
+    workspaceId: workspace.id,
+    parentId: null,
+    title: "Original",
+    body,
+  });
+
+  service.updateContentNode({
+    workspaceId: workspace.id,
+    nodeId: chapter.id,
+    title: "",
+    anchorPointId: point.id,
+    body,
+  });
+
+  const exported = service.exportContentSubtree(workspace.id).nodes[0];
+  expect(exported).toMatchObject({
+    id: chapter.id,
+    title: null,
+    anchorTimelinePointId: point.id,
+    body: "---\nnot front matter inside body\n---\nLine 1\nLine 2\n",
+  });
+  expect(service.readManuscriptNode(workspace.id, chapter.id).body).toBe(
+    "---\nnot front matter inside body\n---\nLine 1\nLine 2\n",
+  );
 });
 
 test("content node anchor point can be updated", () => {

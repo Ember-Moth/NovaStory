@@ -483,6 +483,7 @@ export function moveManuscriptNode(
   },
 ) {
   const node = findManuscriptNode(state, input.nodeId);
+  invariant(input.newParentId !== input.nodeId, "无法移动：不能把章节移动到自己的子章节下。");
   const descendants = new Set<string>();
   const collect = (current: ManuscriptNodeDiskState) => {
     for (const child of current.children) {
@@ -495,6 +496,17 @@ export function moveManuscriptNode(
     !input.newParentId || !descendants.has(input.newParentId),
     "无法移动：不能把章节移动到自己的子章节下。",
   );
+  if (input.newParentId) {
+    findManuscriptNode(state, input.newParentId);
+  }
+  if (input.afterSiblingId) {
+    invariant(input.afterSiblingId !== input.nodeId, "无法移动：目标位置不能是章节自身。");
+    const targetSiblings = listManuscriptChildren(state, input.newParentId);
+    invariant(
+      targetSiblings.some((sibling) => sibling.id === input.afterSiblingId),
+      "无法移动章节：目标位置不在同一个父级下。",
+    );
+  }
 
   const oldParentId = node.parentId;
   const moved = removeNodeFromTree(state.content, input.nodeId);
