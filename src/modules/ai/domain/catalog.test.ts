@@ -1,19 +1,15 @@
 import { expect, test } from "bun:test";
 
-import { setupTestDataDir } from "@/test/setup";
-
-setupTestDataDir();
-
-const userConfig = await import("./user-config");
-const {
+import {
   assertConnectionSupportsCustomModel,
   getAiCatalogStatus,
   listCatalogModelsView,
   listCatalogProvidersView,
   listResolvedModelsForConnection,
   syncAiCatalogFromPayload,
-} = await import("./catalog");
-const { listProviders, readRegistryState } = await import("./catalog-file-store");
+} from "./catalog";
+import { listProviders, readRegistryState } from "./catalog-file-store";
+import * as userConfig from "./user-config";
 
 const payloadV1 = JSON.stringify({
   openai: {

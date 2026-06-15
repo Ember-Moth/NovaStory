@@ -1,14 +1,10 @@
 import { expect, test } from "bun:test";
 
-import { setupTestDataDir } from "@/test/setup";
 import { seedProjectRecord } from "@/test/project";
-
-setupTestDataDir();
-
-const service = await import("@/modules/workspace/domain");
-const auxHandlers = await import("./aux");
-const { rpcTags } = await import("@/rpc/tags");
-const timelineHandlers = await import("./timeline");
+import * as service from "@/modules/workspace/domain";
+import { rpcTags } from "@/rpc/tags";
+import * as auxHandlers from "./aux";
+import * as timelineHandlers from "./timeline";
 const requestCtx = { req: new Request("http://localhost/api/rpc") } as unknown as Parameters<
   typeof auxHandlers.snapshotTree.handler
 >[1];

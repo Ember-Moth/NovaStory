@@ -1,10 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { setupTestDataDir } from "@/test/setup";
-
-setupTestDataDir();
-
-const aiConnections = await import("./connections");
+import * as aiConnections from "./connections";
 
 test("ai connections config defaults to an empty list when missing", () => {
   expect(aiConnections.list()).toEqual([]);

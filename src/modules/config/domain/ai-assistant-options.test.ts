@@ -1,16 +1,13 @@
 import { expect, test } from "bun:test";
 
 import { PROJECT_ASSISTANT_MAX_STEPS } from "@/modules/ai/domain/types";
-import { setupTestDataDir } from "@/test/setup";
-
-setupTestDataDir();
-const { setGlobalConfig } = await import("./global-config");
-const {
+import { setGlobalConfig } from "./global-config";
+import {
   AI_ASSISTANT_MAX_STEPS_MAX,
   AI_ASSISTANT_MAX_STEPS_MIN,
   getAiAssistantMaxSteps,
   setAiAssistantMaxSteps,
-} = await import("./ai-assistant-options");
+} from "./ai-assistant-options";
 
 test("reads the default assistant max steps when unset", () => {
   expect(getAiAssistantMaxSteps()).toBe(PROJECT_ASSISTANT_MAX_STEPS);

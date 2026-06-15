@@ -1,11 +1,7 @@
 import { expect, test } from "bun:test";
 
-import { setupTestDataDir } from "@/test/setup";
 import { seedProjectRecord } from "@/test/project";
-
-setupTestDataDir();
-
-const service = await import("./index");
+import * as service from "./index";
 
 function seedProject(projectId: string) {
   seedProjectRecord(projectId);

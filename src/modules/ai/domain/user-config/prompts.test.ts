@@ -4,11 +4,7 @@ import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "
 import { join } from "node:path";
 
 import { ensureConfigDir } from "@/shared/lib/storage-paths";
-import { setupTestDataDir } from "@/test/setup";
-
-setupTestDataDir();
-
-const globalPrompts = await import("./prompts");
+import * as globalPrompts from "./prompts";
 
 function prompt(id: string, name = id) {
   return {

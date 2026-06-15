@@ -2,12 +2,12 @@ import { expect, test } from "bun:test";
 import { writeFileSync } from "node:fs";
 
 import { getConfigFilePath } from "@/shared/lib/storage-paths";
-import { setupTestDataDir } from "@/test/setup";
-
-setupTestDataDir();
-
-const { deleteGlobalConfig, getGlobalConfig, listGlobalConfigOptions, setGlobalConfig } =
-  await import("./global-config");
+import {
+  deleteGlobalConfig,
+  getGlobalConfig,
+  listGlobalConfigOptions,
+  setGlobalConfig,
+} from "./global-config";
 
 test("setGlobalConfig stores and getGlobalConfig reads JSON values", () => {
   const fallback = {

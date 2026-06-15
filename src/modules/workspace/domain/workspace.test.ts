@@ -2,12 +2,8 @@ import { expect, test } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
 
-import { setupTestDataDir } from "@/test/setup";
 import { seedProjectRecord } from "@/test/project";
-
-setupTestDataDir();
-
-const service = await import("./index");
+import * as service from "./index";
 
 type ExportedAuxNode = ReturnType<typeof service.exportAuxSnapshotTree>["nodes"][number];
 

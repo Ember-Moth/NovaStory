@@ -1,21 +1,19 @@
 import { expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 
-import { setupTestDataDir } from "@/test/setup";
 import { seedProjectRecord } from "@/test/project";
 import {
   listProjectRowsSync,
   readProjectMetaSync,
 } from "@/modules/workspace/domain/git-storage/project-meta-store";
-
-setupTestDataDir();
-
-const workspaceService = await import("@/modules/workspace/domain");
-const auxService = await import("@/modules/workspace/domain/aux");
-const { getProjectRepoGitDir, getProjectWorktreeRoot } =
-  await import("@/modules/workspace/domain/git-storage/paths");
-const projectHandlers = await import("./index");
-const { rpcTags } = await import("@/rpc/tags");
+import * as auxService from "@/modules/workspace/domain/aux";
+import {
+  getProjectRepoGitDir,
+  getProjectWorktreeRoot,
+} from "@/modules/workspace/domain/git-storage/paths";
+import * as workspaceService from "@/modules/workspace/domain";
+import { rpcTags } from "@/rpc/tags";
+import * as projectHandlers from "./index";
 const requestCtx = { req: new Request("http://localhost/api/rpc") } as unknown as Parameters<
   typeof projectHandlers.list.handler
 >[1];

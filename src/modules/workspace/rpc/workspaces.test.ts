@@ -1,13 +1,9 @@
 import { expect, test } from "bun:test";
 
-import { setupTestDataDir } from "@/test/setup";
 import { seedProjectRecord } from "@/test/project";
-
-setupTestDataDir();
-
-const service = await import("@/modules/workspace/domain");
-const { rpcTags } = await import("@/rpc/tags");
-const workspaceHandlers = await import("./workspaces");
+import * as service from "@/modules/workspace/domain";
+import { rpcTags } from "@/rpc/tags";
+import * as workspaceHandlers from "./workspaces";
 const requestCtx = { req: new Request("http://localhost/api/rpc") } as unknown as Parameters<
   typeof workspaceHandlers.list.handler
 >[1];

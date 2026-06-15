@@ -1,11 +1,10 @@
 import { expect, test } from "bun:test";
 
-import { setupTestDataDir } from "@/test/setup";
-
-setupTestDataDir();
-const { setGlobalConfig } = await import("./global-config");
-const { getAiAssistantModelSelection, setAiAssistantModelSelection } =
-  await import("./ai-assistant-model-selection");
+import { setGlobalConfig } from "./global-config";
+import {
+  getAiAssistantModelSelection,
+  setAiAssistantModelSelection,
+} from "./ai-assistant-model-selection";
 
 test("reads back a stored ai assistant model selection", () => {
   const selection = setAiAssistantModelSelection({

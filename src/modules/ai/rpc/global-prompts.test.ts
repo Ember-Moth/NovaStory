@@ -1,11 +1,7 @@
 import { expect, test } from "bun:test";
 
-import { setupTestDataDir } from "@/test/setup";
-
-setupTestDataDir();
-
-const promptHandlers = await import("./index");
-const { rpcTags } = await import("@/rpc/tags");
+import { rpcTags } from "@/rpc/tags";
+import * as promptHandlers from "./index";
 const requestCtx = { req: new Request("http://localhost/api/rpc") } as unknown as Parameters<
   typeof promptHandlers.listGlobalPrompts.handler
 >[1];
