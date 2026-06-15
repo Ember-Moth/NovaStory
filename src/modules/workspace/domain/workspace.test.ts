@@ -878,6 +878,41 @@ test("content node move can reorder across parents and preserve child order", ()
   ]);
 });
 
+test("content node move can lift a nested child to the top level and remain reloadable", () => {
+  const workspace = seedProject("project_content_move_child_to_top");
+
+  const parent = service.createContentNode({
+    workspaceId: workspace.id,
+    parentId: null,
+    title: "Parent",
+  });
+  const child = service.createContentNode({
+    workspaceId: workspace.id,
+    parentId: parent.id,
+    title: "Child",
+    body: "hello",
+  });
+
+  expect(() =>
+    service.moveContentNode({
+      workspaceId: workspace.id,
+      nodeId: child.id,
+      newParentId: null,
+      afterSiblingId: parent.id,
+    }),
+  ).not.toThrow();
+
+  const exported = service.exportContentSubtree(workspace.id);
+  expect(exported.nodes.map((node) => node.title)).toEqual(["Parent", "Child"]);
+  expect(exported.nodes[0]?.children).toEqual([]);
+  expect(exported.nodes[1]).toMatchObject({
+    id: child.id,
+    title: "Child",
+    body: "hello",
+    children: [],
+  });
+});
+
 test("content node move rejects moving a node below its own descendant", () => {
   const workspace = seedProject("project_content_move_into_descendant");
   const rootId = null;

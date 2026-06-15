@@ -220,6 +220,10 @@ function manuscriptTempDirPath(rootDir: string, parentDirPath: string | null, id
   return path.join(base, `${TEMP_RENAME_PREFIX}new-${id}`);
 }
 
+function manuscriptDetachedDirPath(rootDir: string, id: string) {
+  return path.join(rootDir, MANUSCRIPT_DIR, `${TEMP_RENAME_PREFIX}detached-${id}`);
+}
+
 function stageSiblingRenames(parentDir: string, siblings: ManuscriptNodeDiskState[]) {
   siblings.forEach((node, index) => {
     const stagedPath = path.join(parentDir, `${TEMP_RENAME_PREFIX}${index + 1}-${node.id}`);
@@ -495,6 +499,10 @@ export function moveManuscriptNode(
   const oldParentId = node.parentId;
   const moved = removeNodeFromTree(state.content, input.nodeId);
   invariant(moved, "未找到章节。");
+  const detachedPath = manuscriptDetachedDirPath(rootDir, moved.id);
+  fs.rmSync(detachedPath, { recursive: true, force: true });
+  fs.renameSync(moved.dirPath, detachedPath);
+  moved.dirPath = detachedPath;
 
   if (oldParentId == null) {
     const topLevel = listManuscriptChildren(state, null);
