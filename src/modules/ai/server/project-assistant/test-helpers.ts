@@ -4,7 +4,8 @@ import { PROJECT_ASSISTANT_MAX_STEPS } from "@/modules/ai/domain/types";
 
 setupMockDatabase();
 
-export const logs = await import("@/modules/ai/domain/logs");
+export const threadLogs = await import("@/modules/ai/domain/logs/threads");
+export const runLogs = await import("@/modules/ai/domain/logs/runs");
 export const { createDefaultWorkspace } = await import("@/modules/workspace/domain");
 export const workspaceDomain = await import("@/modules/workspace/domain");
 export const { createProjectAssistantService } = await import("./index");

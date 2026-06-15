@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 
-import { appendRunEvent, createRun, createThread } from "@/modules/ai/domain/logs";
+import { createThread } from "@/modules/ai/domain/logs/threads";
+import { appendRunEvent, createRun } from "@/modules/ai/domain/logs/runs";
 import { setupMockDatabase } from "@/test/mock-db";
 import { seedProjectRecord } from "@/test/project";
 

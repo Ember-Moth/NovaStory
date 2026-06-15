@@ -5,7 +5,7 @@ import { seedProjectRecord } from "@/test/project";
 
 setupMockDatabase();
 
-const logs = await import("@/modules/ai/domain/logs");
+const threadLogs = await import("@/modules/ai/domain/logs/threads");
 const handlers = await import("./index");
 const { rpcTags } = await import("@/rpc/tags");
 
@@ -19,7 +19,7 @@ function seedProject(projectId: string) {
 
 test("listProjectThreads watches the project thread tag", async () => {
   seedProject("rpc_threads");
-  logs.createThread({
+  threadLogs.createThread({
     projectId: "rpc_threads",
   });
 
@@ -33,7 +33,7 @@ test("listProjectThreads watches the project thread tag", async () => {
 
 test("getThreadView watches the thread tag", async () => {
   seedProject("rpc_thread_view");
-  const thread = logs.createThread({
+  const thread = threadLogs.createThread({
     projectId: "rpc_thread_view",
   });
 

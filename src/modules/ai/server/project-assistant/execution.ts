@@ -3,20 +3,22 @@ import {
   appendAssistantReasoningPart,
   appendAssistantTextDelta,
   appendAssistantToolCallPart,
-  appendRunEvent,
   assignThreadNodeSourceStepIds,
-  createArtifact,
-  createRunStep,
   createStreamingAssistantNode,
   createStreamingToolResultNode,
+  markThreadNodePartsDone,
+  selectActiveTip,
+} from "@/modules/ai/domain/logs/threads";
+import {
+  appendRunEvent,
+  createArtifact,
+  createRunStep,
   markRunCancelled,
   markRunFailed,
   markRunWaitingForInput,
   markRunSucceeded,
-  markThreadNodePartsDone,
-  selectActiveTip,
   updateRunContextSnapshot,
-} from "@/modules/ai/domain/logs";
+} from "@/modules/ai/domain/logs/runs";
 import type {
   AgentRunView,
   AgentThreadNodeView,

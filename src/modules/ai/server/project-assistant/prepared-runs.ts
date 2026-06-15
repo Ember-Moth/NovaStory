@@ -1,17 +1,19 @@
 import {
-  appendRunEvent,
   appendUserNode,
-  createArtifact,
   createReplacementNode,
-  createRun,
   createStreamingToolResultNode,
   getLatestRunForTriggerNode,
-  getRunTrace,
   getThreadView,
   hasPendingRun,
-  markRunRunning,
   PROJECT_ASSISTANT_AGENT_PROFILE,
-} from "@/modules/ai/domain/logs";
+} from "@/modules/ai/domain/logs/threads";
+import {
+  appendRunEvent,
+  createArtifact,
+  createRun,
+  getRunTrace,
+  markRunRunning,
+} from "@/modules/ai/domain/logs/runs";
 import type {
   AssistantInputRefSnapshot,
   AssistantMentionInput,

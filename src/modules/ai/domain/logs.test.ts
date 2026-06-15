@@ -5,7 +5,9 @@ import { seedProjectRecord } from "@/test/project";
 
 setupMockDatabase();
 
-const logs = await import("./logs");
+const threadLogs = await import("./logs/threads");
+const runLogs = await import("./logs/runs");
+const logs = { ...threadLogs, ...runLogs };
 
 function seedProject(projectId: string) {
   seedProjectRecord(projectId);

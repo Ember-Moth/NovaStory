@@ -12,9 +12,10 @@ import {
   createProjectAssistantService,
   createStepLimitMockStream,
   createDefaultWorkspace,
-  logs,
+  runLogs,
   seedCustomConnection,
   seedProject,
+  threadLogs,
   userConfig,
   workspaceDomain,
 } from "./test-helpers";
@@ -305,7 +306,7 @@ test("retryProjectAssistantMessage creates sibling assistant candidates", async 
     }) as any,
   });
   const thread = service.createProjectAssistantThread("assistant_retry");
-  const userNode = logs.appendUserNode({
+  const userNode = threadLogs.appendUserNode({
     threadId: thread.id,
     parentNodeId: null,
     message: {
@@ -828,7 +829,7 @@ test("continueProjectAssistantRun inherits the updated timeline context snapshot
     },
     activeTools: ["read_file"],
   });
-  logs.updateRunContextSnapshot(first.run.id, {
+  runLogs.updateRunContextSnapshot(first.run.id, {
     workspaceId: workspace.id,
     activeContentNodeId: null,
     activeContentTitle: null,

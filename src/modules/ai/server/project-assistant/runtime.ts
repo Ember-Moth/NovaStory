@@ -1,6 +1,7 @@
 import type { ModelMessage } from "ai";
 
-import { getRunStepResponseBody, resolveThreadPath } from "@/modules/ai/domain/logs";
+import { getRunStepResponseBody } from "@/modules/ai/domain/logs/runs";
+import { resolveThreadPath } from "@/modules/ai/domain/logs/threads";
 import type {
   AgentRunTraceView,
   AgentThreadNodeView,

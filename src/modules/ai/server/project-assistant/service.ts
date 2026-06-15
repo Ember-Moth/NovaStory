@@ -2,17 +2,15 @@ import {
   archiveThread,
   createThread,
   getNodeCandidates,
-  getRunTrace,
-  getThreadView,
-  listChildRuns,
   listThreads,
-  markRunCancelled,
   PROJECT_ASSISTANT_AGENT_PROFILE,
   renameThread,
   resolveActiveThread,
   selectActiveTip,
   setActiveThread,
-} from "@/modules/ai/domain/logs";
+  getThreadView,
+} from "@/modules/ai/domain/logs/threads";
+import { getRunTrace, listChildRuns, markRunCancelled } from "@/modules/ai/domain/logs/runs";
 import type {
   AgentRunTraceView,
   AgentRunView,
