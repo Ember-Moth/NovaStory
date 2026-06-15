@@ -35,6 +35,20 @@ type DropIndicatorRect = {
   height: number;
 };
 
+function pointFallsWithinElementBounds(
+  point: { x: number; y: number },
+  element: HTMLElement | null,
+) {
+  if (!(element instanceof HTMLElement)) {
+    return false;
+  }
+
+  const rect = element.getBoundingClientRect();
+  return (
+    point.x >= rect.left && point.x <= rect.right && point.y >= rect.top && point.y <= rect.bottom
+  );
+}
+
 type AuxSymlinkTargetPickerState = {
   active: boolean;
   sourceNodeId: string | null;
@@ -505,6 +519,12 @@ export function AuxTreePanel({
         ...nextIntent,
       });
       return resolved ? nextIntent : null;
+    }
+
+    const sourceRowElement =
+      panelRef.current?.querySelector<HTMLElement>(`[data-row-id="${CSS.escape(nodeId)}"]`) ?? null;
+    if (pointFallsWithinElementBounds(point, sourceRowElement)) {
+      return null;
     }
 
     const panelDropZone = source?.closest(`[${AUX_PANEL_DROP_ZONE_ATTRIBUTE}]`);

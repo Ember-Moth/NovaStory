@@ -57,6 +57,20 @@ type InsideIndicatorRect = {
 
 type DropIndicatorRect = BoundaryIndicatorRect | InsideIndicatorRect;
 
+function pointFallsWithinElementBounds(
+  point: { x: number; y: number },
+  element: HTMLElement | null,
+) {
+  if (!(element instanceof HTMLElement)) {
+    return false;
+  }
+
+  const rect = element.getBoundingClientRect();
+  return (
+    point.x >= rect.left && point.x <= rect.right && point.y >= rect.top && point.y <= rect.bottom
+  );
+}
+
 function dropPositionFromPointer(clientY: number, row: HTMLElement): ContentDropPosition {
   const rect = row.getBoundingClientRect();
   const ratio = (clientY - rect.top) / Math.max(rect.height, 1);
@@ -430,6 +444,12 @@ export function ContentTreePanel({
       });
 
       return resolved ? nextIntent : null;
+    }
+
+    const sourceRowElement =
+      panelRef.current?.querySelector<HTMLElement>(`[data-row-id="${CSS.escape(nodeId)}"]`) ?? null;
+    if (pointFallsWithinElementBounds(point, sourceRowElement)) {
+      return null;
     }
 
     const panelDropZone = source?.closest(`[${CONTENT_PANEL_DROP_ZONE_ATTRIBUTE}]`);
