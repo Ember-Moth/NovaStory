@@ -11,7 +11,7 @@ import { MAIN_TEXT_EDITOR_MARKDOWN_EXTENSIONS } from "@/shared/ui/editor/MainTex
 import { LoadingBlock } from "@/shared/ui/Loading";
 import { OverlayScrollbar } from "@/shared/ui/OverlayScrollbar";
 
-import { SettingsSidebar } from "./SettingsSidebar";
+import { SettingsSidebar } from "./layout/SettingsSidebar";
 
 interface PromptFormData {
   name: string;
