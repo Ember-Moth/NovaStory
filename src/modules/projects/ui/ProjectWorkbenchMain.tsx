@@ -412,14 +412,6 @@ const workingTreeAreaLabels = {
   aux: "辅助信息",
 } as const;
 
-const contentChangeAspectLabels: Record<string, string> = {
-  title: "标题",
-  body: "正文",
-  parent: "层级",
-  order: "顺序",
-  anchor: "锚点",
-};
-
 function WorkingTreeStatusPanel({
   status,
   loading,
@@ -628,35 +620,101 @@ function WorkingTreeContentChangeDetails({
     );
   }
 
-  const details = change.changedAspects.map((aspect) => contentChangeAspectLabels[aspect]);
   const parentDetail = change.changedAspects.includes("parent")
     ? `${change.previousParentLabel ?? "根目录"} -> ${change.parentLabel ?? "根目录"}`
     : null;
   const anchorDetail = change.changedAspects.includes("anchor")
     ? `${change.previousAnchorTimelinePointLabel ?? "原点"} -> ${change.anchorTimelinePointLabel ?? "原点"}`
     : null;
+  const bodyChanged = change.changedAspects.includes("body");
+  const orderChanged = change.changedAspects.includes("order");
+  const parentChanged = change.changedAspects.includes("parent");
+  const anchorChanged = change.changedAspects.includes("anchor");
   const titleChanged =
     change.changedAspects.includes("title") &&
     change.previousTitle &&
     change.previousTitle !== (change.title ?? change.label);
-  const detailLabels = details.filter((detail) => detail !== contentChangeAspectLabels.title);
   return (
-    <div className="ml-5 text-[11px] leading-relaxed text-foreground-muted">
-      {detailLabels.length ? <span>{detailLabels.join("、")}</span> : null}
+    <div className="ml-5 flex flex-wrap items-center gap-1.5 text-[11px] leading-relaxed text-foreground-muted">
+      {bodyChanged ? <SemanticChangeChip label="正文已改" tone="amber" /> : null}
+      {orderChanged ? <SemanticChangeChip label="同级顺序调整" tone="slate" /> : null}
       {titleChanged ? (
-        <span className={cn("ml-2 inline-flex items-center gap-1.5 align-middle")}>
-          <span className="text-foreground-muted/70">标题</span>
-          <span className="rounded-sm border border-red-500/20 bg-red-500/8 px-1.5 py-0.5 text-red-200/85 line-through decoration-red-300/50">
-            {change.previousTitle}
-          </span>
-          <span className="text-foreground-muted/60">{"->"}</span>
-          <span className="rounded-sm border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-0.5 font-medium text-emerald-100">
-            {change.title ?? change.label}
-          </span>
-        </span>
+        <SemanticTransitionChip
+          label="标题"
+          from={change.previousTitle ?? "未命名"}
+          to={change.title ?? change.label}
+          fromTone="red"
+          toTone="emerald"
+        />
       ) : null}
-      {parentDetail ? <span className="ml-2">{`位置 ${parentDetail}`}</span> : null}
-      {anchorDetail ? <span className="ml-2">{`时间点 ${anchorDetail}`}</span> : null}
+      {parentChanged && parentDetail ? (
+        <SemanticTransitionChip
+          label="移动位置"
+          from={change.previousParentLabel ?? "根目录"}
+          to={change.parentLabel ?? "根目录"}
+          fromTone="slate"
+          toTone="sky"
+        />
+      ) : null}
+      {anchorChanged && anchorDetail ? (
+        <SemanticTransitionChip
+          label="锚点切换"
+          from={change.previousAnchorTimelinePointLabel ?? "原点"}
+          to={change.anchorTimelinePointLabel ?? "原点"}
+          fromTone="slate"
+          toTone="sky"
+        />
+      ) : null}
     </div>
+  );
+}
+
+function SemanticChangeChip({ tone, label }: { tone: "amber" | "slate"; label: string }) {
+  const className =
+    tone === "amber"
+      ? "border-amber-500/20 bg-amber-500/10 text-amber-100"
+      : "border-border bg-sidebar-background text-foreground-muted";
+  return (
+    <span
+      className={cn(
+        "inline-flex h-5.5 items-center rounded-sm border px-1.5 text-[10px] leading-none",
+        className,
+      )}
+    >
+      {label}
+    </span>
+  );
+}
+
+function SemanticTransitionChip({
+  label,
+  from,
+  to,
+  fromTone,
+  toTone,
+}: {
+  label: string;
+  from: string;
+  to: string;
+  fromTone: "red" | "slate";
+  toTone: "emerald" | "sky";
+}) {
+  const fromClassName =
+    fromTone === "red"
+      ? "bg-red-500/14 text-red-200/85 line-through decoration-red-300/50"
+      : "bg-foreground-muted/8 text-foreground-muted";
+  const toClassName =
+    toTone === "emerald"
+      ? "bg-emerald-500/14 font-medium text-emerald-100"
+      : "bg-sky-500/14 text-sky-100";
+  return (
+    <span className="inline-flex h-5.5 items-stretch overflow-hidden rounded-sm border border-border bg-sidebar-background/70 align-middle text-[10px] leading-none">
+      <span className="inline-flex items-center px-1.5 text-foreground-muted/70">{label}</span>
+      <span className={cn("inline-flex items-center px-1.5 leading-none", fromClassName)}>
+        {from}
+      </span>
+      <span className="inline-flex items-center px-1 text-foreground-muted/60">{"→"}</span>
+      <span className={cn("inline-flex items-center px-1.5 leading-none", toClassName)}>{to}</span>
+    </span>
   );
 }
