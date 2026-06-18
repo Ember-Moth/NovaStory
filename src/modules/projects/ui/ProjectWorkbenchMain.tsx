@@ -629,10 +629,9 @@ function WorkingTreeContentChangeDetails({
   }
 
   const details = change.changedAspects.map((aspect) => contentChangeAspectLabels[aspect]);
-  const parentDetail =
-    change.changedAspects.includes("parent") || change.changedAspects.includes("order")
-      ? `${change.previousParentLabel ?? "根目录"} -> ${change.parentLabel ?? "根目录"}`
-      : null;
+  const parentDetail = change.changedAspects.includes("parent")
+    ? `${change.previousParentLabel ?? "根目录"} -> ${change.parentLabel ?? "根目录"}`
+    : null;
   const anchorDetail = change.changedAspects.includes("anchor")
     ? `${change.previousAnchorTimelinePointLabel ?? "原点"} -> ${change.anchorTimelinePointLabel ?? "原点"}`
     : null;
