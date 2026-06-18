@@ -412,6 +412,14 @@ const workingTreeAreaLabels = {
   aux: "辅助信息",
 } as const;
 
+const contentChangeAspectLabels: Record<string, string> = {
+  title: "标题",
+  body: "正文",
+  parent: "层级",
+  order: "顺序",
+  anchor: "锚点",
+};
+
 function WorkingTreeStatusPanel({
   status,
   loading,
@@ -483,20 +491,9 @@ function WorkingTreeStatusPanel({
                     <div className="text-xs font-medium text-foreground-muted">
                       {workingTreeAreaLabels[areaKey]}
                     </div>
-                    <ul className="mt-1 space-y-1">
-                      {area.changes.map((change) => (
-                        <li
-                          key={`${areaKey}-${change.kind}-${change.label}`}
-                          className="flex items-center gap-2 text-sm text-foreground"
-                        >
-                          <WorkingTreeChangeBadge kind={change.kind} />
-                          <WorkingTreeChangeLabel
-                            label={change.label}
-                            emphasizeTimeline={areaKey === "aux"}
-                          />
-                        </li>
-                      ))}
-                    </ul>
+                    {areaKey === "content"
+                      ? renderContentArea(status.areas.content.changes)
+                      : renderPathArea(area.changes, areaKey === "aux")}
                   </div>
                 );
               },
@@ -505,6 +502,44 @@ function WorkingTreeStatusPanel({
         )}
       </div>
     </section>
+  );
+}
+
+function renderContentArea(changes: WorkingTreeStatus["areas"]["content"]["changes"]) {
+  return (
+    <ul className="mt-1 space-y-1">
+      {changes.map((change) => (
+        <li
+          key={`content-${change.kind}-${change.nodeId}`}
+          className="flex flex-col gap-1 text-sm text-foreground"
+        >
+          <div className="flex items-center gap-2">
+            <WorkingTreeChangeBadge kind={change.kind} />
+            <WorkingTreeChangeLabel label={change.label} emphasizeTimeline={false} />
+          </div>
+          <WorkingTreeContentChangeDetails change={change} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function renderPathArea(
+  changes: WorkingTreeStatus["areas"]["timeline"]["changes"],
+  emphasizeTimeline: boolean,
+) {
+  return (
+    <ul className="mt-1 space-y-1">
+      {changes.map((change) => (
+        <li
+          key={`${change.kind}-${change.label}`}
+          className="flex items-center gap-2 text-sm text-foreground"
+        >
+          <WorkingTreeChangeBadge kind={change.kind} />
+          <WorkingTreeChangeLabel label={change.label} emphasizeTimeline={emphasizeTimeline} />
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -538,7 +573,7 @@ function WorkingTreeChangeLabel({
 function WorkingTreeChangeBadge({
   kind,
 }: {
-  kind: WorkingTreeStatus["areas"]["content"]["changes"][number]["kind"];
+  kind: WorkingTreeStatus["areas"]["timeline"]["changes"][number]["kind"];
 }) {
   const label = workingTreeChangeKindLabels[kind];
   const className =
@@ -552,5 +587,63 @@ function WorkingTreeChangeBadge({
     <span className={cn("shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium", className)}>
       {label}
     </span>
+  );
+}
+
+function WorkingTreeContentChangeDetails({
+  change,
+}: {
+  change: WorkingTreeStatus["areas"]["content"]["changes"][number];
+}) {
+  if (change.kind === "added") {
+    const parts = ["新建节点"];
+    if (change.parentLabel) {
+      parts.push(`位于 ${change.parentLabel} 下`);
+    }
+    if (change.anchorTimelinePointLabel && change.anchorTimelinePointLabel !== "原点") {
+      parts.push(`锚定到 ${change.anchorTimelinePointLabel}`);
+    }
+    return (
+      <div className="ml-5 text-[11px] leading-relaxed text-foreground-muted">
+        {parts.join("，")}
+      </div>
+    );
+  }
+
+  if (change.kind === "deleted") {
+    const parts = ["删除节点"];
+    if (change.previousParentLabel) {
+      parts.push(`原位于 ${change.previousParentLabel} 下`);
+    }
+    if (
+      change.previousAnchorTimelinePointLabel &&
+      change.previousAnchorTimelinePointLabel !== "原点"
+    ) {
+      parts.push(`原锚点 ${change.previousAnchorTimelinePointLabel}`);
+    }
+    return (
+      <div className="ml-5 text-[11px] leading-relaxed text-foreground-muted">
+        {parts.join("，")}
+      </div>
+    );
+  }
+
+  const details = change.changedAspects.map((aspect) => contentChangeAspectLabels[aspect]);
+  const parentDetail =
+    change.changedAspects.includes("parent") || change.changedAspects.includes("order")
+      ? `${change.previousParentLabel ?? "根目录"} -> ${change.parentLabel ?? "根目录"}`
+      : null;
+  const anchorDetail = change.changedAspects.includes("anchor")
+    ? `${change.previousAnchorTimelinePointLabel ?? "原点"} -> ${change.anchorTimelinePointLabel ?? "原点"}`
+    : null;
+  return (
+    <div className="ml-5 text-[11px] leading-relaxed text-foreground-muted">
+      {details.length ? <span>{details.join("、")}</span> : null}
+      {change.previousTitle && change.previousTitle !== change.label ? (
+        <span className="ml-2">{`从 “${change.previousTitle}”`}</span>
+      ) : null}
+      {parentDetail ? <span className="ml-2">{`位置 ${parentDetail}`}</span> : null}
+      {anchorDetail ? <span className="ml-2">{`时间点 ${anchorDetail}`}</span> : null}
+    </div>
   );
 }

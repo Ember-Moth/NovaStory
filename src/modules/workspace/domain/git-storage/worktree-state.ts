@@ -124,6 +124,28 @@ export function readWorktreeState(dir: string): WorktreeState {
   };
 }
 
+export function readWorktreeStateFromFiles(files: Record<string, string>): WorktreeState {
+  const rows = parseJsonl<IndexRow>(files[INDEX_FILE]);
+  const idToBody = new Map<string, string>();
+
+  for (const [filepath, content] of Object.entries(files)) {
+    if (!filepath.startsWith(`${MANUSCRIPT_DIR}/`) || !filepath.endsWith(".md")) {
+      continue;
+    }
+    const filename = filepath.slice(MANUSCRIPT_DIR.length + 1);
+    const id = filename.slice(0, -3);
+    if (!id) {
+      continue;
+    }
+    idToBody.set(id, normalizeBody(content));
+  }
+
+  return {
+    content: rebuildTree("", rows, idToBody),
+    timeline: parseJsonl<TimelineMetaRow>(files[TIMELINE_FILE]),
+  };
+}
+
 function flattenContent(nodes: ManuscriptNodeDiskState[]): ManuscriptNodeDiskState[] {
   return nodes.flatMap((node) => [node, ...flattenContent(node.children)]);
 }

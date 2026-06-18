@@ -241,6 +241,12 @@ export async function readFilesAtRef(input: { projectId: string; ref: string }) 
   return await readTreeFiles({ gitdir, treeOid: commit.tree });
 }
 
+export async function readFilesAtCommit(input: { projectId: string; commitId: string }) {
+  const gitdir = await ensureProjectRepo(input.projectId);
+  const { commit } = await git.readCommit({ fs, gitdir, oid: input.commitId });
+  return await readTreeFiles({ gitdir, treeOid: commit.tree });
+}
+
 export async function resolveRef(projectId: string, ref: string) {
   const gitdir = await ensureProjectRepo(projectId);
   return await git.resolveRef({ fs, gitdir, ref }).catch(() => null);

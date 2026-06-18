@@ -25,7 +25,7 @@ test("empty branch before first commit reports no diff areas", async () => {
 
 test("uncommitted edits before first commit appear as additions", async () => {
   const workspace = await seedProject("status_first_commit");
-  await service.createContentNode({
+  const chapter = await service.createContentNode({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
@@ -54,8 +54,20 @@ test("uncommitted edits before first commit appear as additions", async () => {
   expect(status.hasChanges).toBe(true);
   expect(status.headCommitId).toBeNull();
   expect(status.areas.content.changes).toContainEqual({
-    label: expect.stringMatching(/^manuscript\/[A-Za-z0-9]+\.md$/),
+    label: "Chapter 1",
     kind: "added",
+    nodeId: chapter.id,
+    title: "Chapter 1",
+    parentId: null,
+    parentLabel: null,
+    anchorTimelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
+    anchorTimelinePointLabel: "原点",
+    changedAspects: ["title", "body", "parent", "order", "anchor"],
+    previousTitle: null,
+    previousParentId: null,
+    previousParentLabel: null,
+    previousAnchorTimelinePointId: null,
+    previousAnchorTimelinePointLabel: null,
   });
   expect(status.areas.timeline.changes).toContainEqual({
     label: "timeline.jsonl",
@@ -151,17 +163,87 @@ test("content, timeline and aux edits appear in the diff summary", async () => {
   });
 
   const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchId);
+  const chapterChange = status.areas.content.changes.find((change) => change.nodeId === chapter.id);
 
   expect(status.hasChanges).toBe(true);
-  expect(status.areas.content.changes).toContainEqual({
-    label: expect.stringMatching(/^manuscript\/[A-Za-z0-9]+\.md$/),
+  expect(chapterChange).toMatchObject({
+    label: "Changed title",
     kind: "modified",
+    title: "Changed title",
+    previousTitle: "Chapter 1",
   });
+  expect(chapterChange?.changedAspects).toEqual(expect.arrayContaining(["title", "body"]));
   expect(status.areas.timeline.changes).toContainEqual({
     label: "timeline.jsonl",
     kind: "modified",
   });
   expect(status.areas.aux.changed).toBe(true);
+});
+
+test("content move and anchor updates are summarized semantically", async () => {
+  const workspace = await seedProject("status_semantic_content_diff");
+  const introPoint = await service.createTimelinePoint({
+    projectId: workspace.projectId,
+    workspaceId: workspace.id,
+    label: "Intro",
+  });
+  const middlePoint = await service.createTimelinePoint({
+    projectId: workspace.projectId,
+    workspaceId: workspace.id,
+    label: "Middle",
+  });
+  const chapterA = await service.createContentNode({
+    projectId: workspace.projectId,
+    workspaceId: workspace.id,
+    parentId: null,
+    title: "Chapter A",
+    body: "A",
+  });
+  const chapterB = await service.createContentNode({
+    projectId: workspace.projectId,
+    workspaceId: workspace.id,
+    parentId: null,
+    title: "Chapter B",
+    body: "B",
+    anchorPointId: introPoint.id,
+  });
+  await service.createCommit({
+    projectId: workspace.projectId,
+    branchId: workspace.branchId,
+    message: "base",
+  });
+
+  await service.moveContentNode({
+    projectId: workspace.projectId,
+    workspaceId: workspace.id,
+    nodeId: chapterB.id,
+    newParentId: chapterA.id,
+  });
+  await service.updateContentNode({
+    projectId: workspace.projectId,
+    workspaceId: workspace.id,
+    nodeId: chapterB.id,
+    anchorPointId: middlePoint.id,
+  });
+
+  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchId);
+  const chapterChange = status.areas.content.changes.find(
+    (change) => change.nodeId === chapterB.id,
+  );
+
+  expect(chapterChange).toMatchObject({
+    label: "Chapter B",
+    kind: "modified",
+    parentId: chapterA.id,
+    parentLabel: "Chapter A",
+    previousParentId: null,
+    previousParentLabel: null,
+    anchorTimelinePointId: middlePoint.id,
+    anchorTimelinePointLabel: "Middle",
+    previousAnchorTimelinePointId: introPoint.id,
+    previousAnchorTimelinePointLabel: "Intro",
+  });
+  expect(chapterChange?.changedAspects).toEqual(expect.arrayContaining(["parent", "anchor"]));
 });
 
 test("reverting workspace to head clears the diff summary", async () => {

@@ -147,22 +147,41 @@ export interface ResolvedAuxSnapshotNode extends ResolvedAuxNode {
 
 export type WorkingTreeChangeKind = "added" | "modified" | "deleted";
 
-export interface WorkingTreeChangeItem {
+export type ContentChangeAspect = "title" | "body" | "parent" | "order" | "anchor";
+
+export interface WorkingTreePathChangeItem {
   label: string;
   kind: WorkingTreeChangeKind;
 }
 
-export interface WorkingTreeAreaSummary {
+export interface WorkingTreeContentChangeItem {
+  label: string;
+  kind: WorkingTreeChangeKind;
+  nodeId: string;
+  title: string | null;
+  parentId: string | null;
+  parentLabel: string | null;
+  anchorTimelinePointId: string | typeof ORIGIN_TIMELINE_POINT_ID;
+  anchorTimelinePointLabel: string | null;
+  changedAspects: ContentChangeAspect[];
+  previousTitle: string | null;
+  previousParentId: string | null;
+  previousParentLabel: string | null;
+  previousAnchorTimelinePointId: string | typeof ORIGIN_TIMELINE_POINT_ID | null;
+  previousAnchorTimelinePointLabel: string | null;
+}
+
+export interface WorkingTreeAreaSummary<TChange = WorkingTreePathChangeItem> {
   changed: boolean;
-  changes: WorkingTreeChangeItem[];
+  changes: TChange[];
 }
 
 export interface WorkingTreeStatus {
   hasChanges: boolean;
   headCommitId: string | null;
   areas: {
-    content: WorkingTreeAreaSummary;
-    timeline: WorkingTreeAreaSummary;
-    aux: WorkingTreeAreaSummary;
+    content: WorkingTreeAreaSummary<WorkingTreeContentChangeItem>;
+    timeline: WorkingTreeAreaSummary<WorkingTreePathChangeItem>;
+    aux: WorkingTreeAreaSummary<WorkingTreePathChangeItem>;
   };
 }
