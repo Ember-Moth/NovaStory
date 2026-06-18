@@ -6,6 +6,7 @@ import {
   getBranch,
   getCommit,
   getWorkspace,
+  getWorkspaceForBranchId,
   getWorkingTreeStatus,
   listCommits,
 } from "@/modules/workspace/domain";
@@ -25,12 +26,20 @@ export const workingTreeStatus = query<
   Awaited<ReturnType<typeof getWorkingTreeStatus>>,
   RpcTagList
 >({
-  watch: ({ projectId, branchId }) => [
-    rpcTags.branch(branchId),
-    rpcTags.commitHistory(branchId),
-    rpcTags.workspacesByProject(projectId),
-  ],
-  handler: async ({ projectId, branchId }) => await getWorkingTreeStatus(projectId, branchId),
+  handler: async ({ projectId, branchId }, ctx) => {
+    ctx.watch(rpcTags.branch(branchId), rpcTags.commitHistory(branchId));
+    const workspace = await getWorkspaceForBranchId(projectId, branchId);
+    if (workspace) {
+      ctx.watch(
+        rpcTags.contentTree(workspace.id),
+        rpcTags.timelineList(workspace.id),
+        rpcTags.auxWorkspace(workspace.id),
+      );
+    } else {
+      ctx.watch(rpcTags.workspacesByProject(projectId));
+    }
+    return await getWorkingTreeStatus(projectId, branchId);
+  },
 });
 
 export const get = query<

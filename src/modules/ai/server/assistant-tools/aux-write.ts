@@ -94,7 +94,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
             errorContext.set({ existingNode: summarizeAuxNode(existing) });
             invariant(existing == null, "创建辅助资料目录失败：目标路径已存在。");
 
-            assertParentDirPath({
+            await assertParentDirPath({
               projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointId: resolvedTimelinePointId,
@@ -183,7 +183,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
               };
             }
 
-            assertParentDirPath({
+            await assertParentDirPath({
               projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointId: resolvedTimelinePointId,
@@ -273,7 +273,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
             errorContext.set({ conflictingNode: summarizeAuxNode(conflicting) });
             invariant(conflicting == null, "移动辅助资料失败：目标路径已存在。");
 
-            assertParentDirPath({
+            await assertParentDirPath({
               projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointId: resolvedTimelinePointId,
@@ -409,7 +409,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
                 : "创建辅助资料符号链接失败：目标路径已存在。",
             );
 
-            assertParentDirPath({
+            await assertParentDirPath({
               projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointId: resolvedTimelinePointId,

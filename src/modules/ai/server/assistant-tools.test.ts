@@ -802,13 +802,13 @@ test("update_manuscript_node warns when editing body outside the node anchor tim
 
 test("list_files returns a recursive tree by default", async () => {
   const workspace = await seedProject("assistant_tools_list_tree_default");
-  auxMkdir(workspace, "/设定");
-  auxMkdir(workspace, "/设定/世界观");
-  auxWrite(workspace, "/设定/角色.md", "角色");
-  auxWrite(workspace, "/设定/世界观/阵营.md", "阵营");
-  auxWrite(workspace, "/设定/世界观/王都.md", "王都");
-  auxMkdir(workspace, "/索引");
-  auxLink(workspace, "/索引/设定入口", "/设定");
+  await auxMkdir(workspace, "/设定");
+  await auxMkdir(workspace, "/设定/世界观");
+  await auxWrite(workspace, "/设定/角色.md", "角色");
+  await auxWrite(workspace, "/设定/世界观/阵营.md", "阵营");
+  await auxWrite(workspace, "/设定/世界观/王都.md", "王都");
+  await auxMkdir(workspace, "/索引");
+  await auxLink(workspace, "/索引/设定入口", "/设定");
   const tools = createAssistantTools({
     projectId: "assistant_tools_list_tree_default",
     runtimeContext: createRuntimeContext(),
@@ -876,9 +876,9 @@ test("list_files returns a recursive tree by default", async () => {
 
 test("list_files accepts a deeper depth for nested directories", async () => {
   const workspace = await seedProject("assistant_tools_list_tree_deep");
-  auxMkdir(workspace, "/设定");
-  auxMkdir(workspace, "/设定/世界观");
-  auxWrite(workspace, "/设定/世界观/王都.md", "王都");
+  await auxMkdir(workspace, "/设定");
+  await auxMkdir(workspace, "/设定/世界观");
+  await auxWrite(workspace, "/设定/世界观/王都.md", "王都");
   const tools = createAssistantTools({
     projectId: "assistant_tools_list_tree_deep",
     runtimeContext: createRuntimeContext(),
@@ -945,7 +945,7 @@ test("create_dir creates a directory at the current timeline point", async () =>
 
 test("write_file creates a new file when the target path does not exist", async () => {
   const workspace = await seedProject("assistant_tools_write_create");
-  auxMkdir(workspace, "/设定");
+  await auxMkdir(workspace, "/设定");
   const tools = createAssistantTools({
     projectId: "assistant_tools_write_create",
     runtimeContext: createRuntimeContext(),
@@ -978,8 +978,8 @@ test("write_file creates a new file when the target path does not exist", async 
 
 test("write_file overwrites an existing file", async () => {
   const workspace = await seedProject("assistant_tools_write_update");
-  auxMkdir(workspace, "/设定");
-  auxWrite(workspace, "/设定/角色.md", "旧内容");
+  await auxMkdir(workspace, "/设定");
+  await auxWrite(workspace, "/设定/角色.md", "旧内容");
   const tools = createAssistantTools({
     projectId: "assistant_tools_write_update",
     runtimeContext: createRuntimeContext(),
@@ -1012,8 +1012,8 @@ test("write_file overwrites an existing file", async () => {
 
 test("write_file overlays inherited files without changing earlier timeline points", async () => {
   const workspace = await seedProject("assistant_tools_write_overlay_inherit");
-  auxMkdir(workspace, "/设定");
-  auxWrite(workspace, "/设定/角色.md", "origin 内容");
+  await auxMkdir(workspace, "/设定");
+  await auxWrite(workspace, "/设定/角色.md", "origin 内容");
   const timelinePoint = await workspaceDomain.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
@@ -1086,7 +1086,7 @@ test("write_file returns an error when the parent directory does not exist", asy
 
 test("write_file returns an error when the target path is a directory", async () => {
   const workspace = await seedProject("assistant_tools_write_dir_guard");
-  auxMkdir(workspace, "/设定");
+  await auxMkdir(workspace, "/设定");
   const tools = createAssistantTools({
     projectId: "assistant_tools_write_dir_guard",
     runtimeContext: createRuntimeContext(),
@@ -1105,8 +1105,8 @@ test("write_file returns an error when the target path is a directory", async ()
 
 test("move_path renames a file in the same directory", async () => {
   const workspace = await seedProject("assistant_tools_move_rename");
-  auxMkdir(workspace, "/设定");
-  auxWrite(workspace, "/设定/角色.md", "主角设定");
+  await auxMkdir(workspace, "/设定");
+  await auxWrite(workspace, "/设定/角色.md", "主角设定");
   const tools = createAssistantTools({
     projectId: "assistant_tools_move_rename",
     runtimeContext: createRuntimeContext(),
@@ -1148,9 +1148,9 @@ test("move_path renames a file in the same directory", async () => {
 
 test("move_path moves a file across directories", async () => {
   const workspace = await seedProject("assistant_tools_move_cross_dir");
-  auxMkdir(workspace, "/设定");
-  auxMkdir(workspace, "/资料库");
-  auxWrite(workspace, "/设定/角色.md", "主角设定");
+  await auxMkdir(workspace, "/设定");
+  await auxMkdir(workspace, "/资料库");
+  await auxWrite(workspace, "/设定/角色.md", "主角设定");
   const tools = createAssistantTools({
     projectId: "assistant_tools_move_cross_dir",
     runtimeContext: createRuntimeContext(),
@@ -1183,9 +1183,9 @@ test("move_path moves a file across directories", async () => {
 
 test("move_path moves a directory", async () => {
   const workspace = await seedProject("assistant_tools_move_dir");
-  auxMkdir(workspace, "/设定");
-  auxMkdir(workspace, "/资料库");
-  auxMkdir(workspace, "/设定/角色");
+  await auxMkdir(workspace, "/设定");
+  await auxMkdir(workspace, "/资料库");
+  await auxMkdir(workspace, "/设定/角色");
   const tools = createAssistantTools({
     projectId: "assistant_tools_move_dir",
     runtimeContext: createRuntimeContext(),
@@ -1218,9 +1218,9 @@ test("move_path moves a directory", async () => {
 
 test("move_path returns an error when the target path already exists", async () => {
   const workspace = await seedProject("assistant_tools_move_conflict");
-  auxMkdir(workspace, "/设定");
-  auxWrite(workspace, "/设定/角色.md", "a");
-  auxWrite(workspace, "/设定/主角.md", "b");
+  await auxMkdir(workspace, "/设定");
+  await auxWrite(workspace, "/设定/角色.md", "a");
+  await auxWrite(workspace, "/设定/主角.md", "b");
   const tools = createAssistantTools({
     projectId: "assistant_tools_move_conflict",
     runtimeContext: createRuntimeContext(),
@@ -1239,8 +1239,8 @@ test("move_path returns an error when the target path already exists", async () 
 
 test("move_path returns an error when the target parent directory does not exist", async () => {
   const workspace = await seedProject("assistant_tools_move_missing_parent");
-  auxMkdir(workspace, "/设定");
-  auxWrite(workspace, "/设定/角色.md", "a");
+  await auxMkdir(workspace, "/设定");
+  await auxWrite(workspace, "/设定/角色.md", "a");
   const tools = createAssistantTools({
     projectId: "assistant_tools_move_missing_parent",
     runtimeContext: createRuntimeContext(),
@@ -1259,8 +1259,8 @@ test("move_path returns an error when the target parent directory does not exist
 
 test("move_path rejects moving a directory under its own subtree", async () => {
   const workspace = await seedProject("assistant_tools_move_into_child");
-  auxMkdir(workspace, "/设定");
-  auxMkdir(workspace, "/设定/角色");
+  await auxMkdir(workspace, "/设定");
+  await auxMkdir(workspace, "/设定/角色");
   const tools = createAssistantTools({
     projectId: "assistant_tools_move_into_child",
     runtimeContext: createRuntimeContext(),
@@ -1279,9 +1279,9 @@ test("move_path rejects moving a directory under its own subtree", async () => {
 
 test("move_path respects the active timeline point from context", async () => {
   const workspace = await seedProject("assistant_tools_move_timeline");
-  auxMkdir(workspace, "/设定");
-  auxMkdir(workspace, "/资料库");
-  auxWrite(workspace, "/设定/角色.md", "origin");
+  await auxMkdir(workspace, "/设定");
+  await auxMkdir(workspace, "/资料库");
+  await auxWrite(workspace, "/设定/角色.md", "origin");
   const timelinePoint = await workspaceDomain.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
@@ -1329,9 +1329,9 @@ test("move_path respects the active timeline point from context", async () => {
 
 test("create_symlink creates a symlink to a file", async () => {
   const workspace = await seedProject("assistant_tools_symlink_file");
-  auxMkdir(workspace, "/设定");
-  auxMkdir(workspace, "/索引");
-  auxWrite(workspace, "/设定/角色.md", "主角设定");
+  await auxMkdir(workspace, "/设定");
+  await auxMkdir(workspace, "/索引");
+  await auxWrite(workspace, "/设定/角色.md", "主角设定");
   const tools = createAssistantTools({
     projectId: "assistant_tools_symlink_file",
     runtimeContext: createRuntimeContext(),
@@ -1383,8 +1383,8 @@ test("create_symlink creates a symlink to a file", async () => {
 
 test("create_symlink creates a symlink to a directory", async () => {
   const workspace = await seedProject("assistant_tools_symlink_dir");
-  auxMkdir(workspace, "/设定");
-  auxMkdir(workspace, "/索引");
+  await auxMkdir(workspace, "/设定");
+  await auxMkdir(workspace, "/索引");
   const tools = createAssistantTools({
     projectId: "assistant_tools_symlink_dir",
     runtimeContext: createRuntimeContext(),
@@ -1437,7 +1437,7 @@ test("create_symlink creates a symlink to a directory", async () => {
 
 test("create_symlink accepts a broken logical target path", async () => {
   const workspace = await seedProject("assistant_tools_symlink_missing_target");
-  auxMkdir(workspace, "/索引");
+  await auxMkdir(workspace, "/索引");
   const tools = createAssistantTools({
     projectId: "assistant_tools_symlink_missing_target",
     runtimeContext: createRuntimeContext(),
@@ -1470,10 +1470,10 @@ test("create_symlink accepts a broken logical target path", async () => {
 
 test("create_symlink returns an error when the destination path already exists", async () => {
   const workspace = await seedProject("assistant_tools_symlink_conflict");
-  auxMkdir(workspace, "/设定");
-  auxMkdir(workspace, "/索引");
-  auxWrite(workspace, "/设定/角色.md", "主角设定");
-  auxWrite(workspace, "/索引/角色.md", "已存在");
+  await auxMkdir(workspace, "/设定");
+  await auxMkdir(workspace, "/索引");
+  await auxWrite(workspace, "/设定/角色.md", "主角设定");
+  await auxWrite(workspace, "/索引/角色.md", "已存在");
   const tools = createAssistantTools({
     projectId: "assistant_tools_symlink_conflict",
     runtimeContext: createRuntimeContext(),
@@ -1492,10 +1492,10 @@ test("create_symlink returns an error when the destination path already exists",
 
 test("create_symlink suggests retarget_symlink when the destination is an existing symlink", async () => {
   const workspace = await seedProject("assistant_tools_symlink_retarget_hint");
-  auxMkdir(workspace, "/设定");
-  auxMkdir(workspace, "/场景");
-  auxMkdir(workspace, "/索引");
-  auxLink(workspace, "/索引/入口", "/设定");
+  await auxMkdir(workspace, "/设定");
+  await auxMkdir(workspace, "/场景");
+  await auxMkdir(workspace, "/索引");
+  await auxLink(workspace, "/索引/入口", "/设定");
   const tools = createAssistantTools({
     projectId: "assistant_tools_symlink_retarget_hint",
     runtimeContext: createRuntimeContext(),
@@ -1525,10 +1525,10 @@ test("create_symlink suggests retarget_symlink when the destination is an existi
 
 test("retarget_symlink resolves the source path without following the symlink", async () => {
   const workspace = await seedProject("assistant_tools_symlink_retarget_source");
-  auxMkdir(workspace, "/大纲");
-  auxWrite(workspace, "/大纲/序幕大纲.md", "序幕");
-  auxWrite(workspace, "/大纲/第一幕大纲.md", "第一幕");
-  auxLink(workspace, "/当前大纲", "/大纲/序幕大纲.md");
+  await auxMkdir(workspace, "/大纲");
+  await auxWrite(workspace, "/大纲/序幕大纲.md", "序幕");
+  await auxWrite(workspace, "/大纲/第一幕大纲.md", "第一幕");
+  await auxLink(workspace, "/当前大纲", "/大纲/序幕大纲.md");
   const tools = createAssistantTools({
     projectId: "assistant_tools_symlink_retarget_source",
     runtimeContext: createRuntimeContext(),

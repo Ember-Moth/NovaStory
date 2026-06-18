@@ -252,9 +252,7 @@ test("branch workspace timeline deletion only checks anchors in that workspace",
     nodeId: featureChapter!.id,
   });
 
-  await expect(
-    service.deleteTimelinePoint(featureWorkspace.projectId, featureWorkspace.id, point.id),
-  ).resolves.not.toThrow();
+  await service.deleteTimelinePoint(featureWorkspace.projectId, featureWorkspace.id, point.id);
   expect(
     (await service.listTimelinePoints(featureWorkspace.projectId, featureWorkspace.id)).map(
       (item) => item.id,
@@ -288,7 +286,7 @@ test("deleting a branch also deletes its workspace", async () => {
 test("default branch still cannot be deleted", async () => {
   const workspace = await seedProject("proj_delete_default");
 
-  await expect(await service.deleteBranch(workspace.projectId, workspace.branchId)).rejects.toThrow(
+  await expect(service.deleteBranch(workspace.projectId, workspace.branchId)).rejects.toThrow(
     "无法删除：这是项目的默认分支。",
   );
 });

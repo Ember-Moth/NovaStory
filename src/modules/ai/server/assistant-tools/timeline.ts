@@ -41,18 +41,21 @@ export function buildTimelineTools({ projectId, runtimeContext }: ToolBuildConte
             const limited = limitTimelinePoints(
               await listTimelinePoints(workspace.projectId, workspace.id),
             );
+            const points = await Promise.all(
+              limited.points.map(async (point) => ({
+                ...point,
+                auxChangeSummary: await summarizeAuxTimelineChangesAt(
+                  workspace.projectId,
+                  workspace.id,
+                  point.id,
+                ),
+              })),
+            );
             return {
               ok: true as const,
               truncated: limited.truncated,
               data: {
-                points: limited.points.map((point) => ({
-                  ...point,
-                  auxChangeSummary: summarizeAuxTimelineChangesAt(
-                    workspace.projectId,
-                    workspace.id,
-                    point.id,
-                  ),
-                })),
+                points,
               },
             };
           },
@@ -117,7 +120,7 @@ export function buildTimelineTools({ projectId, runtimeContext }: ToolBuildConte
                   workspace.id,
                   point.prevPointId,
                 ),
-                summary: summarizeAuxTimelineChangesAt(
+                summary: await summarizeAuxTimelineChangesAt(
                   workspace.projectId,
                   workspace.id,
                   resolvedPointId,

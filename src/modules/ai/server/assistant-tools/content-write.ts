@@ -17,8 +17,8 @@ import { withProjectWorkspace } from "./workspace";
 
 type QueuedCreateAnchor = string | null;
 
-function createManuscriptInsertQueueKey(input: { workspaceId: string; parentId: string | null }) {
-  return `${input.workspaceId}:${input.parentId ?? "top"}`;
+function createManuscriptInsertQueueKey(input: { projectId: string; parentId: string | null }) {
+  return `${input.projectId}:${input.parentId ?? "top"}`;
 }
 
 function normalizeRequiredNodeId(value: string, fieldName: string) {
@@ -117,58 +117,59 @@ export function buildContentWriteTools({ projectId, runtimeContext }: ToolBuildC
         },
       }),
       execute: ({ parentId, afterSiblingId, title, body }) =>
-        withProjectWorkspace({
-          projectId,
-          execute: async (workspace) => {
-            const normalizedParentId = normalizeOptionalStringToNull(parentId);
-            const normalizedAfterSiblingId = normalizeOptionalStringToNull(afterSiblingId);
-            const normalizedTitle = normalizeRequiredTitle(title, "title");
-            const queueKey = createManuscriptInsertQueueKey({
-              workspaceId: workspace.id,
-              parentId: normalizedParentId,
-            });
-            const previousCreate =
-              createManuscriptNodeQueues.get(queueKey) ?? Promise.resolve(null);
+        (() => {
+          const normalizedParentId = normalizeOptionalStringToNull(parentId);
+          const normalizedAfterSiblingId = normalizeOptionalStringToNull(afterSiblingId);
+          const queueKey = createManuscriptInsertQueueKey({
+            projectId,
+            parentId: normalizedParentId,
+          });
+          const previousCreate = createManuscriptNodeQueues.get(queueKey) ?? Promise.resolve(null);
 
-            const resultPromise = previousCreate
-              .catch(() => normalizedAfterSiblingId)
-              .then(async (queuedAfterSiblingId) => {
-                const effectiveAfterSiblingId = queuedAfterSiblingId ?? normalizedAfterSiblingId;
-                const resolvedTimelinePointId = resolveCurrentTimelinePointId(runtimeContext);
-                const node = await createContentNode({
-                  projectId: workspace.projectId,
-                  workspaceId: workspace.id,
-                  parentId: normalizedParentId,
-                  afterSiblingId: effectiveAfterSiblingId ?? undefined,
-                  anchorPointId: resolvedTimelinePointId,
-                  title: normalizedTitle,
-                  body: body ?? undefined,
-                });
+          const resultPromise = previousCreate
+            .catch(() => normalizedAfterSiblingId)
+            .then(async (queuedAfterSiblingId) => {
+              return await withProjectWorkspace({
+                projectId,
+                execute: async (workspace) => {
+                  const normalizedTitle = normalizeRequiredTitle(title, "title");
+                  const effectiveAfterSiblingId = queuedAfterSiblingId ?? normalizedAfterSiblingId;
+                  const resolvedTimelinePointId = resolveCurrentTimelinePointId(runtimeContext);
+                  const node = await createContentNode({
+                    projectId: workspace.projectId,
+                    workspaceId: workspace.id,
+                    parentId: normalizedParentId,
+                    afterSiblingId: effectiveAfterSiblingId ?? undefined,
+                    anchorPointId: resolvedTimelinePointId,
+                    title: normalizedTitle,
+                    body: body ?? undefined,
+                  });
 
-                return {
-                  ok: true as const,
-                  truncated: false,
-                  data: {
-                    action: "created" as const,
-                    nodeId: node.id,
-                    title: node.title,
-                    parentId: node.parentId,
-                    timelinePointId: resolvedTimelinePointId,
-                  },
-                };
+                  return {
+                    ok: true as const,
+                    truncated: false,
+                    data: {
+                      action: "created" as const,
+                      nodeId: node.id,
+                      title: node.title,
+                      parentId: node.parentId,
+                      timelinePointId: resolvedTimelinePointId,
+                    },
+                  };
+                },
               });
+            });
 
-            createManuscriptNodeQueues.set(
-              queueKey,
-              resultPromise.then(
-                (result) => result.data.nodeId,
-                () => normalizedAfterSiblingId,
-              ),
-            );
+          createManuscriptNodeQueues.set(
+            queueKey,
+            resultPromise.then(
+              (result) => (result.ok ? result.data.nodeId : normalizedAfterSiblingId),
+              () => normalizedAfterSiblingId,
+            ),
+          );
 
-            return await resultPromise;
-          },
-        }),
+          return resultPromise;
+        })(),
     }),
     update_manuscript_node: tool({
       description:
