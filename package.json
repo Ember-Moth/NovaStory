@@ -33,6 +33,7 @@
     "@ai-sdk/google": "^3.0.80",
     "@ai-sdk/openai": "^3.0.68",
     "@ai-sdk/openai-compatible": "^2.0.48",
+    "@ai-sdk/react": "^3.0.210",
     "@ai-sdk/xai": "^3.0.93",
     "auto-transition": "github:Ember-Moth/auto-transition",
     "@codehz/rpc": "^0.1.8",
