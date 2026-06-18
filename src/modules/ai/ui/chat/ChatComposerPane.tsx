@@ -49,7 +49,7 @@ export function ChatComposerPane({
 }) {
   const [draftConnectionId, setDraftConnectionId] = useState(selectedConnectionId);
   const [draftModelId, setDraftModelId] = useState(selectedModelId);
-  const [allowWrites, setAllowWrites] = useState(false);
+  const [allowWrites, setAllowWrites] = useState(true);
   const groupsQuery = rpc.useQuery("ai.listEnabledConnectionModels");
   const groups = useMemo(
     () =>
