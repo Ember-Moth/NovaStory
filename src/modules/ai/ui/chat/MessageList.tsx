@@ -190,7 +190,7 @@ export function MessageList({
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 px-3 py-3">
+    <div className="flex min-h-full flex-col gap-3 px-3 py-3 select-text">
       {messages.length === 0 ? (
         <div className="py-8 text-center text-[12px] text-foreground-muted">开始一段新的对话。</div>
       ) : (

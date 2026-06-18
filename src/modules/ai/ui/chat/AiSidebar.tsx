@@ -31,6 +31,7 @@ import type {
 } from "../assistant/messages/askUserModel";
 import { ChatComposerPane } from "./ChatComposerPane";
 import { MessageList } from "./MessageList";
+import { useAutoFollowScroll } from "./hooks/useAutoFollowScroll";
 import { SessionList } from "./SessionList";
 import { useChatPathState } from "./hooks/useChatPathState";
 import { ProjectChatTransport } from "./transport/ProjectChatTransport";
@@ -117,6 +118,7 @@ function useProjectChats(projectId: string) {
 }
 
 interface ActiveChatControllerValue {
+  chatId: string;
   messages: ProjectChatMessage[];
   allMessages: ReturnType<typeof useChatPathState>["allMessages"];
   candidateGroups: ReturnType<typeof useChatPathState>["candidateGroups"];
@@ -297,6 +299,7 @@ function ActiveChatConversationProvider({
 
   const value = useMemo<ActiveChatControllerValue>(
     () => ({
+      chatId,
       messages,
       allMessages: chatState.allMessages,
       candidateGroups: chatState.candidateGroups,
@@ -312,6 +315,7 @@ function ActiveChatConversationProvider({
     [
       chatState.allMessages,
       chatState.candidateGroups,
+      chatId,
       commitModelSelection,
       isSavingModel,
       messages,
@@ -341,17 +345,65 @@ function useActiveChatController() {
 
 function ActiveChatMessagesPane() {
   const controller = useActiveChatController();
+  const contentVersion = useMemo(
+    () =>
+      `${controller.status}:${controller.messages
+        .map((message) =>
+          [
+            message.id,
+            message.role,
+            message.parts
+              .map((part) => {
+                if (part.type === "text" || part.type === "reasoning") {
+                  return `${part.type}:${part.state}:${part.text.length}`;
+                }
+                const toolPart = part as {
+                  type: string;
+                  state?: string;
+                  toolCallId?: string;
+                };
+                return `${toolPart.type}:${toolPart.toolCallId ?? ""}:${toolPart.state ?? ""}`;
+              })
+              .join(","),
+          ].join(":"),
+        )
+        .join("|")}`,
+    [controller.messages, controller.status],
+  );
+  const autoFollow = useAutoFollowScroll(controller.chatId, contentVersion);
+
   return (
-    <OverlayScrollbar variant="panel">
-      <MessageList
-        messages={controller.messages}
-        allMessages={controller.allMessages}
-        candidateGroups={controller.candidateGroups}
-        isStreaming={controller.status === "streaming" || controller.status === "submitted"}
-        onSelectBranch={controller.selectBranch}
-        onSubmitAskUser={controller.submitAskUser}
-      />
-    </OverlayScrollbar>
+    <>
+      <OverlayScrollbar
+        variant="panel"
+        viewportRef={autoFollow.viewportRef}
+        onViewportScroll={autoFollow.handleViewportScroll}
+      >
+        <div ref={autoFollow.contentRef}>
+          <MessageList
+            messages={controller.messages}
+            allMessages={controller.allMessages}
+            candidateGroups={controller.candidateGroups}
+            isStreaming={controller.status === "streaming" || controller.status === "submitted"}
+            onSelectBranch={controller.selectBranch}
+            onSubmitAskUser={controller.submitAskUser}
+          />
+        </div>
+      </OverlayScrollbar>
+
+      {!autoFollow.shouldAutoFollow && controller.messages.length > 0 ? (
+        <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center px-3">
+          <button
+            type="button"
+            onClick={autoFollow.resumeAutoFollow}
+            className="pointer-events-auto inline-flex h-8 items-center gap-1 rounded-md border border-border bg-sidebar-background px-2.5 text-[11px] text-foreground shadow-sm transition hover:bg-list-hover-background"
+          >
+            <span className="icon-[material-symbols--south] text-[14px]" />
+            <span>跳到最新</span>
+          </button>
+        </div>
+      ) : null}
+    </>
   );
 }
 
