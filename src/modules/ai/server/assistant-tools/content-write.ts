@@ -39,6 +39,26 @@ function normalizeRequiredNodeId(value: string, fieldName: string) {
   return normalized;
 }
 
+function normalizeRequiredTitle(value: string | null | undefined, fieldName: string) {
+  const normalized = value?.trim();
+  if (!normalized) {
+    throw new Error(`${fieldName} 不能为空。`);
+  }
+  return normalized;
+}
+
+function normalizeOptionalUpdatedTitle(value: string | undefined) {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const normalized = value.trim();
+  if (!normalized) {
+    throw new Error("title 不能为空。");
+  }
+  return normalized;
+}
+
 function buildContentAnchorTimelineWarnings(input: {
   workspaceId: string;
   currentTimelinePointId: string;
@@ -67,14 +87,15 @@ export function buildContentWriteTools({ projectId, runtimeContext }: ToolBuildC
   return {
     create_manuscript_node: tool({
       description:
-        "在正文树中创建新的章节节点，并自动锚定到当前故事时间轴的时间点。仅在用户明确要求新增正文/章节时使用；parentId 决定新节点归属在哪个父节点下，省略、null 或空字符串表示创建到顶层；afterSiblingId 只决定同一父节点下的排序位置，省略、null 或空字符串表示插入为该层级的第一个节点。同一轮里连续创建到同一位置的节点会按工具调用顺序排列。",
+        "在正文树中创建新的章节节点，并自动锚定到当前故事时间轴的时间点。仅在用户明确要求新增正文/章节时使用；必须提供非空标题。parentId 决定新节点归属在哪个父节点下，省略、null 或空字符串表示创建到顶层；afterSiblingId 只决定同一父节点下的排序位置，省略、null 或空字符串表示插入为该层级的第一个节点。同一轮里连续创建到同一位置的节点会按工具调用顺序排列。",
       inputSchema: jsonSchema<{
         parentId?: string | null;
         afterSiblingId?: string | null;
-        title?: string;
+        title: string;
         body?: string;
       }>({
         type: "object",
+        required: ["title"],
         properties: {
           parentId: {
             type: ["string", "null"],
@@ -88,7 +109,7 @@ export function buildContentWriteTools({ projectId, runtimeContext }: ToolBuildC
           },
           title: {
             type: "string",
-            description: "章节标题。",
+            description: "章节标题。必须为非空字符串。",
           },
           body: {
             type: "string",
@@ -97,63 +118,64 @@ export function buildContentWriteTools({ projectId, runtimeContext }: ToolBuildC
         },
       }),
       execute: async ({ parentId, afterSiblingId, title, body }) => {
-        const workspace = getWorkspaceForProject(projectId);
-        if (!workspace) {
-          return failure(new Error("当前项目没有默认工作区。"));
-        }
+        try {
+          const workspace = getWorkspaceForProject(projectId);
+          if (!workspace) {
+            return failure(new Error("当前项目没有默认工作区。"));
+          }
 
-        const normalizedParentId = normalizeOptionalManuscriptParentId(parentId);
-        const normalizedAfterSiblingId = normalizeOptionalSiblingId(afterSiblingId);
-        const queueKey = createManuscriptInsertQueueKey({
-          workspaceId: workspace.id,
-          parentId: normalizedParentId,
-        });
-        const previousCreate = createManuscriptNodeQueues.get(queueKey) ?? Promise.resolve(null);
+          const normalizedParentId = normalizeOptionalManuscriptParentId(parentId);
+          const normalizedAfterSiblingId = normalizeOptionalSiblingId(afterSiblingId);
+          const normalizedTitle = normalizeRequiredTitle(title, "title");
+          const queueKey = createManuscriptInsertQueueKey({
+            workspaceId: workspace.id,
+            parentId: normalizedParentId,
+          });
+          const previousCreate = createManuscriptNodeQueues.get(queueKey) ?? Promise.resolve(null);
 
-        const resultPromise = previousCreate
-          .catch(() => normalizedAfterSiblingId)
-          .then((queuedAfterSiblingId) => {
-            const effectiveAfterSiblingId = queuedAfterSiblingId ?? normalizedAfterSiblingId;
-            const result = withEnvelope(() => {
-              const resolvedTimelinePointId = resolveCurrentTimelinePointId(runtimeContext);
-              const node = createContentNode({
-                workspaceId: workspace.id,
-                parentId: normalizedParentId,
-                afterSiblingId: effectiveAfterSiblingId ?? undefined,
-                anchorPointId: resolvedTimelinePointId,
-                title: title ?? undefined,
-                body: body ?? undefined,
+          const resultPromise = previousCreate
+            .catch(() => normalizedAfterSiblingId)
+            .then((queuedAfterSiblingId) => {
+              const effectiveAfterSiblingId = queuedAfterSiblingId ?? normalizedAfterSiblingId;
+              const result = withEnvelope(() => {
+                const resolvedTimelinePointId = resolveCurrentTimelinePointId(runtimeContext);
+                const node = createContentNode({
+                  workspaceId: workspace.id,
+                  parentId: normalizedParentId,
+                  afterSiblingId: effectiveAfterSiblingId ?? undefined,
+                  anchorPointId: resolvedTimelinePointId,
+                  title: normalizedTitle,
+                  body: body ?? undefined,
+                });
+
+                return {
+                  ok: true,
+                  truncated: false,
+                  data: {
+                    action: "created" as const,
+                    nodeId: node.id,
+                    title: node.title,
+                    parentId: node.parentId,
+                    timelinePointId: resolvedTimelinePointId,
+                  },
+                };
               });
 
-              return {
-                ok: true,
-                truncated: false,
-                data: {
-                  action: "created" as const,
-                  nodeId: node.id,
-                  title: node.title,
-                  parentId: node.parentId,
-                  timelinePointId: resolvedTimelinePointId,
-                },
-              };
+              if (!result.ok) {
+                throw result;
+              }
+
+              return result;
             });
 
-            if (!result.ok) {
-              throw result;
-            }
+          createManuscriptNodeQueues.set(
+            queueKey,
+            resultPromise.then(
+              (result) => result.data.nodeId,
+              () => normalizedAfterSiblingId,
+            ),
+          );
 
-            return result;
-          });
-
-        createManuscriptNodeQueues.set(
-          queueKey,
-          resultPromise.then(
-            (result) => result.data.nodeId,
-            () => normalizedAfterSiblingId,
-          ),
-        );
-
-        try {
           return await resultPromise;
         } catch (error) {
           if (error && typeof error === "object" && Reflect.get(error, "ok") === false) {
@@ -168,7 +190,7 @@ export function buildContentWriteTools({ projectId, runtimeContext }: ToolBuildC
         "更新正文节点的标题、正文或锚定时间点。仅在用户明确要求修改正文时使用；省略的字段不会改变。",
       inputSchema: jsonSchema<{
         nodeId: string;
-        title?: string | null;
+        title?: string;
         body?: string | null;
         anchorPointId?: string;
       }>({
@@ -180,8 +202,8 @@ export function buildContentWriteTools({ projectId, runtimeContext }: ToolBuildC
             description: "要更新的正文节点 ID。",
           },
           title: {
-            type: ["string", "null"],
-            description: "新的章节标题。省略则不修改；传 null 可清除。",
+            type: "string",
+            description: "新的章节标题。省略则不修改；如提供，必须为非空字符串。",
           },
           body: {
             type: ["string", "null"],
@@ -201,11 +223,12 @@ export function buildContentWriteTools({ projectId, runtimeContext }: ToolBuildC
 
         return withEnvelope(() => {
           const normalizedNodeId = normalizeRequiredNodeId(nodeId, "nodeId");
+          const normalizedTitle = normalizeOptionalUpdatedTitle(title);
           const currentTimelinePointId = resolveCurrentTimelinePointId(runtimeContext);
           const node = updateContentNode({
             workspaceId: workspace.id,
             nodeId: normalizedNodeId,
-            title: title === undefined ? undefined : (title ?? null),
+            title: normalizedTitle,
             body: body === undefined ? undefined : (body ?? null),
             anchorPointId: anchorPointId ?? undefined,
           });

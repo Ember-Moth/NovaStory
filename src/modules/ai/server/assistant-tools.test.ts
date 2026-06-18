@@ -494,6 +494,33 @@ test("create_manuscript_node creates a top-level node when parentId is omitted",
   });
 });
 
+test("create_manuscript_node rejects missing or blank title", async () => {
+  seedProject("assistant_tools_create_manuscript_missing_title");
+  const tools = createAssistantTools({
+    projectId: "assistant_tools_create_manuscript_missing_title",
+    runtimeContext: createRuntimeContext(),
+  });
+
+  await expect(
+    executeTool(tools.create_manuscript_node!, {
+      parentId: null,
+    }),
+  ).resolves.toMatchObject({
+    ok: false,
+    error: "title 不能为空。",
+  });
+
+  await expect(
+    executeTool(tools.create_manuscript_node!, {
+      parentId: null,
+      title: "   ",
+    }),
+  ).resolves.toMatchObject({
+    ok: false,
+    error: "title 不能为空。",
+  });
+});
+
 test("create_manuscript_node treats empty parent and sibling ids as top-level insertion", async () => {
   const workspace = seedProject("assistant_tools_create_manuscript_empty_parent");
   workspaceDomain.createContentNode({
@@ -636,7 +663,7 @@ test("content write tools return manuscript titles for model and UI summaries", 
   });
 });
 
-test("update_manuscript_node accepts null to clear title and body", async () => {
+test("update_manuscript_node accepts null to clear body but not title", async () => {
   const workspace = seedProject("assistant_tools_update_manuscript_nullable_fields");
   const chapter = workspaceDomain.createContentNode({
     workspaceId: workspace.id,
@@ -651,7 +678,6 @@ test("update_manuscript_node accepts null to clear title and body", async () => 
 
   const result = await executeTool(tools.update_manuscript_node!, {
     nodeId: chapter.id,
-    title: null,
     body: null,
   });
 
@@ -660,13 +686,23 @@ test("update_manuscript_node accepts null to clear title and body", async () => 
     data: {
       action: "updated",
       nodeId: chapter.id,
-      title: null,
+      title: "原标题",
     },
   });
   expect(workspaceDomain.readManuscriptNode(workspace.id, chapter.id)).toMatchObject({
     id: chapter.id,
-    title: null,
+    title: "原标题",
     body: "",
+  });
+
+  await expect(
+    executeTool(tools.update_manuscript_node!, {
+      nodeId: chapter.id,
+      title: "   ",
+    }),
+  ).resolves.toMatchObject({
+    ok: false,
+    error: "title 不能为空。",
   });
 });
 
