@@ -1,5 +1,4 @@
 import { invariant } from "@/shared/lib/domain";
-import { listProjectRowsSync } from "@/modules/workspace/domain/git-storage/project-meta-store";
 import { parseJsonl, stringifyJsonl } from "@/modules/workspace/domain/git-storage/jsonl";
 
 import type {
@@ -22,6 +21,8 @@ import {
   serializeRequiredJson,
   sortByCreatedAt,
   type ProjectAiStorage,
+  type ProjectArtifactRef,
+  type ProjectStepRef,
   type RunTraceRows,
 } from "./shared";
 import { getRunOrThrow, readProjectAiStorage } from "./storage";
@@ -213,32 +214,26 @@ export function applyRunTraceRowsToStorage(storage: ProjectAiStorage, rows: RunT
   });
 }
 
-export function getStepOrThrow(stepId: string) {
-  for (const project of listProjectRowsSync()) {
-    const storage = readProjectAiStorage(project.id);
-    for (const run of storage.index.runs) {
-      const step = parseRunTraceRowsFromStorage(storage, run).steps.find(
-        (entry) => entry.id === stepId,
-      );
-      if (step) {
-        return step;
-      }
-    }
+export function getStepOrThrow({ projectId, runId, stepId }: ProjectStepRef) {
+  const storage = readProjectAiStorage(projectId);
+  const run = getRunOrThrow(storage.index, runId);
+  const step = parseRunTraceRowsFromStorage(storage, run).steps.find(
+    (entry) => entry.id === stepId,
+  );
+  if (step) {
+    return step;
   }
   invariant(false, "未找到 run step。");
 }
 
-export function getArtifactOrThrow(artifactId: string) {
-  for (const project of listProjectRowsSync()) {
-    const storage = readProjectAiStorage(project.id);
-    for (const run of storage.index.runs) {
-      const artifact = parseRunTraceRowsFromStorage(storage, run).artifacts.find(
-        (entry) => entry.id === artifactId,
-      );
-      if (artifact) {
-        return artifact;
-      }
-    }
+export function getArtifactOrThrow({ projectId, runId, artifactId }: ProjectArtifactRef) {
+  const storage = readProjectAiStorage(projectId);
+  const run = getRunOrThrow(storage.index, runId);
+  const artifact = parseRunTraceRowsFromStorage(storage, run).artifacts.find(
+    (entry) => entry.id === artifactId,
+  );
+  if (artifact) {
+    return artifact;
   }
   invariant(false, "未找到 artifact。");
 }

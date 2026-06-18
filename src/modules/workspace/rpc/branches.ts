@@ -15,9 +15,13 @@ export const list = query<{ projectId: string }, ReturnType<typeof listBranches>
   handler: ({ projectId }) => listBranches(projectId),
 });
 
-export const get = query<{ branchId: string }, ReturnType<typeof getBranch>, RpcTagList>({
+export const get = query<
+  { projectId: string; branchId: string },
+  ReturnType<typeof getBranch>,
+  RpcTagList
+>({
   watch: ({ branchId }) => [rpcTags.branch(branchId)],
-  handler: ({ branchId }) => getBranch(branchId),
+  handler: ({ projectId, branchId }) => getBranch(projectId, branchId),
 });
 
 export const heads = query<
@@ -67,5 +71,5 @@ export const deleteMutation = mutation<{ projectId: string; branchId: string }, 
     rpcTags.project(input.projectId),
     rpcTags.projectsList(),
   ],
-  handler: ({ branchId }) => deleteBranch(branchId),
+  handler: ({ projectId, branchId }) => deleteBranch(projectId, branchId),
 });

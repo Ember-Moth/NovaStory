@@ -71,12 +71,17 @@ test("project initialization writes a real repo and metadata custom ref", async 
 test("branch worktrees preserve independent uncommitted edits", async () => {
   const main = seedProject("git_branch_independent");
   const chapter = createContentNode({
+    projectId: main.projectId,
     workspaceId: main.id,
     parentId: null,
     title: "Base",
     body: "base",
   });
-  const base = await createCommit({ branchId: main.branchId, message: "base" });
+  const base = await createCommit({
+    projectId: main.projectId,
+    branchId: main.branchId,
+    message: "base",
+  });
   const feature = await createBranchWorkspace({
     projectId: "git_branch_independent",
     name: "feature",
@@ -84,25 +89,26 @@ test("branch worktrees preserve independent uncommitted edits", async () => {
   });
 
   updateContentNode({
+    projectId: feature.projectId,
     workspaceId: feature.id,
     nodeId: chapter.id,
     body: "feature draft",
   });
 
-  expect(exportContentSubtree(main.id).nodes[0]?.body).toBe("base");
-  expect(exportContentSubtree(feature.id).nodes[0]?.body).toBe("feature draft");
+  expect(exportContentSubtree(main.projectId, main.id).nodes[0]?.body).toBe("base");
+  expect(exportContentSubtree(feature.projectId, feature.id).nodes[0]?.body).toBe("feature draft");
 });
 
 test("AI run events are mirrored into an AI custom ref", async () => {
   seedProject("git_ai_logs");
   const thread = createThread({ projectId: "git_ai_logs", title: "Trace" });
-  const run = createRun({
+  const run = createRun("git_ai_logs", {
     threadId: thread.id,
     runMode: "send",
     agentProfile: "project-assistant",
   });
 
-  appendRunEvent({ runId: run.id, eventKind: "run-started" });
+  appendRunEvent("git_ai_logs", { runId: run.id, eventKind: "run-started" });
 
   await new Promise((resolve) => setTimeout(resolve, 25));
   expect(await resolveRef("git_ai_logs", aiRunsRef())).toMatch(/^[0-9a-f]{40}$/);

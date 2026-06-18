@@ -85,14 +85,14 @@ export function ProjectWorkbenchRoute({ projectId }: { projectId: string }) {
 
   const commitHistoryQuery = rpc.useQuery(
     "commits.history",
-    selectedBranchId ? { branchId: selectedBranchId } : skipToken,
+    selectedBranchId ? { projectId, branchId: selectedBranchId } : skipToken,
     {
       refetchOnWindowFocus: true,
     },
   );
   const workingTreeStatusQuery = rpc.useQuery(
     "commits.workingTreeStatus",
-    selectedBranchId ? { branchId: selectedBranchId } : skipToken,
+    selectedBranchId ? { projectId, branchId: selectedBranchId } : skipToken,
     {
       refetchOnWindowFocus: true,
     },
@@ -309,6 +309,7 @@ export function ProjectWorkbenchRoute({ projectId }: { projectId: string }) {
     try {
       workbenchStore.getState().setDiscardError(null);
       await checkoutCommit.mutate({
+        projectId,
         workspaceId: selectedWorkspace.id,
         commitId: workingTreeStatus.headCommitId,
       });
@@ -343,6 +344,7 @@ export function ProjectWorkbenchRoute({ projectId }: { projectId: string }) {
     try {
       setCommitError(null);
       await createCommit.mutate({
+        projectId,
         branchId: selectedBranch.id,
         message: trimmedMessage,
       });

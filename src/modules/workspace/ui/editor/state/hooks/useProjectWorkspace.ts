@@ -67,7 +67,10 @@ export function resolveProjectWorkspaceIdentity({
 }
 
 export function useProjectWorkspaceIdentity(projectId: string, requestedWorkspaceId: string) {
-  const workspaceQuery = rpc.useQuery("workspaces.get", { workspaceId: requestedWorkspaceId });
+  const workspaceQuery = rpc.useQuery("workspaces.get", {
+    projectId,
+    workspaceId: requestedWorkspaceId,
+  });
   const resolved = resolveProjectWorkspaceIdentity({
     projectId,
     requestedWorkspaceId,
@@ -85,10 +88,10 @@ export function useProjectWorkspaceIdentity(projectId: string, requestedWorkspac
   );
 }
 
-export function useProjectContentData(workspaceId: string | undefined) {
+export function useProjectContentData(projectId: string, workspaceId: string | undefined) {
   const contentQuery = rpc.useQuery(
     "content.exportSubtree",
-    workspaceId ? { workspaceId } : skipToken,
+    workspaceId ? { projectId, workspaceId } : skipToken,
   );
 
   const createContent = rpc.useMutation("content.create");
@@ -144,8 +147,11 @@ export function useProjectContentData(workspaceId: string | undefined) {
   );
 }
 
-export function useProjectTimelineData(workspaceId: string | undefined) {
-  const timelineQuery = rpc.useQuery("timeline.list", workspaceId ? { workspaceId } : skipToken);
+export function useProjectTimelineData(projectId: string, workspaceId: string | undefined) {
+  const timelineQuery = rpc.useQuery(
+    "timeline.list",
+    workspaceId ? { projectId, workspaceId } : skipToken,
+  );
 
   const createTimeline = rpc.useMutation("timeline.create");
   const moveTimeline = rpc.useMutation("timeline.move");
@@ -199,13 +205,14 @@ export function useProjectTimelineData(workspaceId: string | undefined) {
 }
 
 export function useProjectAuxData(
+  projectId: string,
   workspaceId: string | undefined,
   activeTimelinePointId: string | null,
 ) {
   const auxQuery = rpc.useQuery(
     "aux.snapshotTree",
     workspaceId && activeTimelinePointId
-      ? { workspaceId, pointId: activeTimelinePointId }
+      ? { projectId, workspaceId, pointId: activeTimelinePointId }
       : skipToken,
   );
   const visibleAuxSnapshot = selectVisibleAuxSnapshot(auxQuery.data);

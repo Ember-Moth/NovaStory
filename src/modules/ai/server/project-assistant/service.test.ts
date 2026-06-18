@@ -101,7 +101,7 @@ test("sendProjectAssistantMessage materializes user and assistant nodes and reco
   expect(result.assistantNode?.role).toBe("assistant");
   expect(result.state.activePath.map((node) => node.role)).toEqual(["user", "assistant"]);
   expect(result.run.status).toBe("succeeded");
-  expect(service.getRunTrace(result.run.id).steps).toHaveLength(1);
+  expect(service.getRunTrace("assistant_send", result.run.id).steps).toHaveLength(1);
 });
 
 test("sendProjectAssistantMessage resolves global prompt mentions into run refs and user display parts", async () => {
@@ -307,6 +307,7 @@ test("retryProjectAssistantMessage creates sibling assistant candidates", async 
   });
   const thread = service.createProjectAssistantThread("assistant_retry");
   const userNode = threadLogs.appendUserNode({
+    projectId: "assistant_retry",
     threadId: thread.id,
     parentNodeId: null,
     message: {
@@ -322,7 +323,7 @@ test("retryProjectAssistantMessage creates sibling assistant candidates", async 
   });
 
   expect(result.assistantNode?.summaryText).toBe("Retried reply");
-  expect(service.getNodeCandidates(userNode.id)).toHaveLength(1);
+  expect(service.getNodeCandidates("assistant_retry", userNode.id)).toHaveLength(1);
 });
 
 test("retryProjectAssistantMessage reuses original prompt ref snapshots", async () => {
@@ -796,6 +797,7 @@ test("continueProjectAssistantRun inherits the updated timeline context snapshot
   seedProject("assistant_continue_timeline_context");
   const workspace = createDefaultWorkspace("assistant_continue_timeline_context");
   const timelinePoint = workspaceDomain.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
     label: "现在",
@@ -829,7 +831,7 @@ test("continueProjectAssistantRun inherits the updated timeline context snapshot
     },
     activeTools: ["read_file"],
   });
-  runLogs.updateRunContextSnapshot(first.run.id, {
+  runLogs.updateRunContextSnapshot("assistant_continue_timeline_context", first.run.id, {
     workspaceId: workspace.id,
     activeContentNodeId: null,
     activeContentTitle: null,
@@ -843,7 +845,10 @@ test("continueProjectAssistantRun inherits the updated timeline context snapshot
     runId: first.run.id,
   });
 
-  const updatedParentRun = service.getRunTrace(first.run.id).run;
+  const updatedParentRun = service.getRunTrace(
+    "assistant_continue_timeline_context",
+    first.run.id,
+  ).run;
   expect(updatedParentRun.contextSnapshot).toMatchObject({
     activeTimelinePointId: timelinePoint.id,
     activeTimelineLabel: "现在",
@@ -1269,7 +1274,7 @@ test("submitProjectAssistantToolInput resumes the same waiting run with continuo
     toolCallId: "tool_ask",
     answers: [{ questionId: "tone", type: "single_choice", optionId: "quiet" }],
   });
-  const trace = service.getRunTrace(waiting.run.id);
+  const trace = service.getRunTrace("assistant_submit_tool_input", waiting.run.id);
 
   expect(resumed.run.id).toBe(waiting.run.id);
   expect(resumed.run.status).toBe("succeeded");

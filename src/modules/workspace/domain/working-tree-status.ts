@@ -22,10 +22,13 @@ function areaForPath(filepath: string): keyof WorkingTreeStatus["areas"] {
   return "content";
 }
 
-export async function getWorkingTreeStatus(branchId: string): Promise<WorkingTreeStatus> {
-  const branch = getBranch(branchId);
-  const headCommitId = await getBranchHeadCommitId(branch.id);
-  const workspace = getWorkspaceForBranchId(branch.id);
+export async function getWorkingTreeStatus(
+  projectId: string,
+  branchId: string,
+): Promise<WorkingTreeStatus> {
+  const branch = getBranch(projectId, branchId);
+  const headCommitId = await getBranchHeadCommitId(projectId, branch.id);
+  const workspace = getWorkspaceForBranchId(projectId, branch.id);
   if (!workspace) {
     return {
       hasChanges: false,

@@ -270,7 +270,7 @@ test("sendProjectAssistantMessage only materializes per-step response deltas int
     "现在可以开始分析设定了。",
   ]);
 
-  const trace = service.getRunTrace(result.run.id);
+  const trace = service.getRunTrace("assistant_multistep", result.run.id);
   const responseMessageArtifacts = trace.steps
     .map(
       (step) =>
@@ -451,7 +451,7 @@ test("sendProjectAssistantMessage records tool input and output artifacts for ex
       "create_symlink",
     ],
   });
-  const trace = service.getRunTrace(result.run.id);
+  const trace = service.getRunTrace("assistant_write_tool_trace", result.run.id);
 
   expect(trace.artifacts.map((artifact) => artifact.artifactKind)).toContain("tool-input");
   expect(trace.artifacts.map((artifact) => artifact.artifactKind)).toContain("tool-output");

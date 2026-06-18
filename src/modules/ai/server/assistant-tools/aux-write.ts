@@ -85,17 +85,24 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
               parentPath,
               name,
             });
-            const existing = readAuxByPathAt(workspace.id, resolvedTimelinePointId, normalizedPath);
+            const existing = readAuxByPathAt(
+              workspace.projectId,
+              workspace.id,
+              resolvedTimelinePointId,
+              normalizedPath,
+            );
             errorContext.set({ existingNode: summarizeAuxNode(existing) });
             invariant(existing == null, "创建辅助资料目录失败：目标路径已存在。");
 
             assertParentDirPath({
+              projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointId: resolvedTimelinePointId,
               parentPath,
               actionLabel: "创建辅助资料目录",
             });
             const node = mkdirAt({
+              projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointId: resolvedTimelinePointId,
               path: normalizedPath,
@@ -148,12 +155,18 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
               parentPath,
               name,
             });
-            const existing = readAuxByPathAt(workspace.id, resolvedTimelinePointId, normalizedPath);
+            const existing = readAuxByPathAt(
+              workspace.projectId,
+              workspace.id,
+              resolvedTimelinePointId,
+              normalizedPath,
+            );
             errorContext.set({ existingNode: summarizeAuxNode(existing) });
 
             if (existing) {
               invariant(existing.nodeType === "file", "写入辅助资料文件失败：目标路径不是文件。");
               const node = writeFileAt({
+                projectId: workspace.projectId,
                 workspaceId: workspace.id,
                 timelinePointId: resolvedTimelinePointId,
                 path: existing.path,
@@ -171,12 +184,14 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
             }
 
             assertParentDirPath({
+              projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointId: resolvedTimelinePointId,
               parentPath,
               actionLabel: "写入辅助资料文件",
             });
             const node = writeFileAt({
+              projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointId: resolvedTimelinePointId,
               path: normalizedPath,
@@ -242,6 +257,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
             );
 
             const existing = resolveAuxNodeByPathOrThrow({
+              projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointId: resolvedTimelinePointId,
               path: normalizedPath,
@@ -249,6 +265,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
             });
             errorContext.set({ sourceNode: summarizeAuxNode(existing) });
             const conflicting = readAuxByPathAt(
+              workspace.projectId,
               workspace.id,
               resolvedTimelinePointId,
               normalizedNewPath,
@@ -257,12 +274,14 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
             invariant(conflicting == null, "移动辅助资料失败：目标路径已存在。");
 
             assertParentDirPath({
+              projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointId: resolvedTimelinePointId,
               parentPath: newParentPath,
               actionLabel: "移动辅助资料",
             });
             const node = moveAuxNodeAt({
+              projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointId: resolvedTimelinePointId,
               path: existing.path,
@@ -306,6 +325,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
             const { normalizedPath } = splitAuxPath(path, "删除辅助资料");
             errorContext.set({ timelinePointId: resolvedTimelinePointId, normalizedPath });
             const node = resolveAuxNodeByPathOrThrow({
+              projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointId: resolvedTimelinePointId,
               path: normalizedPath,
@@ -314,6 +334,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
             errorContext.set({ targetNode: summarizeAuxNode(node) });
 
             deleteAuxNodeAt({
+              projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointId: resolvedTimelinePointId,
               path: node.path,
@@ -371,9 +392,14 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
               name,
               normalizedTargetPath,
             });
-            const existing = listAuxDirAt(workspace.id, resolvedTimelinePointId, {
-              path: parentPath,
-            }).find((node) => node.name === name);
+            const existing = listAuxDirAt(
+              workspace.projectId,
+              workspace.id,
+              resolvedTimelinePointId,
+              {
+                path: parentPath,
+              },
+            ).find((node) => node.name === name);
             errorContext.set({ existingNode: summarizeAuxNode(existing) });
             invariant(
               existing == null,
@@ -383,12 +409,14 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
             );
 
             assertParentDirPath({
+              projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointId: resolvedTimelinePointId,
               parentPath,
               actionLabel: "创建辅助资料符号链接",
             });
             linkAt({
+              projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointId: resolvedTimelinePointId,
               path: normalizedPath,
@@ -452,6 +480,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
             });
 
             const symlinkNode = resolveAuxNodeByPathOrThrow({
+              projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointId: resolvedTimelinePointId,
               path: normalizedPath,
@@ -465,6 +494,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
             );
 
             retargetAuxSymlinkAt({
+              projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointId: resolvedTimelinePointId,
               path: symlinkNode.path,

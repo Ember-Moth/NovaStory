@@ -63,8 +63,12 @@ function cloneInputRefsSnapshot(
   return inputRefs == null ? [] : inputRefs.map((ref) => structuredClone(ref));
 }
 
-function findLatestInputRefsForTriggerNode(threadId: string, triggerNodeId: string) {
-  const previousRun = getLatestRunForTriggerNode(threadId, triggerNodeId);
+function findLatestInputRefsForTriggerNode(
+  projectId: string,
+  threadId: string,
+  triggerNodeId: string,
+) {
+  const previousRun = getLatestRunForTriggerNode(projectId, threadId, triggerNodeId);
   return cloneInputRefsSnapshot(previousRun?.inputRefsSnapshot);
 }
 
@@ -127,7 +131,7 @@ function assertToolCallNotAnswered(input: {
 }
 
 export function assertNoPendingRunForThread(thread: AgentThreadView) {
-  invariant(!hasPendingRun(thread.id), "当前会话正在生成回复，请稍后再试。");
+  invariant(!hasPendingRun(thread.projectId, thread.id), "当前会话正在生成回复，请稍后再试。");
 }
 
 export function buildSendRun({
@@ -153,7 +157,7 @@ export function buildSendRun({
     selection,
     activeTools,
   });
-  const threadView = getThreadView(threadId);
+  const threadView = getThreadView(projectId, threadId);
   const thread = threadView.thread;
   invariant(thread, "未找到当前会话。");
   invariant(thread.projectId === projectId, "AI 会话不属于当前项目。");
@@ -162,13 +166,14 @@ export function buildSendRun({
   const inputRefs = resolveAssistantInputRefs(mentions);
 
   const userNode = appendUserNode({
+    projectId,
     threadId: thread.id,
     parentNodeId: thread.activeTipNodeId,
     message: buildUserTextMessage(normalizeAssistantUserText(text, inputRefs.length)),
     sourceKind: "user_input",
     extraParts: buildAssistantRefDisplayParts(inputRefs),
   });
-  const run = createRun({
+  const run = createRun(projectId, {
     threadId: thread.id,
     triggerNodeId: userNode.id,
     baseTipNodeId: userNode.id,
@@ -179,7 +184,7 @@ export function buildSendRun({
     inputRefsSnapshot: inputRefs,
     activeTools: resolvedActiveTools,
   });
-  appendRunEvent({
+  appendRunEvent(projectId, {
     runId: run.id,
     eventKind: "run-started",
     nodeId: userNode.id,
@@ -188,6 +193,7 @@ export function buildSendRun({
 
   const system = buildProjectAssistantSystemPrompt();
   const request = resolveAssistantRequest({
+    projectId,
     threadId: thread.id,
     triggerNodeId: userNode.id,
     system,
@@ -210,11 +216,11 @@ export function buildSendRun({
     runtimeContext: createToolRuntimeContext(normalizedContext),
     activeTools: resolvedActiveTools,
     initialResult: {
-      thread: getThreadView(thread.id).thread!,
+      thread: getThreadView(projectId, thread.id).thread!,
       userNode,
       assistantNode: null,
       run,
-      state: getThreadView(thread.id),
+      state: getThreadView(projectId, thread.id),
     },
     runStartedEvent: {
       type: "run-started",
@@ -224,11 +230,11 @@ export function buildSendRun({
       userNode,
     },
     buildFinalResult: ({ run: completedRun, lastAssistantNode }) => ({
-      thread: getThreadView(thread.id).thread!,
+      thread: getThreadView(projectId, thread.id).thread!,
       userNode,
       assistantNode: lastAssistantNode,
       run: completedRun,
-      state: getThreadView(thread.id),
+      state: getThreadView(projectId, thread.id),
     }),
   };
 }
@@ -254,7 +260,7 @@ export function buildRetryRun({
     selection,
     activeTools,
   });
-  const threadView = getThreadView(threadId);
+  const threadView = getThreadView(projectId, threadId);
   const thread = threadView.thread;
   invariant(thread, "未找到当前会话。");
   invariant(thread.projectId === projectId, "AI 会话不属于当前项目。");
@@ -264,9 +270,9 @@ export function buildRetryRun({
   const triggerNode = threadView.activePath.find((node) => node.id === triggerNodeId);
   invariant(triggerNode, "当前只支持重试 active path 上的节点。");
   invariant(triggerNode.role === "user", "当前版本只能重试用户消息的回复。");
-  const inputRefs = findLatestInputRefsForTriggerNode(thread.id, triggerNodeId);
+  const inputRefs = findLatestInputRefsForTriggerNode(projectId, thread.id, triggerNodeId);
 
-  const run = createRun({
+  const run = createRun(projectId, {
     threadId: thread.id,
     triggerNodeId,
     baseTipNodeId: triggerNodeId,
@@ -277,7 +283,7 @@ export function buildRetryRun({
     inputRefsSnapshot: inputRefs,
     activeTools: resolvedActiveTools,
   });
-  appendRunEvent({
+  appendRunEvent(projectId, {
     runId: run.id,
     eventKind: "run-started",
     nodeId: triggerNodeId,
@@ -286,6 +292,7 @@ export function buildRetryRun({
 
   const system = buildProjectAssistantSystemPrompt();
   const request = resolveAssistantRequest({
+    projectId,
     threadId: thread.id,
     triggerNodeId,
     system,
@@ -308,10 +315,10 @@ export function buildRetryRun({
     runtimeContext: createToolRuntimeContext(normalizedContext),
     activeTools: resolvedActiveTools,
     initialResult: {
-      thread: getThreadView(thread.id).thread!,
+      thread: getThreadView(projectId, thread.id).thread!,
       assistantNode: null,
       run,
-      state: getThreadView(thread.id),
+      state: getThreadView(projectId, thread.id),
     },
     runStartedEvent: {
       type: "run-started",
@@ -320,10 +327,10 @@ export function buildRetryRun({
       triggerNodeId,
     },
     buildFinalResult: ({ run: completedRun, lastAssistantNode }) => ({
-      thread: getThreadView(thread.id).thread!,
+      thread: getThreadView(projectId, thread.id).thread!,
       assistantNode: lastAssistantNode,
       run: completedRun,
-      state: getThreadView(thread.id),
+      state: getThreadView(projectId, thread.id),
     }),
   };
 }
@@ -353,7 +360,7 @@ export function buildEditRun({
     selection,
     activeTools,
   });
-  const threadView = getThreadView(threadId);
+  const threadView = getThreadView(projectId, threadId);
   const thread = threadView.thread;
   invariant(thread, "未找到当前会话。");
   invariant(thread.projectId === projectId, "AI 会话不属于当前项目。");
@@ -362,12 +369,13 @@ export function buildEditRun({
   const inputRefs = resolveAssistantInputRefs(mentions);
 
   const replacementNode = createReplacementNode({
+    projectId,
     threadId: thread.id,
     nodeId,
     message: buildUserTextMessage(normalizeAssistantUserText(text, inputRefs.length)),
     extraParts: buildAssistantRefDisplayParts(inputRefs),
   });
-  const run = createRun({
+  const run = createRun(projectId, {
     threadId: thread.id,
     triggerNodeId: replacementNode.id,
     baseTipNodeId: replacementNode.id,
@@ -378,7 +386,7 @@ export function buildEditRun({
     inputRefsSnapshot: inputRefs,
     activeTools: resolvedActiveTools,
   });
-  appendRunEvent({
+  appendRunEvent(projectId, {
     runId: run.id,
     eventKind: "run-started",
     nodeId: replacementNode.id,
@@ -387,6 +395,7 @@ export function buildEditRun({
 
   const system = buildProjectAssistantSystemPrompt();
   const request = resolveAssistantRequest({
+    projectId,
     threadId: thread.id,
     triggerNodeId: replacementNode.id,
     system,
@@ -409,11 +418,11 @@ export function buildEditRun({
     runtimeContext: createToolRuntimeContext(normalizedContext),
     activeTools: resolvedActiveTools,
     initialResult: {
-      thread: getThreadView(thread.id).thread!,
+      thread: getThreadView(projectId, thread.id).thread!,
       replacementNode,
       assistantNode: null,
       run,
-      state: getThreadView(thread.id),
+      state: getThreadView(projectId, thread.id),
     },
     runStartedEvent: {
       type: "run-started",
@@ -423,11 +432,11 @@ export function buildEditRun({
       replacementNode,
     },
     buildFinalResult: ({ run: completedRun, lastAssistantNode }) => ({
-      thread: getThreadView(thread.id).thread!,
+      thread: getThreadView(projectId, thread.id).thread!,
       replacementNode,
       assistantNode: lastAssistantNode,
       run: completedRun,
-      state: getThreadView(thread.id),
+      state: getThreadView(projectId, thread.id),
     }),
   };
 }
@@ -445,13 +454,13 @@ export function buildSubmitToolInputRun({
   toolCallId: string;
   answers: readonly AskUserAnswer[];
 }): PreparedProjectAssistantRun<ProjectAssistantSubmitToolInputResult> {
-  const threadView = getThreadView(threadId);
+  const threadView = getThreadView(projectId, threadId);
   const thread = threadView.thread;
   invariant(thread, "未找到当前会话。");
   invariant(thread.projectId === projectId, "AI 会话不属于当前项目。");
   invariant(thread.archivedAt == null, "不能向已归档会话提交工具输入。");
 
-  const trace = getRunTrace(runId);
+  const trace = getRunTrace(projectId, runId);
   const waitingRun = trace.run;
   invariant(waitingRun.threadId === thread.id, "run 不属于当前会话。");
   invariant(waitingRun.status === "waiting_for_input", "run 当前不在等待用户输入。");
@@ -476,6 +485,7 @@ export function buildSubmitToolInputRun({
     answers,
   });
   const responseNode = createStreamingToolResultNode({
+    projectId,
     threadId: thread.id,
     parentNodeId: activeTipNodeId,
     runId: waitingRun.id,
@@ -489,7 +499,7 @@ export function buildSubmitToolInputRun({
       },
     },
   });
-  const payloadArtifact = createArtifact({
+  const payloadArtifact = createArtifact(projectId, {
     runId: waitingRun.id,
     artifactKind: "tool-output",
     visibility: "internal",
@@ -499,7 +509,7 @@ export function buildSubmitToolInputRun({
     },
     summaryText: "用户已回答提问",
   });
-  appendRunEvent({
+  appendRunEvent(projectId, {
     runId: waitingRun.id,
     eventKind: "user-input-submitted",
     nodeId: responseNode.id,
@@ -508,7 +518,7 @@ export function buildSubmitToolInputRun({
     payloadArtifactId: payloadArtifact.id,
   });
 
-  const run = markRunRunning(waitingRun.id);
+  const run = markRunRunning(projectId, waitingRun.id);
   const selection = resolveProjectAssistantModelSelectionFromSnapshot(run.selectionSnapshot);
   const activeTools = run.activeTools ?? [];
   invariant(
@@ -519,6 +529,7 @@ export function buildSubmitToolInputRun({
   const inputRefs = cloneInputRefsSnapshot(run.inputRefsSnapshot);
   const system = buildProjectAssistantSystemPrompt();
   const request = resolveAssistantRequest({
+    projectId,
     threadId: thread.id,
     triggerNodeId: responseNode.id,
     system,
@@ -542,11 +553,11 @@ export function buildSubmitToolInputRun({
     activeTools,
     stepIndexOffset: trace.steps.length,
     initialResult: {
-      thread: getThreadView(thread.id).thread!,
+      thread: getThreadView(projectId, thread.id).thread!,
       toolNode: responseNode,
       assistantNode: null,
       run,
-      state: getThreadView(thread.id),
+      state: getThreadView(projectId, thread.id),
     },
     runStartedEvent: {
       type: "user-input-submitted",
@@ -554,11 +565,11 @@ export function buildSubmitToolInputRun({
       toolCallId,
     },
     buildFinalResult: ({ run: completedRun, lastAssistantNode }) => ({
-      thread: getThreadView(thread.id).thread!,
+      thread: getThreadView(projectId, thread.id).thread!,
       toolNode: responseNode,
       assistantNode: lastAssistantNode,
       run: completedRun,
-      state: getThreadView(thread.id),
+      state: getThreadView(projectId, thread.id),
     }),
   };
 }
@@ -572,14 +583,14 @@ export function buildContinueRun({
   threadId: string;
   runId: string;
 }): PreparedProjectAssistantRun<ProjectAssistantContinueResult> {
-  const threadView = getThreadView(threadId);
+  const threadView = getThreadView(projectId, threadId);
   const thread = threadView.thread;
   invariant(thread, "未找到当前会话。");
   invariant(thread.projectId === projectId, "AI 会话不属于当前项目。");
   invariant(thread.archivedAt == null, "不能继续已归档会话。");
   assertNoPendingRunForThread(thread);
 
-  const parentTrace = getRunTrace(runId);
+  const parentTrace = getRunTrace(projectId, runId);
   const parentRun = parentTrace.run;
   invariant(parentRun.threadId === thread.id, "原 run 不属于当前会话。");
   invariant(runNeedsContinuation(parentTrace), "这个 run 当前不需要继续。");
@@ -605,6 +616,7 @@ export function buildContinueRun({
   const inputRefs = cloneInputRefsSnapshot(parentRun.inputRefsSnapshot);
   const system = buildProjectAssistantSystemPrompt();
   const request = resolveAssistantRequest({
+    projectId,
     threadId: thread.id,
     triggerNodeId: activeTipNodeId,
     system,
@@ -612,7 +624,7 @@ export function buildContinueRun({
     context,
     inputRefs,
   });
-  const run = createRun({
+  const run = createRun(projectId, {
     threadId: thread.id,
     parentRunId: parentRun.id,
     triggerNodeId: activeTipNodeId,
@@ -624,14 +636,14 @@ export function buildContinueRun({
     inputRefsSnapshot: inputRefs,
     activeTools,
   });
-  appendRunEvent({
+  appendRunEvent(projectId, {
     runId: parentRun.id,
     eventKind: "child-run-started",
     nodeId: activeTipNodeId,
     relatedRunId: run.id,
     summaryText: "继续达到轮次上限的 run",
   });
-  appendRunEvent({
+  appendRunEvent(projectId, {
     runId: run.id,
     eventKind: "run-started",
     nodeId: activeTipNodeId,
@@ -653,11 +665,11 @@ export function buildContinueRun({
     runtimeContext: createToolRuntimeContext(context),
     activeTools,
     initialResult: {
-      thread: getThreadView(thread.id).thread!,
+      thread: getThreadView(projectId, thread.id).thread!,
       assistantNode: null,
       run,
       parentRun,
-      state: getThreadView(thread.id),
+      state: getThreadView(projectId, thread.id),
     },
     runStartedEvent: {
       type: "run-started",
@@ -666,11 +678,11 @@ export function buildContinueRun({
       triggerNodeId: activeTipNodeId,
     },
     buildFinalResult: ({ run: completedRun, lastAssistantNode }) => ({
-      thread: getThreadView(thread.id).thread!,
+      thread: getThreadView(projectId, thread.id).thread!,
       assistantNode: lastAssistantNode,
       run: completedRun,
       parentRun,
-      state: getThreadView(thread.id),
+      state: getThreadView(projectId, thread.id),
     }),
   };
 }

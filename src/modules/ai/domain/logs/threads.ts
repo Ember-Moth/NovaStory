@@ -33,25 +33,25 @@ import {
   type CreateNodeExtraPartInput,
   type CreateThreadInput,
   type MaterializeResponseMessagesInput,
+  type ProjectThreadNodeDeltaInput,
   type ProjectAiStorage,
 } from "./shared";
 import {
+  assertNodeInProject,
+  assertRunInProject,
+  assertThreadInProject,
   getLatestUnarchivedThreadRow,
   getNodeOrThrow,
   getNodeRowsByThread,
-  getProjectIdForNodeOrThrow,
-  getProjectIdForRunOrThrow,
-  getProjectIdForThreadOrThrow,
   getProjectOrThrow,
   getProjectStateRow,
-  getRunOrThrow,
   getThreadOrThrow,
   readProjectAiStorage,
   touchProject,
   updateProjectAiStorage,
   upsertProjectState,
 } from "./storage";
-import { getStepOrThrow } from "./trace-store";
+import { getStepOrThrow, parseRunTraceRowsFromStorage } from "./trace-store";
 
 export { PROJECT_ASSISTANT_AGENT_PROFILE };
 
@@ -137,13 +137,12 @@ export function createThread(input: CreateThreadInput) {
   return result;
 }
 
-export function renameThread(threadId: string, title: string) {
-  const projectId = getProjectIdForThreadOrThrow(threadId);
+export function renameThread(projectId: string, threadId: string, title: string) {
   const result = updateProjectAiStorage(
     projectId,
     `Rename AI thread ${threadId}`,
     (storage: ProjectAiStorage) => {
-      const thread = getThreadOrThrow(storage.index, threadId);
+      const thread = assertThreadInProject(storage.index, projectId, threadId);
       const normalizedTitle = trimOptionalString(title);
       invariant(normalizedTitle, "名称不能为空。");
       const updated: AgentThreadRow = {
@@ -169,13 +168,12 @@ export function setActiveThread(projectId: string, threadId: string) {
   });
 }
 
-export function archiveThread(threadId: string, archived: boolean) {
-  const projectId = getProjectIdForThreadOrThrow(threadId);
+export function archiveThread(projectId: string, threadId: string, archived: boolean) {
   const result = updateProjectAiStorage(
     projectId,
     `Archive AI thread ${threadId}`,
     (storage: ProjectAiStorage) => {
-      const thread = getThreadOrThrow(storage.index, threadId);
+      const thread = assertThreadInProject(storage.index, projectId, threadId);
       const updated: AgentThreadRow = {
         ...thread,
         archivedAt: archived ? now() : null,
@@ -206,10 +204,9 @@ export function archiveThread(threadId: string, archived: boolean) {
   return result;
 }
 
-export function resolveThreadPath(threadId: string, tipNodeId?: string | null) {
-  const projectId = getProjectIdForThreadOrThrow(threadId);
+export function resolveThreadPath(projectId: string, threadId: string, tipNodeId?: string | null) {
   const storage = readProjectAiStorage(projectId);
-  const thread = getThreadOrThrow(storage.index, threadId);
+  const thread = assertThreadInProject(storage.index, projectId, threadId);
   const currentTipId = trimOptionalString(tipNodeId) ?? thread.activeTipNodeId;
   if (!currentTipId) {
     return [] as AgentThreadNodeView[];
@@ -231,14 +228,17 @@ export function resolveThreadPath(threadId: string, tipNodeId?: string | null) {
   return chain.reverse();
 }
 
-export function buildThreadModelMessages(threadId: string, tipNodeId?: string | null) {
-  return resolveThreadPath(threadId, tipNodeId).map((node) => node.message);
+export function buildThreadModelMessages(
+  projectId: string,
+  threadId: string,
+  tipNodeId?: string | null,
+) {
+  return resolveThreadPath(projectId, threadId, tipNodeId).map((node) => node.message);
 }
 
-export function getNodeCandidates(parentNodeId: string) {
-  const projectId = getProjectIdForNodeOrThrow(parentNodeId);
+export function getNodeCandidates(projectId: string, parentNodeId: string) {
   const storage = readProjectAiStorage(projectId);
-  const parent = getNodeOrThrow(storage.index, parentNodeId);
+  const parent = assertNodeInProject(storage.index, projectId, parentNodeId);
   return getNodeRowsByThread(storage.index, parent.threadId, parentNodeId).map((row) => ({
     id: row.id,
     tipNodeId: resolveCandidateLeafTip(storage.index, row.threadId, row.id),
@@ -249,10 +249,9 @@ export function getNodeCandidates(parentNodeId: string) {
   }));
 }
 
-export function listLatestRuns(threadId: string, limit = 10) {
-  const projectId = getProjectIdForThreadOrThrow(threadId);
+export function listLatestRuns(projectId: string, threadId: string, limit = 10) {
   const storage = readProjectAiStorage(projectId);
-  getThreadOrThrow(storage.index, threadId);
+  assertThreadInProject(storage.index, projectId, threadId);
   return [...storage.index.runs]
     .filter((row) => row.threadId === threadId)
     .sort((left, right) => right.createdAt - left.createdAt)
@@ -260,10 +259,13 @@ export function listLatestRuns(threadId: string, limit = 10) {
     .map(mapRunRow) as AgentRunView[];
 }
 
-export function getLatestRunForTriggerNode(threadId: string, triggerNodeId: string) {
-  const projectId = getProjectIdForThreadOrThrow(threadId);
+export function getLatestRunForTriggerNode(
+  projectId: string,
+  threadId: string,
+  triggerNodeId: string,
+) {
   const storage = readProjectAiStorage(projectId);
-  getThreadOrThrow(storage.index, threadId);
+  assertThreadInProject(storage.index, projectId, threadId);
   return (
     [...storage.index.runs]
       .filter((row) => row.threadId === threadId && row.triggerNodeId === triggerNodeId)
@@ -272,24 +274,22 @@ export function getLatestRunForTriggerNode(threadId: string, triggerNodeId: stri
   );
 }
 
-export function getThreadView(threadId: string): AgentThreadStateView {
-  const projectId = getProjectIdForThreadOrThrow(threadId);
+export function getThreadView(projectId: string, threadId: string): AgentThreadStateView {
   const storage = readProjectAiStorage(projectId);
-  const thread = getThreadOrThrow(storage.index, threadId);
-  const activePath = resolveThreadPath(thread.id);
+  const thread = assertThreadInProject(storage.index, projectId, threadId);
+  const activePath = resolveThreadPath(projectId, thread.id);
   return {
     thread: mapThreadRow(thread),
     activePath,
     candidateGroups: buildCandidateGroups(storage.index, thread.id, activePath),
-    latestRuns: listLatestRuns(thread.id),
+    latestRuns: listLatestRuns(projectId, thread.id),
     runSummaries: buildRunSummaries(storage.index, thread.id, activePath),
   };
 }
 
-export function hasPendingRun(threadId: string) {
-  const projectId = getProjectIdForThreadOrThrow(threadId);
+export function hasPendingRun(projectId: string, threadId: string) {
   const storage = readProjectAiStorage(projectId);
-  getThreadOrThrow(storage.index, threadId);
+  assertThreadInProject(storage.index, projectId, threadId);
   return storage.index.runs.some(
     (row) =>
       row.threadId === threadId &&
@@ -297,14 +297,13 @@ export function hasPendingRun(threadId: string) {
   );
 }
 
-export function selectActiveTip(threadId: string, tipNodeId: string) {
-  const projectId = getProjectIdForThreadOrThrow(threadId);
+export function selectActiveTip(projectId: string, threadId: string, tipNodeId: string) {
   const result = updateProjectAiStorage(
     projectId,
     "Select AI thread tip",
     (storage: ProjectAiStorage) => {
-      const thread = getThreadOrThrow(storage.index, threadId);
-      const node = getNodeOrThrow(storage.index, tipNodeId);
+      const thread = assertThreadInProject(storage.index, projectId, threadId);
+      const node = assertNodeInProject(storage.index, projectId, tipNodeId);
       invariant(node.threadId === thread.id, "候选节点不属于当前 thread。");
       const updated: AgentThreadRow = {
         ...thread,
@@ -320,17 +319,18 @@ export function selectActiveTip(threadId: string, tipNodeId: string) {
 }
 
 export function appendUserNode(input: {
+  projectId: string;
   threadId: string;
   parentNodeId: string | null;
   message: ModelMessage;
   sourceKind?: Extract<AgentThreadNodeSourceKind, "user_input" | "edit_rewrite">;
   extraParts?: CreateNodeExtraPartInput[];
 }) {
-  const projectId = getProjectIdForThreadOrThrow(input.threadId);
   const result = updateProjectAiStorage(
-    projectId,
+    input.projectId,
     "Append AI user node",
     (storage: ProjectAiStorage) => {
+      assertThreadInProject(storage.index, input.projectId, input.threadId);
       const node = insertNode(storage, {
         threadId: input.threadId,
         parentNodeId: input.parentNodeId,
@@ -338,7 +338,7 @@ export function appendUserNode(input: {
         sourceKind: input.sourceKind ?? "user_input",
         extraParts: input.extraParts,
       });
-      const thread = getThreadOrThrow(storage.index, input.threadId);
+      const thread = assertThreadInProject(storage.index, input.projectId, input.threadId);
       replaceRowById(storage.index.threads, {
         ...thread,
         activeTipNodeId: node.id,
@@ -347,22 +347,22 @@ export function appendUserNode(input: {
       return node;
     },
   );
-  touchProject(projectId);
+  touchProject(input.projectId);
   return result;
 }
 
 export function createReplacementNode(input: {
+  projectId: string;
   threadId: string;
   nodeId: string;
   message: ModelMessage;
   extraParts?: CreateNodeExtraPartInput[];
 }) {
-  const projectId = getProjectIdForThreadOrThrow(input.threadId);
   const result = updateProjectAiStorage(
-    projectId,
+    input.projectId,
     "Create AI replacement node",
     (storage: ProjectAiStorage) => {
-      const node = getNodeOrThrow(storage.index, input.nodeId);
+      const node = assertNodeInProject(storage.index, input.projectId, input.nodeId);
       invariant(node.threadId === input.threadId, "待修改节点不属于当前 thread。");
       const replacement = insertNode(storage, {
         threadId: input.threadId,
@@ -371,7 +371,7 @@ export function createReplacementNode(input: {
         sourceKind: "edit_rewrite",
         extraParts: input.extraParts,
       });
-      const thread = getThreadOrThrow(storage.index, input.threadId);
+      const thread = assertThreadInProject(storage.index, input.projectId, input.threadId);
       replaceRowById(storage.index.threads, {
         ...thread,
         activeTipNodeId: replacement.id,
@@ -380,17 +380,16 @@ export function createReplacementNode(input: {
       return replacement;
     },
   );
-  touchProject(projectId);
+  touchProject(input.projectId);
   return result;
 }
 
 export function materializeResponseMessages(input: MaterializeResponseMessagesInput) {
-  const projectId = getProjectIdForThreadOrThrow(input.threadId);
   const result = updateProjectAiStorage(
-    projectId,
+    input.projectId,
     "Materialize AI response messages",
     (storage: ProjectAiStorage) => {
-      const thread = getThreadOrThrow(storage.index, input.threadId);
+      const thread = assertThreadInProject(storage.index, input.projectId, input.threadId);
       let parentNodeId = input.parentNodeId;
       const nodes: AgentThreadNodeView[] = [];
 
@@ -413,21 +412,22 @@ export function materializeResponseMessages(input: MaterializeResponseMessagesIn
       };
     },
   );
-  touchProject(projectId);
+  touchProject(input.projectId);
   return result;
 }
 
 export function createStreamingAssistantNode(input: {
+  projectId: string;
   threadId: string;
   parentNodeId: string | null;
   runId: string;
   stepId?: string | null;
 }) {
-  const projectId = getProjectIdForThreadOrThrow(input.threadId);
   const result = updateProjectAiStorage(
-    projectId,
+    input.projectId,
     "Create streaming assistant node",
     (storage: ProjectAiStorage) => {
+      assertThreadInProject(storage.index, input.projectId, input.threadId);
       const node = insertNode(storage, {
         threadId: input.threadId,
         parentNodeId: input.parentNodeId,
@@ -440,7 +440,7 @@ export function createStreamingAssistantNode(input: {
         sourceStepId: trimOptionalString(input.stepId),
         summaryText: "助手回复",
       });
-      const thread = getThreadOrThrow(storage.index, input.threadId);
+      const thread = assertThreadInProject(storage.index, input.projectId, input.threadId);
       replaceRowById(storage.index.threads, {
         ...thread,
         activeTipNodeId: node.id,
@@ -449,17 +449,16 @@ export function createStreamingAssistantNode(input: {
       return node;
     },
   );
-  touchProject(projectId);
+  touchProject(input.projectId);
   return result;
 }
 
-export function appendAssistantTextDelta(input: { nodeId: string; delta: string }) {
-  const projectId = getProjectIdForNodeOrThrow(input.nodeId);
+export function appendAssistantTextDelta(input: ProjectThreadNodeDeltaInput) {
   return updateProjectAiStorage(
-    projectId,
+    input.projectId,
     "Append assistant text delta",
     (storage: ProjectAiStorage) => {
-      const node = getNodeOrThrow(storage.index, input.nodeId);
+      const node = assertNodeInProject(storage.index, input.projectId, input.nodeId);
       invariant(node.role === "assistant", "只能向 assistant 节点追加文本。");
       const message = getNodeModelMessage(node);
       const content = getMessageContentParts(message);
@@ -513,15 +512,15 @@ export function appendAssistantTextDelta(input: { nodeId: string; delta: string 
 }
 
 export function appendAssistantReasoningPart(input: {
+  projectId: string;
   nodeId: string;
   providerMetadata?: unknown;
 }) {
-  const projectId = getProjectIdForNodeOrThrow(input.nodeId);
   return updateProjectAiStorage(
-    projectId,
+    input.projectId,
     "Append assistant reasoning part",
     (storage: ProjectAiStorage) => {
-      const node = getNodeOrThrow(storage.index, input.nodeId);
+      const node = assertNodeInProject(storage.index, input.projectId, input.nodeId);
       invariant(node.role === "assistant", "只能向 assistant 节点追加 reasoning。");
       const message = getNodeModelMessage(node);
       const partIndex = getMessageContentParts(message).length;
@@ -548,17 +547,17 @@ export function appendAssistantReasoningPart(input: {
 }
 
 export function appendAssistantReasoningDelta(input: {
+  projectId: string;
   nodeId: string;
   partIndex: number;
   delta: string;
   providerMetadata?: unknown;
 }) {
-  const projectId = getProjectIdForNodeOrThrow(input.nodeId);
   return updateProjectAiStorage(
-    projectId,
+    input.projectId,
     "Append assistant reasoning delta",
     (storage: ProjectAiStorage) => {
-      const node = getNodeOrThrow(storage.index, input.nodeId);
+      const node = assertNodeInProject(storage.index, input.projectId, input.nodeId);
       invariant(node.role === "assistant", "只能向 assistant 节点追加 reasoning。");
       const message = getNodeModelMessage(node);
       const content = getMessageContentParts(message);
@@ -587,15 +586,15 @@ export function appendAssistantReasoningDelta(input: {
 }
 
 export function appendAssistantToolCallPart(input: {
+  projectId: string;
   nodeId: string;
   toolCall: Record<string, unknown>;
 }) {
-  const projectId = getProjectIdForNodeOrThrow(input.nodeId);
   return updateProjectAiStorage(
-    projectId,
+    input.projectId,
     "Append assistant tool call part",
     (storage: ProjectAiStorage) => {
-      const node = getNodeOrThrow(storage.index, input.nodeId);
+      const node = assertNodeInProject(storage.index, input.projectId, input.nodeId);
       invariant(node.role === "assistant", "只能向 assistant 节点追加工具调用。");
       const message = getNodeModelMessage(node);
       const nextPart = {
@@ -621,15 +620,15 @@ export function appendAssistantToolCallPart(input: {
 }
 
 export function appendAssistantToolApprovalRequestPart(input: {
+  projectId: string;
   nodeId: string;
   approvalRequest: Record<string, unknown>;
 }) {
-  const projectId = getProjectIdForNodeOrThrow(input.nodeId);
   return updateProjectAiStorage(
-    projectId,
+    input.projectId,
     "Append assistant approval request part",
     (storage: ProjectAiStorage) => {
-      const node = getNodeOrThrow(storage.index, input.nodeId);
+      const node = assertNodeInProject(storage.index, input.projectId, input.nodeId);
       invariant(node.role === "assistant", "只能向 assistant 节点追加工具审批请求。");
       const message = getNodeModelMessage(node);
       const approvalId = Reflect.get(input.approvalRequest, "approvalId");
@@ -660,17 +659,18 @@ export function appendAssistantToolApprovalRequestPart(input: {
 }
 
 export function createStreamingToolResultNode(input: {
+  projectId: string;
   threadId: string;
   parentNodeId: string | null;
   runId: string;
   stepId?: string | null;
   toolResult: Record<string, unknown>;
 }) {
-  const projectId = getProjectIdForThreadOrThrow(input.threadId);
   const result = updateProjectAiStorage(
-    projectId,
+    input.projectId,
     "Create streaming tool result node",
     (storage: ProjectAiStorage) => {
+      assertThreadInProject(storage.index, input.projectId, input.threadId);
       const node = insertNode(storage, {
         threadId: input.threadId,
         parentNodeId: input.parentNodeId,
@@ -682,7 +682,7 @@ export function createStreamingToolResultNode(input: {
         createdByRunId: input.runId,
         sourceStepId: trimOptionalString(input.stepId),
       });
-      const thread = getThreadOrThrow(storage.index, input.threadId);
+      const thread = assertThreadInProject(storage.index, input.projectId, input.threadId);
       replaceRowById(storage.index.threads, {
         ...thread,
         activeTipNodeId: node.id,
@@ -691,11 +691,12 @@ export function createStreamingToolResultNode(input: {
       return node;
     },
   );
-  touchProject(projectId);
+  touchProject(input.projectId);
   return result;
 }
 
 export function createToolApprovalResponseNode(input: {
+  projectId: string;
   threadId: string;
   parentNodeId: string | null;
   runId: string;
@@ -705,11 +706,11 @@ export function createToolApprovalResponseNode(input: {
     reason?: string;
   };
 }) {
-  const projectId = getProjectIdForThreadOrThrow(input.threadId);
   const result = updateProjectAiStorage(
-    projectId,
+    input.projectId,
     "Create tool approval response node",
     (storage: ProjectAiStorage) => {
+      assertThreadInProject(storage.index, input.projectId, input.threadId);
       const node = insertNode(storage, {
         threadId: input.threadId,
         parentNodeId: input.parentNodeId,
@@ -720,7 +721,7 @@ export function createToolApprovalResponseNode(input: {
         sourceKind: "tool_result",
         createdByRunId: input.runId,
       });
-      const thread = getThreadOrThrow(storage.index, input.threadId);
+      const thread = assertThreadInProject(storage.index, input.projectId, input.threadId);
       replaceRowById(storage.index.threads, {
         ...thread,
         activeTipNodeId: node.id,
@@ -729,17 +730,16 @@ export function createToolApprovalResponseNode(input: {
       return node;
     },
   );
-  touchProject(projectId);
+  touchProject(input.projectId);
   return result;
 }
 
-export function markThreadNodePartsDone(nodeId: string) {
-  const projectId = getProjectIdForNodeOrThrow(nodeId);
+export function markThreadNodePartsDone(projectId: string, nodeId: string) {
   return updateProjectAiStorage(
     projectId,
     "Mark thread node parts done",
     (storage: ProjectAiStorage) => {
-      const node = getNodeOrThrow(storage.index, nodeId);
+      const node = assertNodeInProject(storage.index, projectId, nodeId);
       const message = getNodeModelMessage(node);
       const parts = parseStoredArray<AgentMessagePartRow>(node.partsJson);
       const nextParts = parts.map((part) => {
@@ -767,17 +767,24 @@ export function markThreadNodePartsDone(nodeId: string) {
   );
 }
 
-export function assignThreadNodeSourceStepIds(nodeIds: string[], stepId: string) {
+export function assignThreadNodeSourceStepIds(
+  projectId: string,
+  nodeIds: string[],
+  stepId: string,
+) {
   if (nodeIds.length === 0) {
     return;
   }
-  const step = getStepOrThrow(stepId);
-  const projectId = getProjectIdForRunOrThrow(step.runId);
   updateProjectAiStorage(
     projectId,
     "Assign thread node source step ids",
     (storage: ProjectAiStorage) => {
-      getRunOrThrow(storage.index, step.runId);
+      const run = storage.index.runs.find((entry) =>
+        parseRunTraceRowsFromStorage(storage, entry).steps.some((step) => step.id === stepId),
+      );
+      invariant(run, "未找到 run step。");
+      assertRunInProject(storage.index, projectId, run.id);
+      getStepOrThrow({ projectId, runId: run.id, stepId });
       nodeIds.forEach((nodeId) => {
         const node = getNodeOrThrow(storage.index, nodeId);
         replaceRowById(storage.index.nodes, {

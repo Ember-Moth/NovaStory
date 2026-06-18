@@ -35,6 +35,7 @@ function formatTimelineContentAnchorError(
 }
 
 type TimelineActionDependencies = {
+  projectId: string;
   workspaceId: string | undefined;
   timelinePoints: TimelinePointVM[];
   flatContentNodes: ContentTreeNodeVM[];
@@ -42,6 +43,7 @@ type TimelineActionDependencies = {
   contentParentMap: ReadonlyMap<string, string | null>;
   createTimeline: {
     mutate: (input: {
+      projectId: string;
       workspaceId: string;
       afterPointId: string;
       label: string;
@@ -50,6 +52,7 @@ type TimelineActionDependencies = {
   };
   moveTimeline: {
     mutate: (input: {
+      projectId: string;
       workspaceId: string;
       pointId: string;
       afterPointId: string;
@@ -58,13 +61,19 @@ type TimelineActionDependencies = {
   deleteTimeline: {
     isPending: boolean;
     mutate: (input: {
+      projectId: string;
       workspaceId: string;
       pointId: string;
       purgeAuxLayers?: true;
     }) => Promise<void>;
   };
   updateTimeline: {
-    mutate: (input: { workspaceId: string; pointId: string; label: string }) => Promise<unknown>;
+    mutate: (input: {
+      projectId: string;
+      workspaceId: string;
+      pointId: string;
+      label: string;
+    }) => Promise<unknown>;
   };
   store: WorkspaceStore;
   timelineDeleteDialog: TimelineDeleteDialogState | null;
@@ -74,6 +83,7 @@ type TimelineActionDependencies = {
 };
 
 export function useProjectTimelineActions({
+  projectId,
   workspaceId,
   timelinePoints,
   flatContentNodes,
@@ -126,6 +136,7 @@ export function useProjectTimelineActions({
 
       try {
         await updateTimeline.mutate({
+          projectId,
           workspaceId,
           pointId,
           label: normalizedLabel,
@@ -140,7 +151,7 @@ export function useProjectTimelineActions({
         return false;
       }
     },
-    [store, updateTimeline, workspaceId],
+    [projectId, store, updateTimeline, workspaceId],
   );
 
   const handleTimelineAdd = useCallback(
@@ -155,6 +166,7 @@ export function useProjectTimelineActions({
 
       try {
         const point = await createTimeline.mutate({
+          projectId,
           workspaceId,
           afterPointId: activeTimelinePointId,
           label: `新时间点 ${newIndex}`,
@@ -169,7 +181,7 @@ export function useProjectTimelineActions({
         );
       }
     },
-    [createTimeline, store, timelinePoints, workspaceId],
+    [createTimeline, projectId, store, timelinePoints, workspaceId],
   );
 
   const handleTimelineMove = useCallback(
@@ -187,6 +199,7 @@ export function useProjectTimelineActions({
 
       try {
         await moveTimeline.mutate({
+          projectId,
           workspaceId,
           pointId,
           afterPointId,
@@ -199,7 +212,7 @@ export function useProjectTimelineActions({
         );
       }
     },
-    [moveTimeline, store, timelinePoints, workspaceId],
+    [moveTimeline, projectId, store, timelinePoints, workspaceId],
   );
 
   const handleTimelineDelete = useCallback(
@@ -224,6 +237,7 @@ export function useProjectTimelineActions({
 
       try {
         const { data: auxChanges } = await rpc.callQuery("aux.listChangesAt", {
+          projectId,
           workspaceId,
           pointId,
         });
@@ -242,6 +256,7 @@ export function useProjectTimelineActions({
         }
 
         await deleteTimeline.mutate({
+          projectId,
           workspaceId,
           pointId,
         });
@@ -260,6 +275,7 @@ export function useProjectTimelineActions({
       deleteTimeline,
       finishTimelineDelete,
       flatContentNodes,
+      projectId,
       setTimelineDeleteDialog,
       store,
       timelinePoints,
@@ -284,6 +300,7 @@ export function useProjectTimelineActions({
 
     try {
       await deleteTimeline.mutate({
+        projectId,
         workspaceId,
         pointId,
         purgeAuxLayers: true,
@@ -301,6 +318,7 @@ export function useProjectTimelineActions({
   }, [
     deleteTimeline,
     finishTimelineDelete,
+    projectId,
     setTimelineDeleteDialog,
     store,
     timelineDeleteDialog,

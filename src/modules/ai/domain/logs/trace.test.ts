@@ -14,11 +14,13 @@ function seedProject(projectId: string) {
 }
 
 test("run trace keeps steps, artifacts, and events", () => {
-  seedProject("project_trace");
+  const projectId = "project_trace";
+  seedProject(projectId);
   const thread = logs.createThread({
-    projectId: "project_trace",
+    projectId,
   });
   const userNode = logs.appendUserNode({
+    projectId,
     threadId: thread.id,
     parentNodeId: null,
     message: {
@@ -26,27 +28,27 @@ test("run trace keeps steps, artifacts, and events", () => {
       content: [{ type: "text", text: "Hello trace" }],
     },
   });
-  const run = logs.createRun({
+  const run = logs.createRun(projectId, {
     threadId: thread.id,
     triggerNodeId: userNode.id,
     baseTipNodeId: userNode.id,
     runMode: "send",
     agentProfile: "project-assistant",
   });
-  const requestArtifact = logs.createArtifact({
+  const requestArtifact = logs.createArtifact(projectId, {
     runId: run.id,
     artifactKind: "request-body",
     visibility: "internal",
     content: { prompt: "Hello trace" },
   });
-  const step = logs.createRunStep({
+  const step = logs.createRunStep(projectId, {
     runId: run.id,
     stepIndex: 0,
     provider: "openai",
     modelId: "gpt-test",
     requestBodyArtifactId: requestArtifact.id,
   });
-  logs.appendRunEvent({
+  logs.appendRunEvent(projectId, {
     runId: run.id,
     stepId: step.id,
     eventKind: "provider-requested",
@@ -54,7 +56,7 @@ test("run trace keeps steps, artifacts, and events", () => {
     payloadArtifactId: requestArtifact.id,
   });
 
-  const trace = logs.getRunTrace(run.id);
+  const trace = logs.getRunTrace(projectId, run.id);
   expect(trace.run.id).toBe(run.id);
   expect(trace.steps).toHaveLength(1);
   expect(trace.events).toHaveLength(1);
@@ -62,11 +64,13 @@ test("run trace keeps steps, artifacts, and events", () => {
 });
 
 test("run trace reads Git projection instead of local run index fields", () => {
-  seedProject("project_trace_git_authoritative");
+  const projectId = "project_trace_git_authoritative";
+  seedProject(projectId);
   const thread = logs.createThread({
-    projectId: "project_trace_git_authoritative",
+    projectId,
   });
   const userNode = logs.appendUserNode({
+    projectId,
     threadId: thread.id,
     parentNodeId: null,
     message: {
@@ -74,34 +78,34 @@ test("run trace reads Git projection instead of local run index fields", () => {
       content: [{ type: "text", text: "Hello Git trace" }],
     },
   });
-  const run = logs.createRun({
+  const run = logs.createRun(projectId, {
     threadId: thread.id,
     triggerNodeId: userNode.id,
     baseTipNodeId: userNode.id,
     runMode: "send",
     agentProfile: "project-assistant",
   });
-  const artifact = logs.createArtifact({
+  const artifact = logs.createArtifact(projectId, {
     runId: run.id,
     artifactKind: "request-body",
     visibility: "internal",
     content: { prompt: "Hello Git trace" },
   });
-  const step = logs.createRunStep({
+  const step = logs.createRunStep(projectId, {
     runId: run.id,
     stepIndex: 0,
     provider: "openai",
     modelId: "gpt-test",
     requestBodyArtifactId: artifact.id,
   });
-  logs.appendRunEvent({
+  logs.appendRunEvent(projectId, {
     runId: run.id,
     stepId: step.id,
     eventKind: "provider-requested",
     payloadArtifactId: artifact.id,
   });
 
-  const trace = logs.getRunTrace(run.id);
+  const trace = logs.getRunTrace(projectId, run.id);
   expect(trace.run.status).toBe("running");
   expect(trace.steps.map((entry) => entry.id)).toEqual([step.id]);
   expect(trace.events.map((entry) => entry.eventKind)).toEqual(["provider-requested"]);

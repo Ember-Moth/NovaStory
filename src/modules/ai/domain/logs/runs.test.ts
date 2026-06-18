@@ -14,11 +14,13 @@ function seedProject(projectId: string) {
 }
 
 test("thread view builds run summaries for completed multi-step assistant runs", () => {
-  seedProject("project_run_summary_success");
+  const projectId = "project_run_summary_success";
+  seedProject(projectId);
   const thread = logs.createThread({
-    projectId: "project_run_summary_success",
+    projectId,
   });
   const userNode = logs.appendUserNode({
+    projectId,
     threadId: thread.id,
     parentNodeId: null,
     message: {
@@ -26,14 +28,14 @@ test("thread view builds run summaries for completed multi-step assistant runs",
       content: [{ type: "text", text: "继续" }],
     },
   });
-  const run = logs.createRun({
+  const run = logs.createRun(projectId, {
     threadId: thread.id,
     triggerNodeId: userNode.id,
     baseTipNodeId: userNode.id,
     runMode: "send",
     agentProfile: "project-assistant",
   });
-  const stepA = logs.createRunStep({
+  const stepA = logs.createRunStep(projectId, {
     runId: run.id,
     stepIndex: 0,
     provider: "openai",
@@ -41,13 +43,14 @@ test("thread view builds run summaries for completed multi-step assistant runs",
     usage: { totalTokens: 10 },
   });
   const branchA = logs.materializeResponseMessages({
+    projectId,
     threadId: thread.id,
     parentNodeId: userNode.id,
     runId: run.id,
     stepId: stepA.id,
     messages: [{ role: "assistant", content: [{ type: "text", text: "先读取上下文。" }] }],
   });
-  const stepB = logs.createRunStep({
+  const stepB = logs.createRunStep(projectId, {
     runId: run.id,
     stepIndex: 1,
     provider: "openai",
@@ -55,16 +58,17 @@ test("thread view builds run summaries for completed multi-step assistant runs",
     usage: { inputTokens: 3, outputTokens: 8 },
   });
   const branchB = logs.materializeResponseMessages({
+    projectId,
     threadId: thread.id,
     parentNodeId: branchA.tipNodeId!,
     runId: run.id,
     stepId: stepB.id,
     messages: [{ role: "assistant", content: [{ type: "text", text: "这是最终答复。" }] }],
   });
-  logs.selectActiveTip(thread.id, branchB.tipNodeId!);
-  logs.markRunSucceeded(run.id);
+  logs.selectActiveTip(projectId, thread.id, branchB.tipNodeId!);
+  logs.markRunSucceeded(projectId, run.id);
 
-  const summary = logs.getThreadView(thread.id).runSummaries[0]!;
+  const summary = logs.getThreadView(projectId, thread.id).runSummaries[0]!;
   expect(summary).toMatchObject({
     runId: run.id,
     displayNodeId: branchB.tipNodeId,
@@ -77,11 +81,13 @@ test("thread view builds run summaries for completed multi-step assistant runs",
 });
 
 test("thread view falls back to trigger user node for failed runs without assistant output", () => {
-  seedProject("project_run_summary_failed_user");
+  const projectId = "project_run_summary_failed_user";
+  seedProject(projectId);
   const thread = logs.createThread({
-    projectId: "project_run_summary_failed_user",
+    projectId,
   });
   const userNode = logs.appendUserNode({
+    projectId,
     threadId: thread.id,
     parentNodeId: null,
     message: {
@@ -89,23 +95,23 @@ test("thread view falls back to trigger user node for failed runs without assist
       content: [{ type: "text", text: "失败一下" }],
     },
   });
-  const run = logs.createRun({
+  const run = logs.createRun(projectId, {
     threadId: thread.id,
     triggerNodeId: userNode.id,
     baseTipNodeId: userNode.id,
     runMode: "send",
     agentProfile: "project-assistant",
   });
-  const errorArtifact = logs.createArtifact({
+  const errorArtifact = logs.createArtifact(projectId, {
     runId: run.id,
     artifactKind: "error",
     visibility: "internal",
     content: { message: "provider timeout" },
     summaryText: "provider timeout",
   });
-  logs.markRunFailed(run.id, errorArtifact.id);
+  logs.markRunFailed(projectId, run.id, errorArtifact.id);
 
-  expect(logs.getThreadView(thread.id).runSummaries).toEqual([
+  expect(logs.getThreadView(projectId, thread.id).runSummaries).toEqual([
     expect.objectContaining({
       runId: run.id,
       displayNodeId: userNode.id,
@@ -119,11 +125,13 @@ test("thread view falls back to trigger user node for failed runs without assist
 });
 
 test("thread view keeps failed summaries on the last assistant node when partial output exists", () => {
-  seedProject("project_run_summary_failed_assistant");
+  const projectId = "project_run_summary_failed_assistant";
+  seedProject(projectId);
   const thread = logs.createThread({
-    projectId: "project_run_summary_failed_assistant",
+    projectId,
   });
   const userNode = logs.appendUserNode({
+    projectId,
     threadId: thread.id,
     parentNodeId: null,
     message: {
@@ -131,14 +139,14 @@ test("thread view keeps failed summaries on the last assistant node when partial
       content: [{ type: "text", text: "说到一半失败" }],
     },
   });
-  const run = logs.createRun({
+  const run = logs.createRun(projectId, {
     threadId: thread.id,
     triggerNodeId: userNode.id,
     baseTipNodeId: userNode.id,
     runMode: "send",
     agentProfile: "project-assistant",
   });
-  const step = logs.createRunStep({
+  const step = logs.createRunStep(projectId, {
     runId: run.id,
     stepIndex: 0,
     provider: "openai",
@@ -146,23 +154,24 @@ test("thread view keeps failed summaries on the last assistant node when partial
     usage: { totalTokens: 9 },
   });
   const branch = logs.materializeResponseMessages({
+    projectId,
     threadId: thread.id,
     parentNodeId: userNode.id,
     runId: run.id,
     stepId: step.id,
     messages: [{ role: "assistant", content: [{ type: "text", text: "先回答一半。" }] }],
   });
-  logs.selectActiveTip(thread.id, branch.tipNodeId!);
-  const errorArtifact = logs.createArtifact({
+  logs.selectActiveTip(projectId, thread.id, branch.tipNodeId!);
+  const errorArtifact = logs.createArtifact(projectId, {
     runId: run.id,
     artifactKind: "error",
     visibility: "internal",
     content: { message: "model error" },
     summaryText: "model error",
   });
-  logs.markRunFailed(run.id, errorArtifact.id);
+  logs.markRunFailed(projectId, run.id, errorArtifact.id);
 
-  expect(logs.getThreadView(thread.id).runSummaries).toEqual([
+  expect(logs.getThreadView(projectId, thread.id).runSummaries).toEqual([
     expect.objectContaining({
       runId: run.id,
       displayNodeId: branch.tipNodeId,

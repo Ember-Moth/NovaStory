@@ -17,7 +17,11 @@ export const defaultWorkspace = query<
   handler: ({ projectId }) => getDefaultWorkspace(projectId),
 });
 
-export const get = query<{ workspaceId: string }, ReturnType<typeof getWorkspace>, RpcTagList>({
+export const get = query<
+  { projectId: string; workspaceId: string },
+  ReturnType<typeof getWorkspace>,
+  RpcTagList
+>({
   watch: ({ workspaceId }) => [rpcTags.workspace(workspaceId)],
-  handler: ({ workspaceId }) => getWorkspace(workspaceId),
+  handler: ({ projectId, workspaceId }) => getWorkspace(projectId, workspaceId),
 });

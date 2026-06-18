@@ -26,7 +26,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
   const store = useWorkspaceStoreApi();
 
   const {
-    identity: { workspaceId },
+    identity: { projectId, workspaceId },
     content: {
       tree: contentTree,
       flatNodes: flatContentNodes,
@@ -87,6 +87,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
 
       try {
         await updateContent.mutate({
+          projectId,
           workspaceId,
           nodeId,
           body,
@@ -101,7 +102,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         decrementPendingSaveCount(store.getState(), nodeId);
       }
     },
-    [store, updateContent, workspaceId],
+    [projectId, store, updateContent, workspaceId],
   );
 
   const flushAuxSave = useCallback(
@@ -120,6 +121,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
 
       try {
         await writeFileAux.mutate({
+          projectId,
           workspaceId,
           timelinePointId,
           path: nodeId,
@@ -135,7 +137,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
         decrementPendingSaveCount(store.getState(), nodeId);
       }
     },
-    [store, workspaceId, writeFileAux],
+    [projectId, store, workspaceId, writeFileAux],
   );
 
   const flushDirtyContent = useCallback(() => {
@@ -277,6 +279,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
   );
 
   const contentActions = useProjectContentActions({
+    projectId,
     workspaceId,
     activeContentNode,
     contentTree,
@@ -295,6 +298,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
   });
 
   const auxActions = useProjectAuxActions({
+    projectId,
     workspaceId,
     auxTree,
     auxRootPath,
@@ -315,6 +319,7 @@ export function useProjectActions(workspace: ProjectWorkspaceState) {
   });
 
   const timelineActions = useProjectTimelineActions({
+    projectId,
     workspaceId,
     timelinePoints,
     flatContentNodes,

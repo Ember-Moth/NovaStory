@@ -5,11 +5,7 @@ import { createId, invariant, now } from "@/shared/lib/domain";
 import { branchRef, deleteRefSync, resolveRef, writeRefSync } from "./git-storage/git-store";
 import { getProjectWorktreeDir } from "./git-storage/paths";
 import type { BranchIndexRow, ProjectIndexRow } from "./git-storage/types";
-import {
-  findProjectMetaByBranchIdSync,
-  readProjectMetaSync,
-  updateProjectMetaSync,
-} from "./git-storage/project-meta-store";
+import { readProjectMetaSync, updateProjectMetaSync } from "./git-storage/project-meta-store";
 import { getWorkspaceForBranchId } from "./lifecycle";
 
 export type BranchRow = BranchIndexRow;
@@ -68,22 +64,21 @@ export function createBranch(input: {
     }),
     "Create branch metadata",
   );
-  return getBranch(branchId);
+  return getBranch(project.id, branchId);
 }
 
 export function listBranches(projectId: string) {
   return readProjectMetaSync(projectId).branches;
 }
 
-export function getBranch(branchId: string) {
-  const payload = findProjectMetaByBranchIdSync(branchId);
-  const branch = payload?.branches.find((item) => item.id === branchId);
+export function getBranch(projectId: string, branchId: string) {
+  const branch = readProjectMetaSync(projectId).branches.find((item) => item.id === branchId);
   invariant(branch, "未找到分支。");
   return branch;
 }
 
-export async function getBranchHeadCommitId(branchId: string) {
-  const branch = getBranch(branchId);
+export async function getBranchHeadCommitId(projectId: string, branchId: string) {
+  const branch = getBranch(projectId, branchId);
   return await resolveRef(branch.projectId, branchRef(branch.id));
 }
 
@@ -97,21 +92,21 @@ export async function listBranchHeads(projectId: string): Promise<BranchHeadRow[
   );
 }
 
-export async function deleteBranch(branchId: string) {
-  const branch = getBranch(branchId);
-  const project = getProject(branch.projectId);
+export async function deleteBranch(projectId: string, branchId: string) {
+  const branch = getBranch(projectId, branchId);
+  const project = getProject(projectId);
   invariant(
     project.defaultBranchId !== branch.id,
     "无法删除：这是项目的默认分支。请先切换默认分支。",
   );
-  const workspace = getWorkspaceForBranchId(branch.id);
+  const workspace = getWorkspaceForBranchId(projectId, branch.id);
   if (workspace) {
     await fs.promises.rm(getProjectWorktreeDir(workspace.projectId, workspace.id), {
       recursive: true,
       force: true,
     });
   }
-  deleteRefSync({ projectId: branch.projectId, ref: branchRef(branch.id) });
+  deleteRefSync({ projectId, ref: branchRef(branch.id) });
   updateProjectMetaSync(
     project.id,
     (payload) => {

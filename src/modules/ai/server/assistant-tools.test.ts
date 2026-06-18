@@ -38,6 +38,7 @@ type TestWorkspace = ReturnType<typeof seedProject>;
 
 function auxMkdir(workspace: TestWorkspace, auxPath: string, timelinePointId?: string) {
   return workspaceDomain.mkdirAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: timelinePointId ?? workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
     path: auxPath,
@@ -51,6 +52,7 @@ function auxWrite(
   timelinePointId?: string,
 ) {
   return workspaceDomain.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: timelinePointId ?? workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
     path: auxPath,
@@ -65,6 +67,7 @@ function auxLink(
   timelinePointId?: string,
 ) {
   return workspaceDomain.linkAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: timelinePointId ?? workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
     path: auxPath,
@@ -79,6 +82,7 @@ function seedTimelineAuxDiffScenario(projectId: string) {
   auxWrite(workspace, "/state/backup.md", "backup");
   auxLink(workspace, "/current_location", "/state/location.md");
   const pointA = workspaceDomain.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
     label: "离家后",
@@ -86,16 +90,19 @@ function seedTimelineAuxDiffScenario(projectId: string) {
   auxWrite(workspace, "/delta-only.md", "delta", pointA.id);
   auxWrite(workspace, "/state/location.md", "park", pointA.id);
   const pointB = workspaceDomain.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: pointA.id,
     label: "折返前",
   });
   workspaceDomain.deleteAuxNodeAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: pointB.id,
     path: "/delta-only.md",
   });
   workspaceDomain.retargetAuxSymlinkAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: pointB.id,
     path: "/current_location",
@@ -209,18 +216,21 @@ test("ask_user rejects invalid single_choice answer shapes", () => {
 test("list_manuscript_nodes returns structure without bodies by default", async () => {
   const workspace = seedProject("assistant_tools_list_manuscript_default");
   const chapter = workspaceDomain.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "第一章",
     body: "第一章正文",
   });
   const scene = workspaceDomain.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: chapter.id,
     title: "第一场",
     body: "第一场正文",
   });
   workspaceDomain.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: scene.id,
     title: "镜头一",
@@ -263,16 +273,19 @@ test("list_manuscript_nodes returns structure without bodies by default", async 
 test("list_manuscript_nodes accepts a root node and deeper depth", async () => {
   const workspace = seedProject("assistant_tools_list_manuscript_deep");
   const chapter = workspaceDomain.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "第一章",
   });
   const scene = workspaceDomain.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: chapter.id,
     title: "第一场",
   });
   const beat = workspaceDomain.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: scene.id,
     title: "镜头一",
@@ -321,18 +334,21 @@ test("list_manuscript_nodes accepts a root node and deeper depth", async () => {
 test("read_manuscript_node returns one full node with child structure summaries", async () => {
   const workspace = seedProject("assistant_tools_read_manuscript_node");
   const chapter = workspaceDomain.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "第一章",
     body: "第一章完整正文",
   });
   const scene = workspaceDomain.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: chapter.id,
     title: "第一场",
     body: "子节点正文不应返回",
   });
   workspaceDomain.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: scene.id,
     title: "镜头一",
@@ -371,6 +387,7 @@ test("read_manuscript_node returns one full node with child structure summaries"
 test("read_manuscript_node defaults to the active content node", async () => {
   const workspace = seedProject("assistant_tools_read_active_manuscript_node");
   const chapter = workspaceDomain.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "当前章",
@@ -421,6 +438,7 @@ test("read_manuscript_node fails without a node id or active content node", asyn
 test("create_manuscript_node anchors new content to the current timeline point", async () => {
   const workspace = seedProject("assistant_tools_create_manuscript_anchor");
   const timelinePoint = workspaceDomain.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
     label: "第二幕",
@@ -454,7 +472,9 @@ test("create_manuscript_node anchors new content to the current timeline point",
     },
   });
   const nodeId = (result as { data: { nodeId: string } }).data.nodeId;
-  expect(workspaceDomain.readManuscriptNode(workspace.id, nodeId)).toMatchObject({
+  expect(
+    workspaceDomain.readManuscriptNode(workspace.projectId, workspace.id, nodeId),
+  ).toMatchObject({
     id: nodeId,
     anchorTimelinePointId: timelinePoint.id,
     title: "新场景",
@@ -485,10 +505,12 @@ test("create_manuscript_node creates a top-level node when parentId is omitted",
   const nodeId = (result as { data: { nodeId: string } }).data.nodeId;
   expect(
     workspaceDomain
-      .listManuscriptNodes(workspace.id, undefined, { depth: 1 })
+      .listManuscriptNodes(workspace.projectId, workspace.id, undefined, { depth: 1 })
       .nodes.map((node) => node.id),
   ).toContain(nodeId);
-  expect(workspaceDomain.readManuscriptNode(workspace.id, nodeId)).toMatchObject({
+  expect(
+    workspaceDomain.readManuscriptNode(workspace.projectId, workspace.id, nodeId),
+  ).toMatchObject({
     id: nodeId,
     title: "顶层章节",
   });
@@ -524,6 +546,7 @@ test("create_manuscript_node rejects missing or blank title", async () => {
 test("create_manuscript_node treats empty parent and sibling ids as top-level insertion", async () => {
   const workspace = seedProject("assistant_tools_create_manuscript_empty_parent");
   workspaceDomain.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "已存在章节",
@@ -541,7 +564,7 @@ test("create_manuscript_node treats empty parent and sibling ids as top-level in
 
   expect(
     workspaceDomain
-      .listManuscriptNodes(workspace.id, undefined, { depth: 1 })
+      .listManuscriptNodes(workspace.projectId, workspace.id, undefined, { depth: 1 })
       .nodes.map((node) => node.title),
   ).toEqual(["新顶层章节", "已存在章节"]);
 });
@@ -549,11 +572,13 @@ test("create_manuscript_node treats empty parent and sibling ids as top-level in
 test("create_manuscript_node preserves call order when parallel calls share an insertion point", async () => {
   const workspace = seedProject("assistant_tools_create_manuscript_parallel_order");
   const chapter7 = workspaceDomain.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "第七章",
   });
   workspaceDomain.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     afterSiblingId: chapter7.id,
@@ -584,7 +609,7 @@ test("create_manuscript_node preserves call order when parallel calls share an i
 
   expect(
     workspaceDomain
-      .listManuscriptNodes(workspace.id, undefined, { depth: 1 })
+      .listManuscriptNodes(workspace.projectId, workspace.id, undefined, { depth: 1 })
       .nodes.map((node) => node.title),
   ).toEqual(["第七章", "第八章", "第九章", "第十章", "终章"]);
 });
@@ -592,11 +617,13 @@ test("create_manuscript_node preserves call order when parallel calls share an i
 test("content write tools return manuscript titles for model and UI summaries", async () => {
   const workspace = seedProject("assistant_tools_content_write_titles");
   const chapter = workspaceDomain.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "旧标题",
   });
   const parent = workspaceDomain.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "第二卷",
@@ -666,6 +693,7 @@ test("content write tools return manuscript titles for model and UI summaries", 
 test("update_manuscript_node accepts null to clear body but not title", async () => {
   const workspace = seedProject("assistant_tools_update_manuscript_nullable_fields");
   const chapter = workspaceDomain.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "原标题",
@@ -689,7 +717,9 @@ test("update_manuscript_node accepts null to clear body but not title", async ()
       title: "原标题",
     },
   });
-  expect(workspaceDomain.readManuscriptNode(workspace.id, chapter.id)).toMatchObject({
+  expect(
+    workspaceDomain.readManuscriptNode(workspace.projectId, workspace.id, chapter.id),
+  ).toMatchObject({
     id: chapter.id,
     title: "原标题",
     body: "",
@@ -709,16 +739,19 @@ test("update_manuscript_node accepts null to clear body but not title", async ()
 test("update_manuscript_node warns when editing body outside the node anchor timeline", async () => {
   const workspace = seedProject("assistant_tools_update_manuscript_anchor_warning");
   const anchoredPoint = workspaceDomain.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
     label: "锚定章节",
   });
   const currentPoint = workspaceDomain.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: anchoredPoint.id,
     label: "当前上下文",
   });
   const chapter = workspaceDomain.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     anchorPointId: anchoredPoint.id,
@@ -893,8 +926,12 @@ test("create_dir creates a directory at the current timeline point", async () =>
     },
   });
   expect(
-    workspaceDomain.readAuxByPathAt(workspace.id, workspaceDomain.ORIGIN_TIMELINE_POINT_ID, "/设定")
-      ?.nodeType,
+    workspaceDomain.readAuxByPathAt(
+      workspace.projectId,
+      workspace.id,
+      workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+      "/设定",
+    )?.nodeType,
   ).toBe("dir");
 });
 
@@ -921,6 +958,7 @@ test("write_file creates a new file when the target path does not exist", async 
   });
   expect(
     workspaceDomain.readAuxByPathAt(
+      workspace.projectId,
       workspace.id,
       workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
       "/设定/角色.md",
@@ -952,6 +990,7 @@ test("write_file overwrites an existing file", async () => {
   });
   expect(
     workspaceDomain.readAuxByPathAt(
+      workspace.projectId,
       workspace.id,
       workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
       "/设定/角色.md",
@@ -964,6 +1003,7 @@ test("write_file overlays inherited files without changing earlier timeline poin
   auxMkdir(workspace, "/设定");
   auxWrite(workspace, "/设定/角色.md", "origin 内容");
   const timelinePoint = workspaceDomain.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
     label: "Draft",
@@ -994,13 +1034,19 @@ test("write_file overlays inherited files without changing earlier timeline poin
   });
   expect(
     workspaceDomain.readAuxByPathAt(
+      workspace.projectId,
       workspace.id,
       workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
       "/设定/角色.md",
     )?.content,
   ).toBe("origin 内容");
   expect(
-    workspaceDomain.readAuxByPathAt(workspace.id, timelinePoint.id, "/设定/角色.md")?.content,
+    workspaceDomain.readAuxByPathAt(
+      workspace.projectId,
+      workspace.id,
+      timelinePoint.id,
+      "/设定/角色.md",
+    )?.content,
   ).toBe("draft 内容");
 });
 
@@ -1066,6 +1112,7 @@ test("move_path renames a file in the same directory", async () => {
   });
   expect(
     workspaceDomain.readAuxByPathAt(
+      workspace.projectId,
       workspace.id,
       workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
       "/设定/角色.md",
@@ -1073,6 +1120,7 @@ test("move_path renames a file in the same directory", async () => {
   ).toBeNull();
   expect(
     workspaceDomain.readAuxByPathAt(
+      workspace.projectId,
       workspace.id,
       workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
       "/设定/主角.md",
@@ -1105,6 +1153,7 @@ test("move_path moves a file across directories", async () => {
   });
   expect(
     workspaceDomain.readAuxByPathAt(
+      workspace.projectId,
       workspace.id,
       workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
       "/资料库/角色.md",
@@ -1137,6 +1186,7 @@ test("move_path moves a directory", async () => {
   });
   expect(
     workspaceDomain.readAuxByPathAt(
+      workspace.projectId,
       workspace.id,
       workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
       "/资料库/角色档案",
@@ -1211,6 +1261,7 @@ test("move_path respects the active timeline point from context", async () => {
   auxMkdir(workspace, "/资料库");
   auxWrite(workspace, "/设定/角色.md", "origin");
   const timelinePoint = workspaceDomain.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
     label: "Draft",
@@ -1234,13 +1285,19 @@ test("move_path respects the active timeline point from context", async () => {
 
   expect(
     workspaceDomain.readAuxByPathAt(
+      workspace.projectId,
       workspace.id,
       workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
       "/设定/角色.md",
     )?.path,
   ).toBe("/设定/角色.md");
   expect(
-    workspaceDomain.readAuxByPathAt(workspace.id, timelinePoint.id, "/资料库/角色.md")?.path,
+    workspaceDomain.readAuxByPathAt(
+      workspace.projectId,
+      workspace.id,
+      timelinePoint.id,
+      "/资料库/角色.md",
+    )?.path,
   ).toBe("/资料库/角色.md");
 });
 
@@ -1269,6 +1326,7 @@ test("create_symlink creates a symlink to a file", async () => {
   });
   expect(
     workspaceDomain.readAuxByPathAt(
+      workspace.projectId,
       workspace.id,
       workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
       "/索引/角色.md",
@@ -1276,6 +1334,7 @@ test("create_symlink creates a symlink to a file", async () => {
   ).toBe("/索引/角色.md");
   expect(
     workspaceDomain.readAuxByPathAt(
+      workspace.projectId,
       workspace.id,
       workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
       "/索引/角色.md",
@@ -1283,7 +1342,11 @@ test("create_symlink creates a symlink to a file", async () => {
   ).toBe("symlink");
   expect(
     workspaceDomain
-      .exportAuxSnapshotTree(workspace.id, workspaceDomain.ORIGIN_TIMELINE_POINT_ID)
+      .exportAuxSnapshotTree(
+        workspace.projectId,
+        workspace.id,
+        workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+      )
       .nodes.find((node) => node.path === "/索引")?.children[0]?.symlinkTargetPath,
   ).toBe("/设定/角色.md");
 });
@@ -1311,13 +1374,18 @@ test("create_symlink creates a symlink to a directory", async () => {
     },
   });
   const indexNode = workspaceDomain
-    .exportAuxSnapshotTree(workspace.id, workspaceDomain.ORIGIN_TIMELINE_POINT_ID)
+    .exportAuxSnapshotTree(
+      workspace.projectId,
+      workspace.id,
+      workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+    )
     .nodes.find((node) => node.path === "/索引");
   expect(
     indexNode?.children.find((node) => node.path === "/索引/设定入口")?.symlinkTargetPath,
   ).toBe("/设定");
   expect(
     workspaceDomain.readAuxByPathAt(
+      workspace.projectId,
       workspace.id,
       workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
       "/索引/设定入口",
@@ -1325,6 +1393,7 @@ test("create_symlink creates a symlink to a directory", async () => {
   ).toBe("/索引/设定入口");
   expect(
     workspaceDomain.readAuxByPathAt(
+      workspace.projectId,
       workspace.id,
       workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
       "/索引/设定入口",
@@ -1355,6 +1424,7 @@ test("create_symlink accepts a broken logical target path", async () => {
   });
   expect(
     workspaceDomain.readAuxByPathAt(
+      workspace.projectId,
       workspace.id,
       workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
       "/索引/角色.md",
@@ -1406,8 +1476,12 @@ test("create_symlink suggests retarget_symlink when the destination is an existi
       "创建辅助资料符号链接失败：同路径已存在符号链接。通常你想要的是调用 retarget_symlink 来修改它的目标。",
   });
   expect(
-    workspaceDomain.readAuxByPathAt(workspace.id, workspaceDomain.ORIGIN_TIMELINE_POINT_ID, "/场景")
-      ?.path,
+    workspaceDomain.readAuxByPathAt(
+      workspace.projectId,
+      workspace.id,
+      workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+      "/场景",
+    )?.path,
   ).toBe("/场景");
 });
 
@@ -1437,6 +1511,7 @@ test("retarget_symlink resolves the source path without following the symlink", 
   });
   expect(
     workspaceDomain.readAuxByPathAt(
+      workspace.projectId,
       workspace.id,
       workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
       "/当前大纲",
@@ -1444,7 +1519,11 @@ test("retarget_symlink resolves the source path without following the symlink", 
   ).toBe("/当前大纲");
   expect(
     workspaceDomain
-      .exportAuxSnapshotTree(workspace.id, workspaceDomain.ORIGIN_TIMELINE_POINT_ID)
+      .exportAuxSnapshotTree(
+        workspace.projectId,
+        workspace.id,
+        workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+      )
       .nodes.find((node) => node.path === "/当前大纲")?.symlinkTargetPath,
   ).toBe("/大纲/第一幕大纲.md");
 });
@@ -1452,6 +1531,7 @@ test("retarget_symlink resolves the source path without following the symlink", 
 test("aux write tools respect the active timeline point from context", async () => {
   const workspace = seedProject("assistant_tools_timeline");
   const timelinePoint = workspaceDomain.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
     label: "Draft",
@@ -1472,19 +1552,22 @@ test("aux write tools respect the active timeline point from context", async () 
 
   expect(
     workspaceDomain.readAuxByPathAt(
+      workspace.projectId,
       workspace.id,
       workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
       "/草稿",
     ),
   ).toBeNull();
-  expect(workspaceDomain.readAuxByPathAt(workspace.id, timelinePoint.id, "/草稿")?.nodeType).toBe(
-    "dir",
-  );
+  expect(
+    workspaceDomain.readAuxByPathAt(workspace.projectId, workspace.id, timelinePoint.id, "/草稿")
+      ?.nodeType,
+  ).toBe("dir");
 });
 
 test("set_current_timeline updates runtime context for later file tools", async () => {
   const workspace = seedProject("assistant_tools_set_timeline");
   const timelinePoint = workspaceDomain.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
     label: "Draft",
@@ -1516,11 +1599,13 @@ test("set_current_timeline updates runtime context for later file tools", async 
     },
   });
   expect(runtimeContext.snapshot?.activeTimelinePointId).toBe(timelinePoint.id);
-  expect(workspaceDomain.readAuxByPathAt(workspace.id, timelinePoint.id, "/草稿")?.nodeType).toBe(
-    "dir",
-  );
+  expect(
+    workspaceDomain.readAuxByPathAt(workspace.projectId, workspace.id, timelinePoint.id, "/草稿")
+      ?.nodeType,
+  ).toBe("dir");
   expect(
     workspaceDomain.readAuxByPathAt(
+      workspace.projectId,
       workspace.id,
       workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
       "/草稿",
@@ -1531,6 +1616,7 @@ test("set_current_timeline updates runtime context for later file tools", async 
 test("set_current_timeline accepts origin", async () => {
   const workspace = seedProject("assistant_tools_set_origin");
   const timelinePoint = workspaceDomain.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
     label: "Draft",
@@ -1568,6 +1654,7 @@ test("set_current_timeline accepts origin", async () => {
 test("set_current_timeline accepts timeline label as fallback and returns warning", async () => {
   const workspace = seedProject("assistant_tools_set_timeline_by_label");
   const timelinePoint = workspaceDomain.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
     label: "Draft",
@@ -1731,11 +1818,13 @@ test("list_current_timeline_aux_changes enumerates current timeline changes with
 test("create_story_timeline_points accepts afterPointId as timeline label", async () => {
   const workspace = seedProject("assistant_tools_create_timeline_after_label");
   const prologue = workspaceDomain.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
     label: "序幕",
   });
   workspaceDomain.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: prologue.id,
     label: "第一章",
@@ -1757,22 +1846,23 @@ test("create_story_timeline_points accepts afterPointId as timeline label", asyn
       points: [{ label: "转折" }],
     },
   });
-  expect(workspaceDomain.listTimelinePoints(workspace.id).map((point) => point.label)).toEqual([
-    "原点",
-    "序幕",
-    "转折",
-    "第一章",
-  ]);
+  expect(
+    workspaceDomain
+      .listTimelinePoints(workspace.projectId, workspace.id)
+      .map((point) => point.label),
+  ).toEqual(["原点", "序幕", "转折", "第一章"]);
 });
 
 test("create_story_timeline_points prefers exact id over matching label", async () => {
   const workspace = seedProject("assistant_tools_create_timeline_after_id_priority");
   const firstPoint = workspaceDomain.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
     label: "第一章",
   });
   workspaceDomain.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: firstPoint.id,
     label: firstPoint.id,
@@ -1787,17 +1877,17 @@ test("create_story_timeline_points prefers exact id over matching label", async 
     afterPointId: firstPoint.id,
   });
 
-  expect(workspaceDomain.listTimelinePoints(workspace.id).map((point) => point.label)).toEqual([
-    "原点",
-    "第一章",
-    "插入点",
-    firstPoint.id,
-  ]);
+  expect(
+    workspaceDomain
+      .listTimelinePoints(workspace.projectId, workspace.id)
+      .map((point) => point.label),
+  ).toEqual(["原点", "第一章", "插入点", firstPoint.id]);
 });
 
 test("create_story_timeline_points creates multiple points in one batch", async () => {
   const workspace = seedProject("assistant_tools_create_timeline_batch");
   workspaceDomain.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
     label: "序幕",
@@ -1823,30 +1913,31 @@ test("create_story_timeline_points creates multiple points in one batch", async 
       ],
     },
   });
-  expect(workspaceDomain.listTimelinePoints(workspace.id).map((point) => point.label)).toEqual([
-    "原点",
-    "序幕",
-    "第一章",
-    "第二章",
-    "第三章",
-  ]);
+  expect(
+    workspaceDomain
+      .listTimelinePoints(workspace.projectId, workspace.id)
+      .map((point) => point.label),
+  ).toEqual(["原点", "序幕", "第一章", "第二章", "第三章"]);
 });
 
 test("move_story_timeline_point accepts pointId and afterPointId as timeline labels", async () => {
   const workspace = seedProject("assistant_tools_move_timeline_by_label");
   workspaceDomain.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
     label: "序幕",
   });
   workspaceDomain.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
-    afterPointId: workspaceDomain.listTimelinePoints(workspace.id)[1]!.id,
+    afterPointId: workspaceDomain.listTimelinePoints(workspace.projectId, workspace.id)[1]!.id,
     label: "第一章",
   });
   workspaceDomain.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
-    afterPointId: workspaceDomain.listTimelinePoints(workspace.id)[2]!.id,
+    afterPointId: workspaceDomain.listTimelinePoints(workspace.projectId, workspace.id)[2]!.id,
     label: "第二章",
   });
   const tools = createAssistantTools({
@@ -1867,12 +1958,11 @@ test("move_story_timeline_point accepts pointId and afterPointId as timeline lab
       label: "第二章",
     },
   });
-  expect(workspaceDomain.listTimelinePoints(workspace.id).map((point) => point.label)).toEqual([
-    "原点",
-    "序幕",
-    "第二章",
-    "第一章",
-  ]);
+  expect(
+    workspaceDomain
+      .listTimelinePoints(workspace.projectId, workspace.id)
+      .map((point) => point.label),
+  ).toEqual(["原点", "序幕", "第二章", "第一章"]);
 });
 
 test("move_story_timeline_point rejects origin by name", async () => {
@@ -1896,13 +1986,15 @@ test("move_story_timeline_point rejects origin by name", async () => {
 test("delete_story_timeline_point accepts pointId as timeline label", async () => {
   const workspace = seedProject("assistant_tools_delete_timeline_by_label");
   workspaceDomain.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
     label: "序幕",
   });
   workspaceDomain.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
-    afterPointId: workspaceDomain.listTimelinePoints(workspace.id)[1]!.id,
+    afterPointId: workspaceDomain.listTimelinePoints(workspace.projectId, workspace.id)[1]!.id,
     label: "第一章",
   });
   const tools = createAssistantTools({
@@ -1922,10 +2014,11 @@ test("delete_story_timeline_point accepts pointId as timeline label", async () =
       label: "序幕",
     },
   });
-  expect(workspaceDomain.listTimelinePoints(workspace.id).map((point) => point.label)).toEqual([
-    "原点",
-    "第一章",
-  ]);
+  expect(
+    workspaceDomain
+      .listTimelinePoints(workspace.projectId, workspace.id)
+      .map((point) => point.label),
+  ).toEqual(["原点", "第一章"]);
 });
 
 test("delete_story_timeline_point rejects origin by name", async () => {

@@ -19,7 +19,10 @@ function seedProject(projectId: string) {
 test("workspace detail query watches the workspace tag and returns the workspace", async () => {
   const workspace = seedProject("rpc_workspace_detail");
 
-  const result = await workspaceHandlers.get.handler({ workspaceId: workspace.id }, requestCtx);
+  const result = await workspaceHandlers.get.handler(
+    { projectId: workspace.projectId, workspaceId: workspace.id },
+    requestCtx,
+  );
 
   expect(result.watch).toEqual([rpcTags.workspace(workspace.id)]);
   expect(result.data).toMatchObject({

@@ -37,7 +37,10 @@ test("getThreadView watches the thread tag", async () => {
     projectId: "rpc_thread_view",
   });
 
-  const result = await handlers.getThreadView.handler({ threadId: thread.id }, requestCtx);
+  const result = await handlers.getThreadView.handler(
+    { projectId: "rpc_thread_view", threadId: thread.id },
+    requestCtx,
+  );
   expect(result.watch).toEqual([rpcTags.aiThreadView(thread.id)]);
 });
 

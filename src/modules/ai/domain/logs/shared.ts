@@ -1,6 +1,11 @@
 import type { ModelMessage } from "ai";
 
 import { invariant } from "@/shared/lib/domain";
+import type {
+  ProjectNodeRef,
+  ProjectRunRef,
+  ProjectThreadRef,
+} from "@/modules/workspace/domain/types";
 
 import type { AiIndexPayload } from "../ai-index-store";
 import type {
@@ -103,11 +108,28 @@ export interface CreateRunEventInput {
 }
 
 export interface MaterializeResponseMessagesInput {
+  projectId: string;
   threadId: string;
   parentNodeId: string | null;
   runId: string;
   stepId: string;
   messages: ModelMessage[];
+}
+
+export interface ProjectStepRef extends ProjectRunRef {
+  stepId: string;
+}
+
+export interface ProjectArtifactRef extends ProjectRunRef {
+  artifactId: string;
+}
+
+export interface ProjectThreadNodeDeltaInput extends ProjectNodeRef {
+  delta: string;
+}
+
+export interface ProjectThreadTitleInput extends ProjectThreadRef {
+  title: string;
 }
 
 export interface ProjectAiStorage {

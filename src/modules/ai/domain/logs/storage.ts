@@ -1,9 +1,4 @@
-import {
-  findProjectIdForNodeSync,
-  findProjectIdForRunSync,
-  findProjectIdForThreadSync,
-  readAiIndexSync,
-} from "@/modules/ai/domain/ai-index-store";
+import { readAiIndexSync } from "@/modules/ai/domain/ai-index-store";
 import { now } from "@/shared/lib/domain";
 import {
   readProjectMetaSync,
@@ -103,24 +98,6 @@ export function updateProjectAiStorage<T>(
   return result;
 }
 
-export function getProjectIdForThreadOrThrow(threadId: string) {
-  const projectId = findProjectIdForThreadSync(threadId);
-  invariant(projectId, "未找到 agent thread。");
-  return projectId;
-}
-
-export function getProjectIdForNodeOrThrow(nodeId: string) {
-  const projectId = findProjectIdForNodeSync(nodeId);
-  invariant(projectId, "未找到 agent 节点。");
-  return projectId;
-}
-
-export function getProjectIdForRunOrThrow(runId: string) {
-  const projectId = findProjectIdForRunSync(runId);
-  invariant(projectId, "未找到 agent run。");
-  return projectId;
-}
-
 export function getThreadOrThrow(index: AiIndexPayload, threadId: string) {
   const thread = index.threads.find((entry) => entry.id === threadId);
   invariant(thread, "未找到 agent thread。");
@@ -206,4 +183,24 @@ export function getLatestUnarchivedThreadRow(
         entry.archivedAt == null,
     ),
   )[0];
+}
+
+export function assertThreadInProject(index: AiIndexPayload, projectId: string, threadId: string) {
+  const thread = getThreadOrThrow(index, threadId);
+  invariant(thread.projectId === projectId, "agent thread 不属于当前项目。");
+  return thread;
+}
+
+export function assertNodeInProject(index: AiIndexPayload, projectId: string, nodeId: string) {
+  const node = getNodeOrThrow(index, nodeId);
+  const thread = getThreadOrThrow(index, node.threadId);
+  invariant(thread.projectId === projectId, "agent 节点不属于当前项目。");
+  return node;
+}
+
+export function assertRunInProject(index: AiIndexPayload, projectId: string, runId: string) {
+  const run = getRunOrThrow(index, runId);
+  const thread = getThreadOrThrow(index, run.threadId);
+  invariant(thread.projectId === projectId, "agent run 不属于当前项目。");
+  return run;
 }

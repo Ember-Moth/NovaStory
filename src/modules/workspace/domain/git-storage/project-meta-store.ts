@@ -91,18 +91,6 @@ export function listProjectRowsSync() {
   return listProjectMetaSync().map((payload) => payload.project);
 }
 
-export function findProjectMetaByBranchIdSync(branchId: string) {
-  return listProjectMetaSync().find((payload) =>
-    payload.branches.some((branch) => branch.id === branchId),
-  );
-}
-
-export function findProjectMetaByWorkspaceIdSync(workspaceId: string) {
-  return listProjectMetaSync().find((payload) =>
-    payload.workspaces.some((workspace) => workspace.id === workspaceId),
-  );
-}
-
 export function writeProjectMetaSync(
   payload: ProjectMetaPayload,
   message = "Update project metadata",

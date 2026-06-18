@@ -20,6 +20,7 @@ function seedProject(projectId: string) {
 test("aux snapshot tree watches the active point snapshot key instead of workspace timeline", async () => {
   const workspace = seedProject("rpc_aux_snapshot_watch");
   const point = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "Point A",
@@ -27,6 +28,7 @@ test("aux snapshot tree watches the active point snapshot key instead of workspa
 
   const result = await auxHandlers.snapshotTree.handler(
     {
+      projectId: workspace.projectId,
       workspaceId: workspace.id,
       pointId: point.id,
     },
@@ -42,6 +44,7 @@ test("aux snapshot tree watches the active point snapshot key instead of workspa
 test("timeline label updates do not invalidate aux snapshots", async () => {
   const workspace = seedProject("rpc_timeline_update");
   const point = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "Point A",
@@ -49,6 +52,7 @@ test("timeline label updates do not invalidate aux snapshots", async () => {
 
   const result = await timelineHandlers.update.handler(
     {
+      projectId: workspace.projectId,
       workspaceId: workspace.id,
       pointId: point.id,
       label: "Point A+",
@@ -62,11 +66,13 @@ test("timeline label updates do not invalidate aux snapshots", async () => {
 test("deleting a point invalidates the aux workspace cache", async () => {
   const workspace = seedProject("rpc_timeline_delete");
   const pointA = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "Point A",
   });
   const pointB = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: pointA.id,
     label: "Point B",
@@ -74,6 +80,7 @@ test("deleting a point invalidates the aux workspace cache", async () => {
 
   const result = await timelineHandlers.deleteMutation.handler(
     {
+      projectId: workspace.projectId,
       workspaceId: workspace.id,
       pointId: pointB.id,
     },
@@ -89,11 +96,13 @@ test("deleting a point invalidates the aux workspace cache", async () => {
 test("creating a point invalidates the aux workspace cache", async () => {
   const workspace = seedProject("rpc_timeline_create");
   const pointA = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "Point A",
   });
   const pointB = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: pointA.id,
     label: "Point B",
@@ -101,6 +110,7 @@ test("creating a point invalidates the aux workspace cache", async () => {
 
   const result = await timelineHandlers.create.handler(
     {
+      projectId: workspace.projectId,
       workspaceId: workspace.id,
       afterPointId: pointB.id,
       label: "Point C",
@@ -117,17 +127,20 @@ test("creating a point invalidates the aux workspace cache", async () => {
 test("restoring a deleted aux path invalidates the aux workspace cache", async () => {
   const workspace = seedProject("rpc_aux_restore_deleted");
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/notes.md",
     content: "origin",
   });
   const point = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "Point A",
   });
   service.deleteAuxNodeAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: point.id,
     path: "/notes.md",
@@ -135,6 +148,7 @@ test("restoring a deleted aux path invalidates the aux workspace cache", async (
 
   const result = await auxHandlers.restoreDeleted.handler(
     {
+      projectId: workspace.projectId,
       workspaceId: workspace.id,
       timelinePointId: point.id,
       path: "/notes.md",

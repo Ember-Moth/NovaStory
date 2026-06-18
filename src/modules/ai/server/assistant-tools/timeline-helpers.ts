@@ -15,6 +15,7 @@ export function resolveCurrentTimelinePointId(runtimeContext: ToolRuntimeContext
 }
 
 export function resolveSelectableTimelinePoint(input: {
+  projectId: string;
   workspaceId: string;
   timelinePointIdOrLabel: string;
 }) {
@@ -25,7 +26,7 @@ export function resolveSelectableTimelinePoint(input: {
       matchedBy: "origin" as const,
     };
   }
-  const points = listTimelinePoints(input.workspaceId);
+  const points = listTimelinePoints(input.projectId, input.workspaceId);
   const foundById = points.find((point) => point.id === input.timelinePointIdOrLabel);
   if (foundById) {
     return {
@@ -45,6 +46,7 @@ export function resolveSelectableTimelinePoint(input: {
 }
 
 export function resolveTimelinePointIdOrLabel(input: {
+  projectId: string;
   workspaceId: string;
   timelinePointIdOrLabel: string;
 }) {
@@ -52,7 +54,7 @@ export function resolveTimelinePointIdOrLabel(input: {
     return ORIGIN_TIMELINE_POINT_ID;
   }
 
-  const points = listTimelinePoints(input.workspaceId);
+  const points = listTimelinePoints(input.projectId, input.workspaceId);
   const foundById = points.find((point) => point.id === input.timelinePointIdOrLabel);
   if (foundById) {
     return foundById.id;
@@ -64,6 +66,7 @@ export function resolveTimelinePointIdOrLabel(input: {
 }
 
 export function resolveOptionalTimelinePointIdOrLabel(input: {
+  projectId: string;
   workspaceId: string;
   timelinePointIdOrLabel?: string | null;
 }) {
@@ -72,6 +75,7 @@ export function resolveOptionalTimelinePointIdOrLabel(input: {
   }
 
   return resolveTimelinePointIdOrLabel({
+    projectId: input.projectId,
     workspaceId: input.workspaceId,
     timelinePointIdOrLabel: input.timelinePointIdOrLabel,
   });
@@ -92,10 +96,16 @@ export function updateRuntimeTimelineSelection(input: {
   }));
 }
 
-export function getTimelineLabelById(workspaceId: string, timelinePointId: string): string | null {
+export function getTimelineLabelById(
+  projectId: string,
+  workspaceId: string,
+  timelinePointId: string,
+): string | null {
   if (timelinePointId === ORIGIN_TIMELINE_POINT_ID) {
     return "原点";
   }
-  const found = listTimelinePoints(workspaceId).find((point) => point.id === timelinePointId);
+  const found = listTimelinePoints(projectId, workspaceId).find(
+    (point) => point.id === timelinePointId,
+  );
   return found?.label ?? null;
 }

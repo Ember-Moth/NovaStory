@@ -39,11 +39,10 @@ import {
   type ProjectAiStorage,
 } from "./shared";
 import {
+  assertRunInProject,
+  assertThreadInProject,
   getNodeOrThrow,
-  getProjectIdForRunOrThrow,
-  getProjectIdForThreadOrThrow,
   getRunOrThrow,
-  getThreadOrThrow,
   readProjectAiStorage,
   touchProject,
   touchThread,
@@ -54,10 +53,9 @@ import { createId } from "@/shared/lib/domain";
 export { buildAgentRunCacheFieldsFromTrace };
 export type { RunTraceRows } from "./shared";
 
-export function createRun(input: CreateRunInput) {
-  const projectId = getProjectIdForThreadOrThrow(input.threadId);
+export function createRun(projectId: string, input: CreateRunInput) {
   const result = updateProjectAiStorage(projectId, "Create AI run", (storage: ProjectAiStorage) => {
-    const thread = getThreadOrThrow(storage.index, input.threadId);
+    const thread = assertThreadInProject(storage.index, projectId, input.threadId);
     const status = input.status ?? "running";
     if (input.parentRunId) {
       const parentRun = getRunOrThrow(storage.index, input.parentRunId);
@@ -157,17 +155,27 @@ export function createRun(input: CreateRunInput) {
   return result;
 }
 
-export function createArtifact(input: CreateArtifactInput) {
+export function createArtifact(projectId: string, input: CreateArtifactInput) {
   invariant(input.runId || input.stepId, "artifact 必须关联 run 或 step。");
-  const runId = trimOptionalString(input.runId) ?? getStepOrThrow(input.stepId!).runId;
-  const projectId = getProjectIdForRunOrThrow(runId);
+  const runId = trimOptionalString(input.runId);
   return updateProjectAiStorage(
     projectId,
-    `Update AI run ${runId}`,
+    `Update AI run ${runId ?? input.stepId}`,
     (storage: ProjectAiStorage) => {
-      const run = getRunOrThrow(storage.index, runId);
+      const resolvedRunId =
+        runId ??
+        (() => {
+          const candidate = storage.index.runs.find((entry) =>
+            parseRunTraceRowsFromStorage(storage, entry).steps.some(
+              (step) => step.id === input.stepId,
+            ),
+          );
+          invariant(candidate, "未找到 run step。");
+          return candidate.id;
+        })();
+      const run = assertRunInProject(storage.index, projectId, resolvedRunId);
       if (input.stepId) {
-        const step = getStepOrThrow(input.stepId);
+        const step = getStepOrThrow({ projectId, runId: run.id, stepId: input.stepId });
         invariant(step.runId === run.id, "artifact step 不属于当前 run。");
       }
       const artifact: AgentArtifactRow = {
@@ -193,13 +201,12 @@ export function createArtifact(input: CreateArtifactInput) {
   );
 }
 
-export function createRunStep(input: CreateRunStepInput) {
-  const projectId = getProjectIdForRunOrThrow(input.runId);
+export function createRunStep(projectId: string, input: CreateRunStepInput) {
   return updateProjectAiStorage(
     projectId,
     `Update AI run ${input.runId}`,
     (storage: ProjectAiStorage) => {
-      const run = getRunOrThrow(storage.index, input.runId);
+      const run = assertRunInProject(storage.index, projectId, input.runId);
       const rows = parseRunTraceRowsFromStorage(storage, run);
       invariant(
         !rows.steps.some((step) => step.stepIndex === input.stepIndex),
@@ -236,15 +243,14 @@ export function createRunStep(input: CreateRunStepInput) {
   );
 }
 
-export function appendRunEvent(input: CreateRunEventInput) {
-  const projectId = getProjectIdForRunOrThrow(input.runId);
+export function appendRunEvent(projectId: string, input: CreateRunEventInput) {
   return updateProjectAiStorage(
     projectId,
     `Append AI run event ${input.runId}`,
     (storage: ProjectAiStorage) => {
-      const run = getRunOrThrow(storage.index, input.runId);
+      const run = assertRunInProject(storage.index, projectId, input.runId);
       if (input.stepId) {
-        const step = getStepOrThrow(input.stepId);
+        const step = getStepOrThrow({ projectId, runId: run.id, stepId: input.stepId });
         invariant(step.runId === run.id, "事件 step 不属于当前 run。");
       }
       if (input.nodeId) {
@@ -281,6 +287,7 @@ export function appendRunEvent(input: CreateRunEventInput) {
 }
 
 export function updateRunStep(input: {
+  projectId: string;
   stepId: string;
   finishReason?: string | null;
   rawFinishReason?: string | null;
@@ -291,13 +298,20 @@ export function updateRunStep(input: {
   providerMetadataArtifactId?: string | null;
   usage?: unknown;
 }) {
-  const step = getStepOrThrow(input.stepId);
-  const projectId = getProjectIdForRunOrThrow(step.runId);
   return updateProjectAiStorage(
-    projectId,
-    `Update AI run ${step.runId}`,
+    input.projectId,
+    `Update AI run step ${input.stepId}`,
     (storage: ProjectAiStorage) => {
-      const run = getRunOrThrow(storage.index, step.runId);
+      const run = storage.index.runs.find((entry) =>
+        parseRunTraceRowsFromStorage(storage, entry).steps.some((step) => step.id === input.stepId),
+      );
+      invariant(run, "未找到 run step。");
+      assertRunInProject(storage.index, input.projectId, run.id);
+      const step = getStepOrThrow({
+        projectId: input.projectId,
+        runId: run.id,
+        stepId: input.stepId,
+      });
       const rows = parseRunTraceRowsFromStorage(storage, run);
       const index = rows.steps.findIndex((entry) => entry.id === step.id);
       invariant(index >= 0, "未找到 run step。");
@@ -325,6 +339,7 @@ export function updateRunStep(input: {
 }
 
 function updateRunStatus(
+  projectId: string,
   runId: string,
   status: AgentRunStatus,
   {
@@ -335,7 +350,6 @@ function updateRunStatus(
     errorArtifactId?: string | null;
   },
 ) {
-  const projectId = getProjectIdForRunOrThrow(runId);
   return updateProjectAiStorage(
     projectId,
     `Update AI run ${runId}`,
@@ -355,42 +369,42 @@ function updateRunStatus(
   );
 }
 
-export function markRunSucceeded(runId: string) {
-  return updateRunStatus(runId, "succeeded", { completedAt: now() });
+export function markRunSucceeded(projectId: string, runId: string) {
+  return updateRunStatus(projectId, runId, "succeeded", { completedAt: now() });
 }
 
-export function markRunWaitingForInput(runId: string) {
-  return updateRunStatus(runId, "waiting_for_input", { completedAt: null });
+export function markRunWaitingForInput(projectId: string, runId: string) {
+  return updateRunStatus(projectId, runId, "waiting_for_input", { completedAt: null });
 }
 
-export function markRunRunning(runId: string) {
-  return updateRunStatus(runId, "running", { completedAt: null });
+export function markRunRunning(projectId: string, runId: string) {
+  return updateRunStatus(projectId, runId, "running", { completedAt: null });
 }
 
-export function markRunFailed(runId: string, errorArtifactId?: string | null) {
+export function markRunFailed(projectId: string, runId: string, errorArtifactId?: string | null) {
   if (errorArtifactId) {
-    getArtifactOrThrow(errorArtifactId);
+    getArtifactOrThrow({ projectId, runId, artifactId: errorArtifactId });
   }
-  return updateRunStatus(runId, "failed", {
+  return updateRunStatus(projectId, runId, "failed", {
     completedAt: now(),
     errorArtifactId: trimOptionalString(errorArtifactId),
   });
 }
 
-export function markRunCancelled(runId: string) {
-  return updateRunStatus(runId, "cancelled", { completedAt: now() });
+export function markRunCancelled(projectId: string, runId: string) {
+  return updateRunStatus(projectId, runId, "cancelled", { completedAt: now() });
 }
 
 export function updateRunContextSnapshot(
+  projectId: string,
   runId: string,
   contextSnapshot: ProjectAssistantContextSnapshot | null,
 ) {
-  const projectId = getProjectIdForRunOrThrow(runId);
   return updateProjectAiStorage(
     projectId,
     `Update AI run ${runId}`,
     (storage: ProjectAiStorage) => {
-      const run = getRunOrThrow(storage.index, runId);
+      const run = assertRunInProject(storage.index, projectId, runId);
       const rows = parseRunTraceRowsFromStorage(storage, run);
       rows.run = {
         ...rows.run,
@@ -403,28 +417,40 @@ export function updateRunContextSnapshot(
   );
 }
 
-export function getRunTrace(runId: string): AgentRunTraceView {
-  const projectId = getProjectIdForRunOrThrow(runId);
+export function getRunTrace(projectId: string, runId: string): AgentRunTraceView {
   const storage = readProjectAiStorage(projectId);
-  const run = getRunOrThrow(storage.index, runId);
+  const run = assertRunInProject(storage.index, projectId, runId);
   return mapTraceRows(parseRunTraceRowsFromStorage(storage, run));
 }
 
-export function getRunStepResponseBody(stepId: string): unknown | null {
-  const step = getStepOrThrow(stepId);
-  if (!step.responseBodyArtifactId) {
+export function getRunStepResponseBody(projectId: string, stepId: string): unknown | null {
+  const trace = storageAwareFindRunTraceByStep(projectId, stepId);
+  if (!trace.step.responseBodyArtifactId) {
     return null;
   }
-  const trace = getRunTrace(step.runId);
-  const artifact = trace.artifacts.find((entry) => entry.id === step.responseBodyArtifactId);
+  const artifact = trace.artifacts.find((entry) => entry.id === trace.step.responseBodyArtifactId);
   invariant(artifact, "未找到 artifact。");
   return artifact.content;
 }
 
-export function listChildRuns(runId: string) {
-  const projectId = getProjectIdForRunOrThrow(runId);
+function storageAwareFindRunTraceByStep(projectId: string, stepId: string) {
   const storage = readProjectAiStorage(projectId);
-  getRunOrThrow(storage.index, runId);
+  const run = storage.index.runs.find((entry) =>
+    parseRunTraceRowsFromStorage(storage, entry).steps.some((step) => step.id === stepId),
+  );
+  invariant(run, "未找到 run step。");
+  const rows = parseRunTraceRowsFromStorage(storage, run);
+  const step = rows.steps.find((entry) => entry.id === stepId);
+  invariant(step, "未找到 run step。");
+  return {
+    step,
+    artifacts: mapTraceRows(rows).artifacts,
+  };
+}
+
+export function listChildRuns(projectId: string, runId: string) {
+  const storage = readProjectAiStorage(projectId);
+  assertRunInProject(storage.index, projectId, runId);
   return sortByCreatedAt(storage.index.runs.filter((row) => row.parentRunId === runId)).map(
     mapRunRow,
   );

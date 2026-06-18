@@ -38,14 +38,20 @@ export function buildTimelineTools({ projectId, runtimeContext }: ToolBuildConte
         withProjectWorkspace({
           projectId,
           execute: (workspace) => {
-            const limited = limitTimelinePoints(listTimelinePoints(workspace.id));
+            const limited = limitTimelinePoints(
+              listTimelinePoints(workspace.projectId, workspace.id),
+            );
             return {
               ok: true as const,
               truncated: limited.truncated,
               data: {
                 points: limited.points.map((point) => ({
                   ...point,
-                  auxChangeSummary: summarizeAuxTimelineChangesAt(workspace.id, point.id),
+                  auxChangeSummary: summarizeAuxTimelineChangesAt(
+                    workspace.projectId,
+                    workspace.id,
+                    point.id,
+                  ),
                 })),
               },
             };
@@ -74,6 +80,7 @@ export function buildTimelineTools({ projectId, runtimeContext }: ToolBuildConte
               timelinePointId === undefined
                 ? resolveCurrentTimelinePointId(runtimeContext)
                 : resolveTimelinePointIdOrLabel({
+                    projectId: workspace.projectId,
                     workspaceId: workspace.id,
                     timelinePointIdOrLabel: timelinePointId,
                   });
@@ -82,13 +89,17 @@ export function buildTimelineTools({ projectId, runtimeContext }: ToolBuildConte
               "原点没有前一个时间线，无法枚举辅助信息变更。",
             );
 
-            const point = listTimelinePoints(workspace.id).find(
+            const point = listTimelinePoints(workspace.projectId, workspace.id).find(
               (item) => item.id === resolvedPointId,
             );
             invariant(point, "指定的时间点不存在。");
             invariant(point.prevPointId, "原点没有前一个时间线，无法枚举辅助信息变更。");
 
-            const changes = listAuxTimelineChangesAt(workspace.id, resolvedPointId);
+            const changes = listAuxTimelineChangesAt(
+              workspace.projectId,
+              workspace.id,
+              resolvedPointId,
+            );
             const limited = limitItems(changes, TIMELINE_AUX_CHANGE_LIMIT);
 
             return {
@@ -96,10 +107,22 @@ export function buildTimelineTools({ projectId, runtimeContext }: ToolBuildConte
               truncated: limited.truncated,
               data: {
                 timelinePointId: resolvedPointId,
-                timelineLabel: getTimelineLabelById(workspace.id, resolvedPointId),
+                timelineLabel: getTimelineLabelById(
+                  workspace.projectId,
+                  workspace.id,
+                  resolvedPointId,
+                ),
                 previousTimelinePointId: point.prevPointId,
-                previousTimelineLabel: getTimelineLabelById(workspace.id, point.prevPointId),
-                summary: summarizeAuxTimelineChangesAt(workspace.id, resolvedPointId),
+                previousTimelineLabel: getTimelineLabelById(
+                  workspace.projectId,
+                  workspace.id,
+                  point.prevPointId,
+                ),
+                summary: summarizeAuxTimelineChangesAt(
+                  workspace.projectId,
+                  workspace.id,
+                  resolvedPointId,
+                ),
                 changes: limited.items,
               },
             };
@@ -125,6 +148,7 @@ export function buildTimelineTools({ projectId, runtimeContext }: ToolBuildConte
           projectId,
           execute: (workspace) => {
             const selected = resolveSelectableTimelinePoint({
+              projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointIdOrLabel: timelinePointId,
             });
@@ -207,10 +231,12 @@ export function buildTimelineTools({ projectId, runtimeContext }: ToolBuildConte
           projectId,
           execute: (workspace) => {
             const resolvedAfterPointId = resolveOptionalTimelinePointIdOrLabel({
+              projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointIdOrLabel: afterPointId,
             });
             const createdPoints = createTimelinePoints({
+              projectId: workspace.projectId,
               workspaceId: workspace.id,
               afterPointId: resolvedAfterPointId,
               points: points.map((point) => ({
@@ -263,6 +289,7 @@ export function buildTimelineTools({ projectId, runtimeContext }: ToolBuildConte
           projectId,
           execute: (workspace) => {
             const point = updateTimelinePoint({
+              projectId: workspace.projectId,
               workspaceId: workspace.id,
               pointId,
               label: label ?? undefined,
@@ -307,15 +334,18 @@ export function buildTimelineTools({ projectId, runtimeContext }: ToolBuildConte
           projectId,
           execute: (workspace) => {
             const resolvedPointId = resolveTimelinePointIdOrLabel({
+              projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointIdOrLabel: pointId,
             });
             invariant(resolvedPointId !== ORIGIN_TIMELINE_POINT_ID, "无法移动原点时间点。");
             const resolvedAfterPointId = resolveOptionalTimelinePointIdOrLabel({
+              projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointIdOrLabel: afterPointId,
             });
             const point = moveTimelinePoint({
+              projectId: workspace.projectId,
               workspaceId: workspace.id,
               pointId: resolvedPointId,
               afterPointId: resolvedAfterPointId,
@@ -359,12 +389,13 @@ export function buildTimelineTools({ projectId, runtimeContext }: ToolBuildConte
           projectId,
           execute: (workspace) => {
             const resolvedPointId = resolveTimelinePointIdOrLabel({
+              projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointIdOrLabel: pointId,
             });
             invariant(resolvedPointId !== ORIGIN_TIMELINE_POINT_ID, "无法删除原点时间点。");
-            const label = getTimelineLabelById(workspace.id, resolvedPointId);
-            deleteTimelinePoint(workspace.id, resolvedPointId, {
+            const label = getTimelineLabelById(workspace.projectId, workspace.id, resolvedPointId);
+            deleteTimelinePoint(workspace.projectId, workspace.id, resolvedPointId, {
               purgeAuxLayers: purgeAuxLayers ?? undefined,
             });
 

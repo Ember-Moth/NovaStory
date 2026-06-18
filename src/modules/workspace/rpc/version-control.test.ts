@@ -41,11 +41,16 @@ test("branch heads watches the project branch-heads tag and resolves current hea
 test("creating a branch with workspace invalidates branches and workspaces", async () => {
   const workspace = seedProject("rpc_branch_create");
   service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "Base",
   });
-  const commit = await service.createCommit({ branchId: workspace.branchId, message: "base" });
+  const commit = await service.createCommit({
+    projectId: workspace.projectId,
+    branchId: workspace.branchId,
+    message: "base",
+  });
 
   const result = await branchHandlers.createWithWorkspace.handler(
     { projectId: "rpc_branch_create", name: "feature", fromCommitId: commit.id },
@@ -85,19 +90,22 @@ test("deleting a branch invalidates branch, workspace, and project tags", async 
     rpcTags.project("rpc_branch_delete"),
     rpcTags.projectsList(),
   ]);
-  expect(() => service.getWorkspace(featureWorkspace.id)).toThrow("未找到工作区。");
+  expect(() => service.getWorkspace(featureWorkspace.projectId, featureWorkspace.id)).toThrow(
+    "未找到工作区。",
+  );
 });
 
 test("commit create invalidates history and branch tags", async () => {
   const workspace = seedProject("rpc_commit_create");
   service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "One",
   });
 
   const result = await commitHandlers.create.handler(
-    { branchId: workspace.branchId, message: "one" },
+    { projectId: workspace.projectId, branchId: workspace.branchId, message: "one" },
     requestCtx,
   );
 
@@ -115,14 +123,19 @@ test("commit create invalidates history and branch tags", async () => {
 test("commit checkout invalidates the workspace content views", async () => {
   const workspace = seedProject("rpc_commit_checkout");
   service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "One",
   });
-  const commit = await service.createCommit({ branchId: workspace.branchId, message: "one" });
+  const commit = await service.createCommit({
+    projectId: workspace.projectId,
+    branchId: workspace.branchId,
+    message: "one",
+  });
 
   const result = await commitHandlers.checkout.handler(
-    { workspaceId: workspace.id, commitId: commit.id },
+    { projectId: workspace.projectId, workspaceId: workspace.id, commitId: commit.id },
     requestCtx,
   );
 
@@ -138,7 +151,7 @@ test("working tree status watches branch, history and workspace tags", async () 
   const workspace = seedProject("rpc_working_tree_status");
 
   const result = await commitHandlers.workingTreeStatus.handler(
-    { branchId: workspace.branchId },
+    { projectId: workspace.projectId, branchId: workspace.branchId },
     requestCtx,
   );
 
@@ -156,19 +169,32 @@ test("working tree status watches branch, history and workspace tags", async () 
 test("commit history returns the mainline newest first", async () => {
   const workspace = seedProject("rpc_commit_history");
   service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "One",
   });
-  const c1 = await service.createCommit({ branchId: workspace.branchId, message: "one" });
+  const c1 = await service.createCommit({
+    projectId: workspace.projectId,
+    branchId: workspace.branchId,
+    message: "one",
+  });
   service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "Two",
   });
-  const c2 = await service.createCommit({ branchId: workspace.branchId, message: "two" });
+  const c2 = await service.createCommit({
+    projectId: workspace.projectId,
+    branchId: workspace.branchId,
+    message: "two",
+  });
 
-  const result = await commitHandlers.history.handler({ branchId: workspace.branchId }, requestCtx);
+  const result = await commitHandlers.history.handler(
+    { projectId: workspace.projectId, branchId: workspace.branchId },
+    requestCtx,
+  );
 
   expect(result.watch).toEqual([rpcTags.commitHistory(workspace.branchId)]);
   expect(result.data.map((commit) => commit.id)).toEqual([c2.id, c1.id]);

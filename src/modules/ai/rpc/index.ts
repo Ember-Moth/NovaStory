@@ -51,6 +51,7 @@ import type {
   ProjectAssistantToolName,
 } from "@/modules/ai/domain/types";
 import { PROJECT_ASSISTANT_WRITE_TOOL_NAMES } from "@/modules/ai/domain/types";
+import type { ProjectRunRef, ProjectThreadRef } from "@/modules/workspace/domain/types";
 import * as userConfig from "@/modules/ai/domain/user-config";
 import { assertRpcFound } from "@/rpc/errors";
 import { rpcTags, type RpcTagList } from "@/rpc/tags";
@@ -154,11 +155,7 @@ interface EditProjectAssistantMessageInput {
   activeTools?: ProjectAssistantToolName[] | null;
 }
 
-interface ContinueProjectAssistantRunInput {
-  projectId: string;
-  threadId: string;
-  runId: string;
-}
+interface ContinueProjectAssistantRunInput extends ProjectThreadRef, ProjectRunRef {}
 
 interface SubmitProjectAssistantToolInputInput {
   projectId: string;
@@ -168,11 +165,7 @@ interface SubmitProjectAssistantToolInputInput {
   answers: AskUserAnswer[];
 }
 
-interface CancelProjectAssistantRunInput {
-  projectId: string;
-  threadId: string;
-  runId: string;
-}
+interface CancelProjectAssistantRunInput extends ProjectThreadRef, ProjectRunRef {}
 
 type RpcMutationCtx = MutationCtx<RpcTagList>;
 
@@ -239,7 +232,7 @@ function isSuccessfulWriteToolOutput(content: unknown) {
 }
 
 function invalidateAuxWorkspaceForRun(ctx: RpcMutationCtx, projectId: string, runId: string) {
-  const trace = getProjectAssistantService().getRunTrace(runId);
+  const trace = getProjectAssistantService().getRunTrace(projectId, runId);
   const hasSuccessfulWrite = trace.artifacts.some(
     (artifact) =>
       artifact.artifactKind === "tool-output" && isSuccessfulWriteToolOutput(artifact.content),
@@ -782,7 +775,7 @@ export const getProjectAssistantState = query<
   handler: ({ projectId }) => getProjectAssistantService().getProjectAssistantState(projectId),
 });
 
-export const getThreadView = query<{ threadId: string }, AgentThreadStateView, RpcTagList>({
+export const getThreadView = query<ProjectThreadRef, AgentThreadStateView, RpcTagList>({
   watch: ({ threadId }, result) => [
     rpcTags.aiThreadView(threadId),
     ...result.candidateGroups.map((group) =>
@@ -790,26 +783,28 @@ export const getThreadView = query<{ threadId: string }, AgentThreadStateView, R
     ),
     ...result.latestRuns.map((run) => rpcTags.aiRunTrace(run.id)),
   ],
-  handler: ({ threadId }) => getProjectAssistantService().getThreadView(threadId),
+  handler: ({ projectId, threadId }) =>
+    getProjectAssistantService().getThreadView(projectId, threadId),
 });
 
 export const getNodeCandidatesQuery = query<
-  { parentNodeId: string },
+  { projectId: string; parentNodeId: string },
   AgentCandidateNodeView[],
   RpcTagList
 >({
   watch: ({ parentNodeId }) => [rpcTags.aiNodeCandidates(parentNodeId)],
-  handler: ({ parentNodeId }) => getProjectAssistantService().getNodeCandidates(parentNodeId),
+  handler: ({ projectId, parentNodeId }) =>
+    getProjectAssistantService().getNodeCandidates(projectId, parentNodeId),
 });
 
-export const getRunTraceQuery = query<{ runId: string }, AgentRunTraceView, RpcTagList>({
+export const getRunTraceQuery = query<ProjectRunRef, AgentRunTraceView, RpcTagList>({
   watch: ({ runId }) => [rpcTags.aiRunTrace(runId), rpcTags.aiChildRuns(runId)],
-  handler: ({ runId }) => getProjectAssistantService().getRunTrace(runId),
+  handler: ({ projectId, runId }) => getProjectAssistantService().getRunTrace(projectId, runId),
 });
 
-export const getChildRunsQuery = query<{ runId: string }, AgentRunView[], RpcTagList>({
+export const getChildRunsQuery = query<ProjectRunRef, AgentRunView[], RpcTagList>({
   watch: ({ runId }) => [rpcTags.aiChildRuns(runId)],
-  handler: ({ runId }) => getProjectAssistantService().getChildRuns(runId),
+  handler: ({ projectId, runId }) => getProjectAssistantService().getChildRuns(projectId, runId),
 });
 
 export const createProjectAssistantThread = mutation<
@@ -825,7 +820,7 @@ export const createProjectAssistantThread = mutation<
 });
 
 export const setProjectAssistantActiveThread = mutation<
-  { projectId: string; threadId: string },
+  ProjectThreadRef,
   AgentThreadView,
   RpcTagList
 >(({ projectId, threadId }, ctx) => {
@@ -837,36 +832,44 @@ export const setProjectAssistantActiveThread = mutation<
 });
 
 export const renameProjectAssistantThread = mutation<
-  { threadId: string; title: string },
+  ProjectThreadRef & { title: string },
   AgentThreadView,
   RpcTagList
->(({ threadId, title }, ctx) => {
-  const thread = getProjectAssistantService().renameProjectAssistantThread(threadId, title);
-  invalidateProjectAiState(ctx, thread.projectId, {
+>(({ projectId, threadId, title }, ctx) => {
+  const thread = getProjectAssistantService().renameProjectAssistantThread(
+    projectId,
+    threadId,
+    title,
+  );
+  invalidateProjectAiState(ctx, projectId, {
     threadId: thread.id,
   });
   return thread;
 });
 
 export const archiveProjectAssistantThread = mutation<
-  { threadId: string; archived: boolean },
+  ProjectThreadRef & { archived: boolean },
   AgentThreadView,
   RpcTagList
->(({ threadId, archived }, ctx) => {
-  const thread = getProjectAssistantService().archiveProjectAssistantThread(threadId, archived);
-  invalidateProjectAiState(ctx, thread.projectId, {
+>(({ projectId, threadId, archived }, ctx) => {
+  const thread = getProjectAssistantService().archiveProjectAssistantThread(
+    projectId,
+    threadId,
+    archived,
+  );
+  invalidateProjectAiState(ctx, projectId, {
     threadId: thread.id,
   });
   return thread;
 });
 
 export const selectThreadTip = mutation<
-  { threadId: string; tipNodeId: string },
+  ProjectThreadRef & { tipNodeId: string },
   AgentThreadView,
   RpcTagList
->(({ threadId, tipNodeId }, ctx) => {
-  const thread = getProjectAssistantService().selectThreadTip(threadId, tipNodeId);
-  invalidateProjectAiState(ctx, thread.projectId, {
+>(({ projectId, threadId, tipNodeId }, ctx) => {
+  const thread = getProjectAssistantService().selectThreadTip(projectId, threadId, tipNodeId);
+  invalidateProjectAiState(ctx, projectId, {
     threadId: thread.id,
     candidateParentNodeId: tipNodeId,
   });

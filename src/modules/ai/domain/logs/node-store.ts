@@ -38,9 +38,17 @@ export function insertNode(storage: ProjectAiStorage, input: CreateNodeInput) {
     invariant(run.threadId === thread.id, "节点来源 run 不属于当前 thread。");
   }
   if (input.sourceStepId) {
-    const step = getStepOrThrow(input.sourceStepId);
-    const run = getRunOrThrow(storage.index, step.runId);
-    invariant(run.threadId === thread.id, "节点来源 step 不属于当前 thread。");
+    const sourceRun = input.createdByRunId
+      ? getRunOrThrow(storage.index, input.createdByRunId)
+      : null;
+    invariant(sourceRun, "节点来源 step 需要关联当前项目内 run。");
+    const step = getStepOrThrow({
+      projectId: thread.projectId,
+      runId: sourceRun.id,
+      stepId: input.sourceStepId,
+    });
+    const stepRun = getRunOrThrow(storage.index, step.runId);
+    invariant(stepRun.threadId === thread.id, "节点来源 step 不属于当前 thread。");
   }
 
   const storedMessage = normalizeModelMessage(input.message);

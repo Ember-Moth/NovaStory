@@ -23,6 +23,7 @@ export function splitAuxPath(path: string, actionLabel: string) {
 }
 
 export function assertParentDirPath(input: {
+  projectId: string;
   workspaceId: string;
   timelinePointId: string;
   parentPath: string;
@@ -30,22 +31,34 @@ export function assertParentDirPath(input: {
 }) {
   if (input.parentPath === "/") return "/";
 
-  const parentNode = readAuxByPathAt(input.workspaceId, input.timelinePointId, input.parentPath);
+  const parentNode = readAuxByPathAt(
+    input.projectId,
+    input.workspaceId,
+    input.timelinePointId,
+    input.parentPath,
+  );
   invariant(parentNode, `${input.actionLabel}失败：父目录不存在或在当前时间点不可见。`);
   invariant(parentNode.nodeType === "dir", `${input.actionLabel}失败：父路径不是辅助资料目录。`);
   return parentNode.path;
 }
 
 export function resolveAuxNodeByPathOrThrow(input: {
+  projectId: string;
   workspaceId: string;
   timelinePointId: string;
   path: string;
   actionLabel: string;
   followSymlinks?: boolean;
 }) {
-  const node = readAuxByPathAt(input.workspaceId, input.timelinePointId, input.path, {
-    followSymlinks: input.followSymlinks,
-  });
+  const node = readAuxByPathAt(
+    input.projectId,
+    input.workspaceId,
+    input.timelinePointId,
+    input.path,
+    {
+      followSymlinks: input.followSymlinks,
+    },
+  );
   invariant(node, `${input.actionLabel}失败：目标路径不存在或在当前时间点不可见。`);
   return node;
 }

@@ -19,6 +19,7 @@ import type { WorkspaceStore } from "@/modules/workspace/ui/editor/state/molecul
 import { clearActiveContentSelection } from "./projectActionShared";
 
 type ContentActionDependencies = {
+  projectId: string;
   workspaceId: string | undefined;
   activeContentNode: ContentTreeNodeVM | null;
   contentTree: ContentTreeNodeVM[];
@@ -27,6 +28,7 @@ type ContentActionDependencies = {
   contentParentMap: ReadonlyMap<string, string | null>;
   createContent: {
     mutate: (input: {
+      projectId: string;
       workspaceId: string;
       parentId: string | null;
       afterSiblingId?: string;
@@ -35,10 +37,11 @@ type ContentActionDependencies = {
     }) => Promise<{ id: string; anchorTimelinePointId?: string | null }>;
   };
   deleteContent: {
-    mutate: (input: { workspaceId: string; nodeId: string }) => Promise<void>;
+    mutate: (input: { projectId: string; workspaceId: string; nodeId: string }) => Promise<void>;
   };
   moveContent: {
     mutate: (input: {
+      projectId: string;
       workspaceId: string;
       nodeId: string;
       newParentId: string | null;
@@ -47,6 +50,7 @@ type ContentActionDependencies = {
   };
   updateContent: {
     mutate: (input: {
+      projectId: string;
       workspaceId: string;
       nodeId: string;
       title?: string | null;
@@ -61,6 +65,7 @@ type ContentActionDependencies = {
 };
 
 export function useProjectContentActions({
+  projectId,
   workspaceId,
   activeContentNode,
   contentTree,
@@ -124,6 +129,7 @@ export function useProjectContentActions({
 
       try {
         const node = await createContent.mutate({
+          projectId,
           workspaceId,
           parentId,
           afterSiblingId,
@@ -152,6 +158,7 @@ export function useProjectContentActions({
       expandContentParent,
       flatContentNodes.length,
       flushDirtyContentBeforeSwitch,
+      projectId,
       store,
       workspaceId,
     ],
@@ -171,6 +178,7 @@ export function useProjectContentActions({
 
       try {
         const node = await createContent.mutate({
+          projectId,
           workspaceId,
           parentId: parentNode.id,
           afterSiblingId: lastChild?.id,
@@ -194,6 +202,7 @@ export function useProjectContentActions({
       expandContentParent,
       flatContentNodes.length,
       flushDirtyContentBeforeSwitch,
+      projectId,
       store,
       workspaceId,
     ],
@@ -220,7 +229,7 @@ export function useProjectContentActions({
       clearActionError(setContentError);
 
       try {
-        await deleteContent.mutate({ workspaceId, nodeId });
+        await deleteContent.mutate({ projectId, workspaceId, nodeId });
         clearContentNodeLocalState(deletedIds);
         if (shouldReselect) {
           if (fallbackNode) {
@@ -244,6 +253,7 @@ export function useProjectContentActions({
       contentParentMap,
       contentTree,
       deleteContent,
+      projectId,
       store,
       workspaceId,
     ],
@@ -263,6 +273,7 @@ export function useProjectContentActions({
 
       try {
         await updateContent.mutate({
+          projectId,
           workspaceId,
           nodeId: activeContentNode.id,
           anchorPointId: pointId,
@@ -276,7 +287,7 @@ export function useProjectContentActions({
         );
       }
     },
-    [activeContentNode, store, updateContent, workspaceId],
+    [activeContentNode, projectId, store, updateContent, workspaceId],
   );
 
   const handleContentRename = useCallback(
@@ -289,6 +300,7 @@ export function useProjectContentActions({
 
       try {
         await updateContent.mutate({
+          projectId,
           workspaceId,
           nodeId,
           title,
@@ -303,7 +315,7 @@ export function useProjectContentActions({
         return false;
       }
     },
-    [store, updateContent, workspaceId],
+    [projectId, store, updateContent, workspaceId],
   );
 
   const handleContentMove = useCallback(
@@ -331,6 +343,7 @@ export function useProjectContentActions({
 
       try {
         await moveContent.mutate({
+          projectId,
           workspaceId,
           nodeId: move.nodeId,
           newParentId: move.newParentId,
@@ -351,6 +364,7 @@ export function useProjectContentActions({
       expandContentParent,
       moveContent,
       store,
+      projectId,
       workspaceId,
     ],
   );

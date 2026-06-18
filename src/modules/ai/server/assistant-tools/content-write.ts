@@ -50,6 +50,7 @@ function normalizeOptionalUpdatedTitle(value: string | undefined) {
 }
 
 function buildContentAnchorTimelineWarnings(input: {
+  projectId: string;
   workspaceId: string;
   currentTimelinePointId: string;
   nodeTimelinePointId: string;
@@ -64,9 +65,17 @@ function buildContentAnchorTimelineWarnings(input: {
       message:
         "当前章节锚定的时间轴锚点未被选中，如果需要读取章节锚定的上下文，请执行 set_current_timeline。",
       currentTimelinePointId: input.currentTimelinePointId,
-      currentTimelineLabel: getTimelineLabelById(input.workspaceId, input.currentTimelinePointId),
+      currentTimelineLabel: getTimelineLabelById(
+        input.projectId,
+        input.workspaceId,
+        input.currentTimelinePointId,
+      ),
       nodeTimelinePointId: input.nodeTimelinePointId,
-      nodeTimelineLabel: getTimelineLabelById(input.workspaceId, input.nodeTimelinePointId),
+      nodeTimelineLabel: getTimelineLabelById(
+        input.projectId,
+        input.workspaceId,
+        input.nodeTimelinePointId,
+      ),
     },
   ];
 }
@@ -127,6 +136,7 @@ export function buildContentWriteTools({ projectId, runtimeContext }: ToolBuildC
                 const effectiveAfterSiblingId = queuedAfterSiblingId ?? normalizedAfterSiblingId;
                 const resolvedTimelinePointId = resolveCurrentTimelinePointId(runtimeContext);
                 const node = createContentNode({
+                  projectId: workspace.projectId,
                   workspaceId: workspace.id,
                   parentId: normalizedParentId,
                   afterSiblingId: effectiveAfterSiblingId ?? undefined,
@@ -198,6 +208,7 @@ export function buildContentWriteTools({ projectId, runtimeContext }: ToolBuildC
             const normalizedTitle = normalizeOptionalUpdatedTitle(title);
             const currentTimelinePointId = resolveCurrentTimelinePointId(runtimeContext);
             const node = updateContentNode({
+              projectId: workspace.projectId,
               workspaceId: workspace.id,
               nodeId: normalizedNodeId,
               title: normalizedTitle,
@@ -208,6 +219,7 @@ export function buildContentWriteTools({ projectId, runtimeContext }: ToolBuildC
               body === undefined
                 ? []
                 : buildContentAnchorTimelineWarnings({
+                    projectId: workspace.projectId,
                     workspaceId: workspace.id,
                     currentTimelinePointId,
                     nodeTimelinePointId: node.anchorTimelinePointId ?? ORIGIN_TIMELINE_POINT_ID,
@@ -263,6 +275,7 @@ export function buildContentWriteTools({ projectId, runtimeContext }: ToolBuildC
             const normalizedParentId = normalizeOptionalStringToNull(newParentId);
             const normalizedAfterSiblingId = normalizeOptionalStringToNull(afterSiblingId);
             const node = moveContentNode({
+              projectId: workspace.projectId,
               workspaceId: workspace.id,
               nodeId: normalizedNodeId,
               newParentId: normalizedParentId,
@@ -300,8 +313,9 @@ export function buildContentWriteTools({ projectId, runtimeContext }: ToolBuildC
           projectId,
           execute: (workspace) => {
             const normalizedNodeId = normalizeRequiredNodeId(nodeId, "nodeId");
-            const node = readManuscriptNode(workspace.id, normalizedNodeId);
+            const node = readManuscriptNode(workspace.projectId, workspace.id, normalizedNodeId);
             deleteContentNode({
+              projectId: workspace.projectId,
               workspaceId: workspace.id,
               nodeId: normalizedNodeId,
             });

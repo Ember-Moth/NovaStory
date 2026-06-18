@@ -74,11 +74,13 @@ test("setDefaultBranch rejects branches from another project", async () => {
 test("setDefaultBranch invalidates project list and detail tags", async () => {
   const workspace = await seedProject("project_default_switch");
   workspaceService.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "Base",
   });
   const baseCommit = await workspaceService.createCommit({
+    projectId: workspace.projectId,
     branchId: workspace.branchId,
     message: "base",
   });
@@ -122,10 +124,12 @@ test("delete project cascades default workspace roots", async () => {
 test("delete project cascades content anchored to timeline points", async () => {
   const workspace = await seedProject("project_delete_content_anchor");
   const point = workspaceService.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     label: "Act I",
   });
   workspaceService.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     anchorPointId: point.id,
@@ -141,10 +145,12 @@ test("delete project cascades content anchored to timeline points", async () => 
 test("delete project cascades aux overlay files", async () => {
   const workspace = await seedProject("project_delete_aux_overlay");
   const point = workspaceService.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     label: "Act I",
   });
   auxService.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: point.id,
     path: "/notes.md",

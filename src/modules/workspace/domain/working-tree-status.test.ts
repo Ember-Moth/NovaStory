@@ -14,7 +14,7 @@ function seedProject(projectId: string) {
 test("empty branch before first commit reports no diff areas", async () => {
   const workspace = seedProject("status_empty_branch");
 
-  const status = await service.getWorkingTreeStatus(workspace.branchId);
+  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchId);
 
   expect(status.hasChanges).toBe(false);
   expect(status.headCommitId).toBeNull();
@@ -26,26 +26,30 @@ test("empty branch before first commit reports no diff areas", async () => {
 test("uncommitted edits before first commit appear as additions", async () => {
   const workspace = seedProject("status_first_commit");
   service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "Chapter 1",
     body: "Once",
   });
   service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     label: "Intro",
   });
   service.mkdirAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     path: "/lore",
   });
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     path: "/lore/world.md",
     content: "world building",
   });
 
-  const status = await service.getWorkingTreeStatus(workspace.branchId);
+  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchId);
 
   expect(status.hasChanges).toBe(true);
   expect(status.headCommitId).toBeNull();
@@ -63,14 +67,19 @@ test("uncommitted edits before first commit appear as additions", async () => {
 test("committed workspace with no edits reports hasChanges false", async () => {
   const workspace = seedProject("status_clean");
   service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "Chapter 1",
     body: "Once",
   });
-  await service.createCommit({ branchId: workspace.branchId, message: "first" });
+  await service.createCommit({
+    projectId: workspace.projectId,
+    branchId: workspace.branchId,
+    message: "first",
+  });
 
-  const status = await service.getWorkingTreeStatus(workspace.branchId);
+  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchId);
 
   expect(status.hasChanges).toBe(false);
   expect(status.headCommitId).toMatch(/^[0-9a-f]{40}$/);
@@ -82,50 +91,66 @@ test("committed workspace with no edits reports hasChanges false", async () => {
 test("content, timeline and aux edits appear in the diff summary", async () => {
   const workspace = seedProject("status_diff");
   const chapter = service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "Chapter 1",
     body: "Once",
   });
   const introPoint = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     label: "Intro",
   });
   service.mkdirAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     path: "/lore",
   });
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     path: "/lore/world.md",
     content: "world building",
   });
-  await service.createCommit({ branchId: workspace.branchId, message: "base" });
+  await service.createCommit({
+    projectId: workspace.projectId,
+    branchId: workspace.branchId,
+    message: "base",
+  });
 
   service.updateContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     nodeId: chapter.id,
     title: "Changed title",
     body: "different",
   });
   service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     label: "Middle",
   });
-  service.deleteAuxNodeAt({ workspaceId: workspace.id, path: "/lore" });
+  service.deleteAuxNodeAt({
+    projectId: workspace.projectId,
+    workspaceId: workspace.id,
+    path: "/lore",
+  });
   service.mkdirAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: introPoint.id,
     path: "/notes",
   });
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: introPoint.id,
     path: "/notes/draft.md",
     content: "timeline-specific note",
   });
 
-  const status = await service.getWorkingTreeStatus(workspace.branchId);
+  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchId);
 
   expect(status.hasChanges).toBe(true);
   expect(status.areas.content.changes).toContainEqual({
@@ -142,24 +167,36 @@ test("content, timeline and aux edits appear in the diff summary", async () => {
 test("reverting workspace to head clears the diff summary", async () => {
   const workspace = seedProject("status_revert");
   const chapter = service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "Chapter 1",
     body: "Once",
   });
-  const commit = await service.createCommit({ branchId: workspace.branchId, message: "first" });
+  const commit = await service.createCommit({
+    projectId: workspace.projectId,
+    branchId: workspace.branchId,
+    message: "first",
+  });
 
   service.updateContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     nodeId: chapter.id,
     title: "Changed title",
     body: "different",
   });
-  expect((await service.getWorkingTreeStatus(workspace.branchId)).hasChanges).toBe(true);
+  expect(
+    (await service.getWorkingTreeStatus(workspace.projectId, workspace.branchId)).hasChanges,
+  ).toBe(true);
 
-  await service.checkoutCommit({ workspaceId: workspace.id, commitId: commit.id });
+  await service.checkoutCommit({
+    projectId: workspace.projectId,
+    workspaceId: workspace.id,
+    commitId: commit.id,
+  });
 
-  const status = await service.getWorkingTreeStatus(workspace.branchId);
+  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchId);
   expect(status.hasChanges).toBe(false);
   expect(status.areas.content.changes).toEqual([]);
 });

@@ -30,7 +30,9 @@ export function buildContentReadTools({ projectId, runtimeContext }: ToolBuildCo
         withProjectWorkspace({
           projectId,
           execute: (workspace) => {
-            const list = listManuscriptNodes(workspace.id, rootNodeId ?? undefined, { depth });
+            const list = listManuscriptNodes(workspace.projectId, workspace.id, rootNodeId, {
+              depth,
+            });
             return {
               ok: true as const,
               truncated: list.truncated,
@@ -68,7 +70,7 @@ export function buildContentReadTools({ projectId, runtimeContext }: ToolBuildCo
               ok: true as const,
               truncated: false,
               data: {
-                node: readManuscriptNode(workspace.id, targetNodeId),
+                node: readManuscriptNode(workspace.projectId, workspace.id, targetNodeId),
               },
             };
           },

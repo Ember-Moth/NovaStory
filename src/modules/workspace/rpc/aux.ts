@@ -18,6 +18,7 @@ import {
 import { rpcTags, type RpcTagList } from "@/rpc/tags";
 
 function auxSnapshotTags(input: {
+  projectId: string;
   workspaceId: string;
   pointId?: string | typeof ORIGIN_TIMELINE_POINT_ID;
 }) {
@@ -85,16 +86,23 @@ export const restoreDeleted = mutation<
 });
 
 export const readByPath = query<
-  { workspaceId: string; pointId?: string | typeof ORIGIN_TIMELINE_POINT_ID; path: string },
+  {
+    projectId: string;
+    workspaceId: string;
+    pointId?: string | typeof ORIGIN_TIMELINE_POINT_ID;
+    path: string;
+  },
   ReturnType<typeof readAuxByPathAt>,
   RpcTagList
 >({
   watch: auxSnapshotTags,
-  handler: ({ workspaceId, pointId, path }) => readAuxByPathAt(workspaceId, pointId, path),
+  handler: ({ projectId, workspaceId, pointId, path }) =>
+    readAuxByPathAt(projectId, workspaceId, pointId, path),
 });
 
 export const listDir = query<
   {
+    projectId: string;
     workspaceId: string;
     pointId?: string | typeof ORIGIN_TIMELINE_POINT_ID;
     path?: string;
@@ -103,20 +111,22 @@ export const listDir = query<
   RpcTagList
 >({
   watch: auxSnapshotTags,
-  handler: ({ workspaceId, pointId, path }) => listAuxDirAt(workspaceId, pointId, { path }),
+  handler: ({ projectId, workspaceId, pointId, path }) =>
+    listAuxDirAt(projectId, workspaceId, pointId, { path }),
 });
 
 export const snapshotTree = query<
-  { workspaceId: string; pointId?: string | typeof ORIGIN_TIMELINE_POINT_ID },
+  { projectId: string; workspaceId: string; pointId?: string | typeof ORIGIN_TIMELINE_POINT_ID },
   ReturnType<typeof exportAuxSnapshotTree>,
   RpcTagList
 >({
   watch: auxSnapshotTags,
-  handler: ({ workspaceId, pointId }) => exportAuxSnapshotTree(workspaceId, pointId),
+  handler: ({ projectId, workspaceId, pointId }) =>
+    exportAuxSnapshotTree(projectId, workspaceId, pointId),
 });
 
 export const listChangesAt = query<
-  { workspaceId: string; pointId: string },
+  { projectId: string; workspaceId: string; pointId: string },
   ReturnType<typeof listAuxChangesAt>,
   RpcTagList
 >({
@@ -124,5 +134,6 @@ export const listChangesAt = query<
     rpcTags.auxWorkspace(workspaceId),
     rpcTags.timelineList(workspaceId),
   ],
-  handler: ({ workspaceId, pointId }) => listAuxChangesAt(workspaceId, pointId),
+  handler: ({ projectId, workspaceId, pointId }) =>
+    listAuxChangesAt(projectId, workspaceId, pointId),
 });

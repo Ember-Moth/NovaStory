@@ -36,6 +36,7 @@ export function buildAuxReadTools({ projectId, runtimeContext }: ToolBuildContex
           execute: (workspace) => {
             const resolvedTimelinePointId = resolveCurrentTimelinePointId(runtimeContext);
             const tree = listAuxTreeAt(
+              workspace.projectId,
               workspace.id,
               resolvedTimelinePointId,
               { path: path ?? "/" },
@@ -78,7 +79,12 @@ export function buildAuxReadTools({ projectId, runtimeContext }: ToolBuildContex
               throw new Error("当前没有可读取的辅助资料路径。");
             }
 
-            const node = readAuxByPathAt(workspace.id, resolvedTimelinePointId, resolvedPath);
+            const node = readAuxByPathAt(
+              workspace.projectId,
+              workspace.id,
+              resolvedTimelinePointId,
+              resolvedPath,
+            );
             if (!node) {
               throw new Error("辅助资料不存在或在当前时间点不可见。");
             }

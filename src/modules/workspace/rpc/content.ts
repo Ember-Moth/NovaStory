@@ -45,16 +45,17 @@ export const deleteMutation = mutation<Parameters<typeof deleteContentNode>[0], 
 });
 
 export const exportSubtree = query<
-  { workspaceId: string; rootNodeId?: string },
+  { projectId: string; workspaceId: string; rootNodeId?: string },
   ReturnType<typeof exportContentSubtree>,
   RpcTagList
 >({
   watch: ({ workspaceId }) => [rpcTags.contentTree(workspaceId)],
-  handler: ({ workspaceId, rootNodeId }) => exportContentSubtree(workspaceId, rootNodeId),
+  handler: ({ projectId, workspaceId, rootNodeId }) =>
+    exportContentSubtree(projectId, workspaceId, rootNodeId),
 });
 
 export const composeWritingContext = query<
-  { workspaceId: string; contentNodeId: string },
+  { projectId: string; workspaceId: string; contentNodeId: string },
   ReturnType<typeof buildWritingContext>,
   RpcTagList
 >({
@@ -63,5 +64,6 @@ export const composeWritingContext = query<
     rpcTags.auxWorkspace(workspaceId),
     rpcTags.timelineList(workspaceId),
   ],
-  handler: ({ workspaceId, contentNodeId }) => buildWritingContext(workspaceId, contentNodeId),
+  handler: ({ projectId, workspaceId, contentNodeId }) =>
+    buildWritingContext(projectId, workspaceId, contentNodeId),
 });

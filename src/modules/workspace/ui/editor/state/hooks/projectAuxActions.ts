@@ -27,6 +27,7 @@ function joinAuxPath(parentPath: string, name: string) {
 }
 
 type AuxActionDependencies = {
+  projectId: string;
   workspaceId: string | undefined;
   auxTree: AuxTreeNodeVM[];
   auxRootPath: string | undefined;
@@ -34,6 +35,7 @@ type AuxActionDependencies = {
   auxParentMap: ReadonlyMap<string, string | null>;
   mkdirAux: {
     mutate: (input: {
+      projectId: string;
       workspaceId: string;
       timelinePointId: string;
       path: string;
@@ -41,6 +43,7 @@ type AuxActionDependencies = {
   };
   writeFileAux: {
     mutate: (input: {
+      projectId: string;
       workspaceId: string;
       timelinePointId: string;
       path: string;
@@ -49,6 +52,7 @@ type AuxActionDependencies = {
   };
   linkAux: {
     mutate: (input: {
+      projectId: string;
       workspaceId: string;
       timelinePointId: string;
       path: string;
@@ -57,6 +61,7 @@ type AuxActionDependencies = {
   };
   moveAux: {
     mutate: (input: {
+      projectId: string;
       workspaceId: string;
       timelinePointId: string;
       path: string;
@@ -65,6 +70,7 @@ type AuxActionDependencies = {
   };
   retargetSymlinkAux: {
     mutate: (input: {
+      projectId: string;
       workspaceId: string;
       timelinePointId: string;
       path: string;
@@ -73,6 +79,7 @@ type AuxActionDependencies = {
   };
   deleteAux: {
     mutate: (input: {
+      projectId: string;
       workspaceId: string;
       timelinePointId: string;
       path: string;
@@ -80,6 +87,7 @@ type AuxActionDependencies = {
   };
   restoreDeletedAux: {
     mutate: (input: {
+      projectId: string;
       workspaceId: string;
       timelinePointId: string;
       path: string;
@@ -93,6 +101,7 @@ type AuxActionDependencies = {
 };
 
 export function useProjectAuxActions({
+  projectId,
   workspaceId,
   auxTree,
   auxRootPath,
@@ -157,6 +166,7 @@ export function useProjectAuxActions({
 
       try {
         const node = await mkdirAux.mutate({
+          projectId,
           workspaceId,
           timelinePointId: activeTimelinePointId,
           path: joinAuxPath(parentDirId, name),
@@ -172,7 +182,16 @@ export function useProjectAuxActions({
         );
       }
     },
-    [auxNodeMap, auxTree, expandAuxParent, mkdirAux, normalizedAuxRootPath, store, workspaceId],
+    [
+      auxNodeMap,
+      auxTree,
+      expandAuxParent,
+      mkdirAux,
+      normalizedAuxRootPath,
+      projectId,
+      store,
+      workspaceId,
+    ],
   );
 
   const createAuxFile = useCallback(
@@ -189,6 +208,7 @@ export function useProjectAuxActions({
 
       try {
         const node = await writeFileAux.mutate({
+          projectId,
           workspaceId,
           timelinePointId: activeTimelinePointId,
           path: joinAuxPath(parentDirId, name),
@@ -205,7 +225,16 @@ export function useProjectAuxActions({
         );
       }
     },
-    [auxNodeMap, auxTree, expandAuxParent, normalizedAuxRootPath, store, workspaceId, writeFileAux],
+    [
+      auxNodeMap,
+      auxTree,
+      expandAuxParent,
+      normalizedAuxRootPath,
+      projectId,
+      store,
+      workspaceId,
+      writeFileAux,
+    ],
   );
 
   const createAuxSymlink = useCallback(
@@ -222,6 +251,7 @@ export function useProjectAuxActions({
 
       try {
         const node = await linkAux.mutate({
+          projectId,
           workspaceId,
           timelinePointId: activeTimelinePointId,
           path: joinAuxPath(parentDirId, name),
@@ -238,7 +268,16 @@ export function useProjectAuxActions({
         );
       }
     },
-    [auxNodeMap, auxTree, expandAuxParent, linkAux, normalizedAuxRootPath, store, workspaceId],
+    [
+      auxNodeMap,
+      auxTree,
+      expandAuxParent,
+      linkAux,
+      normalizedAuxRootPath,
+      projectId,
+      store,
+      workspaceId,
+    ],
   );
 
   const exitAuxSymlinkTargetPicker = useCallback(() => {
@@ -321,6 +360,7 @@ export function useProjectAuxActions({
 
       try {
         await retargetSymlinkAux.mutate({
+          projectId,
           workspaceId,
           timelinePointId: activeTimelinePointId,
           path: source.id,
@@ -337,7 +377,7 @@ export function useProjectAuxActions({
         );
       }
     },
-    [auxNodeMap, exitAuxSymlinkTargetPicker, retargetSymlinkAux, store, workspaceId],
+    [auxNodeMap, exitAuxSymlinkTargetPicker, projectId, retargetSymlinkAux, store, workspaceId],
   );
 
   const handleAuxSelect = useCallback(
@@ -451,6 +491,7 @@ export function useProjectAuxActions({
 
       try {
         await moveAux.mutate({
+          projectId,
           workspaceId,
           timelinePointId: activeTimelinePointId,
           path: nodeId,
@@ -466,7 +507,16 @@ export function useProjectAuxActions({
         return false;
       }
     },
-    [auxNodeMap, auxParentMap, auxTree, moveAux, normalizedAuxRootPath, store, workspaceId],
+    [
+      auxNodeMap,
+      auxParentMap,
+      auxTree,
+      moveAux,
+      normalizedAuxRootPath,
+      projectId,
+      store,
+      workspaceId,
+    ],
   );
 
   const handleAuxMove = useCallback(
@@ -499,6 +549,7 @@ export function useProjectAuxActions({
 
       try {
         await moveAux.mutate({
+          projectId,
           workspaceId,
           timelinePointId: activeTimelinePointId,
           path: move.nodeId,
@@ -512,7 +563,16 @@ export function useProjectAuxActions({
         );
       }
     },
-    [auxNodeMap, auxParentMap, expandAuxParent, moveAux, normalizedAuxRootPath, store, workspaceId],
+    [
+      auxNodeMap,
+      auxParentMap,
+      expandAuxParent,
+      moveAux,
+      normalizedAuxRootPath,
+      projectId,
+      store,
+      workspaceId,
+    ],
   );
 
   const handleAuxDelete = useCallback(
@@ -526,6 +586,7 @@ export function useProjectAuxActions({
 
       try {
         await deleteAux.mutate({
+          projectId,
           workspaceId,
           timelinePointId: activeTimelinePointId,
           path: nodeId,
@@ -543,7 +604,7 @@ export function useProjectAuxActions({
         );
       }
     },
-    [auxNodeMap, clearAuxNodeLocalState, deleteAux, store, workspaceId],
+    [auxNodeMap, clearAuxNodeLocalState, deleteAux, projectId, store, workspaceId],
   );
 
   const handleAuxRestoreDeleted = useCallback(
@@ -561,6 +622,7 @@ export function useProjectAuxActions({
 
       try {
         await restoreDeletedAux.mutate({
+          projectId,
           workspaceId,
           timelinePointId: activeTimelinePointId,
           path: nodeId,
@@ -579,7 +641,7 @@ export function useProjectAuxActions({
         );
       }
     },
-    [clearAuxNodeLocalState, restoreDeletedAux, store, workspaceId],
+    [clearAuxNodeLocalState, projectId, restoreDeletedAux, store, workspaceId],
   );
 
   return {

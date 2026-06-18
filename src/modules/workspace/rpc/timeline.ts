@@ -11,16 +11,17 @@ import {
 import { rpcTags, type RpcTagList } from "@/rpc/tags";
 
 export const list = query<
-  { workspaceId: string },
+  { projectId: string; workspaceId: string },
   ReturnType<typeof listTimelinePoints>,
   RpcTagList
 >({
   watch: ({ workspaceId }) => [rpcTags.timelineList(workspaceId)],
-  handler: ({ workspaceId }) => listTimelinePoints(workspaceId),
+  handler: ({ projectId, workspaceId }) => listTimelinePoints(projectId, workspaceId),
 });
 
 export const create = mutation<
   {
+    projectId: string;
     workspaceId: string;
     afterPointId?: string | typeof ORIGIN_TIMELINE_POINT_ID;
     label: string;
@@ -36,6 +37,7 @@ export const create = mutation<
 
 export const move = mutation<
   {
+    projectId: string;
     workspaceId: string;
     pointId: string;
     afterPointId?: string | typeof ORIGIN_TIMELINE_POINT_ID;
@@ -49,16 +51,17 @@ export const move = mutation<
 });
 
 export const deleteMutation = mutation<
-  { workspaceId: string; pointId: string; purgeAuxLayers?: boolean },
+  { projectId: string; workspaceId: string; pointId: string; purgeAuxLayers?: boolean },
   void,
   RpcTagList
->(({ workspaceId, pointId, purgeAuxLayers }, ctx) => {
-  deleteTimelinePoint(workspaceId, pointId, { purgeAuxLayers });
+>(({ projectId, workspaceId, pointId, purgeAuxLayers }, ctx) => {
+  deleteTimelinePoint(projectId, workspaceId, pointId, { purgeAuxLayers });
   ctx.invalidate(rpcTags.timelineList(workspaceId), rpcTags.auxWorkspace(workspaceId));
 });
 
 export const update = mutation<
   {
+    projectId: string;
     workspaceId: string;
     pointId: string;
     label?: string;

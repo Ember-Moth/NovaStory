@@ -130,7 +130,7 @@ export function createProjectAssistantService(
         activeThreadId: activeThread?.id ?? null,
         threads,
         state: activeThread
-          ? getThreadView(activeThread.id)
+          ? getThreadView(projectId, activeThread.id)
           : { thread: null, activePath: [], candidateGroups: [], latestRuns: [], runSummaries: [] },
       };
     },
@@ -146,32 +146,32 @@ export function createProjectAssistantService(
       return setActiveThread(projectId, threadId);
     },
 
-    renameProjectAssistantThread(threadId: string, title: string) {
-      return renameThread(threadId, title);
+    renameProjectAssistantThread(projectId: string, threadId: string, title: string) {
+      return renameThread(projectId, threadId, title);
     },
 
-    archiveProjectAssistantThread(threadId: string, archived: boolean) {
-      return archiveThread(threadId, archived);
+    archiveProjectAssistantThread(projectId: string, threadId: string, archived: boolean) {
+      return archiveThread(projectId, threadId, archived);
     },
 
-    getThreadView(threadId: string) {
-      return getThreadView(threadId);
+    getThreadView(projectId: string, threadId: string) {
+      return getThreadView(projectId, threadId);
     },
 
-    getRunTrace(runId: string): AgentRunTraceView {
-      return getRunTrace(runId);
+    getRunTrace(projectId: string, runId: string): AgentRunTraceView {
+      return getRunTrace(projectId, runId);
     },
 
-    getNodeCandidates(parentNodeId: string) {
-      return getNodeCandidates(parentNodeId);
+    getNodeCandidates(projectId: string, parentNodeId: string) {
+      return getNodeCandidates(projectId, parentNodeId);
     },
 
-    getChildRuns(runId: string) {
-      return listChildRuns(runId);
+    getChildRuns(projectId: string, runId: string) {
+      return listChildRuns(projectId, runId);
     },
 
-    selectThreadTip(threadId: string, tipNodeId: string) {
-      return selectActiveTip(threadId, tipNodeId);
+    selectThreadTip(projectId: string, threadId: string, tipNodeId: string) {
+      return selectActiveTip(projectId, threadId, tipNodeId);
     },
 
     sendProjectAssistantMessageStream({
@@ -309,12 +309,12 @@ export function createProjectAssistantService(
       threadId: string;
       runId: string;
     }) {
-      const threadView = getThreadView(threadId);
+      const threadView = getThreadView(projectId, threadId);
       const thread = threadView.thread;
       invariant(thread, "未找到当前会话。");
       invariant(thread.projectId === projectId, "AI 会话不属于当前项目。");
 
-      const trace = getRunTrace(runId);
+      const trace = getRunTrace(projectId, runId);
       invariant(trace.run.threadId === thread.id, "run 不属于当前会话。");
       invariant(
         trace.run.status === "running" ||
@@ -324,7 +324,7 @@ export function createProjectAssistantService(
       );
 
       if (trace.run.status === "waiting_for_input") {
-        markRunCancelled(runId);
+        markRunCancelled(projectId, runId);
         return {
           runId,
         };

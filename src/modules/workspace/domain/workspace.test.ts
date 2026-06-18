@@ -42,29 +42,33 @@ test("content export preserves sibling order and nesting", async () => {
   const rootId = null;
 
   const chapter1 = service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: rootId,
     title: "Chapter 1",
   });
   const chapter2 = service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: rootId,
     afterSiblingId: chapter1.id,
     title: "Chapter 2",
   });
   service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: rootId,
     title: "Prologue",
   });
   service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: chapter1.id,
     title: "Scene 1",
     body: "Opening scene",
   });
 
-  const exported = service.exportContentSubtree(workspace.id);
+  const exported = service.exportContentSubtree(workspace.projectId, workspace.id);
   expect(exported.nodes.map((node) => node.title)).toEqual(["Prologue", "Chapter 1", "Chapter 2"]);
   expect(exported.nodes[1]?.children.map((node) => node.title)).toEqual(["Scene 1"]);
   expect(chapter2.parentId).toBe(rootId);
@@ -75,28 +79,33 @@ test("aux overlay resolves by timeline point and composeWritingContext follows a
   const contentRootId = null;
 
   service.mkdirAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/state",
   });
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/state/location.md",
     content: "home",
   });
   const point = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "After leave home",
   });
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: point.id,
     path: "/state/location.md",
     content: "park",
   });
   const scene = service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: contentRootId,
     anchorPointId: point.id,
@@ -104,14 +113,19 @@ test("aux overlay resolves by timeline point and composeWritingContext follows a
   });
 
   expect(
-    service.readAuxByPathAt(workspace.id, service.ORIGIN_TIMELINE_POINT_ID, "/state/location.md")
-      ?.content,
+    service.readAuxByPathAt(
+      workspace.projectId,
+      workspace.id,
+      service.ORIGIN_TIMELINE_POINT_ID,
+      "/state/location.md",
+    )?.content,
   ).toBe("home");
-  expect(service.readAuxByPathAt(workspace.id, point.id, "/state/location.md")?.content).toBe(
-    "park",
-  );
+  expect(
+    service.readAuxByPathAt(workspace.projectId, workspace.id, point.id, "/state/location.md")
+      ?.content,
+  ).toBe("park");
 
-  const context = service.composeWritingContext(workspace.id, scene.id);
+  const context = service.composeWritingContext(workspace.projectId, workspace.id, scene.id);
   expect(context.timelinePointId).toBe(point.id);
   expect(context.auxSnapshot.find((node) => node.path === "/state/location.md")?.content).toBe(
     "park",
@@ -122,21 +136,25 @@ test("symlink stores a logical aux path target and does not follow target moves"
   const workspace = await seedProject("project_symlink");
 
   service.mkdirAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/places",
   });
   service.mkdirAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/places/home",
   });
   service.mkdirAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/places/home/bathroom",
   });
   service.linkAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/current_location",
@@ -144,28 +162,36 @@ test("symlink stores a logical aux path target and does not follow target moves"
   });
 
   const point = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "After move",
   });
   service.mkdirAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: point.id,
     path: "/places/villa",
   });
   service.moveAuxNodeAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: point.id,
     path: "/places/home/bathroom",
     newPath: "/places/villa/main_bathroom",
   });
 
-  const resolved = service.readAuxByPathAt(workspace.id, point.id, "/current_location");
+  const resolved = service.readAuxByPathAt(
+    workspace.projectId,
+    workspace.id,
+    point.id,
+    "/current_location",
+  );
   expect(resolved?.nodeType).toBe("symlink");
   expect(resolved?.path).toBe("/current_location");
   expect(resolved?.symlinkTargetPath).toBe("/places/home/bathroom");
 
-  const exported = service.exportAuxSnapshotTree(workspace.id, point.id);
+  const exported = service.exportAuxSnapshotTree(workspace.projectId, workspace.id, point.id);
   expect(exported.timelinePointId).toBe(point.id);
   expect(exported.nodes.map((node) => node.name)).toEqual(["current_location", "places"]);
   expect(exported.nodes.find((node) => node.name === "current_location")?.symlinkTargetPath).toBe(
@@ -180,17 +206,20 @@ test("retargetAuxSymlinkAt updates the exported symlink target path", async () =
   const workspace = await seedProject("project_symlink_retarget");
 
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/old.md",
     content: "old",
   });
   service.mkdirAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/state",
   });
   service.linkAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/current",
@@ -198,16 +227,22 @@ test("retargetAuxSymlinkAt updates the exported symlink target path", async () =
   });
 
   service.retargetAuxSymlinkAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/current",
     targetPath: "/state",
   });
 
-  const exported = service.exportAuxSnapshotTree(workspace.id);
+  const exported = service.exportAuxSnapshotTree(workspace.projectId, workspace.id);
   expect(exported.nodes.find((node) => node.path === "/current")?.symlinkTargetPath).toBe("/state");
   expect(
-    service.readAuxByPathAt(workspace.id, service.ORIGIN_TIMELINE_POINT_ID, "/current")?.path,
+    service.readAuxByPathAt(
+      workspace.projectId,
+      workspace.id,
+      service.ORIGIN_TIMELINE_POINT_ID,
+      "/current",
+    )?.path,
   ).toBe("/current");
 });
 
@@ -215,18 +250,21 @@ test("retargetAuxSymlinkAt can point to another symlink node", async () => {
   const workspace = await seedProject("project_symlink_retarget_symlink");
 
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/notes.md",
     content: "notes",
   });
   service.linkAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/target_link",
     targetPath: "/notes.md",
   });
   service.linkAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/source_link",
@@ -234,18 +272,24 @@ test("retargetAuxSymlinkAt can point to another symlink node", async () => {
   });
 
   service.retargetAuxSymlinkAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/source_link",
     targetPath: "/target_link",
   });
 
-  const exported = service.exportAuxSnapshotTree(workspace.id);
+  const exported = service.exportAuxSnapshotTree(workspace.projectId, workspace.id);
   expect(exported.nodes.find((node) => node.path === "/source_link")?.symlinkTargetPath).toBe(
     "/target_link",
   );
   expect(
-    service.readAuxByPathAt(workspace.id, service.ORIGIN_TIMELINE_POINT_ID, "/source_link")?.path,
+    service.readAuxByPathAt(
+      workspace.projectId,
+      workspace.id,
+      service.ORIGIN_TIMELINE_POINT_ID,
+      "/source_link",
+    )?.path,
   ).toBe("/source_link");
 });
 
@@ -253,24 +297,28 @@ test("retargetAuxSymlinkAt records self and indirect symlink targets", async () 
   const workspace = await seedProject("project_symlink_retarget_cycle");
 
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/notes.md",
     content: "notes",
   });
   service.linkAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/source_link",
     targetPath: "/notes.md",
   });
   service.linkAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/loop_b",
     targetPath: "/source_link",
   });
   service.linkAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/loop_a",
@@ -278,25 +326,29 @@ test("retargetAuxSymlinkAt records self and indirect symlink targets", async () 
   });
 
   service.retargetAuxSymlinkAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/source_link",
     targetPath: "/source_link",
   });
   expect(
-    service.exportAuxSnapshotTree(workspace.id).nodes.find((node) => node.path === "/source_link")
-      ?.symlinkTargetPath,
+    service
+      .exportAuxSnapshotTree(workspace.projectId, workspace.id)
+      .nodes.find((node) => node.path === "/source_link")?.symlinkTargetPath,
   ).toBe("/source_link");
 
   service.retargetAuxSymlinkAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/source_link",
     targetPath: "/loop_a",
   });
   expect(
-    service.exportAuxSnapshotTree(workspace.id).nodes.find((node) => node.path === "/source_link")
-      ?.symlinkTargetPath,
+    service
+      .exportAuxSnapshotTree(workspace.projectId, workspace.id)
+      .nodes.find((node) => node.path === "/source_link")?.symlinkTargetPath,
   ).toBe("/loop_a");
 });
 
@@ -304,12 +356,14 @@ test("retargetAuxSymlinkAt rejects non-symlink sources", () => {
   const workspace = seedProject("project_symlink_retarget_non_symlink");
 
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/notes.md",
     content: "notes",
   });
   service.mkdirAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/state",
@@ -317,6 +371,7 @@ test("retargetAuxSymlinkAt rejects non-symlink sources", () => {
 
   expect(() =>
     service.retargetAuxSymlinkAt({
+      projectId: workspace.projectId,
       workspaceId: workspace.id,
       timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
       path: "/notes.md",
@@ -329,12 +384,14 @@ test("aux node names must stay unique within the same parent", () => {
   const workspace = seedProject("project_aux_unique_names");
 
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/notes.md",
     content: "notes",
   });
   service.mkdirAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/state",
@@ -342,6 +399,7 @@ test("aux node names must stay unique within the same parent", () => {
 
   expect(() =>
     service.moveAuxNodeAt({
+      projectId: workspace.projectId,
       workspaceId: workspace.id,
       timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
       path: "/state",
@@ -350,6 +408,7 @@ test("aux node names must stay unique within the same parent", () => {
   ).toThrow("同路径辅助信息已存在。");
 
   const spacedDir = service.mkdirAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/ notes.md ",
@@ -357,17 +416,24 @@ test("aux node names must stay unique within the same parent", () => {
   expect(spacedDir.path).toBe("/ notes.md");
 
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/notes.md",
     content: "updated",
   });
   expect(
-    service.readAuxByPathAt(workspace.id, service.ORIGIN_TIMELINE_POINT_ID, "/notes.md")?.content,
+    service.readAuxByPathAt(
+      workspace.projectId,
+      workspace.id,
+      service.ORIGIN_TIMELINE_POINT_ID,
+      "/notes.md",
+    )?.content,
   ).toBe("updated");
 
   expect(() =>
     service.linkAt({
+      projectId: workspace.projectId,
       workspaceId: workspace.id,
       timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
       path: "/notes.md",
@@ -375,22 +441,22 @@ test("aux node names must stay unique within the same parent", () => {
     }),
   ).toThrow("同路径辅助信息已存在。");
 
-  expect(service.exportAuxSnapshotTree(workspace.id).nodes.map((node) => node.path)).toEqual([
-    "/ notes.md",
-    "/notes.md",
-    "/state",
-  ]);
+  expect(
+    service.exportAuxSnapshotTree(workspace.projectId, workspace.id).nodes.map((node) => node.path),
+  ).toEqual(["/ notes.md", "/notes.md", "/state"]);
 });
 
 test("origin aux creation can coexist with descendant timeline names", () => {
   const workspace = seedProject("project_aux_origin_descendant_duplicate");
   const point = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "Point 1",
   });
 
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: point.id,
     path: "/新文件 1",
@@ -398,6 +464,7 @@ test("origin aux creation can coexist with descendant timeline names", () => {
   });
 
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/新文件 1",
@@ -405,62 +472,69 @@ test("origin aux creation can coexist with descendant timeline names", () => {
   });
 
   expect(
-    service.exportAuxSnapshotTree(workspace.id, point.id).nodes.map((node) => node.path),
+    service
+      .exportAuxSnapshotTree(workspace.projectId, workspace.id, point.id)
+      .nodes.map((node) => node.path),
   ).toEqual(["/新文件 1"]);
-  expect(service.readAuxByPathAt(workspace.id, point.id, "/新文件 1")?.content).toBe("point file");
+  expect(
+    service.readAuxByPathAt(workspace.projectId, workspace.id, point.id, "/新文件 1")?.content,
+  ).toBe("point file");
 });
 
 test("aux snapshot sorts top-level nodes by path", () => {
   const workspace = seedProject("project_aux_natural_sort");
 
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/文件10",
     content: "",
   });
   service.mkdirAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/目录十",
   });
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/文件2",
     content: "",
   });
   service.mkdirAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/目录二",
   });
   service.linkAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/文件１ - 链接",
     targetPath: "/目录十",
   });
 
-  expect(service.exportAuxSnapshotTree(workspace.id).nodes.map((node) => node.path)).toEqual([
-    "/文件１ - 链接",
-    "/文件10",
-    "/文件2",
-    "/目录二",
-    "/目录十",
-  ]);
+  expect(
+    service.exportAuxSnapshotTree(workspace.projectId, workspace.id).nodes.map((node) => node.path),
+  ).toEqual(["/文件１ - 链接", "/文件10", "/文件2", "/目录二", "/目录十"]);
 });
 
 test("aux snapshot shows current timeline deleted file tombstones", () => {
   const workspace = seedProject("project_aux_deleted_ghost_natural_sort");
 
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/文件10",
     content: "",
   });
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/文件2",
@@ -468,23 +542,26 @@ test("aux snapshot shows current timeline deleted file tombstones", () => {
   });
 
   const point = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "After delete file 10",
   });
   service.deleteAuxNodeAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: point.id,
     path: "/文件10",
   });
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: point.id,
     path: "/文件1",
     content: "",
   });
 
-  const snapshot = service.exportAuxSnapshotTree(workspace.id, point.id);
+  const snapshot = service.exportAuxSnapshotTree(workspace.projectId, workspace.id, point.id);
   const statusByPath = new Map(snapshot.nodes.map((node) => [node.path, node.overlayStatus]));
 
   expect(statusByPath.get("/文件1")).toBe("visible");
@@ -496,17 +573,20 @@ test("aux snapshot marks visible nodes with layers at the active timeline point"
   const workspace = seedProject("project_aux_snapshot_changes");
 
   service.mkdirAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/state",
   });
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/state/location.md",
     content: "home",
   });
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/state/character.md",
@@ -514,35 +594,40 @@ test("aux snapshot marks visible nodes with layers at the active timeline point"
   });
 
   const originSnapshot = service.exportAuxSnapshotTree(
+    workspace.projectId,
     workspace.id,
     service.ORIGIN_TIMELINE_POINT_ID,
   );
   expect(flattenAuxNodes(originSnapshot.nodes).every((node) => !node.hasTimelineChange)).toBe(true);
 
   const point = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "After departure",
   });
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: point.id,
     path: "/state/location.md",
     content: "home",
   });
   service.mkdirAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: point.id,
     path: "/delta-only",
   });
   service.moveAuxNodeAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: point.id,
     path: "/state/character.md",
     newPath: "/cast.md",
   });
 
-  const pointSnapshot = service.exportAuxSnapshotTree(workspace.id, point.id);
+  const pointSnapshot = service.exportAuxSnapshotTree(workspace.projectId, workspace.id, point.id);
   const changesByPath = new Map(
     flattenAuxNodes(pointSnapshot.nodes).map((node) => [node.path, node.hasTimelineChange]),
   );
@@ -557,11 +642,13 @@ test("aux snapshot shows deleted folder tombstones without descendants", () => {
   const workspace = seedProject("project_aux_deleted_ghosts");
 
   service.mkdirAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/state",
   });
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/state/location.md",
@@ -569,17 +656,19 @@ test("aux snapshot shows deleted folder tombstones without descendants", () => {
   });
 
   const point = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "After delete state",
   });
   service.deleteAuxNodeAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: point.id,
     path: "/state",
   });
 
-  const snapshot = service.exportAuxSnapshotTree(workspace.id, point.id);
+  const snapshot = service.exportAuxSnapshotTree(workspace.projectId, workspace.id, point.id);
   expect(snapshot.nodes.find((node) => node.path === "/state")).toMatchObject({
     path: "/state",
     nodeType: "dir",
@@ -595,54 +684,65 @@ test("whiteout deletion can be overridden by rewriting the same path", () => {
   const workspace = seedProject("project_aux_whiteout_recreate");
 
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/notes.md",
     content: "origin",
   });
   const point = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "After delete notes",
   });
   service.deleteAuxNodeAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: point.id,
     path: "/notes.md",
   });
-  expect(service.readAuxByPathAt(workspace.id, point.id, "/notes.md")).toBeNull();
+  expect(
+    service.readAuxByPathAt(workspace.projectId, workspace.id, point.id, "/notes.md"),
+  ).toBeNull();
 
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: point.id,
     path: "/notes.md",
     content: "replacement",
   });
 
-  expect(service.readAuxByPathAt(workspace.id, point.id, "/notes.md")?.content).toBe("replacement");
+  expect(
+    service.readAuxByPathAt(workspace.projectId, workspace.id, point.id, "/notes.md")?.content,
+  ).toBe("replacement");
 });
 
 test("aux snapshot exposes current timeline whiteouts as deleted rows", () => {
   const workspace = seedProject("project_aux_whiteout_deleted_rows");
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/notes.md",
     content: "origin",
   });
   const point = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "After delete notes",
   });
 
   service.deleteAuxNodeAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: point.id,
     path: "/notes.md",
   });
 
-  const snapshot = service.exportAuxSnapshotTree(workspace.id, point.id);
+  const snapshot = service.exportAuxSnapshotTree(workspace.projectId, workspace.id, point.id);
   expect(snapshot.nodes).toEqual([
     expect.objectContaining({
       path: "/notes.md",
@@ -653,7 +753,7 @@ test("aux snapshot exposes current timeline whiteouts as deleted rows", () => {
       children: [],
     }),
   ]);
-  expect(service.exportAuxSnapshotTree(workspace.id).nodes).toEqual([
+  expect(service.exportAuxSnapshotTree(workspace.projectId, workspace.id).nodes).toEqual([
     expect.objectContaining({
       path: "/notes.md",
       overlayStatus: "visible",
@@ -664,63 +764,74 @@ test("aux snapshot exposes current timeline whiteouts as deleted rows", () => {
 test("aux snapshot does not expose origin or upper-only deletes as deleted rows", () => {
   const workspace = seedProject("project_aux_whiteout_deleted_rows_scope");
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/origin.md",
     content: "origin",
   });
   service.deleteAuxNodeAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/origin.md",
   });
-  expect(service.exportAuxSnapshotTree(workspace.id).nodes).toEqual([]);
+  expect(service.exportAuxSnapshotTree(workspace.projectId, workspace.id).nodes).toEqual([]);
 
   const point = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "Draft",
   });
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: point.id,
     path: "/draft.md",
     content: "draft",
   });
   service.deleteAuxNodeAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: point.id,
     path: "/draft.md",
   });
 
-  expect(service.exportAuxSnapshotTree(workspace.id, point.id).nodes).toEqual([]);
+  expect(service.exportAuxSnapshotTree(workspace.projectId, workspace.id, point.id).nodes).toEqual(
+    [],
+  );
 });
 
 test("restoreDeletedAuxNodeAt removes the current whiteout and restores lower folders", () => {
   const workspace = seedProject("project_aux_whiteout_restore");
   service.mkdirAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/state",
   });
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/state/location.md",
     content: "home",
   });
   const point = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "After delete state",
   });
   service.deleteAuxNodeAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: point.id,
     path: "/state",
   });
 
-  let snapshot = service.exportAuxSnapshotTree(workspace.id, point.id);
+  let snapshot = service.exportAuxSnapshotTree(workspace.projectId, workspace.id, point.id);
   expect(snapshot.nodes).toEqual([
     expect.objectContaining({
       path: "/state",
@@ -731,12 +842,13 @@ test("restoreDeletedAuxNodeAt removes the current whiteout and restores lower fo
   ]);
 
   service.restoreDeletedAuxNodeAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: point.id,
     path: "/state",
   });
 
-  snapshot = service.exportAuxSnapshotTree(workspace.id, point.id);
+  snapshot = service.exportAuxSnapshotTree(workspace.projectId, workspace.id, point.id);
   expect(snapshot.nodes[0]).toMatchObject({
     path: "/state",
     overlayStatus: "visible",
@@ -755,12 +867,14 @@ test("restoreDeletedAuxNodeAt removes the current whiteout and restores lower fo
 test("restoreDeletedAuxNodeAt rejects origin and missing whiteouts", () => {
   const workspace = seedProject("project_aux_whiteout_restore_rejects");
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/notes.md",
     content: "origin",
   });
   const point = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "Draft",
@@ -768,6 +882,7 @@ test("restoreDeletedAuxNodeAt rejects origin and missing whiteouts", () => {
 
   expect(() =>
     service.restoreDeletedAuxNodeAt({
+      projectId: workspace.projectId,
       workspaceId: workspace.id,
       timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
       path: "/notes.md",
@@ -775,6 +890,7 @@ test("restoreDeletedAuxNodeAt rejects origin and missing whiteouts", () => {
   ).toThrow();
   expect(() =>
     service.restoreDeletedAuxNodeAt({
+      projectId: workspace.projectId,
       workspaceId: workspace.id,
       timelinePointId: point.id,
       path: "/notes.md",
@@ -787,25 +903,32 @@ test("content node deletion removes subtree and preserves sibling order", () => 
   const rootId = null;
 
   const chapter1 = service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: rootId,
     title: "Chapter 1",
   });
   service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: rootId,
     afterSiblingId: chapter1.id,
     title: "Chapter 2",
   });
   service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: chapter1.id,
     title: "Scene 1",
   });
 
-  service.deleteContentNode({ workspaceId: workspace.id, nodeId: chapter1.id });
+  service.deleteContentNode({
+    projectId: workspace.projectId,
+    workspaceId: workspace.id,
+    nodeId: chapter1.id,
+  });
 
-  const exported = service.exportContentSubtree(workspace.id);
+  const exported = service.exportContentSubtree(workspace.projectId, workspace.id);
   expect(exported.nodes.map((node) => node.title)).toEqual(["Chapter 2"]);
 });
 
@@ -814,17 +937,20 @@ test("deleting a middle content sibling rewires next sibling without violating u
   const rootId = null;
 
   const chapter1 = service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: rootId,
     title: "Chapter 1",
   });
   const chapter2 = service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: rootId,
     afterSiblingId: chapter1.id,
     title: "Chapter 2",
   });
   service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: rootId,
     afterSiblingId: chapter2.id,
@@ -832,10 +958,14 @@ test("deleting a middle content sibling rewires next sibling without violating u
   });
 
   expect(() =>
-    service.deleteContentNode({ workspaceId: workspace.id, nodeId: chapter2.id }),
+    service.deleteContentNode({
+      projectId: workspace.projectId,
+      workspaceId: workspace.id,
+      nodeId: chapter2.id,
+    }),
   ).not.toThrow();
 
-  const exported = service.exportContentSubtree(workspace.id);
+  const exported = service.exportContentSubtree(workspace.projectId, workspace.id);
   expect(exported.nodes.map((node) => node.title)).toEqual(["Chapter 1", "Chapter 3"]);
 });
 
@@ -844,22 +974,26 @@ test("content node move can reorder across parents and preserve child order", ()
   const rootId = null;
 
   const chapter1 = service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: rootId,
     title: "Chapter 1",
   });
   const chapter2 = service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: rootId,
     afterSiblingId: chapter1.id,
     title: "Chapter 2",
   });
   const scene1 = service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: chapter1.id,
     title: "Scene 1",
   });
   service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: chapter1.id,
     afterSiblingId: scene1.id,
@@ -867,37 +1001,40 @@ test("content node move can reorder across parents and preserve child order", ()
   });
 
   service.moveContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     nodeId: scene1.id,
     newParentId: chapter2.id,
   });
 
-  const exported = service.exportContentSubtree(workspace.id);
+  const exported = service.exportContentSubtree(workspace.projectId, workspace.id);
   expect(exported.nodes.map((node) => node.title)).toEqual(["Chapter 1", "Chapter 2"]);
   expect(exported.nodes[0]?.children.map((node) => node.title)).toEqual(["Scene 2"]);
   expect(exported.nodes[1]?.children.map((node) => node.title)).toEqual(["Scene 1"]);
 
   service.moveContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     nodeId: chapter2.id,
     newParentId: rootId,
   });
 
-  expect(service.exportContentSubtree(workspace.id).nodes.map((node) => node.title)).toEqual([
-    "Chapter 2",
-    "Chapter 1",
-  ]);
+  expect(
+    service.exportContentSubtree(workspace.projectId, workspace.id).nodes.map((node) => node.title),
+  ).toEqual(["Chapter 2", "Chapter 1"]);
 });
 
 test("content node move can lift a nested child to the top level and remain reloadable", () => {
   const workspace = seedProject("project_content_move_child_to_top");
 
   const parent = service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "Parent",
   });
   const child = service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: parent.id,
     title: "Child",
@@ -906,6 +1043,7 @@ test("content node move can lift a nested child to the top level and remain relo
 
   expect(() =>
     service.moveContentNode({
+      projectId: workspace.projectId,
       workspaceId: workspace.id,
       nodeId: child.id,
       newParentId: null,
@@ -913,7 +1051,7 @@ test("content node move can lift a nested child to the top level and remain relo
     }),
   ).not.toThrow();
 
-  const exported = service.exportContentSubtree(workspace.id);
+  const exported = service.exportContentSubtree(workspace.projectId, workspace.id);
   expect(exported.nodes.map((node) => node.title)).toEqual(["Parent", "Child"]);
   expect(exported.nodes[0]?.children).toEqual([]);
   expect(exported.nodes[1]).toMatchObject({
@@ -929,11 +1067,13 @@ test("content node move rejects moving a node below its own descendant", () => {
   const rootId = null;
 
   const chapter = service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: rootId,
     title: "Chapter",
   });
   const scene = service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: chapter.id,
     title: "Scene",
@@ -941,6 +1081,7 @@ test("content node move rejects moving a node below its own descendant", () => {
 
   expect(() =>
     service.moveContentNode({
+      projectId: workspace.projectId,
       workspaceId: workspace.id,
       nodeId: chapter.id,
       newParentId: scene.id,
@@ -952,12 +1093,14 @@ test("content node move rejects invalid targets without corrupting persisted tre
   const workspace = seedProject("project_content_move_invalid_target_clean");
 
   const chapter1 = service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "Chapter 1",
     body: "one",
   });
   const chapter2 = service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     afterSiblingId: chapter1.id,
@@ -965,16 +1108,18 @@ test("content node move rejects invalid targets without corrupting persisted tre
     body: "two",
   });
   const scene = service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: chapter1.id,
     title: "Scene",
     body: "scene",
   });
-  const before = service.exportContentSubtree(workspace.id);
+  const before = service.exportContentSubtree(workspace.projectId, workspace.id);
   const rootDirsBefore = listManuscriptDirs(worktreePathFor(workspace));
 
   expect(() =>
     service.moveContentNode({
+      projectId: workspace.projectId,
       workspaceId: workspace.id,
       nodeId: scene.id,
       newParentId: chapter2.id,
@@ -982,7 +1127,7 @@ test("content node move rejects invalid targets without corrupting persisted tre
     }),
   ).toThrow("无法移动章节：目标位置不在同一个父级下。");
 
-  expect(service.exportContentSubtree(workspace.id)).toEqual(before);
+  expect(service.exportContentSubtree(workspace.projectId, workspace.id)).toEqual(before);
   expect(listManuscriptDirs(worktreePathFor(workspace))).toEqual(rootDirsBefore);
   expectNoTemporaryManuscriptDirs(worktreePathFor(workspace));
 });
@@ -991,19 +1136,22 @@ test("content node move rejects self-referential positions without detaching dir
   const workspace = seedProject("project_content_move_self_target_clean");
 
   const chapter = service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "Chapter",
   });
   service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: chapter.id,
     title: "Scene",
   });
-  const before = service.exportContentSubtree(workspace.id);
+  const before = service.exportContentSubtree(workspace.projectId, workspace.id);
 
   expect(() =>
     service.moveContentNode({
+      projectId: workspace.projectId,
       workspaceId: workspace.id,
       nodeId: chapter.id,
       newParentId: chapter.id,
@@ -1011,6 +1159,7 @@ test("content node move rejects self-referential positions without detaching dir
   ).toThrow("无法移动：不能把章节移动到自己的子章节下。");
   expect(() =>
     service.moveContentNode({
+      projectId: workspace.projectId,
       workspaceId: workspace.id,
       nodeId: chapter.id,
       newParentId: null,
@@ -1018,7 +1167,7 @@ test("content node move rejects self-referential positions without detaching dir
     }),
   ).toThrow("无法移动：目标位置不能是章节自身。");
 
-  expect(service.exportContentSubtree(workspace.id)).toEqual(before);
+  expect(service.exportContentSubtree(workspace.projectId, workspace.id)).toEqual(before);
   expectNoTemporaryManuscriptDirs(worktreePathFor(workspace));
 });
 
@@ -1026,19 +1175,22 @@ test("content node creation rejects foreign after-sibling without writing partia
   const workspace = seedProject("project_content_create_invalid_sibling_clean");
 
   const chapter = service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "Chapter",
   });
   const scene = service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: chapter.id,
     title: "Scene",
   });
-  const before = service.exportContentSubtree(workspace.id);
+  const before = service.exportContentSubtree(workspace.projectId, workspace.id);
 
   expect(() =>
     service.createContentNode({
+      projectId: workspace.projectId,
       workspaceId: workspace.id,
       parentId: null,
       afterSiblingId: scene.id,
@@ -1047,13 +1199,14 @@ test("content node creation rejects foreign after-sibling without writing partia
     }),
   ).toThrow("无法创建章节：目标位置不在同一个父级下。");
 
-  expect(service.exportContentSubtree(workspace.id)).toEqual(before);
+  expect(service.exportContentSubtree(workspace.projectId, workspace.id)).toEqual(before);
   expectNoTemporaryManuscriptDirs(worktreePathFor(workspace));
 });
 
 test("content body updates preserve front matter delimiters and normalize newlines", () => {
   const workspace = seedProject("project_content_body_roundtrip");
   const point = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "Draft",
@@ -1061,6 +1214,7 @@ test("content body updates preserve front matter delimiters and normalize newlin
   const body = "---\nnot front matter inside body\n---\r\nLine 1\r\nLine 2\n";
 
   const chapter = service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "Original",
@@ -1068,6 +1222,7 @@ test("content body updates preserve front matter delimiters and normalize newlin
   });
 
   service.updateContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     nodeId: chapter.id,
     title: "",
@@ -1075,14 +1230,14 @@ test("content body updates preserve front matter delimiters and normalize newlin
     body,
   });
 
-  const exported = service.exportContentSubtree(workspace.id).nodes[0];
+  const exported = service.exportContentSubtree(workspace.projectId, workspace.id).nodes[0];
   expect(exported).toMatchObject({
     id: chapter.id,
     title: null,
     anchorTimelinePointId: point.id,
     body: "---\nnot front matter inside body\n---\nLine 1\nLine 2\n",
   });
-  expect(service.readManuscriptNode(workspace.id, chapter.id).body).toBe(
+  expect(service.readManuscriptNode(workspace.projectId, workspace.id, chapter.id).body).toBe(
     "---\nnot front matter inside body\n---\nLine 1\nLine 2\n",
   );
 });
@@ -1092,16 +1247,19 @@ test("content node anchor point can be updated", () => {
   const contentRootId = null;
 
   const pointA = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "Point A",
   });
   const pointB = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: pointA.id,
     label: "Point B",
   });
   const scene = service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: contentRootId,
     anchorPointId: pointA.id,
@@ -1109,12 +1267,13 @@ test("content node anchor point can be updated", () => {
   });
 
   service.updateContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     nodeId: scene.id,
     anchorPointId: pointB.id,
   });
 
-  const exported = service.exportContentSubtree(workspace.id);
+  const exported = service.exportContentSubtree(workspace.projectId, workspace.id);
   expect(exported.nodes[0]?.anchorTimelinePointId).toBe(pointB.id);
 });
 
@@ -1122,19 +1281,21 @@ test("timeline point deletion is blocked when content still anchors to it", () =
   const workspace = seedProject("project_guard");
   const contentRootId = null;
   const point = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "Occupied point",
   });
 
   service.createContentNode({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: contentRootId,
     anchorPointId: point.id,
     title: "Guarded",
   });
 
-  expect(() => service.deleteTimelinePoint(workspace.id, point.id)).toThrow(
+  expect(() => service.deleteTimelinePoint(workspace.projectId, workspace.id, point.id)).toThrow(
     "无法删除：仍有章节锚定到该时间点。",
   );
 });
@@ -1143,34 +1304,39 @@ test("listAuxChangesAt only returns layer changes at the requested timeline poin
   const workspace = seedProject("project_aux_changes");
 
   service.mkdirAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/state",
   });
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/state/location.md",
     content: "home",
   });
   const point = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "Overlay point",
   });
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: point.id,
     path: "/state/location.md",
     content: "park",
   });
   service.mkdirAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: point.id,
     path: "/delta-only",
   });
 
-  expect(service.listAuxChangesAt(workspace.id, point.id)).toEqual([
+  expect(service.listAuxChangesAt(workspace.projectId, workspace.id, point.id)).toEqual([
     { path: "/delta-only", isDeleted: false },
     { path: "/state/location.md", isDeleted: false },
   ]);
@@ -1180,70 +1346,82 @@ test("listAuxTimelineChangesAt compares a timeline point against its predecessor
   const workspace = seedProject("project_aux_timeline_diff");
 
   service.mkdirAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/state",
   });
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/state/location.md",
     content: "home",
   });
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/state/backup.md",
     content: "backup",
   });
   service.linkAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/current_location",
     targetPath: "/state/location.md",
   });
   const pointA = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "离家后",
   });
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: pointA.id,
     path: "/delta-only.md",
     content: "delta",
   });
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: pointA.id,
     path: "/state/location.md",
     content: "park",
   });
   const pointB = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: pointA.id,
     label: "折返前",
   });
   service.deleteAuxNodeAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: pointB.id,
     path: "/delta-only.md",
   });
   service.retargetAuxSymlinkAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: pointB.id,
     path: "/current_location",
     targetPath: "/state/backup.md",
   });
 
-  expect(service.summarizeAuxTimelineChangesAt(workspace.id, pointA.id)).toEqual({
+  expect(
+    service.summarizeAuxTimelineChangesAt(workspace.projectId, workspace.id, pointA.id),
+  ).toEqual({
     hasChanges: true,
     added: 1,
     modified: 1,
     deleted: 0,
     total: 2,
   });
-  expect(service.listAuxTimelineChangesAt(workspace.id, pointB.id)).toEqual([
+  expect(service.listAuxTimelineChangesAt(workspace.projectId, workspace.id, pointB.id)).toEqual([
     {
       kind: "modified",
       nodeType: "symlink",
@@ -1268,18 +1446,20 @@ test("listAuxTimelineChangesAt compares a timeline point against its predecessor
 test("timeline point deletion is blocked when auxiliary layers exist without purge", () => {
   const workspace = seedProject("project_aux_guard");
   const point = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "Aux point",
   });
 
   service.mkdirAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: point.id,
     path: "/notes",
   });
 
-  expect(() => service.deleteTimelinePoint(workspace.id, point.id)).toThrow(
+  expect(() => service.deleteTimelinePoint(workspace.projectId, workspace.id, point.id)).toThrow(
     "无法删除：该时间点仍有辅助信息变更。",
   );
 });
@@ -1287,20 +1467,28 @@ test("timeline point deletion is blocked when auxiliary layers exist without pur
 test("timeline point deletion purges auxiliary overlay directory when requested", () => {
   const workspace = seedProject("project_aux_purge");
   const point = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "Purge point",
   });
 
   service.mkdirAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: point.id,
     path: "/notes",
   });
 
-  service.deleteTimelinePoint(workspace.id, point.id, { purgeAuxLayers: true });
+  service.deleteTimelinePoint(workspace.projectId, workspace.id, point.id, {
+    purgeAuxLayers: true,
+  });
 
-  expect(service.listTimelinePoints(workspace.id).some((item) => item.id === point.id)).toBe(false);
+  expect(
+    service
+      .listTimelinePoints(workspace.projectId, workspace.id)
+      .some((item) => item.id === point.id),
+  ).toBe(false);
   expect(fs.existsSync(path.join(worktreePathFor(workspace), "aux/timeline", point.id))).toBe(
     false,
   );
@@ -1309,18 +1497,20 @@ test("timeline point deletion purges auxiliary overlay directory when requested"
 test("timeline point insertion at origin rewires the previous head", () => {
   const workspace = seedProject("project_timeline_insert_origin");
   const pointA = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "Point A",
   });
 
   const pointB = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "Point B",
   });
 
-  const ordered = service.listTimelinePoints(workspace.id);
+  const ordered = service.listTimelinePoints(workspace.projectId, workspace.id);
   expect(ordered.map((point) => point.id)).toEqual([
     service.ORIGIN_TIMELINE_POINT_ID,
     pointB.id,
@@ -1331,18 +1521,20 @@ test("timeline point insertion at origin rewires the previous head", () => {
 test("timeline point batch insertion preserves order without requiring intermediate ids", () => {
   const workspace = seedProject("project_timeline_insert_batch");
   const pointA = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "Point A",
   });
 
   const created = service.createTimelinePoints({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     points: [{ label: "Point B" }, { label: "Point C" }, { label: "Point D" }],
   });
 
-  const ordered = service.listTimelinePoints(workspace.id);
+  const ordered = service.listTimelinePoints(workspace.projectId, workspace.id);
   expect(created.map((point) => point.label)).toEqual(["Point B", "Point C", "Point D"]);
   expect(ordered.map((point) => point.id)).toEqual([
     service.ORIGIN_TIMELINE_POINT_ID,
@@ -1356,33 +1548,38 @@ test("timeline point batch insertion preserves order without requiring intermedi
 test("timeline point move rewires both source and target segments", () => {
   const workspace = seedProject("project_timeline_move");
   const pointA = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "Point A",
   });
   const pointB = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: pointA.id,
     label: "Point B",
   });
   const pointC = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: pointB.id,
     label: "Point C",
   });
   const pointD = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: pointC.id,
     label: "Point D",
   });
 
   service.moveTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     pointId: pointC.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
   });
 
-  let ordered = service.listTimelinePoints(workspace.id);
+  let ordered = service.listTimelinePoints(workspace.projectId, workspace.id);
   expect(ordered.map((point) => point.id)).toEqual([
     service.ORIGIN_TIMELINE_POINT_ID,
     pointC.id,
@@ -1392,12 +1589,13 @@ test("timeline point move rewires both source and target segments", () => {
   ]);
 
   service.moveTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     pointId: pointA.id,
     afterPointId: pointD.id,
   });
 
-  ordered = service.listTimelinePoints(workspace.id);
+  ordered = service.listTimelinePoints(workspace.projectId, workspace.id);
   expect(ordered.map((point) => point.id)).toEqual([
     service.ORIGIN_TIMELINE_POINT_ID,
     pointC.id,
@@ -1411,6 +1609,7 @@ test("deleteAuxNodeAt physically removes origin aux nodes without whiteouts", ()
   const workspace = seedProject("project_aux_gc_delete");
 
   service.mkdirAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/notes",
@@ -1418,13 +1617,19 @@ test("deleteAuxNodeAt physically removes origin aux nodes without whiteouts", ()
   fs.writeFileSync(path.join(worktreePathFor(workspace), "aux/origin/.wh.orphan"), "", "utf8");
 
   service.deleteAuxNodeAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/notes",
   });
 
   expect(
-    service.readAuxByPathAt(workspace.id, service.ORIGIN_TIMELINE_POINT_ID, "/notes"),
+    service.readAuxByPathAt(
+      workspace.projectId,
+      workspace.id,
+      service.ORIGIN_TIMELINE_POINT_ID,
+      "/notes",
+    ),
   ).toBeNull();
   expect(fs.existsSync(path.join(worktreePathFor(workspace), "aux/origin/notes"))).toBe(false);
   expect(fs.existsSync(path.join(worktreePathFor(workspace), "aux/origin/.wh.notes"))).toBe(false);
@@ -1435,17 +1640,20 @@ test("deleteAuxNodeAt keeps timeline whiteouts only when hiding lower nodes", ()
   const workspace = seedProject("project_aux_gc_timeline_whiteout");
 
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/origin.md",
     content: "origin",
   });
   const point = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "Draft",
   });
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: point.id,
     path: "/draft.md",
@@ -1453,11 +1661,13 @@ test("deleteAuxNodeAt keeps timeline whiteouts only when hiding lower nodes", ()
   });
 
   service.deleteAuxNodeAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: point.id,
     path: "/draft.md",
   });
   service.deleteAuxNodeAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: point.id,
     path: "/origin.md",
@@ -1478,11 +1688,13 @@ test("deleting an aux parent hides its descendants", () => {
   const workspace = seedProject("project_aux_gc_parent_guard");
 
   service.mkdirAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/state",
   });
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/state/location.md",
@@ -1490,16 +1702,27 @@ test("deleting an aux parent hides its descendants", () => {
   });
 
   service.deleteAuxNodeAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/state",
   });
 
   expect(
-    service.readAuxByPathAt(workspace.id, service.ORIGIN_TIMELINE_POINT_ID, "/state"),
+    service.readAuxByPathAt(
+      workspace.projectId,
+      workspace.id,
+      service.ORIGIN_TIMELINE_POINT_ID,
+      "/state",
+    ),
   ).toBeNull();
   expect(
-    service.readAuxByPathAt(workspace.id, service.ORIGIN_TIMELINE_POINT_ID, "/state/location.md"),
+    service.readAuxByPathAt(
+      workspace.projectId,
+      workspace.id,
+      service.ORIGIN_TIMELINE_POINT_ID,
+      "/state/location.md",
+    ),
   ).toBeNull();
 });
 
@@ -1507,11 +1730,13 @@ test("deleting an aux symlink leaves its target visible", () => {
   const workspace = seedProject("project_aux_gc_symlink_guard");
 
   service.mkdirAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/places",
   });
   service.linkAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/current",
@@ -1519,16 +1744,27 @@ test("deleting an aux symlink leaves its target visible", () => {
   });
 
   service.deleteAuxNodeAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/current",
   });
 
   expect(
-    service.readAuxByPathAt(workspace.id, service.ORIGIN_TIMELINE_POINT_ID, "/places"),
+    service.readAuxByPathAt(
+      workspace.projectId,
+      workspace.id,
+      service.ORIGIN_TIMELINE_POINT_ID,
+      "/places",
+    ),
   ).not.toBeNull();
   expect(
-    service.readAuxByPathAt(workspace.id, service.ORIGIN_TIMELINE_POINT_ID, "/current"),
+    service.readAuxByPathAt(
+      workspace.projectId,
+      workspace.id,
+      service.ORIGIN_TIMELINE_POINT_ID,
+      "/current",
+    ),
   ).toBeNull();
 });
 
@@ -1536,11 +1772,13 @@ test("deleted aux subtree nodes are hidden and whiteouts are path-based", () => 
   const workspace = seedProject("project_aux_gc_subtree");
 
   service.mkdirAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/state",
   });
   service.writeFileAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/state/location.md",
@@ -1548,21 +1786,33 @@ test("deleted aux subtree nodes are hidden and whiteouts are path-based", () => 
   });
 
   service.deleteAuxNodeAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/state/location.md",
   });
   service.deleteAuxNodeAt({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/state",
   });
 
   expect(
-    service.readAuxByPathAt(workspace.id, service.ORIGIN_TIMELINE_POINT_ID, "/state/location.md"),
+    service.readAuxByPathAt(
+      workspace.projectId,
+      workspace.id,
+      service.ORIGIN_TIMELINE_POINT_ID,
+      "/state/location.md",
+    ),
   ).toBeNull();
   expect(
-    service.readAuxByPathAt(workspace.id, service.ORIGIN_TIMELINE_POINT_ID, "/state"),
+    service.readAuxByPathAt(
+      workspace.projectId,
+      workspace.id,
+      service.ORIGIN_TIMELINE_POINT_ID,
+      "/state",
+    ),
   ).toBeNull();
   expect(
     fs.existsSync(path.join(worktreePathFor(workspace), "aux/origin/state/.wh.location.md")),
@@ -1573,18 +1823,20 @@ test("deleted aux subtree nodes are hidden and whiteouts are path-based", () => 
 test("timeline point label can be updated", () => {
   const workspace = seedProject("project_timeline_update");
   const point = service.createTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "Before update",
   });
 
   service.updateTimelinePoint({
+    projectId: workspace.projectId,
     workspaceId: workspace.id,
     pointId: point.id,
     label: "After update",
   });
 
-  const points = service.listTimelinePoints(workspace.id);
+  const points = service.listTimelinePoints(workspace.projectId, workspace.id);
   const updated = points.find((entry) => entry.id === point.id);
   expect(updated?.label).toBe("After update");
 });
@@ -1594,6 +1846,7 @@ test("implicit origin timeline point cannot be updated", () => {
 
   expect(() =>
     service.updateTimelinePoint({
+      projectId: workspace.projectId,
       workspaceId: workspace.id,
       pointId: service.ORIGIN_TIMELINE_POINT_ID,
       label: "Forbidden",

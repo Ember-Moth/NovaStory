@@ -13,21 +13,21 @@ import {
 import { rpcTags, type RpcTagList } from "@/rpc/tags";
 
 export const history = query<
-  { branchId: string },
+  { projectId: string; branchId: string },
   Awaited<ReturnType<typeof listCommits>>,
   RpcTagList
 >({
   watch: ({ branchId }) => [rpcTags.commitHistory(branchId)],
-  handler: ({ branchId }) => listCommits(branchId),
+  handler: ({ projectId, branchId }) => listCommits(projectId, branchId),
 });
 
 export const workingTreeStatus = query<
-  { branchId: string },
+  { projectId: string; branchId: string },
   Awaited<ReturnType<typeof getWorkingTreeStatus>>,
   RpcTagList
 >({
-  watch: ({ branchId }) => {
-    const workspace = getWorkspaceForBranchId(branchId);
+  watch: ({ projectId, branchId }) => {
+    const workspace = getWorkspaceForBranchId(projectId, branchId);
     return workspace
       ? [
           rpcTags.branch(branchId),
@@ -38,7 +38,7 @@ export const workingTreeStatus = query<
         ]
       : [rpcTags.branch(branchId)];
   },
-  handler: ({ branchId }) => getWorkingTreeStatus(branchId),
+  handler: ({ projectId, branchId }) => getWorkingTreeStatus(projectId, branchId),
 });
 
 export const get = query<
@@ -52,6 +52,7 @@ export const get = query<
 
 export const create = mutation<
   {
+    projectId: string;
     branchId: string;
     message: string;
     author?: string | null;
@@ -61,7 +62,7 @@ export const create = mutation<
   RpcTagList
 >(async (input, ctx) => {
   const commit = await createCommit(input);
-  const branch = getBranch(input.branchId);
+  const branch = getBranch(input.projectId, input.branchId);
   ctx.invalidate(
     rpcTags.commitHistory(input.branchId),
     rpcTags.branch(input.branchId),
@@ -74,12 +75,12 @@ export const create = mutation<
 });
 
 export const checkout = mutation<
-  { workspaceId: string; commitId: string },
+  { projectId: string; workspaceId: string; commitId: string },
   Awaited<ReturnType<typeof checkoutCommit>>,
   RpcTagList
 >(async (input, ctx) => {
   const commit = await checkoutCommit(input);
-  const workspace = getWorkspace(input.workspaceId);
+  const workspace = getWorkspace(input.projectId, input.workspaceId);
   ctx.invalidate(
     rpcTags.workspace(workspace.id),
     rpcTags.contentTree(workspace.id),

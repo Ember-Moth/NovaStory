@@ -209,20 +209,21 @@ function extractResponseId(value: unknown) {
   return typeof id === "string" && id.trim().length > 0 ? id : null;
 }
 
-function getStepResponseId(stepId: string | null | undefined) {
+function getStepResponseId(projectId: string, stepId: string | null | undefined) {
   const normalizedStepId = normalizeOptionalString(stepId);
   if (!normalizedStepId) {
     return null;
   }
 
   try {
-    return extractResponseId(getRunStepResponseBody(normalizedStepId));
+    return extractResponseId(getRunStepResponseBody(projectId, normalizedStepId));
   } catch {
     return null;
   }
 }
 
 export function resolveAssistantRequest({
+  projectId,
   threadId,
   triggerNodeId,
   system,
@@ -230,6 +231,7 @@ export function resolveAssistantRequest({
   context,
   inputRefs,
 }: {
+  projectId: string;
   threadId: string;
   triggerNodeId: string;
   system: string;
@@ -241,7 +243,7 @@ export function resolveAssistantRequest({
   transportSystem: string | null;
   providerOptions?: StreamProviderOptions;
 } {
-  const path = resolveThreadPath(threadId, triggerNodeId);
+  const path = resolveThreadPath(projectId, threadId, triggerNodeId);
   const contextMessage = buildProjectAssistantContextMessage(context ?? null);
   const refsMessage = buildProjectAssistantRefsMessage(inputRefs);
   const appendedMessages = [contextMessage, refsMessage].filter(
@@ -261,7 +263,7 @@ export function resolveAssistantRequest({
   const pathMessages = path.map((node) => node.message);
   const lastAssistantIndex = [...path].map((node) => node.role).lastIndexOf("assistant");
   const previousAssistant = lastAssistantIndex >= 0 ? path[lastAssistantIndex] : null;
-  const previousResponseId = getStepResponseId(previousAssistant?.sourceStepId);
+  const previousResponseId = getStepResponseId(projectId, previousAssistant?.sourceStepId);
   const messages =
     previousAssistant && previousResponseId
       ? path.slice(lastAssistantIndex + 1).map((node) => node.message)

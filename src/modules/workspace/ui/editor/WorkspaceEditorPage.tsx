@@ -117,10 +117,10 @@ function ProjectWorkspace({
   workspaceId: string;
 }) {
   const identity = useProjectWorkspaceIdentity(projectId, requestedWorkspaceId);
-  const content = useProjectContentData(identity.workspaceId);
-  const timeline = useProjectTimelineData(identity.workspaceId);
+  const content = useProjectContentData(projectId, identity.workspaceId);
+  const timeline = useProjectTimelineData(projectId, identity.workspaceId);
   const rawActiveTimelinePointId = useWorkspaceState((state) => state.activeTimelinePointId);
-  const aux = useProjectAuxData(identity.workspaceId, rawActiveTimelinePointId);
+  const aux = useProjectAuxData(projectId, identity.workspaceId, rawActiveTimelinePointId);
   const selection = useProjectSelectionView({
     contentNodeMap: content.nodeMap,
     auxNodeMap: aux.nodeMap,

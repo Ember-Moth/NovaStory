@@ -302,13 +302,14 @@ function ensureCurrentAssistantNode({
   assistantTextByNodeId: Map<string, string>;
 }) {
   const assistantNode = createStreamingAssistantNode({
+    projectId: prepared.projectId,
     threadId: prepared.thread.id,
     parentNodeId: currentParentId,
     runId: prepared.run.id,
   });
   stepRuntime.nodeIds.push(assistantNode.id);
   assistantTextByNodeId.set(assistantNode.id, "");
-  appendRunEvent({
+  appendRunEvent(prepared.projectId, {
     runId: prepared.run.id,
     eventKind: "node-materialized",
     nodeId: assistantNode.id,
@@ -324,12 +325,14 @@ function ensureCurrentAssistantNode({
 }
 
 function persistStepArtifactsAndEvents({
+  projectId,
   run,
   system,
   steps,
   stepRuntime,
   stepIndexOffset = 0,
 }: {
+  projectId: string;
   run: AgentRunView;
   system: string;
   steps: GeneratedAssistantStep[];
@@ -338,35 +341,35 @@ function persistStepArtifactsAndEvents({
 }) {
   for (const step of steps) {
     const stepIndex = step.stepNumber + stepIndexOffset;
-    const preparedMessagesArtifact = createArtifact({
+    const preparedMessagesArtifact = createArtifact(projectId, {
       runId: run.id,
       artifactKind: "prepared-model-messages",
       visibility: "internal",
       content: step.preparedMessages,
       summaryText: `step ${stepIndex} 输入消息`,
     });
-    const responseMessagesArtifact = createArtifact({
+    const responseMessagesArtifact = createArtifact(projectId, {
       runId: run.id,
       artifactKind: "response-messages",
       visibility: "internal",
       content: step.response.messages,
       summaryText: `step ${stepIndex} 响应消息`,
     });
-    const requestBodyArtifact = createArtifact({
+    const requestBodyArtifact = createArtifact(projectId, {
       runId: run.id,
       artifactKind: "request-body",
       visibility: "internal",
       content: step.request.body ?? null,
       summaryText: `step ${stepIndex} provider request`,
     });
-    const responseBodyArtifact = createArtifact({
+    const responseBodyArtifact = createArtifact(projectId, {
       runId: run.id,
       artifactKind: "response-body",
       visibility: "internal",
       content: step.response.body ?? null,
       summaryText: `step ${stepIndex} provider response`,
     });
-    const providerMetadataArtifact = createArtifact({
+    const providerMetadataArtifact = createArtifact(projectId, {
       runId: run.id,
       artifactKind: "provider-metadata",
       visibility: "internal",
@@ -374,7 +377,7 @@ function persistStepArtifactsAndEvents({
       summaryText: `step ${stepIndex} provider metadata`,
     });
 
-    const stepRecord = createRunStep({
+    const stepRecord = createRunStep(projectId, {
       runId: run.id,
       stepIndex,
       provider: step.model.provider,
@@ -391,22 +394,22 @@ function persistStepArtifactsAndEvents({
     });
 
     const runtime = stepRuntime.get(stepIndex);
-    assignThreadNodeSourceStepIds(runtime?.nodeIds ?? [], stepRecord.id);
+    assignThreadNodeSourceStepIds(projectId, runtime?.nodeIds ?? [], stepRecord.id);
 
-    appendRunEvent({
+    appendRunEvent(projectId, {
       runId: run.id,
       stepId: stepRecord.id,
       eventKind: "step-started",
       summaryText: `step ${stepIndex} started`,
     });
-    appendRunEvent({
+    appendRunEvent(projectId, {
       runId: run.id,
       stepId: stepRecord.id,
       eventKind: "provider-requested",
       summaryText: `step ${stepIndex} provider request`,
       payloadArtifactId: requestBodyArtifact.id,
     });
-    appendRunEvent({
+    appendRunEvent(projectId, {
       runId: run.id,
       stepId: stepRecord.id,
       eventKind: "provider-responded",
@@ -415,7 +418,7 @@ function persistStepArtifactsAndEvents({
     });
 
     for (const toolCall of runtime?.toolCalls ?? step.toolCalls) {
-      const payloadArtifact = createArtifact({
+      const payloadArtifact = createArtifact(projectId, {
         runId: run.id,
         stepId: stepRecord.id,
         artifactKind: "tool-input",
@@ -423,7 +426,7 @@ function persistStepArtifactsAndEvents({
         content: toolCall,
         summaryText: summarizeToolCall(toolCall),
       });
-      appendRunEvent({
+      appendRunEvent(projectId, {
         runId: run.id,
         stepId: stepRecord.id,
         eventKind: "tool-call-started",
@@ -437,7 +440,7 @@ function persistStepArtifactsAndEvents({
     }
 
     for (const toolResult of runtime?.toolResults ?? step.toolResults) {
-      const payloadArtifact = createArtifact({
+      const payloadArtifact = createArtifact(projectId, {
         runId: run.id,
         stepId: stepRecord.id,
         artifactKind: "tool-output",
@@ -445,7 +448,7 @@ function persistStepArtifactsAndEvents({
         content: toolResult,
         summaryText: summarizeToolResult(toolResult),
       });
-      appendRunEvent({
+      appendRunEvent(projectId, {
         runId: run.id,
         stepId: stepRecord.id,
         eventKind:
@@ -537,6 +540,7 @@ export async function executeProjectAssistantRun<TResult>({
         }
 
         const appended = appendAssistantReasoningPart({
+          projectId: prepared.projectId,
           nodeId: currentAssistantNode.id,
           providerMetadata: chunk.providerMetadata,
         });
@@ -566,6 +570,7 @@ export async function executeProjectAssistantRun<TResult>({
         let activeReasoning = reasoningPartsByStreamId.get(chunk.id);
         if (!activeReasoning) {
           const appended = appendAssistantReasoningPart({
+            projectId: prepared.projectId,
             nodeId: currentAssistantNode.id,
             providerMetadata: chunk.providerMetadata,
           });
@@ -579,6 +584,7 @@ export async function executeProjectAssistantRun<TResult>({
         }
 
         const nextAssistantNode = appendAssistantReasoningDelta({
+          projectId: prepared.projectId,
           nodeId: activeReasoning.nodeId,
           partIndex: activeReasoning.partIndex,
           delta: chunk.delta,
@@ -622,6 +628,7 @@ export async function executeProjectAssistantRun<TResult>({
         }
 
         const nextAssistantNode = appendAssistantTextDelta({
+          projectId: prepared.projectId,
           nodeId: currentAssistantNode.id,
           delta: chunk.delta,
         });
@@ -723,6 +730,7 @@ export async function executeProjectAssistantRun<TResult>({
           }
           const request = normalizeAskUserInput(Reflect.get(chunk.toolCall, "input"));
           appendAssistantToolCallPart({
+            projectId: prepared.projectId,
             nodeId: currentAssistantNode.id,
             toolCall: chunk.toolCall,
           });
@@ -732,14 +740,14 @@ export async function executeProjectAssistantRun<TResult>({
             toolCallId,
             input: request,
           };
-          const payloadArtifact = createArtifact({
+          const payloadArtifact = createArtifact(prepared.projectId, {
             runId: prepared.run.id,
             artifactKind: "tool-input",
             visibility: "internal",
             content: chunk.toolCall,
             summaryText: "等待用户回答",
           });
-          appendRunEvent({
+          appendRunEvent(prepared.projectId, {
             runId: prepared.run.id,
             eventKind: "user-input-requested",
             nodeId: currentAssistantNode.id,
@@ -765,6 +773,7 @@ export async function executeProjectAssistantRun<TResult>({
         }
 
         appendAssistantToolCallPart({
+          projectId: prepared.projectId,
           nodeId: currentAssistantNode.id,
           toolCall: chunk.toolCall,
         });
@@ -791,6 +800,7 @@ export async function executeProjectAssistantRun<TResult>({
           throw new Error("提问工具正在等待用户回答，不能继续接收其他工具结果。");
         }
         const toolNode = createStreamingToolResultNode({
+          projectId: prepared.projectId,
           threadId: prepared.thread.id,
           parentNodeId: currentParentId,
           runId: prepared.run.id,
@@ -799,7 +809,7 @@ export async function executeProjectAssistantRun<TResult>({
         currentParentId = toolNode.id;
         currentStepRuntime.nodeIds.push(toolNode.id);
         currentStepRuntime.toolResults.push(chunk.toolResult);
-        appendRunEvent({
+        appendRunEvent(prepared.projectId, {
           runId: prepared.run.id,
           eventKind: "node-materialized",
           nodeId: toolNode.id,
@@ -832,14 +842,21 @@ export async function executeProjectAssistantRun<TResult>({
         });
         if (timelineSelectionUpdatedEvent) {
           relay.emit(timelineSelectionUpdatedEvent);
-          updateRunContextSnapshot(prepared.run.id, prepared.runtimeContext.snapshot);
+          updateRunContextSnapshot(
+            prepared.projectId,
+            prepared.run.id,
+            prepared.runtimeContext.snapshot,
+          );
         }
         continue;
       }
 
       if (chunk.type === "finish-step") {
         if (currentAssistantNode) {
-          currentAssistantNode = markThreadNodePartsDone(currentAssistantNode.id);
+          currentAssistantNode = markThreadNodePartsDone(
+            prepared.projectId,
+            currentAssistantNode.id,
+          );
           lastAssistantNode = currentAssistantNode;
         }
         relay.emit({
@@ -853,6 +870,7 @@ export async function executeProjectAssistantRun<TResult>({
 
     const steps = await runtime.steps;
     persistStepArtifactsAndEvents({
+      projectId: prepared.projectId,
       run: prepared.run,
       system: prepared.system,
       steps,
@@ -861,8 +879,8 @@ export async function executeProjectAssistantRun<TResult>({
     });
 
     if (currentParentId) {
-      selectActiveTip(prepared.thread.id, currentParentId);
-      appendRunEvent({
+      selectActiveTip(prepared.projectId, prepared.thread.id, currentParentId);
+      appendRunEvent(prepared.projectId, {
         runId: prepared.run.id,
         eventKind: "active-tip-moved",
         nodeId: currentParentId,
@@ -871,15 +889,15 @@ export async function executeProjectAssistantRun<TResult>({
     }
 
     if (pendingUserInputRequest) {
-      const waitingRun = markRunWaitingForInput(prepared.run.id);
+      const waitingRun = markRunWaitingForInput(prepared.projectId, prepared.run.id);
       return prepared.buildFinalResult({
         run: waitingRun,
         lastAssistantNode,
       });
     }
 
-    const completedRun = markRunSucceeded(prepared.run.id);
-    appendRunEvent({
+    const completedRun = markRunSucceeded(prepared.projectId, prepared.run.id);
+    appendRunEvent(prepared.projectId, {
       runId: prepared.run.id,
       eventKind: "run-succeeded",
       summaryText: completedRun.completedAt ? "run succeeded" : "run completed",
@@ -892,25 +910,25 @@ export async function executeProjectAssistantRun<TResult>({
   } catch (error) {
     if (abortSignal.aborted) {
       if (currentAssistantNode) {
-        currentAssistantNode = markThreadNodePartsDone(currentAssistantNode.id);
+        currentAssistantNode = markThreadNodePartsDone(prepared.projectId, currentAssistantNode.id);
         lastAssistantNode = currentAssistantNode;
       }
-      const cancelledRun = markRunCancelled(prepared.run.id);
+      const cancelledRun = markRunCancelled(prepared.projectId, prepared.run.id);
       return prepared.buildFinalResult({
         run: cancelledRun,
         lastAssistantNode,
       });
     }
 
-    const errorArtifact = createArtifact({
+    const errorArtifact = createArtifact(prepared.projectId, {
       runId: prepared.run.id,
       artifactKind: "error",
       visibility: "internal",
       content: normalizeError(error),
       summaryText: error instanceof Error ? error.message : "run failed",
     });
-    const failedRun = markRunFailed(prepared.run.id, errorArtifact.id);
-    appendRunEvent({
+    const failedRun = markRunFailed(prepared.projectId, prepared.run.id, errorArtifact.id);
+    appendRunEvent(prepared.projectId, {
       runId: failedRun.id,
       eventKind: "run-failed",
       nodeId: prepared.triggerNodeId,

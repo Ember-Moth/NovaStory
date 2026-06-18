@@ -1,6 +1,31 @@
 import type { ORIGIN_TIMELINE_POINT_ID } from "@/modules/workspace/domain/constants";
 
 export type TimelinePointRef = string | null | undefined | typeof ORIGIN_TIMELINE_POINT_ID;
+export interface ProjectBranchRef {
+  projectId: string;
+  branchId: string;
+}
+
+export interface ProjectWorkspaceRef {
+  projectId: string;
+  workspaceId: string;
+}
+
+export interface ProjectThreadRef {
+  projectId: string;
+  threadId: string;
+}
+
+export interface ProjectNodeRef {
+  projectId: string;
+  nodeId: string;
+}
+
+export interface ProjectRunRef {
+  projectId: string;
+  runId: string;
+}
+
 export type AuxNodeType = "dir" | "file" | "symlink";
 export type AuxOverlayStatus = "visible" | "deleted";
 

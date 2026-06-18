@@ -26,17 +26,18 @@ export interface CommitRow {
 }
 
 export async function createCommit(input: {
+  projectId: string;
   branchId: string;
   message: string;
   author?: string | null;
   extraParents?: Array<{ parentId: string; mergeRole?: "normal" | "mainline" | "merged" }>;
 }) {
-  const branch = getBranch(input.branchId);
-  const workspace = getWorkspaceForBranchId(branch.id);
+  const branch = getBranch(input.projectId, input.branchId);
+  const workspace = getWorkspaceForBranchId(input.projectId, branch.id);
   invariant(workspace, "无法提交：该分支没有关联的工作区。");
   const message = input.message.trim();
   invariant(message, "无法提交：提交信息不能为空。");
-  const headCommitId = await getBranchHeadCommitId(branch.id);
+  const headCommitId = await getBranchHeadCommitId(input.projectId, branch.id);
   const parents = [
     ...(headCommitId ? [headCommitId] : []),
     ...(input.extraParents?.map((parent) => parent.parentId) ?? []),
@@ -67,8 +68,12 @@ export async function createCommit(input: {
   return await getCommit(oid, branch.projectId);
 }
 
-export async function checkoutCommit(input: { workspaceId: string; commitId: string }) {
-  const workspace = getWorkspace(input.workspaceId);
+export async function checkoutCommit(input: {
+  projectId: string;
+  workspaceId: string;
+  commitId: string;
+}) {
+  const workspace = getWorkspace(input.projectId, input.workspaceId);
   await checkoutCommitToWorktree({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
@@ -112,8 +117,8 @@ function mapLogEntry(
   };
 }
 
-export async function listCommits(branchId: string) {
-  const branch = getBranch(branchId);
+export async function listCommits(projectId: string, branchId: string) {
+  const branch = getBranch(projectId, branchId);
   const commits = await listLog({ projectId: branch.projectId, ref: branchRef(branch.id) });
   return commits.map((entry) => mapLogEntry(branch.projectId, entry));
 }

@@ -24,8 +24,8 @@ import {
 } from "./git-storage/worktree-state";
 import type { ManuscriptNodeDiskState } from "./git-storage/types";
 
-function touchWorkspace(workspaceId: string) {
-  touchWorkspaceMeta(workspaceId, now());
+function touchWorkspace(projectId: string, workspaceId: string) {
+  touchWorkspaceMeta(projectId, workspaceId, now());
 }
 
 function toExportedNode(node: ManuscriptNodeDiskState): ExportedContentNode {
@@ -81,6 +81,7 @@ function toListNode(
 }
 
 export function createContentNode(input: {
+  projectId: string;
   workspaceId: string;
   parentId: string | null;
   afterSiblingId?: string | null;
@@ -88,7 +89,7 @@ export function createContentNode(input: {
   title?: string | null;
   body?: string | null;
 }) {
-  const workspace = getWorkspace(input.workspaceId);
+  const workspace = getWorkspace(input.projectId, input.workspaceId);
   const worktreePath = getProjectWorktreeDir(workspace.projectId, workspace.id);
   const state = readWorktreeState(worktreePath);
   if (input.parentId) {
@@ -112,7 +113,7 @@ export function createContentNode(input: {
     afterSiblingId: input.afterSiblingId,
   });
   writeWorktreeStateSync(worktreePath, state);
-  touchWorkspace(workspace.id);
+  touchWorkspace(workspace.projectId, workspace.id);
   const created = findManuscriptNode(state, node.id);
   return {
     id: created.id,
@@ -127,12 +128,13 @@ export function createContentNode(input: {
 }
 
 export function moveContentNode(input: {
+  projectId: string;
   workspaceId: string;
   nodeId: string;
   newParentId: string | null;
   afterSiblingId?: string | null;
 }) {
-  const workspace = getWorkspace(input.workspaceId);
+  const workspace = getWorkspace(input.projectId, input.workspaceId);
   const worktreePath = getProjectWorktreeDir(workspace.projectId, workspace.id);
   const state = readWorktreeState(worktreePath);
   if (input.newParentId) {
@@ -144,7 +146,7 @@ export function moveContentNode(input: {
     afterSiblingId: input.afterSiblingId,
   });
   writeWorktreeStateSync(worktreePath, state);
-  touchWorkspace(workspace.id);
+  touchWorkspace(workspace.projectId, workspace.id);
   const node = findManuscriptNode(state, moved.id);
   return {
     id: node.id,
@@ -158,23 +160,28 @@ export function moveContentNode(input: {
   };
 }
 
-export function deleteContentNode(input: { workspaceId: string; nodeId: string }) {
-  const workspace = getWorkspace(input.workspaceId);
+export function deleteContentNode(input: {
+  projectId: string;
+  workspaceId: string;
+  nodeId: string;
+}) {
+  const workspace = getWorkspace(input.projectId, input.workspaceId);
   const worktreePath = getProjectWorktreeDir(workspace.projectId, workspace.id);
   const state = readWorktreeState(worktreePath);
   removeManuscriptNode(worktreePath, state, input.nodeId);
   writeWorktreeStateSync(worktreePath, state);
-  touchWorkspace(workspace.id);
+  touchWorkspace(workspace.projectId, workspace.id);
 }
 
 export function updateContentNode(input: {
+  projectId: string;
   workspaceId: string;
   nodeId: string;
   anchorPointId?: TimelinePointRef;
   title?: string | null;
   body?: string | null;
 }) {
-  const workspace = getWorkspace(input.workspaceId);
+  const workspace = getWorkspace(input.projectId, input.workspaceId);
   const worktreePath = getProjectWorktreeDir(workspace.projectId, workspace.id);
   const state = readWorktreeState(worktreePath);
   const node = findManuscriptNode(state, input.nodeId);
@@ -188,7 +195,7 @@ export function updateContentNode(input: {
     node.body = input.body ?? "";
   }
   writeWorktreeStateSync(worktreePath, state);
-  touchWorkspace(workspace.id);
+  touchWorkspace(workspace.projectId, workspace.id);
   return {
     id: node.id,
     parentId: node.parentId,
@@ -202,10 +209,11 @@ export function updateContentNode(input: {
 }
 
 export function exportContentSubtree(
+  projectId: string,
   workspaceId: string,
   rootNodeId?: string,
 ): ExportedContentSubtree {
-  const workspace = getWorkspace(workspaceId);
+  const workspace = getWorkspace(projectId, workspaceId);
   const state = readWorktreeState(getProjectWorktreeDir(workspace.projectId, workspace.id));
   const roots = rootNodeId
     ? [findManuscriptNode(state, rootNodeId)]
@@ -216,11 +224,12 @@ export function exportContentSubtree(
 }
 
 export function listManuscriptNodes(
+  projectId: string,
   workspaceId: string,
   rootNodeId?: string,
   options: { depth?: number } = {},
 ): ManuscriptNodeList {
-  const workspace = getWorkspace(workspaceId);
+  const workspace = getWorkspace(projectId, workspaceId);
   const state = readWorktreeState(getProjectWorktreeDir(workspace.projectId, workspace.id));
   const roots = rootNodeId
     ? [findManuscriptNode(state, rootNodeId)]
@@ -239,8 +248,12 @@ export function listManuscriptNodes(
   };
 }
 
-export function readManuscriptNode(workspaceId: string, nodeId: string): ManuscriptNodeRead {
-  const workspace = getWorkspace(workspaceId);
+export function readManuscriptNode(
+  projectId: string,
+  workspaceId: string,
+  nodeId: string,
+): ManuscriptNodeRead {
+  const workspace = getWorkspace(projectId, workspaceId);
   const state = readWorktreeState(getProjectWorktreeDir(workspace.projectId, workspace.id));
   const node = findManuscriptNode(state, nodeId);
   return {
@@ -255,8 +268,8 @@ export function readManuscriptNode(workspaceId: string, nodeId: string): Manuscr
   };
 }
 
-export function listAnchoredTimelinePointIds(workspaceId: string) {
-  const workspace = getWorkspace(workspaceId);
+export function listAnchoredTimelinePointIds(projectId: string, workspaceId: string) {
+  const workspace = getWorkspace(projectId, workspaceId);
   const state = readWorktreeState(getProjectWorktreeDir(workspace.projectId, workspace.id));
   return new Set(
     flattenManuscriptNodes(state)
