@@ -50,7 +50,7 @@ test("uncommitted edits before first commit appear as additions", async () => {
   expect(status.hasChanges).toBe(true);
   expect(status.headCommitId).toBeNull();
   expect(status.areas.content.changes).toContainEqual({
-    label: expect.stringMatching(/^manuscript\/0001-content_[^/]+\/content\.md$/),
+    label: expect.stringMatching(/^manuscript\/0001-[A-Za-z0-9]+\/content\.md$/),
     kind: "added",
   });
   expect(status.areas.timeline.changes).toContainEqual({
@@ -129,7 +129,7 @@ test("content, timeline and aux edits appear in the diff summary", async () => {
 
   expect(status.hasChanges).toBe(true);
   expect(status.areas.content.changes).toContainEqual({
-    label: expect.stringMatching(/^manuscript\/0001-content_[^/]+\/content\.md$/),
+    label: expect.stringMatching(/^manuscript\/0001-[A-Za-z0-9]+\/content\.md$/),
     kind: "modified",
   });
   expect(status.areas.timeline.changes).toContainEqual({

@@ -44,5 +44,5 @@ export function PageHeader({
 }
 
 export function formatCommitId(id: string) {
-  return id.startsWith("commit_") ? id.slice("commit_".length) : id;
+  return id;
 }

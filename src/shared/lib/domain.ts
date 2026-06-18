@@ -5,8 +5,8 @@ const createEntityIdSuffix = customAlphabet(
   21,
 );
 
-export function createId(prefix: string) {
-  return `${prefix}_${createEntityIdSuffix()}`;
+export function createId(_prefix: string) {
+  return createEntityIdSuffix();
 }
 
 export function createProjectId() {

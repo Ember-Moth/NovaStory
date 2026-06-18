@@ -2,11 +2,11 @@ import { expect, test } from "bun:test";
 
 import { createId, createProjectId } from "./domain";
 
-test("createId keeps the prefix and separator", () => {
+test("createId returns a bare nanoid (prefix parameter is kept for compat but ignored)", () => {
   const id = createId("workspace");
 
-  expect(id).toStartWith("workspace_");
-  expect(id.slice("workspace_".length)).not.toHaveLength(0);
+  expect(id).not.toContain("_");
+  expect(id).not.toHaveLength(0);
   expect(id.includes("-")).toBe(false);
 });
 

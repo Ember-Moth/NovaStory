@@ -122,7 +122,7 @@ function padOrder(index: number, minWidth = 4) {
 }
 
 function parseNodeDirName(name: string) {
-  const match = /^(\d+)-(content_[A-Za-z0-9]+)$/.exec(name);
+  const match = /^(\d+)-([A-Za-z0-9]+)$/.exec(name);
   invariant(match?.[1] && match[2], `无效的正文节点目录名：${name}`);
   return {
     order: Number.parseInt(match[1], 10),
