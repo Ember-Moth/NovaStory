@@ -50,7 +50,7 @@ export function createEmptyAiIndexPayload(): AiIndexPayload {
 export function readAiIndexSync(projectId: string): AiIndexPayload {
   readProjectMetaSync(projectId);
   try {
-    const files = readFilesAtRefSync({ projectId, ref: aiRunsRef(projectId) });
+    const files = readFilesAtRefSync({ projectId, ref: aiRunsRef() });
     return normalizeIndexPayload({
       threads: parseJsonl<AgentThreadRow>(files["threads.jsonl"]),
       projectState: parseJsonl<AgentProjectStateRow>(files["project-state.jsonl"]),
@@ -71,7 +71,7 @@ export function writeAiIndexSync(
   const normalized = normalizeIndexPayload(payload);
   commitCustomRefSync({
     projectId,
-    ref: aiRunsRef(projectId),
+    ref: aiRunsRef(),
     message,
     files: {
       "threads.jsonl": stringifyJsonl(normalized.threads),

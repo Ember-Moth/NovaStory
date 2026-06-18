@@ -56,7 +56,7 @@ export function touchProject(projectId: string) {
 
 function readAiRunFilesOrEmpty(projectId: string) {
   try {
-    return readFilesAtRefSync({ projectId, ref: aiRunsRef(projectId) });
+    return readFilesAtRefSync({ projectId, ref: aiRunsRef() });
   } catch {
     return {};
   }
@@ -81,7 +81,7 @@ function writeProjectAiStorage(projectId: string, storage: ProjectAiStorage, mes
   };
   commitCustomRefSync({
     projectId,
-    ref: aiRunsRef(projectId),
+    ref: aiRunsRef(),
     message,
     replace: true,
     files,

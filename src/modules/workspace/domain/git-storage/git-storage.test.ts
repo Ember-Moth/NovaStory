@@ -33,11 +33,11 @@ async function waitForRef(projectId: string, ref: string) {
 
 async function waitForProjectMeta(projectId: string) {
   for (let attempt = 0; attempt < 20; attempt += 1) {
-    const oid = await resolveRef(projectId, metaRef(projectId));
+    const oid = await resolveRef(projectId, metaRef());
     if (oid) {
       const projectJson = await readFileAtRef({
         projectId,
-        ref: metaRef(projectId),
+        ref: metaRef(),
         filepath: "project.json",
       });
       const parsed = JSON.parse(projectJson) as { defaultBranchId: string | null };
@@ -51,16 +51,16 @@ async function waitForProjectMeta(projectId: string) {
 test("project initialization writes a real repo and metadata custom ref", async () => {
   const workspace = seedProject("git_init");
 
-  expect(await waitForRef("git_init", metaRef("git_init"))).toMatch(/^[0-9a-f]{40}$/);
+  expect(await waitForRef("git_init", metaRef())).toMatch(/^[0-9a-f]{40}$/);
   expect((await waitForProjectMeta("git_init"))?.defaultBranchId).toBe(workspace.branchId);
   const branchesJsonl = await readFileAtRef({
     projectId: "git_init",
-    ref: metaRef("git_init"),
+    ref: metaRef(),
     filepath: "branches.jsonl",
   });
   const workspacesJsonl = await readFileAtRef({
     projectId: "git_init",
-    ref: metaRef("git_init"),
+    ref: metaRef(),
     filepath: "workspaces.jsonl",
   });
   expect(branchesJsonl).not.toContain('"ref"');
@@ -105,10 +105,10 @@ test("AI run events are mirrored into an AI custom ref", async () => {
   appendRunEvent({ runId: run.id, eventKind: "run-started" });
 
   await new Promise((resolve) => setTimeout(resolve, 25));
-  expect(await resolveRef("git_ai_logs", aiRunsRef("git_ai_logs"))).toMatch(/^[0-9a-f]{40}$/);
+  expect(await resolveRef("git_ai_logs", aiRunsRef())).toMatch(/^[0-9a-f]{40}$/);
   const events = await readFileAtRef({
     projectId: "git_ai_logs",
-    ref: aiRunsRef("git_ai_logs"),
+    ref: aiRunsRef(),
     filepath: `runs/${run.id}/events.jsonl`,
   });
   expect(events).toContain("run-started");

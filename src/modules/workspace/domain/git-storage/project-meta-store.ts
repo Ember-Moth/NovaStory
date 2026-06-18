@@ -54,7 +54,7 @@ function parsePayload(files: Record<string, string>): ProjectMetaPayload {
 
 export function tryReadProjectMetaSync(projectId: string): ProjectMetaPayload | null {
   try {
-    return parsePayload(readFilesAtRefSync({ projectId, ref: metaRef(projectId) }));
+    return parsePayload(readFilesAtRefSync({ projectId, ref: metaRef() }));
   } catch {
     return null;
   }
@@ -110,7 +110,7 @@ export function writeProjectMetaSync(
   const normalized = normalizePayload(payload);
   commitCustomRefSync({
     projectId: normalized.project.id,
-    ref: metaRef(normalized.project.id),
+    ref: metaRef(),
     message,
     replace: true,
     files: {

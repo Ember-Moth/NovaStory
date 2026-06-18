@@ -17,12 +17,12 @@ export function branchRef(branchId: string) {
   return `refs/heads/branch/${branchId}`;
 }
 
-export function metaRef(projectId: string) {
-  return `refs/novel-evolver/meta/${projectId}`;
+export function metaRef() {
+  return `refs/novel-evolver/meta`;
 }
 
-export function aiRunsRef(projectId: string) {
-  return `refs/novel-evolver/ai-runs/${projectId}`;
+export function aiRunsRef() {
+  return `refs/novel-evolver/ai-runs`;
 }
 
 export async function ensureProjectRepo(projectId: string) {

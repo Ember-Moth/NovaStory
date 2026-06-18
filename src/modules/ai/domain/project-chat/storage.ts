@@ -31,15 +31,15 @@ const PROJECT_MODEL_CONFIG_FILE = "model-config.json";
 
 type ProjectChatStorageFiles = Record<string, string>;
 
-function projectChatRef(projectId: string) {
-  return `${PROJECT_CHAT_REF_PREFIX}/${projectId}`;
+function projectChatRef() {
+  return PROJECT_CHAT_REF_PREFIX;
 }
 
 function readProjectChatStorageFiles(projectId: string): ProjectChatStorageFiles {
   readProjectMetaSync(projectId);
 
   try {
-    return readFilesAtRefSync({ projectId, ref: projectChatRef(projectId) });
+    return readFilesAtRefSync({ projectId, ref: projectChatRef() });
   } catch {
     return {};
   }
@@ -52,7 +52,7 @@ function writeProjectChatStorageFiles(
 ) {
   commitCustomRefSync({
     projectId,
-    ref: projectChatRef(projectId),
+    ref: projectChatRef(),
     files,
     message,
     replace: true,
