@@ -350,7 +350,7 @@ function createEmptySection(): AssistantToolTraceSection {
 
 function appendResponseMeta(section: AssistantToolTraceSection, payload: unknown) {
   const envelope = getResponseEnvelope(payload);
-  if (envelope.truncated != null) {
+  if (envelope.truncated === true) {
     section.summaryRows.push({
       label: "截断",
       value: formatScalar(envelope.truncated),

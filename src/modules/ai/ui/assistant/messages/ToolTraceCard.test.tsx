@@ -102,6 +102,37 @@ test("ToolTraceCard renders timeline list as structured rows", () => {
   expect(html).toContain("大战前");
   expect(html).toContain("point_1");
   expect(html).toContain("新增 2 / 修改 1 / 删除 0 / 共 3");
+  expect(html).not.toContain("截断");
+});
+
+test("ToolTraceCard only renders truncated row when response is truncated", () => {
+  const truncatedHtml = renderToStaticMarkup(
+    <ToolTraceCard
+      expanded
+      onToggle={() => {}}
+      entry={{
+        toolCallId: "tool_2_truncated",
+        toolName: "list_story_timeline_points",
+        status: "success",
+        summary: "查看故事时间线",
+        nodeId: "assistant_1",
+        runId: "run_1",
+        requestPayload: {},
+        responsePayload: {
+          ok: true,
+          truncated: true,
+          data: {
+            points: [],
+          },
+        },
+        streamingInputTextRaw: null,
+        streamingRequestPayload: null,
+      }}
+    />,
+  );
+
+  expect(truncatedHtml).toContain("截断");
+  expect(truncatedHtml).toContain("是");
 });
 
 test("ToolTraceCard truncates write_file request content by default", () => {
