@@ -6,7 +6,6 @@ import {
   getBranch,
   getCommit,
   getWorkspace,
-  getWorkspaceForBranchId,
   getWorkingTreeStatus,
   listCommits,
 } from "@/modules/workspace/domain";
@@ -18,7 +17,7 @@ export const history = query<
   RpcTagList
 >({
   watch: ({ branchId }) => [rpcTags.commitHistory(branchId)],
-  handler: ({ projectId, branchId }) => listCommits(projectId, branchId),
+  handler: async ({ projectId, branchId }) => await listCommits(projectId, branchId),
 });
 
 export const workingTreeStatus = query<
@@ -26,19 +25,12 @@ export const workingTreeStatus = query<
   Awaited<ReturnType<typeof getWorkingTreeStatus>>,
   RpcTagList
 >({
-  watch: ({ projectId, branchId }) => {
-    const workspace = getWorkspaceForBranchId(projectId, branchId);
-    return workspace
-      ? [
-          rpcTags.branch(branchId),
-          rpcTags.commitHistory(branchId),
-          rpcTags.contentTree(workspace.id),
-          rpcTags.timelineList(workspace.id),
-          rpcTags.auxWorkspace(workspace.id),
-        ]
-      : [rpcTags.branch(branchId)];
-  },
-  handler: ({ projectId, branchId }) => getWorkingTreeStatus(projectId, branchId),
+  watch: ({ projectId, branchId }) => [
+    rpcTags.branch(branchId),
+    rpcTags.commitHistory(branchId),
+    rpcTags.workspacesByProject(projectId),
+  ],
+  handler: async ({ projectId, branchId }) => await getWorkingTreeStatus(projectId, branchId),
 });
 
 export const get = query<
@@ -47,7 +39,7 @@ export const get = query<
   RpcTagList
 >({
   watch: ({ commitId }) => [rpcTags.commit(commitId)],
-  handler: ({ commitId, projectId }) => getCommit(commitId, projectId),
+  handler: async ({ commitId, projectId }) => await getCommit(commitId, projectId),
 });
 
 export const create = mutation<
@@ -62,7 +54,7 @@ export const create = mutation<
   RpcTagList
 >(async (input, ctx) => {
   const commit = await createCommit(input);
-  const branch = getBranch(input.projectId, input.branchId);
+  const branch = await getBranch(input.projectId, input.branchId);
   ctx.invalidate(
     rpcTags.commitHistory(input.branchId),
     rpcTags.branch(input.branchId),
@@ -80,7 +72,7 @@ export const checkout = mutation<
   RpcTagList
 >(async (input, ctx) => {
   const commit = await checkoutCommit(input);
-  const workspace = getWorkspace(input.projectId, input.workspaceId);
+  const workspace = await getWorkspace(input.projectId, input.workspaceId);
   ctx.invalidate(
     rpcTags.workspace(workspace.id),
     rpcTags.contentTree(workspace.id),

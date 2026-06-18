@@ -17,8 +17,8 @@ import {
 } from "./git-storage/worktree-state";
 import { listAnchoredTimelinePointIds } from "./content";
 
-function touchWorkspace(projectId: string, workspaceId: string) {
-  touchWorkspaceMeta(projectId, workspaceId, now());
+function touchWorkspaceAsync(projectId: string, workspaceId: string) {
+  return touchWorkspaceMeta(projectId, workspaceId, now());
 }
 
 function originTimelinePoint(): TimelinePointView {
@@ -31,8 +31,11 @@ function originTimelinePoint(): TimelinePointView {
   };
 }
 
-export function listTimelinePoints(projectId: string, workspaceId: string): TimelinePointView[] {
-  const workspace = getWorkspace(projectId, workspaceId);
+export async function listTimelinePoints(
+  projectId: string,
+  workspaceId: string,
+): Promise<TimelinePointView[]> {
+  const workspace = await getWorkspace(projectId, workspaceId);
   const worktreePath = getProjectWorktreeDir(workspace.projectId, workspace.id);
   const state = readWorktreeState(worktreePath);
   return [
@@ -56,28 +59,29 @@ function validatePoint(state: ReturnType<typeof readWorktreeState>, pointId: Tim
   return normalized;
 }
 
-export function createTimelinePoint(input: {
+export async function createTimelinePoint(input: {
   projectId: string;
   workspaceId: string;
   afterPointId?: string | typeof ORIGIN_TIMELINE_POINT_ID;
   label: string;
   description?: string | null;
 }) {
-  return createTimelinePoints({
+  const results = await createTimelinePoints({
     projectId: input.projectId,
     workspaceId: input.workspaceId,
     afterPointId: input.afterPointId,
     points: [{ label: input.label, description: input.description }],
-  })[0]!;
+  });
+  return results[0]!;
 }
 
-export function createTimelinePoints(input: {
+export async function createTimelinePoints(input: {
   projectId: string;
   workspaceId: string;
   afterPointId?: string | typeof ORIGIN_TIMELINE_POINT_ID;
   points: Array<{ label: string; description?: string | null }>;
 }) {
-  const workspace = getWorkspace(input.projectId, input.workspaceId);
+  const workspace = await getWorkspace(input.projectId, input.workspaceId);
   const worktreePath = getProjectWorktreeDir(workspace.projectId, workspace.id);
   const state = readWorktreeState(worktreePath);
   invariant(input.points.length > 0, "至少需要创建一个时间点。");
@@ -96,18 +100,18 @@ export function createTimelinePoints(input: {
   });
   if (successor) successor.prevPointId = prevPointId;
   writeWorktreeStateSync(worktreePath, state);
-  touchWorkspace(workspace.projectId, workspace.id);
+  await touchWorkspaceAsync(workspace.projectId, workspace.id);
   return created;
 }
 
-export function moveTimelinePoint(input: {
+export async function moveTimelinePoint(input: {
   projectId: string;
   workspaceId: string;
   pointId: string;
   afterPointId?: string | typeof ORIGIN_TIMELINE_POINT_ID;
 }) {
   invariant(input.pointId !== ORIGIN_TIMELINE_POINT_ID, "无法移动原点时间点。");
-  const workspace = getWorkspace(input.projectId, input.workspaceId);
+  const workspace = await getWorkspace(input.projectId, input.workspaceId);
   const worktreePath = getProjectWorktreeDir(workspace.projectId, workspace.id);
   const state = readWorktreeState(worktreePath);
   const point = state.timeline.find((item) => item.id === input.pointId);
@@ -120,11 +124,11 @@ export function moveTimelinePoint(input: {
   point.prevPointId = afterPointId;
   if (targetSuccessor && targetSuccessor.id !== point.id) targetSuccessor.prevPointId = point.id;
   writeWorktreeStateSync(worktreePath, state);
-  touchWorkspace(workspace.projectId, workspace.id);
+  await touchWorkspaceAsync(workspace.projectId, workspace.id);
   return point;
 }
 
-export function updateTimelinePoint(input: {
+export async function updateTimelinePoint(input: {
   projectId: string;
   workspaceId: string;
   pointId: string;
@@ -132,7 +136,7 @@ export function updateTimelinePoint(input: {
   description?: string | null;
 }) {
   invariant(input.pointId !== ORIGIN_TIMELINE_POINT_ID, "无法修改原点时间点。");
-  const workspace = getWorkspace(input.projectId, input.workspaceId);
+  const workspace = await getWorkspace(input.projectId, input.workspaceId);
   const worktreePath = getProjectWorktreeDir(workspace.projectId, workspace.id);
   const state = readWorktreeState(worktreePath);
   const point = state.timeline.find((item) => item.id === input.pointId);
@@ -140,24 +144,24 @@ export function updateTimelinePoint(input: {
   if (input.label !== undefined) point.label = input.label;
   if (input.description !== undefined) point.description = input.description;
   writeWorktreeStateSync(worktreePath, state);
-  touchWorkspace(workspace.projectId, workspace.id);
+  await touchWorkspaceAsync(workspace.projectId, workspace.id);
   return point;
 }
 
-export function deleteTimelinePoint(
+export async function deleteTimelinePoint(
   projectId: string,
   workspaceId: string,
   pointId: string,
   options: { purgeAuxLayers?: boolean } = {},
 ) {
   invariant(pointId !== ORIGIN_TIMELINE_POINT_ID, "无法删除原点时间点。");
-  const workspace = getWorkspace(projectId, workspaceId);
+  const workspace = await getWorkspace(projectId, workspaceId);
   const worktreePath = getProjectWorktreeDir(workspace.projectId, workspace.id);
   const state = readWorktreeState(worktreePath);
   const point = state.timeline.find((item) => item.id === pointId);
   invariant(point, "未找到时间点。");
   invariant(
-    !listAnchoredTimelinePointIds(projectId, workspaceId).has(pointId),
+    !(await listAnchoredTimelinePointIds(projectId, workspaceId)).has(pointId),
     "无法删除：仍有章节锚定到该时间点。",
   );
   if (!options.purgeAuxLayers) {
@@ -177,7 +181,7 @@ export function deleteTimelinePoint(
     });
   }
   writeWorktreeStateSync(worktreePath, state);
-  touchWorkspace(workspace.projectId, workspace.id);
+  await touchWorkspaceAsync(workspace.projectId, workspace.id);
 }
 
 export function normalizeTimelinePointId(pointId: TimelinePointRef) {

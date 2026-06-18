@@ -9,16 +9,16 @@ const requestCtx = { req: new Request("http://localhost/api/rpc") } as unknown a
   typeof branchHandlers.list.handler
 >[1];
 
-function seedProject(projectId: string) {
-  seedProjectRecord(projectId);
-  if (!service.getDefaultWorkspace(projectId)) {
-    service.createDefaultWorkspace(projectId);
+async function seedProject(projectId: string) {
+  await seedProjectRecord(projectId);
+  if (!(await service.getDefaultWorkspace(projectId))) {
+    await service.createDefaultWorkspace(projectId);
   }
-  return service.getDefaultWorkspace(projectId)!;
+  return (await service.getDefaultWorkspace(projectId))!;
 }
 
 test("branch list watches the project branches tag and includes the default branch", async () => {
-  const workspace = seedProject("rpc_branch_list");
+  const workspace = await seedProject("rpc_branch_list");
   const result = await branchHandlers.list.handler({ projectId: "rpc_branch_list" }, requestCtx);
 
   expect(result.watch).toEqual([rpcTags.branchesByProject("rpc_branch_list")]);
@@ -28,7 +28,7 @@ test("branch list watches the project branches tag and includes the default bran
 });
 
 test("branch heads watches the project branch-heads tag and resolves current heads", async () => {
-  const workspace = seedProject("rpc_branch_heads");
+  const workspace = await seedProject("rpc_branch_heads");
   const result = await branchHandlers.heads.handler({ projectId: "rpc_branch_heads" }, requestCtx);
 
   expect(result.watch).toEqual([rpcTags.branchHeadsByProject("rpc_branch_heads")]);
@@ -39,8 +39,8 @@ test("branch heads watches the project branch-heads tag and resolves current hea
 });
 
 test("creating a branch with workspace invalidates branches and workspaces", async () => {
-  const workspace = seedProject("rpc_branch_create");
-  service.createContentNode({
+  const workspace = await seedProject("rpc_branch_create");
+  await service.createContentNode({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
@@ -96,8 +96,8 @@ test("deleting a branch invalidates branch, workspace, and project tags", async 
 });
 
 test("commit create invalidates history and branch tags", async () => {
-  const workspace = seedProject("rpc_commit_create");
-  service.createContentNode({
+  const workspace = await seedProject("rpc_commit_create");
+  await service.createContentNode({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
@@ -121,8 +121,8 @@ test("commit create invalidates history and branch tags", async () => {
 });
 
 test("commit checkout invalidates the workspace content views", async () => {
-  const workspace = seedProject("rpc_commit_checkout");
-  service.createContentNode({
+  const workspace = await seedProject("rpc_commit_checkout");
+  await service.createContentNode({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
@@ -148,7 +148,7 @@ test("commit checkout invalidates the workspace content views", async () => {
 });
 
 test("working tree status watches branch, history and workspace tags", async () => {
-  const workspace = seedProject("rpc_working_tree_status");
+  const workspace = await seedProject("rpc_working_tree_status");
 
   const result = await commitHandlers.workingTreeStatus.handler(
     { projectId: workspace.projectId, branchId: workspace.branchId },
@@ -167,8 +167,8 @@ test("working tree status watches branch, history and workspace tags", async () 
 });
 
 test("commit history returns the mainline newest first", async () => {
-  const workspace = seedProject("rpc_commit_history");
-  service.createContentNode({
+  const workspace = await seedProject("rpc_commit_history");
+  await service.createContentNode({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
@@ -179,7 +179,7 @@ test("commit history returns the mainline newest first", async () => {
     branchId: workspace.branchId,
     message: "one",
   });
-  service.createContentNode({
+  await service.createContentNode({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,

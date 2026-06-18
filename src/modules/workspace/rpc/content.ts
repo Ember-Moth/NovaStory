@@ -12,51 +12,51 @@ import { rpcTags, type RpcTagList } from "@/rpc/tags";
 
 export const create = mutation<
   Parameters<typeof createContentNode>[0],
-  ReturnType<typeof createContentNode>,
+  Awaited<ReturnType<typeof createContentNode>>,
   RpcTagList
 >({
   invalidate: (input) => [rpcTags.contentTree(input.workspaceId)],
-  handler: (input) => createContentNode(input),
+  handler: async (input) => await createContentNode(input),
 });
 
 export const move = mutation<
   Parameters<typeof moveContentNode>[0],
-  ReturnType<typeof moveContentNode>,
+  Awaited<ReturnType<typeof moveContentNode>>,
   RpcTagList
 >({
   invalidate: (input) => [rpcTags.contentTree(input.workspaceId)],
-  handler: (input) => moveContentNode(input),
+  handler: async (input) => await moveContentNode(input),
 });
 
 export const update = mutation<
   Parameters<typeof updateContentNode>[0],
-  ReturnType<typeof updateContentNode>,
+  Awaited<ReturnType<typeof updateContentNode>>,
   RpcTagList
 >({
   invalidate: (input) => [rpcTags.contentTree(input.workspaceId)],
-  handler: (input) => updateContentNode(input),
+  handler: async (input) => await updateContentNode(input),
 });
 
 export const deleteMutation = mutation<Parameters<typeof deleteContentNode>[0], void, RpcTagList>({
   invalidate: (input) => [rpcTags.contentTree(input.workspaceId)],
-  handler: (input) => {
-    deleteContentNode(input);
+  handler: async (input) => {
+    await deleteContentNode(input);
   },
 });
 
 export const exportSubtree = query<
   { projectId: string; workspaceId: string; rootNodeId?: string },
-  ReturnType<typeof exportContentSubtree>,
+  Awaited<ReturnType<typeof exportContentSubtree>>,
   RpcTagList
 >({
   watch: ({ workspaceId }) => [rpcTags.contentTree(workspaceId)],
-  handler: ({ projectId, workspaceId, rootNodeId }) =>
-    exportContentSubtree(projectId, workspaceId, rootNodeId),
+  handler: async ({ projectId, workspaceId, rootNodeId }) =>
+    await exportContentSubtree(projectId, workspaceId, rootNodeId),
 });
 
 export const composeWritingContext = query<
   { projectId: string; workspaceId: string; contentNodeId: string },
-  ReturnType<typeof buildWritingContext>,
+  Awaited<ReturnType<typeof buildWritingContext>>,
   RpcTagList
 >({
   watch: ({ workspaceId }) => [
@@ -64,6 +64,6 @@ export const composeWritingContext = query<
     rpcTags.auxWorkspace(workspaceId),
     rpcTags.timelineList(workspaceId),
   ],
-  handler: ({ projectId, workspaceId, contentNodeId }) =>
-    buildWritingContext(projectId, workspaceId, contentNodeId),
+  handler: async ({ projectId, workspaceId, contentNodeId }) =>
+    await buildWritingContext(projectId, workspaceId, contentNodeId),
 });

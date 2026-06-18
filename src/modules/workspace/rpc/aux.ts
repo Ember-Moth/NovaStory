@@ -30,59 +30,63 @@ function auxSnapshotTags(input: {
 
 export const mkdir = mutation<
   Parameters<typeof mkdirAt>[0],
-  ReturnType<typeof mkdirAt>,
+  Awaited<ReturnType<typeof mkdirAt>>,
   RpcTagList
 >({
   invalidate: (input) => [rpcTags.auxWorkspace(input.workspaceId)],
-  handler: (input) => mkdirAt(input),
+  handler: async (input) => await mkdirAt(input),
 });
 
 export const writeFile = mutation<
   Parameters<typeof writeFileAt>[0],
-  ReturnType<typeof writeFileAt>,
+  Awaited<ReturnType<typeof writeFileAt>>,
   RpcTagList
 >({
   invalidate: (input) => [rpcTags.auxWorkspace(input.workspaceId)],
-  handler: (input) => writeFileAt(input),
+  handler: async (input) => await writeFileAt(input),
 });
 
-export const link = mutation<Parameters<typeof linkAt>[0], ReturnType<typeof linkAt>, RpcTagList>({
+export const link = mutation<
+  Parameters<typeof linkAt>[0],
+  Awaited<ReturnType<typeof linkAt>>,
+  RpcTagList
+>({
   invalidate: (input) => [rpcTags.auxWorkspace(input.workspaceId)],
-  handler: (input) => linkAt(input),
+  handler: async (input) => await linkAt(input),
 });
 
 export const move = mutation<
   Parameters<typeof moveAuxNodeAt>[0],
-  ReturnType<typeof moveAuxNodeAt>,
+  Awaited<ReturnType<typeof moveAuxNodeAt>>,
   RpcTagList
 >({
   invalidate: (input) => [rpcTags.auxWorkspace(input.workspaceId)],
-  handler: (input) => moveAuxNodeAt(input),
+  handler: async (input) => await moveAuxNodeAt(input),
 });
 
 export const retargetSymlink = mutation<
   Parameters<typeof retargetAuxSymlinkAt>[0],
-  ReturnType<typeof retargetAuxSymlinkAt>,
+  Awaited<ReturnType<typeof retargetAuxSymlinkAt>>,
   RpcTagList
 >({
   invalidate: (input) => [rpcTags.auxWorkspace(input.workspaceId)],
-  handler: (input) => retargetAuxSymlinkAt(input),
+  handler: async (input) => await retargetAuxSymlinkAt(input),
 });
 
 export const deleteMutation = mutation<Parameters<typeof deleteAuxNodeAt>[0], void, RpcTagList>({
   invalidate: (input) => [rpcTags.auxWorkspace(input.workspaceId)],
-  handler: (input) => {
-    deleteAuxNodeAt(input);
+  handler: async (input) => {
+    await deleteAuxNodeAt(input);
   },
 });
 
 export const restoreDeleted = mutation<
   Parameters<typeof restoreDeletedAuxNodeAt>[0],
-  ReturnType<typeof restoreDeletedAuxNodeAt>,
+  Awaited<ReturnType<typeof restoreDeletedAuxNodeAt>>,
   RpcTagList
 >({
   invalidate: (input) => [rpcTags.auxWorkspace(input.workspaceId)],
-  handler: (input) => restoreDeletedAuxNodeAt(input),
+  handler: async (input) => await restoreDeletedAuxNodeAt(input),
 });
 
 export const readByPath = query<
@@ -92,12 +96,12 @@ export const readByPath = query<
     pointId?: string | typeof ORIGIN_TIMELINE_POINT_ID;
     path: string;
   },
-  ReturnType<typeof readAuxByPathAt>,
+  Awaited<ReturnType<typeof readAuxByPathAt>>,
   RpcTagList
 >({
   watch: auxSnapshotTags,
-  handler: ({ projectId, workspaceId, pointId, path }) =>
-    readAuxByPathAt(projectId, workspaceId, pointId, path),
+  handler: async ({ projectId, workspaceId, pointId, path }) =>
+    await readAuxByPathAt(projectId, workspaceId, pointId, path),
 });
 
 export const listDir = query<
@@ -107,33 +111,33 @@ export const listDir = query<
     pointId?: string | typeof ORIGIN_TIMELINE_POINT_ID;
     path?: string;
   },
-  ReturnType<typeof listAuxDirAt>,
+  Awaited<ReturnType<typeof listAuxDirAt>>,
   RpcTagList
 >({
   watch: auxSnapshotTags,
-  handler: ({ projectId, workspaceId, pointId, path }) =>
-    listAuxDirAt(projectId, workspaceId, pointId, { path }),
+  handler: async ({ projectId, workspaceId, pointId, path }) =>
+    await listAuxDirAt(projectId, workspaceId, pointId, { path }),
 });
 
 export const snapshotTree = query<
   { projectId: string; workspaceId: string; pointId?: string | typeof ORIGIN_TIMELINE_POINT_ID },
-  ReturnType<typeof exportAuxSnapshotTree>,
+  Awaited<ReturnType<typeof exportAuxSnapshotTree>>,
   RpcTagList
 >({
   watch: auxSnapshotTags,
-  handler: ({ projectId, workspaceId, pointId }) =>
-    exportAuxSnapshotTree(projectId, workspaceId, pointId),
+  handler: async ({ projectId, workspaceId, pointId }) =>
+    await exportAuxSnapshotTree(projectId, workspaceId, pointId),
 });
 
 export const listChangesAt = query<
   { projectId: string; workspaceId: string; pointId: string },
-  ReturnType<typeof listAuxChangesAt>,
+  Awaited<ReturnType<typeof listAuxChangesAt>>,
   RpcTagList
 >({
   watch: ({ workspaceId }) => [
     rpcTags.auxWorkspace(workspaceId),
     rpcTags.timelineList(workspaceId),
   ],
-  handler: ({ projectId, workspaceId, pointId }) =>
-    listAuxChangesAt(projectId, workspaceId, pointId),
+  handler: async ({ projectId, workspaceId, pointId }) =>
+    await listAuxChangesAt(projectId, workspaceId, pointId),
 });

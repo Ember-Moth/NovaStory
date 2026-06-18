@@ -14,7 +14,7 @@ export function resolveCurrentTimelinePointId(runtimeContext: ToolRuntimeContext
   return resolveTimelinePointId(runtimeContext.snapshot);
 }
 
-export function resolveSelectableTimelinePoint(input: {
+export async function resolveSelectableTimelinePoint(input: {
   projectId: string;
   workspaceId: string;
   timelinePointIdOrLabel: string;
@@ -26,7 +26,7 @@ export function resolveSelectableTimelinePoint(input: {
       matchedBy: "origin" as const,
     };
   }
-  const points = listTimelinePoints(input.projectId, input.workspaceId);
+  const points = await listTimelinePoints(input.projectId, input.workspaceId);
   const foundById = points.find((point) => point.id === input.timelinePointIdOrLabel);
   if (foundById) {
     return {
@@ -45,7 +45,7 @@ export function resolveSelectableTimelinePoint(input: {
   };
 }
 
-export function resolveTimelinePointIdOrLabel(input: {
+export async function resolveTimelinePointIdOrLabel(input: {
   projectId: string;
   workspaceId: string;
   timelinePointIdOrLabel: string;
@@ -54,7 +54,7 @@ export function resolveTimelinePointIdOrLabel(input: {
     return ORIGIN_TIMELINE_POINT_ID;
   }
 
-  const points = listTimelinePoints(input.projectId, input.workspaceId);
+  const points = await listTimelinePoints(input.projectId, input.workspaceId);
   const foundById = points.find((point) => point.id === input.timelinePointIdOrLabel);
   if (foundById) {
     return foundById.id;
@@ -65,7 +65,7 @@ export function resolveTimelinePointIdOrLabel(input: {
   return foundByLabel.id;
 }
 
-export function resolveOptionalTimelinePointIdOrLabel(input: {
+export async function resolveOptionalTimelinePointIdOrLabel(input: {
   projectId: string;
   workspaceId: string;
   timelinePointIdOrLabel?: string | null;
@@ -74,7 +74,7 @@ export function resolveOptionalTimelinePointIdOrLabel(input: {
     return undefined;
   }
 
-  return resolveTimelinePointIdOrLabel({
+  return await resolveTimelinePointIdOrLabel({
     projectId: input.projectId,
     workspaceId: input.workspaceId,
     timelinePointIdOrLabel: input.timelinePointIdOrLabel,
@@ -96,16 +96,15 @@ export function updateRuntimeTimelineSelection(input: {
   }));
 }
 
-export function getTimelineLabelById(
+export async function getTimelineLabelById(
   projectId: string,
   workspaceId: string,
   timelinePointId: string,
-): string | null {
+): Promise<string | null> {
   if (timelinePointId === ORIGIN_TIMELINE_POINT_ID) {
     return "原点";
   }
-  const found = listTimelinePoints(projectId, workspaceId).find(
-    (point) => point.id === timelinePointId,
-  );
+  const points = await listTimelinePoints(projectId, workspaceId);
+  const found = points.find((point) => point.id === timelinePointId);
   return found?.label ?? null;
 }

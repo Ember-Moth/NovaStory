@@ -6,66 +6,64 @@ import { createBranch } from "./branches";
 import { branchRef, checkoutCommitToWorktree, resolveRef } from "./git-storage/git-store";
 import { getProjectWorktreeDir } from "./git-storage/paths";
 import type { BranchIndexRow, ProjectIndexRow, WorkspaceIndexRow } from "./git-storage/types";
-import {
-  readProjectMetaSync,
-  updateProjectMetaSync,
-  writeProjectMetaSync as persistProjectMetaSync,
-} from "./git-storage/project-meta-store";
+import { readProjectMeta, updateProjectMeta } from "./git-storage/project-meta-store";
 import { seedEmptyWorktree } from "./git-storage/worktree-state";
 
 export type WorkspaceRow = WorkspaceIndexRow;
 
-function getProjectRow(projectId: string): ProjectIndexRow {
-  return readProjectMetaSync(projectId).project;
+async function getProjectRow(projectId: string): Promise<ProjectIndexRow> {
+  return (await readProjectMeta(projectId)).project;
 }
 
-function getBranchRow(projectId: string, branchId: string): BranchIndexRow {
-  const branch = readProjectMetaSync(projectId).branches.find((item) => item.id === branchId);
+async function getBranchRow(projectId: string, branchId: string): Promise<BranchIndexRow> {
+  const branch = (await readProjectMeta(projectId)).branches.find((item) => item.id === branchId);
   invariant(branch, "未找到分支。");
   return branch;
 }
 
-function getWorkspaceRow(projectId: string, workspaceId: string) {
-  return readProjectMetaSync(projectId).workspaces.find((item) => item.id === workspaceId) ?? null;
+async function getWorkspaceRow(projectId: string, workspaceId: string) {
+  return (
+    (await readProjectMeta(projectId)).workspaces.find((item) => item.id === workspaceId) ?? null
+  );
 }
 
-export function listWorkspaces(projectId: string): WorkspaceRow[] {
-  return readProjectMetaSync(projectId).workspaces;
+export async function listWorkspaces(projectId: string): Promise<WorkspaceRow[]> {
+  return (await readProjectMeta(projectId)).workspaces;
 }
 
-export function getWorkspace(projectId: string, workspaceId: string): WorkspaceRow {
-  const workspace = getWorkspaceRow(projectId, workspaceId);
+export async function getWorkspace(projectId: string, workspaceId: string): Promise<WorkspaceRow> {
+  const workspace = await getWorkspaceRow(projectId, workspaceId);
   invariant(workspace, "未找到工作区。");
   return workspace;
 }
 
-export function getWorkspaceForBranchId(projectId: string, branchId: string): WorkspaceRow | null {
-  return (
-    readProjectMetaSync(projectId).workspaces.find(
-      (workspace) => workspace.branchId === branchId,
-    ) ?? null
-  );
+export async function getWorkspaceForBranchId(
+  projectId: string,
+  branchId: string,
+): Promise<WorkspaceRow | null> {
+  const payload = await readProjectMeta(projectId);
+  return payload.workspaces.find((workspace) => workspace.branchId === branchId) ?? null;
 }
 
-export function getDefaultWorkspace(projectId: string) {
-  const project = getProjectRow(projectId);
+export async function getDefaultWorkspace(projectId: string) {
+  const project = await getProjectRow(projectId);
   return project.defaultBranchId
-    ? (getWorkspaceForBranchId(projectId, project.defaultBranchId) ?? undefined)
+    ? ((await getWorkspaceForBranchId(projectId, project.defaultBranchId)) ?? undefined)
     : undefined;
 }
 
 export async function writeProjectMeta(projectId: string) {
-  const payload = readProjectMetaSync(projectId);
-  persistProjectMetaSync(payload);
+  const payload = await readProjectMeta(projectId);
+  await updateProjectMeta(projectId, () => payload);
 }
 
-export function writeProjectMetaSync(projectId: string) {
-  persistProjectMetaSync(readProjectMetaSync(projectId));
-}
-
-export function touchWorkspaceMeta(projectId: string, workspaceId: string, timestamp = now()) {
-  getWorkspace(projectId, workspaceId);
-  updateProjectMetaSync(
+export async function touchWorkspaceMeta(
+  projectId: string,
+  workspaceId: string,
+  timestamp = now(),
+) {
+  await getWorkspace(projectId, workspaceId);
+  await updateProjectMeta(
     projectId,
     (payload) => ({
       ...payload,
@@ -81,8 +79,8 @@ export function touchWorkspaceMeta(projectId: string, workspaceId: string, times
   );
 }
 
-export function touchProjectMeta(projectId: string, timestamp = now()) {
-  updateProjectMetaSync(
+export async function touchProjectMeta(projectId: string, timestamp = now()) {
+  await updateProjectMeta(
     projectId,
     (payload) => ({
       ...payload,
@@ -96,8 +94,11 @@ export function touchProjectMeta(projectId: string, timestamp = now()) {
 }
 
 export async function createWorkspaceForBranch(projectId: string, branchId: string, name?: string) {
-  const branch = getBranchRow(projectId, branchId);
-  invariant(!getWorkspaceForBranchId(projectId, branch.id), "无法创建工作区：该分支已存在工作区。");
+  const branch = await getBranchRow(projectId, branchId);
+  invariant(
+    !(await getWorkspaceForBranchId(projectId, branch.id)),
+    "无法创建工作区：该分支已存在工作区。",
+  );
 
   const timestamp = now();
   const workspaceId = createId("workspace");
@@ -114,7 +115,7 @@ export async function createWorkspaceForBranch(projectId: string, branchId: stri
     });
   }
 
-  updateProjectMetaSync(
+  await updateProjectMeta(
     branch.projectId,
     (payload) => ({
       ...payload,
@@ -136,17 +137,17 @@ export async function createWorkspaceForBranch(projectId: string, branchId: stri
     }),
     "Create workspace metadata",
   );
-  return getWorkspace(projectId, workspaceId);
+  return await getWorkspace(projectId, workspaceId);
 }
 
-export function createDefaultWorkspace(projectId: string, name = "main") {
-  const branch = createBranch({ projectId, name });
+export async function createDefaultWorkspace(projectId: string, name = "main") {
+  const branch = await createBranch({ projectId, name });
   const workspaceId = createId("workspace");
   const worktreePath = getProjectWorktreeDir(projectId, workspaceId);
   mkdirSync(worktreePath, { recursive: true });
   seedEmptyWorktree(worktreePath);
   const timestamp = now();
-  updateProjectMetaSync(
+  await updateProjectMeta(
     projectId,
     (payload) => ({
       ...payload,
@@ -169,8 +170,7 @@ export function createDefaultWorkspace(projectId: string, name = "main") {
     }),
     "Create default workspace metadata",
   );
-  const workspace = getWorkspace(projectId, workspaceId);
-  writeProjectMetaSync(projectId);
+  const workspace = await getWorkspace(projectId, workspaceId);
   return workspace;
 }
 
@@ -180,7 +180,7 @@ export async function createBranchWorkspace(input: {
   fromCommitId?: string | null;
   workspaceName?: string;
 }) {
-  const branch = createBranch({
+  const branch = await createBranch({
     projectId: input.projectId,
     name: input.name,
     fromCommitId: input.fromCommitId,

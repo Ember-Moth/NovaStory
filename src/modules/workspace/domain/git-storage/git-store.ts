@@ -1,7 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import { createHash } from "node:crypto";
-import { deflateSync, inflateSync } from "node:zlib";
 
 import git from "isomorphic-git";
 
@@ -27,35 +25,16 @@ export async function ensureProjectRepo(projectId: string) {
   if (!fs.existsSync(path.join(gitdir, "HEAD"))) {
     await git.init({ fs, gitdir, bare: true, defaultBranch: "main" });
   }
-  return gitdir;
-}
-
-function ensureProjectRepoSync(projectId: string) {
-  const gitdir = getProjectRepoGitDir(projectId);
-  fs.mkdirSync(path.join(gitdir, "objects"), { recursive: true });
-  fs.mkdirSync(path.join(gitdir, "refs"), { recursive: true });
-  if (!fs.existsSync(path.join(gitdir, "HEAD"))) {
-    fs.writeFileSync(path.join(gitdir, "HEAD"), "ref: refs/heads/main\n");
-  }
-  if (!fs.existsSync(path.join(gitdir, "config"))) {
-    fs.writeFileSync(
-      path.join(gitdir, "config"),
-      "[core]\n\trepositoryformatversion = 0\n\tfilemode = false\n\tbare = true\n",
-    );
+  // isomorphic-git's writeObjectLoose does not create object subdirectories
+  // (e.g. objects/e2/xxx). Pre-create all 256 possible subdirs.
+  const objectsDir = path.join(gitdir, "objects");
+  await fs.promises.mkdir(objectsDir, { recursive: true }).catch(() => {});
+  await fs.promises.mkdir(path.join(objectsDir, "pack"), { recursive: true }).catch(() => {});
+  for (let i = 0; i < 256; i++) {
+    const sub = i.toString(16).padStart(2, "0");
+    await fs.promises.mkdir(path.join(objectsDir, sub), { recursive: true }).catch(() => {});
   }
   return gitdir;
-}
-
-export function writeRefSync(input: { projectId: string; ref: string; value: string }) {
-  const gitdir = ensureProjectRepoSync(input.projectId);
-  const refPath = path.join(gitdir, input.ref);
-  fs.mkdirSync(path.dirname(refPath), { recursive: true });
-  fs.writeFileSync(refPath, `${input.value}\n`);
-}
-
-export function deleteRefSync(input: { projectId: string; ref: string }) {
-  const gitdir = ensureProjectRepoSync(input.projectId);
-  fs.rmSync(path.join(gitdir, input.ref), { force: true });
 }
 
 async function removeWorktreeGitFile(dir: string) {
@@ -202,168 +181,14 @@ async function readTreeFiles(input: {
   return files;
 }
 
-function readRefSync(gitdir: string, ref: string): string | null {
-  const refPath = path.join(gitdir, ref);
-  if (fs.existsSync(refPath)) {
-    const value = fs.readFileSync(refPath, "utf8").trim();
-    if (value.startsWith("ref: ")) {
-      return readRefSync(gitdir, value.slice(5).trim());
-    }
-    return value || null;
-  }
-
-  const packedRefsPath = path.join(gitdir, "packed-refs");
-  if (!fs.existsSync(packedRefsPath)) return null;
-  for (const line of fs.readFileSync(packedRefsPath, "utf8").split("\n")) {
-    if (!line || line.startsWith("#") || line.startsWith("^")) continue;
-    const [oid, name] = line.trim().split(/\s+/, 2);
-    if (name === ref && oid) return oid;
-  }
-  return null;
+export async function writeRef(input: { projectId: string; ref: string; value: string }) {
+  const gitdir = await ensureProjectRepo(input.projectId);
+  await git.writeRef({ fs, gitdir, ref: input.ref, value: input.value, force: true });
 }
 
-function readLooseObjectSync(gitdir: string, oid: string) {
-  const objectPath = path.join(gitdir, "objects", oid.slice(0, 2), oid.slice(2));
-  const inflated = inflateSync(fs.readFileSync(objectPath));
-  const nulIndex = inflated.indexOf(0);
-  if (nulIndex < 0) {
-    throw new Error(`Invalid git object: ${oid}`);
-  }
-  const header = inflated.subarray(0, nulIndex).toString("utf8");
-  const [type] = header.split(" ", 1);
-  return { type, body: inflated.subarray(nulIndex + 1) };
-}
-
-function writeLooseObjectSync(gitdir: string, type: string, body: Buffer) {
-  const header = Buffer.from(`${type} ${body.length}\0`, "utf8");
-  const raw = Buffer.concat([header, body]);
-  const oid = createHash("sha1").update(raw).digest("hex");
-  const objectDir = path.join(gitdir, "objects", oid.slice(0, 2));
-  const objectPath = path.join(objectDir, oid.slice(2));
-  fs.mkdirSync(objectDir, { recursive: true });
-  if (!fs.existsSync(objectPath)) {
-    fs.writeFileSync(objectPath, deflateSync(raw));
-  }
-  return oid;
-}
-
-function readCommitTreeOidSync(gitdir: string, oid: string) {
-  const object = readLooseObjectSync(gitdir, oid);
-  if (object.type !== "commit") {
-    throw new Error(`Expected commit object at ${oid}, got ${object.type}`);
-  }
-  const match = /^tree ([0-9a-f]{40})$/m.exec(object.body.toString("utf8"));
-  if (!match?.[1]) {
-    throw new Error(`Commit ${oid} is missing a tree`);
-  }
-  return match[1];
-}
-
-function readTreeFilesSync(input: {
-  gitdir: string;
-  treeOid: string;
-  prefix?: string;
-}): Record<string, string> {
-  const object = readLooseObjectSync(input.gitdir, input.treeOid);
-  if (object.type !== "tree") {
-    throw new Error(`Expected tree object at ${input.treeOid}, got ${object.type}`);
-  }
-
-  const files: Record<string, string> = {};
-  let offset = 0;
-  while (offset < object.body.length) {
-    const spaceIndex = object.body.indexOf(0x20, offset);
-    const nulIndex = object.body.indexOf(0, spaceIndex + 1);
-    if (spaceIndex < 0 || nulIndex < 0 || nulIndex + 21 > object.body.length) {
-      throw new Error(`Invalid git tree object: ${input.treeOid}`);
-    }
-    const mode = object.body.subarray(offset, spaceIndex).toString("utf8");
-    const entryPath = object.body.subarray(spaceIndex + 1, nulIndex).toString("utf8");
-    const oid = object.body.subarray(nulIndex + 1, nulIndex + 21).toString("hex");
-    const filepath = input.prefix ? `${input.prefix}/${entryPath}` : entryPath;
-
-    if (mode === "40000" || mode === "040000") {
-      Object.assign(
-        files,
-        readTreeFilesSync({ gitdir: input.gitdir, treeOid: oid, prefix: filepath }),
-      );
-    } else {
-      const blob = readLooseObjectSync(input.gitdir, oid);
-      if (blob.type === "blob") {
-        files[filepath] = blob.body.toString("utf8");
-      }
-    }
-    offset = nulIndex + 21;
-  }
-
-  return files;
-}
-
-function writeTreeFromFilesSync(gitdir: string, files: Record<string, string>): string {
-  const { blobs, dirs } = splitTreeFiles(files);
-  const entries: Buffer[] = [];
-
-  for (const [filepath, content] of [...blobs.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-    const oid = writeLooseObjectSync(gitdir, "blob", Buffer.from(content, "utf8"));
-    entries.push(
-      Buffer.concat([Buffer.from(`100644 ${filepath}\0`, "utf8"), Buffer.from(oid, "hex")]),
-    );
-  }
-
-  for (const [dirname, childFiles] of [...dirs.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-    const oid = writeTreeFromFilesSync(gitdir, childFiles);
-    entries.push(
-      Buffer.concat([Buffer.from(`40000 ${dirname}\0`, "utf8"), Buffer.from(oid, "hex")]),
-    );
-  }
-
-  return writeLooseObjectSync(gitdir, "tree", Buffer.concat(entries));
-}
-
-export function commitCustomRefSync(input: {
-  projectId: string;
-  ref: string;
-  files: Record<string, string>;
-  message: string;
-  replace?: boolean;
-}) {
-  const gitdir = ensureProjectRepoSync(input.projectId);
-  const previous = readRefSync(gitdir, input.ref);
-  const previousFiles =
-    previous && !input.replace
-      ? readTreeFilesSync({ gitdir, treeOid: readCommitTreeOidSync(gitdir, previous) })
-      : {};
-  const tree = writeTreeFromFilesSync(gitdir, { ...previousFiles, ...input.files });
-  const timestamp = Math.floor(Date.now() / 1000);
-  const parentLines = previous ? `parent ${previous}\n` : "";
-  const commitBody = Buffer.from(
-    [
-      `tree ${tree}`,
-      parentLines.trimEnd(),
-      `author ${AUTHOR.name} <${AUTHOR.email}> ${timestamp} +0000`,
-      `committer ${AUTHOR.name} <${AUTHOR.email}> ${timestamp} +0000`,
-      "",
-      input.message,
-      "",
-    ]
-      .filter((line, index) => line || index === 4 || index === 6)
-      .join("\n"),
-    "utf8",
-  );
-  const oid = writeLooseObjectSync(gitdir, "commit", commitBody);
-  const refPath = path.join(gitdir, input.ref);
-  fs.mkdirSync(path.dirname(refPath), { recursive: true });
-  fs.writeFileSync(refPath, `${oid}\n`);
-  return oid;
-}
-
-export function readFilesAtRefSync(input: { projectId: string; ref: string }) {
-  const gitdir = ensureProjectRepoSync(input.projectId);
-  const oid = readRefSync(gitdir, input.ref);
-  if (!oid) {
-    throw new Error(`Git ref not found: ${input.ref}`);
-  }
-  return readTreeFilesSync({ gitdir, treeOid: readCommitTreeOidSync(gitdir, oid) });
+export async function deleteRef(input: { projectId: string; ref: string }) {
+  const gitdir = await ensureProjectRepo(input.projectId);
+  await fs.promises.rm(path.join(gitdir, input.ref), { force: true });
 }
 
 export async function commitCustomRef(input: {

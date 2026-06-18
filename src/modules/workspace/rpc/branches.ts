@@ -10,18 +10,22 @@ import {
 } from "@/modules/workspace/domain";
 import { rpcTags, type RpcTagList } from "@/rpc/tags";
 
-export const list = query<{ projectId: string }, ReturnType<typeof listBranches>, RpcTagList>({
+export const list = query<
+  { projectId: string },
+  Awaited<ReturnType<typeof listBranches>>,
+  RpcTagList
+>({
   watch: ({ projectId }) => [rpcTags.branchesByProject(projectId)],
-  handler: ({ projectId }) => listBranches(projectId),
+  handler: async ({ projectId }) => await listBranches(projectId),
 });
 
 export const get = query<
   { projectId: string; branchId: string },
-  ReturnType<typeof getBranch>,
+  Awaited<ReturnType<typeof getBranch>>,
   RpcTagList
 >({
   watch: ({ branchId }) => [rpcTags.branch(branchId)],
-  handler: ({ projectId, branchId }) => getBranch(projectId, branchId),
+  handler: async ({ projectId, branchId }) => await getBranch(projectId, branchId),
 });
 
 export const heads = query<
@@ -35,7 +39,7 @@ export const heads = query<
 
 export const create = mutation<
   { projectId: string; name: string; fromCommitId?: string | null },
-  ReturnType<typeof createBranch>,
+  Awaited<ReturnType<typeof createBranch>>,
   RpcTagList
 >({
   invalidate: (input) => [
@@ -44,7 +48,7 @@ export const create = mutation<
     rpcTags.project(input.projectId),
     rpcTags.projectsList(),
   ],
-  handler: (input) => createBranch(input),
+  handler: async (input) => await createBranch(input),
 });
 
 export const createWithWorkspace = mutation<
@@ -71,5 +75,5 @@ export const deleteMutation = mutation<{ projectId: string; branchId: string }, 
     rpcTags.project(input.projectId),
     rpcTags.projectsList(),
   ],
-  handler: ({ projectId, branchId }) => deleteBranch(projectId, branchId),
+  handler: async ({ projectId, branchId }) => await deleteBranch(projectId, branchId),
 });

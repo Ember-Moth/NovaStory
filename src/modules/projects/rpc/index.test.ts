@@ -3,8 +3,8 @@ import { existsSync } from "node:fs";
 
 import { seedProjectRecord } from "@/test/project";
 import {
-  listProjectRowsSync,
-  readProjectMetaSync,
+  listProjectRows,
+  readProjectMeta,
 } from "@/modules/workspace/domain/git-storage/project-meta-store";
 import * as auxService from "@/modules/workspace/domain/aux";
 import {
@@ -19,28 +19,31 @@ const requestCtx = { req: new Request("http://localhost/api/rpc") } as unknown a
 >[1];
 
 async function seedProject(projectId: string) {
-  seedProjectRecord(projectId);
-  if (!workspaceService.getDefaultWorkspace(projectId)) {
-    workspaceService.createDefaultWorkspace(projectId);
+  await seedProjectRecord(projectId);
+  if (!(await workspaceService.getDefaultWorkspace(projectId))) {
+    await workspaceService.createDefaultWorkspace(projectId);
   }
-  return workspaceService.getDefaultWorkspace(projectId)!;
+  return (await workspaceService.getDefaultWorkspace(projectId))!;
 }
 
 async function deleteProject(projectId: string) {
   return projectHandlers.deleteMutation.handler({ id: projectId }, requestCtx);
 }
 
-function projectIndexCounts() {
+async function projectIndexCounts() {
+  const rows = await listProjectRows();
   return {
-    projects: listProjectRowsSync().length,
-    branches: listProjectRowsSync().reduce(
-      (count, project) => count + readProjectMetaSync(project.id).branches.length,
-      0,
-    ),
-    workspaces: listProjectRowsSync().reduce(
-      (count, project) => count + readProjectMetaSync(project.id).workspaces.length,
-      0,
-    ),
+    projects: rows.length,
+    branches: (
+      await Promise.all(
+        rows.map(async (project) => (await readProjectMeta(project.id)).branches.length),
+      )
+    ).reduce((a, b) => a + b, 0),
+    workspaces: (
+      await Promise.all(
+        rows.map(async (project) => (await readProjectMeta(project.id)).workspaces.length),
+      )
+    ).reduce((a, b) => a + b, 0),
   };
 }
 
@@ -102,7 +105,7 @@ test("setDefaultBranch invalidates project list and detail tags", async () => {
     rpcTags.projectsList(),
     rpcTags.project("project_default_switch"),
   ]);
-  expect(readProjectMetaSync("project_default_switch").project.defaultBranchId).toBe(
+  expect((await readProjectMeta("project_default_switch")).project.defaultBranchId).toBe(
     featureWorkspace.branchId,
   );
 });
@@ -116,19 +119,19 @@ test("delete project cascades default workspace roots", async () => {
     rpcTags.projectsList(),
     rpcTags.project("project_delete_default"),
   ]);
-  expect(projectIndexCounts()).toEqual({ projects: 0, branches: 0, workspaces: 0 });
+  expect(await projectIndexCounts()).toEqual({ projects: 0, branches: 0, workspaces: 0 });
   expect(existsSync(getProjectRepoGitDir("project_delete_default"))).toBe(false);
   expect(existsSync(getProjectWorktreeRoot("project_delete_default"))).toBe(false);
 });
 
 test("delete project cascades content anchored to timeline points", async () => {
   const workspace = await seedProject("project_delete_content_anchor");
-  const point = workspaceService.createTimelinePoint({
+  const point = await workspaceService.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     label: "Act I",
   });
-  workspaceService.createContentNode({
+  await workspaceService.createContentNode({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
@@ -137,19 +140,19 @@ test("delete project cascades content anchored to timeline points", async () => 
   });
 
   await expect(deleteProject("project_delete_content_anchor")).resolves.toBeDefined();
-  expect(projectIndexCounts()).toEqual({ projects: 0, branches: 0, workspaces: 0 });
+  expect(await projectIndexCounts()).toEqual({ projects: 0, branches: 0, workspaces: 0 });
   expect(existsSync(getProjectRepoGitDir("project_delete_content_anchor"))).toBe(false);
   expect(existsSync(getProjectWorktreeRoot("project_delete_content_anchor"))).toBe(false);
 });
 
 test("delete project cascades aux overlay files", async () => {
   const workspace = await seedProject("project_delete_aux_overlay");
-  const point = workspaceService.createTimelinePoint({
+  const point = await workspaceService.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     label: "Act I",
   });
-  auxService.writeFileAt({
+  await auxService.writeFileAt({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: point.id,
@@ -158,7 +161,7 @@ test("delete project cascades aux overlay files", async () => {
   });
 
   await expect(deleteProject("project_delete_aux_overlay")).resolves.toBeDefined();
-  expect(projectIndexCounts()).toEqual({ projects: 0, branches: 0, workspaces: 0 });
+  expect(await projectIndexCounts()).toEqual({ projects: 0, branches: 0, workspaces: 0 });
   expect(existsSync(getProjectRepoGitDir("project_delete_aux_overlay"))).toBe(false);
   expect(existsSync(getProjectWorktreeRoot("project_delete_aux_overlay"))).toBe(false);
 });

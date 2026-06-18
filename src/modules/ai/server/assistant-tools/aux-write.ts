@@ -75,7 +75,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
         return withProjectWorkspace({
           projectId,
           getContext: errorContext.get,
-          execute: (workspace) => {
+          execute: async (workspace) => {
             errorContext.set({ workspaceId: workspace.id });
             const resolvedTimelinePointId = resolveCurrentTimelinePointId(runtimeContext);
             const { normalizedPath, parentPath, name } = splitAuxPath(path, "创建辅助资料目录");
@@ -85,7 +85,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
               parentPath,
               name,
             });
-            const existing = readAuxByPathAt(
+            const existing = await readAuxByPathAt(
               workspace.projectId,
               workspace.id,
               resolvedTimelinePointId,
@@ -101,7 +101,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
               parentPath,
               actionLabel: "创建辅助资料目录",
             });
-            const node = mkdirAt({
+            const node = await mkdirAt({
               projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointId: resolvedTimelinePointId,
@@ -145,7 +145,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
         return withProjectWorkspace({
           projectId,
           getContext: errorContext.get,
-          execute: (workspace) => {
+          execute: async (workspace) => {
             errorContext.set({ workspaceId: workspace.id });
             const resolvedTimelinePointId = resolveCurrentTimelinePointId(runtimeContext);
             const { normalizedPath, parentPath, name } = splitAuxPath(path, "写入辅助资料文件");
@@ -155,7 +155,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
               parentPath,
               name,
             });
-            const existing = readAuxByPathAt(
+            const existing = await readAuxByPathAt(
               workspace.projectId,
               workspace.id,
               resolvedTimelinePointId,
@@ -165,7 +165,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
 
             if (existing) {
               invariant(existing.nodeType === "file", "写入辅助资料文件失败：目标路径不是文件。");
-              const node = writeFileAt({
+              const node = await writeFileAt({
                 projectId: workspace.projectId,
                 workspaceId: workspace.id,
                 timelinePointId: resolvedTimelinePointId,
@@ -190,7 +190,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
               parentPath,
               actionLabel: "写入辅助资料文件",
             });
-            const node = writeFileAt({
+            const node = await writeFileAt({
               projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointId: resolvedTimelinePointId,
@@ -235,7 +235,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
         return withProjectWorkspace({
           projectId,
           getContext: errorContext.get,
-          execute: (workspace) => {
+          execute: async (workspace) => {
             errorContext.set({ workspaceId: workspace.id });
             const resolvedTimelinePointId = resolveCurrentTimelinePointId(runtimeContext);
             const { normalizedPath } = splitAuxPath(path, "移动辅助资料");
@@ -256,7 +256,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
               "移动辅助资料失败：目标路径不能与原路径相同。",
             );
 
-            const existing = resolveAuxNodeByPathOrThrow({
+            const existing = await resolveAuxNodeByPathOrThrow({
               projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointId: resolvedTimelinePointId,
@@ -264,7 +264,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
               actionLabel: "移动辅助资料",
             });
             errorContext.set({ sourceNode: summarizeAuxNode(existing) });
-            const conflicting = readAuxByPathAt(
+            const conflicting = await readAuxByPathAt(
               workspace.projectId,
               workspace.id,
               resolvedTimelinePointId,
@@ -280,7 +280,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
               parentPath: newParentPath,
               actionLabel: "移动辅助资料",
             });
-            const node = moveAuxNodeAt({
+            const node = await moveAuxNodeAt({
               projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointId: resolvedTimelinePointId,
@@ -319,12 +319,12 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
         return withProjectWorkspace({
           projectId,
           getContext: errorContext.get,
-          execute: (workspace) => {
+          execute: async (workspace) => {
             errorContext.set({ workspaceId: workspace.id });
             const resolvedTimelinePointId = resolveCurrentTimelinePointId(runtimeContext);
             const { normalizedPath } = splitAuxPath(path, "删除辅助资料");
             errorContext.set({ timelinePointId: resolvedTimelinePointId, normalizedPath });
-            const node = resolveAuxNodeByPathOrThrow({
+            const node = await resolveAuxNodeByPathOrThrow({
               projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointId: resolvedTimelinePointId,
@@ -333,7 +333,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
             });
             errorContext.set({ targetNode: summarizeAuxNode(node) });
 
-            deleteAuxNodeAt({
+            await deleteAuxNodeAt({
               projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointId: resolvedTimelinePointId,
@@ -377,7 +377,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
         return withProjectWorkspace({
           projectId,
           getContext: errorContext.get,
-          execute: (workspace) => {
+          execute: async (workspace) => {
             errorContext.set({ workspaceId: workspace.id });
             const resolvedTimelinePointId = resolveCurrentTimelinePointId(runtimeContext);
             const { normalizedPath, parentPath, name } = splitAuxPath(path, "创建辅助资料符号链接");
@@ -392,14 +392,15 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
               name,
               normalizedTargetPath,
             });
-            const existing = listAuxDirAt(
+            const dirEntries = await listAuxDirAt(
               workspace.projectId,
               workspace.id,
               resolvedTimelinePointId,
               {
                 path: parentPath,
               },
-            ).find((node) => node.name === name);
+            );
+            const existing = dirEntries.find((node) => node.name === name);
             errorContext.set({ existingNode: summarizeAuxNode(existing) });
             invariant(
               existing == null,
@@ -415,7 +416,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
               parentPath,
               actionLabel: "创建辅助资料符号链接",
             });
-            linkAt({
+            await linkAt({
               projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointId: resolvedTimelinePointId,
@@ -464,7 +465,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
         return withProjectWorkspace({
           projectId,
           getContext: errorContext.get,
-          execute: (workspace) => {
+          execute: async (workspace) => {
             errorContext.set({ workspaceId: workspace.id });
             const resolvedTimelinePointId = resolveCurrentTimelinePointId(runtimeContext);
             const { normalizedPath } = splitAuxPath(path, "重定向辅助资料符号链接");
@@ -479,7 +480,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
               followSymlinksForPath: false,
             });
 
-            const symlinkNode = resolveAuxNodeByPathOrThrow({
+            const symlinkNode = await resolveAuxNodeByPathOrThrow({
               projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointId: resolvedTimelinePointId,
@@ -493,7 +494,7 @@ export function buildAuxWriteTools({ projectId, runtimeContext }: ToolBuildConte
               "重定向辅助资料符号链接失败：指定路径不是符号链接。",
             );
 
-            retargetAuxSymlinkAt({
+            await retargetAuxSymlinkAt({
               projectId: workspace.projectId,
               workspaceId: workspace.id,
               timelinePointId: resolvedTimelinePointId,

@@ -3,16 +3,16 @@ import { expect, test } from "bun:test";
 import { seedProjectRecord } from "@/test/project";
 import * as service from "./index";
 
-function seedProject(projectId: string) {
-  seedProjectRecord(projectId);
-  if (!service.getDefaultWorkspace(projectId)) {
-    service.createDefaultWorkspace(projectId);
+async function seedProject(projectId: string) {
+  await seedProjectRecord(projectId);
+  if (!(await service.getDefaultWorkspace(projectId))) {
+    await service.createDefaultWorkspace(projectId);
   }
-  return service.getDefaultWorkspace(projectId)!;
+  return (await service.getDefaultWorkspace(projectId))!;
 }
 
 test("empty branch before first commit reports no diff areas", async () => {
-  const workspace = seedProject("status_empty_branch");
+  const workspace = await seedProject("status_empty_branch");
 
   const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchId);
 
@@ -24,25 +24,25 @@ test("empty branch before first commit reports no diff areas", async () => {
 });
 
 test("uncommitted edits before first commit appear as additions", async () => {
-  const workspace = seedProject("status_first_commit");
-  service.createContentNode({
+  const workspace = await seedProject("status_first_commit");
+  await service.createContentNode({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "Chapter 1",
     body: "Once",
   });
-  service.createTimelinePoint({
+  await service.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     label: "Intro",
   });
-  service.mkdirAt({
+  await service.mkdirAt({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     path: "/lore",
   });
-  service.writeFileAt({
+  await service.writeFileAt({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     path: "/lore/world.md",
@@ -65,8 +65,8 @@ test("uncommitted edits before first commit appear as additions", async () => {
 });
 
 test("committed workspace with no edits reports hasChanges false", async () => {
-  const workspace = seedProject("status_clean");
-  service.createContentNode({
+  const workspace = await seedProject("status_clean");
+  await service.createContentNode({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
@@ -89,25 +89,25 @@ test("committed workspace with no edits reports hasChanges false", async () => {
 });
 
 test("content, timeline and aux edits appear in the diff summary", async () => {
-  const workspace = seedProject("status_diff");
-  const chapter = service.createContentNode({
+  const workspace = await seedProject("status_diff");
+  const chapter = await service.createContentNode({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "Chapter 1",
     body: "Once",
   });
-  const introPoint = service.createTimelinePoint({
+  const introPoint = await service.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     label: "Intro",
   });
-  service.mkdirAt({
+  await service.mkdirAt({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     path: "/lore",
   });
-  service.writeFileAt({
+  await service.writeFileAt({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     path: "/lore/world.md",
@@ -119,30 +119,30 @@ test("content, timeline and aux edits appear in the diff summary", async () => {
     message: "base",
   });
 
-  service.updateContentNode({
+  await service.updateContentNode({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     nodeId: chapter.id,
     title: "Changed title",
     body: "different",
   });
-  service.createTimelinePoint({
+  await service.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     label: "Middle",
   });
-  service.deleteAuxNodeAt({
+  await service.deleteAuxNodeAt({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     path: "/lore",
   });
-  service.mkdirAt({
+  await service.mkdirAt({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: introPoint.id,
     path: "/notes",
   });
-  service.writeFileAt({
+  await service.writeFileAt({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: introPoint.id,
@@ -165,8 +165,8 @@ test("content, timeline and aux edits appear in the diff summary", async () => {
 });
 
 test("reverting workspace to head clears the diff summary", async () => {
-  const workspace = seedProject("status_revert");
-  const chapter = service.createContentNode({
+  const workspace = await seedProject("status_revert");
+  const chapter = await service.createContentNode({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
@@ -179,7 +179,7 @@ test("reverting workspace to head clears the diff summary", async () => {
     message: "first",
   });
 
-  service.updateContentNode({
+  await service.updateContentNode({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     nodeId: chapter.id,

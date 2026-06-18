@@ -70,22 +70,22 @@ function message(id: string, parentMessageId: string | null): StoredProjectChatM
   };
 }
 
-test("project chat storage persists messages and branch selection under git custom refs", () => {
-  seedProjectRecord("project_chat_storage");
+test("project chat storage persists messages and branch selection under git custom refs", async () => {
+  await seedProjectRecord("project_chat_storage");
   const modelConfig = seedModelSelection();
-  const chat = createProjectChat("project_chat_storage", {
+  const chat = await createProjectChat("project_chat_storage", {
     modelConfig,
   });
 
-  writeProjectChatMessages(
+  await writeProjectChatMessages(
     "project_chat_storage",
     chat.id,
     [message("user_a", null), message("assistant_a1", "user_a"), message("assistant_a2", "user_a")],
     "Seed project chat messages",
   );
-  selectProjectChatMessageChild("project_chat_storage", chat.id, "user_a", "assistant_a1");
+  await selectProjectChatMessageChild("project_chat_storage", chat.id, "user_a", "assistant_a1");
 
-  const detail = getProjectChatDetail("project_chat_storage", chat.id);
+  const detail = await getProjectChatDetail("project_chat_storage", chat.id);
 
   expect(detail.chat.modelConfig).toEqual(modelConfig);
   expect(detail.visibleMessages.map((entry) => entry.id)).toEqual(["user_a", "assistant_a1"]);

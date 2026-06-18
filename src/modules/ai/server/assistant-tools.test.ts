@@ -29,15 +29,15 @@ function createRuntimeContext(
   };
 }
 
-function seedProject(projectId: string) {
-  seedProjectRecord(projectId);
-  return workspaceDomain.createDefaultWorkspace(projectId);
+async function seedProject(projectId: string) {
+  await seedProjectRecord(projectId);
+  return await workspaceDomain.createDefaultWorkspace(projectId);
 }
 
-type TestWorkspace = ReturnType<typeof seedProject>;
+type TestWorkspace = Awaited<ReturnType<typeof seedProject>>;
 
-function auxMkdir(workspace: TestWorkspace, auxPath: string, timelinePointId?: string) {
-  return workspaceDomain.mkdirAt({
+async function auxMkdir(workspace: TestWorkspace, auxPath: string, timelinePointId?: string) {
+  return await workspaceDomain.mkdirAt({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: timelinePointId ?? workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
@@ -45,13 +45,13 @@ function auxMkdir(workspace: TestWorkspace, auxPath: string, timelinePointId?: s
   });
 }
 
-function auxWrite(
+async function auxWrite(
   workspace: TestWorkspace,
   auxPath: string,
   content: string,
   timelinePointId?: string,
 ) {
-  return workspaceDomain.writeFileAt({
+  return await workspaceDomain.writeFileAt({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: timelinePointId ?? workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
@@ -60,13 +60,13 @@ function auxWrite(
   });
 }
 
-function auxLink(
+async function auxLink(
   workspace: TestWorkspace,
   auxPath: string,
   targetPath: string,
   timelinePointId?: string,
 ) {
-  return workspaceDomain.linkAt({
+  return await workspaceDomain.linkAt({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: timelinePointId ?? workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
@@ -75,33 +75,33 @@ function auxLink(
   });
 }
 
-function seedTimelineAuxDiffScenario(projectId: string) {
-  const workspace = seedProject(projectId);
-  auxMkdir(workspace, "/state");
-  auxWrite(workspace, "/state/location.md", "home");
-  auxWrite(workspace, "/state/backup.md", "backup");
-  auxLink(workspace, "/current_location", "/state/location.md");
-  const pointA = workspaceDomain.createTimelinePoint({
+async function seedTimelineAuxDiffScenario(projectId: string) {
+  const workspace = await seedProject(projectId);
+  await auxMkdir(workspace, "/state");
+  await auxWrite(workspace, "/state/location.md", "home");
+  await auxWrite(workspace, "/state/backup.md", "backup");
+  await auxLink(workspace, "/current_location", "/state/location.md");
+  const pointA = await workspaceDomain.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
     label: "离家后",
   });
-  auxWrite(workspace, "/delta-only.md", "delta", pointA.id);
-  auxWrite(workspace, "/state/location.md", "park", pointA.id);
-  const pointB = workspaceDomain.createTimelinePoint({
+  await auxWrite(workspace, "/delta-only.md", "delta", pointA.id);
+  await auxWrite(workspace, "/state/location.md", "park", pointA.id);
+  const pointB = await workspaceDomain.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: pointA.id,
     label: "折返前",
   });
-  workspaceDomain.deleteAuxNodeAt({
+  await workspaceDomain.deleteAuxNodeAt({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: pointB.id,
     path: "/delta-only.md",
   });
-  workspaceDomain.retargetAuxSymlinkAt({
+  await workspaceDomain.retargetAuxSymlinkAt({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: pointB.id,
@@ -119,8 +119,8 @@ async function executeTool<TArgs, TResult>(toolDefinition: unknown, args: TArgs)
   return await execute!(args);
 }
 
-test("createAssistantTools always exposes the full tool set", () => {
-  seedProject("assistant_tools_filter");
+test("createAssistantTools always exposes the full tool set", async () => {
+  await seedProject("assistant_tools_filter");
 
   const tools = createAssistantTools({
     projectId: "assistant_tools_filter",
@@ -136,8 +136,8 @@ test("createAssistantTools always exposes the full tool set", () => {
   expect(tools.write_file).toBeDefined();
 });
 
-test("ask_user is exposed as an external tool without automatic execution", () => {
-  seedProject("assistant_tools_ask_user");
+test("ask_user is exposed as an external tool without automatic execution", async () => {
+  await seedProject("assistant_tools_ask_user");
   const tools = createAssistantTools({
     projectId: "assistant_tools_ask_user",
     runtimeContext: createRuntimeContext(),
@@ -149,7 +149,7 @@ test("ask_user is exposed as an external tool without automatic execution", () =
   expect((tools.ask_user as { inputSchema?: unknown }).inputSchema).toBeDefined();
 });
 
-test("ask_user accepts single_choice custom text answers", () => {
+test("ask_user accepts single_choice custom text answers", async () => {
   const request = normalizeAskUserInput({
     questions: [
       {
@@ -172,7 +172,7 @@ test("ask_user accepts single_choice custom text answers", () => {
   ).toEqual([{ questionId: "tone", type: "single_choice", text: "更梦幻一点" }]);
 });
 
-test("ask_user rejects invalid single_choice answer shapes", () => {
+test("ask_user rejects invalid single_choice answer shapes", async () => {
   const request = normalizeAskUserInput({
     questions: [
       {
@@ -214,22 +214,22 @@ test("ask_user rejects invalid single_choice answer shapes", () => {
 });
 
 test("list_manuscript_nodes returns structure without bodies by default", async () => {
-  const workspace = seedProject("assistant_tools_list_manuscript_default");
-  const chapter = workspaceDomain.createContentNode({
+  const workspace = await seedProject("assistant_tools_list_manuscript_default");
+  const chapter = await workspaceDomain.createContentNode({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "第一章",
     body: "第一章正文",
   });
-  const scene = workspaceDomain.createContentNode({
+  const scene = await workspaceDomain.createContentNode({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: chapter.id,
     title: "第一场",
     body: "第一场正文",
   });
-  workspaceDomain.createContentNode({
+  await workspaceDomain.createContentNode({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: scene.id,
@@ -271,20 +271,20 @@ test("list_manuscript_nodes returns structure without bodies by default", async 
 });
 
 test("list_manuscript_nodes accepts a root node and deeper depth", async () => {
-  const workspace = seedProject("assistant_tools_list_manuscript_deep");
-  const chapter = workspaceDomain.createContentNode({
+  const workspace = await seedProject("assistant_tools_list_manuscript_deep");
+  const chapter = await workspaceDomain.createContentNode({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "第一章",
   });
-  const scene = workspaceDomain.createContentNode({
+  const scene = await workspaceDomain.createContentNode({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: chapter.id,
     title: "第一场",
   });
-  const beat = workspaceDomain.createContentNode({
+  const beat = await workspaceDomain.createContentNode({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: scene.id,
@@ -332,22 +332,22 @@ test("list_manuscript_nodes accepts a root node and deeper depth", async () => {
 });
 
 test("read_manuscript_node returns one full node with child structure summaries", async () => {
-  const workspace = seedProject("assistant_tools_read_manuscript_node");
-  const chapter = workspaceDomain.createContentNode({
+  const workspace = await seedProject("assistant_tools_read_manuscript_node");
+  const chapter = await workspaceDomain.createContentNode({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "第一章",
     body: "第一章完整正文",
   });
-  const scene = workspaceDomain.createContentNode({
+  const scene = await workspaceDomain.createContentNode({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: chapter.id,
     title: "第一场",
     body: "子节点正文不应返回",
   });
-  workspaceDomain.createContentNode({
+  await workspaceDomain.createContentNode({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: scene.id,
@@ -385,8 +385,8 @@ test("read_manuscript_node returns one full node with child structure summaries"
 });
 
 test("read_manuscript_node defaults to the active content node", async () => {
-  const workspace = seedProject("assistant_tools_read_active_manuscript_node");
-  const chapter = workspaceDomain.createContentNode({
+  const workspace = await seedProject("assistant_tools_read_active_manuscript_node");
+  const chapter = await workspaceDomain.createContentNode({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
@@ -421,7 +421,7 @@ test("read_manuscript_node defaults to the active content node", async () => {
 });
 
 test("read_manuscript_node fails without a node id or active content node", async () => {
-  seedProject("assistant_tools_read_manuscript_node_missing");
+  await seedProject("assistant_tools_read_manuscript_node_missing");
   const tools = createAssistantTools({
     projectId: "assistant_tools_read_manuscript_node_missing",
     runtimeContext: createRuntimeContext(),
@@ -436,8 +436,8 @@ test("read_manuscript_node fails without a node id or active content node", asyn
 });
 
 test("create_manuscript_node anchors new content to the current timeline point", async () => {
-  const workspace = seedProject("assistant_tools_create_manuscript_anchor");
-  const timelinePoint = workspaceDomain.createTimelinePoint({
+  const workspace = await seedProject("assistant_tools_create_manuscript_anchor");
+  const timelinePoint = await workspaceDomain.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
@@ -473,7 +473,7 @@ test("create_manuscript_node anchors new content to the current timeline point",
   });
   const nodeId = (result as { data: { nodeId: string } }).data.nodeId;
   expect(
-    workspaceDomain.readManuscriptNode(workspace.projectId, workspace.id, nodeId),
+    await workspaceDomain.readManuscriptNode(workspace.projectId, workspace.id, nodeId),
   ).toMatchObject({
     id: nodeId,
     anchorTimelinePointId: timelinePoint.id,
@@ -483,7 +483,7 @@ test("create_manuscript_node anchors new content to the current timeline point",
 });
 
 test("create_manuscript_node creates a top-level node when parentId is omitted", async () => {
-  const workspace = seedProject("assistant_tools_create_manuscript_top_level_omitted_parent");
+  const workspace = await seedProject("assistant_tools_create_manuscript_top_level_omitted_parent");
   const tools = createAssistantTools({
     projectId: "assistant_tools_create_manuscript_top_level_omitted_parent",
     runtimeContext: createRuntimeContext(),
@@ -504,12 +504,14 @@ test("create_manuscript_node creates a top-level node when parentId is omitted",
 
   const nodeId = (result as { data: { nodeId: string } }).data.nodeId;
   expect(
-    workspaceDomain
-      .listManuscriptNodes(workspace.projectId, workspace.id, undefined, { depth: 1 })
-      .nodes.map((node) => node.id),
+    (
+      await workspaceDomain.listManuscriptNodes(workspace.projectId, workspace.id, undefined, {
+        depth: 1,
+      })
+    ).nodes.map((node) => node.id),
   ).toContain(nodeId);
   expect(
-    workspaceDomain.readManuscriptNode(workspace.projectId, workspace.id, nodeId),
+    await workspaceDomain.readManuscriptNode(workspace.projectId, workspace.id, nodeId),
   ).toMatchObject({
     id: nodeId,
     title: "顶层章节",
@@ -517,7 +519,7 @@ test("create_manuscript_node creates a top-level node when parentId is omitted",
 });
 
 test("create_manuscript_node rejects missing or blank title", async () => {
-  seedProject("assistant_tools_create_manuscript_missing_title");
+  await seedProject("assistant_tools_create_manuscript_missing_title");
   const tools = createAssistantTools({
     projectId: "assistant_tools_create_manuscript_missing_title",
     runtimeContext: createRuntimeContext(),
@@ -544,8 +546,8 @@ test("create_manuscript_node rejects missing or blank title", async () => {
 });
 
 test("create_manuscript_node treats empty parent and sibling ids as top-level insertion", async () => {
-  const workspace = seedProject("assistant_tools_create_manuscript_empty_parent");
-  workspaceDomain.createContentNode({
+  const workspace = await seedProject("assistant_tools_create_manuscript_empty_parent");
+  await workspaceDomain.createContentNode({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
@@ -563,21 +565,23 @@ test("create_manuscript_node treats empty parent and sibling ids as top-level in
   });
 
   expect(
-    workspaceDomain
-      .listManuscriptNodes(workspace.projectId, workspace.id, undefined, { depth: 1 })
-      .nodes.map((node) => node.title),
+    (
+      await workspaceDomain.listManuscriptNodes(workspace.projectId, workspace.id, undefined, {
+        depth: 1,
+      })
+    ).nodes.map((node) => node.title),
   ).toEqual(["新顶层章节", "已存在章节"]);
 });
 
 test("create_manuscript_node preserves call order when parallel calls share an insertion point", async () => {
-  const workspace = seedProject("assistant_tools_create_manuscript_parallel_order");
-  const chapter7 = workspaceDomain.createContentNode({
+  const workspace = await seedProject("assistant_tools_create_manuscript_parallel_order");
+  const chapter7 = await workspaceDomain.createContentNode({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "第七章",
   });
-  workspaceDomain.createContentNode({
+  await workspaceDomain.createContentNode({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
@@ -608,21 +612,23 @@ test("create_manuscript_node preserves call order when parallel calls share an i
   ]);
 
   expect(
-    workspaceDomain
-      .listManuscriptNodes(workspace.projectId, workspace.id, undefined, { depth: 1 })
-      .nodes.map((node) => node.title),
+    (
+      await workspaceDomain.listManuscriptNodes(workspace.projectId, workspace.id, undefined, {
+        depth: 1,
+      })
+    ).nodes.map((node) => node.title),
   ).toEqual(["第七章", "第八章", "第九章", "第十章", "终章"]);
 });
 
 test("content write tools return manuscript titles for model and UI summaries", async () => {
-  const workspace = seedProject("assistant_tools_content_write_titles");
-  const chapter = workspaceDomain.createContentNode({
+  const workspace = await seedProject("assistant_tools_content_write_titles");
+  const chapter = await workspaceDomain.createContentNode({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
     title: "旧标题",
   });
-  const parent = workspaceDomain.createContentNode({
+  const parent = await workspaceDomain.createContentNode({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
@@ -691,8 +697,8 @@ test("content write tools return manuscript titles for model and UI summaries", 
 });
 
 test("update_manuscript_node accepts null to clear body but not title", async () => {
-  const workspace = seedProject("assistant_tools_update_manuscript_nullable_fields");
-  const chapter = workspaceDomain.createContentNode({
+  const workspace = await seedProject("assistant_tools_update_manuscript_nullable_fields");
+  const chapter = await workspaceDomain.createContentNode({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
@@ -718,7 +724,7 @@ test("update_manuscript_node accepts null to clear body but not title", async ()
     },
   });
   expect(
-    workspaceDomain.readManuscriptNode(workspace.projectId, workspace.id, chapter.id),
+    await workspaceDomain.readManuscriptNode(workspace.projectId, workspace.id, chapter.id),
   ).toMatchObject({
     id: chapter.id,
     title: "原标题",
@@ -737,20 +743,20 @@ test("update_manuscript_node accepts null to clear body but not title", async ()
 });
 
 test("update_manuscript_node warns when editing body outside the node anchor timeline", async () => {
-  const workspace = seedProject("assistant_tools_update_manuscript_anchor_warning");
-  const anchoredPoint = workspaceDomain.createTimelinePoint({
+  const workspace = await seedProject("assistant_tools_update_manuscript_anchor_warning");
+  const anchoredPoint = await workspaceDomain.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
     label: "锚定章节",
   });
-  const currentPoint = workspaceDomain.createTimelinePoint({
+  const currentPoint = await workspaceDomain.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: anchoredPoint.id,
     label: "当前上下文",
   });
-  const chapter = workspaceDomain.createContentNode({
+  const chapter = await workspaceDomain.createContentNode({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     parentId: null,
@@ -795,7 +801,7 @@ test("update_manuscript_node warns when editing body outside the node anchor tim
 });
 
 test("list_files returns a recursive tree by default", async () => {
-  const workspace = seedProject("assistant_tools_list_tree_default");
+  const workspace = await seedProject("assistant_tools_list_tree_default");
   auxMkdir(workspace, "/设定");
   auxMkdir(workspace, "/设定/世界观");
   auxWrite(workspace, "/设定/角色.md", "角色");
@@ -869,7 +875,7 @@ test("list_files returns a recursive tree by default", async () => {
 });
 
 test("list_files accepts a deeper depth for nested directories", async () => {
-  const workspace = seedProject("assistant_tools_list_tree_deep");
+  const workspace = await seedProject("assistant_tools_list_tree_deep");
   auxMkdir(workspace, "/设定");
   auxMkdir(workspace, "/设定/世界观");
   auxWrite(workspace, "/设定/世界观/王都.md", "王都");
@@ -909,7 +915,7 @@ test("list_files accepts a deeper depth for nested directories", async () => {
 });
 
 test("create_dir creates a directory at the current timeline point", async () => {
-  const workspace = seedProject("assistant_tools_mkdir");
+  const workspace = await seedProject("assistant_tools_mkdir");
   const tools = createAssistantTools({
     projectId: "assistant_tools_mkdir",
     runtimeContext: createRuntimeContext(),
@@ -926,17 +932,19 @@ test("create_dir creates a directory at the current timeline point", async () =>
     },
   });
   expect(
-    workspaceDomain.readAuxByPathAt(
-      workspace.projectId,
-      workspace.id,
-      workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
-      "/设定",
+    (
+      await workspaceDomain.readAuxByPathAt(
+        workspace.projectId,
+        workspace.id,
+        workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+        "/设定",
+      )
     )?.nodeType,
   ).toBe("dir");
 });
 
 test("write_file creates a new file when the target path does not exist", async () => {
-  const workspace = seedProject("assistant_tools_write_create");
+  const workspace = await seedProject("assistant_tools_write_create");
   auxMkdir(workspace, "/设定");
   const tools = createAssistantTools({
     projectId: "assistant_tools_write_create",
@@ -957,17 +965,19 @@ test("write_file creates a new file when the target path does not exist", async 
     },
   });
   expect(
-    workspaceDomain.readAuxByPathAt(
-      workspace.projectId,
-      workspace.id,
-      workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
-      "/设定/角色.md",
+    (
+      await workspaceDomain.readAuxByPathAt(
+        workspace.projectId,
+        workspace.id,
+        workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+        "/设定/角色.md",
+      )
     )?.content,
   ).toBe("主角设定");
 });
 
 test("write_file overwrites an existing file", async () => {
-  const workspace = seedProject("assistant_tools_write_update");
+  const workspace = await seedProject("assistant_tools_write_update");
   auxMkdir(workspace, "/设定");
   auxWrite(workspace, "/设定/角色.md", "旧内容");
   const tools = createAssistantTools({
@@ -989,20 +999,22 @@ test("write_file overwrites an existing file", async () => {
     },
   });
   expect(
-    workspaceDomain.readAuxByPathAt(
-      workspace.projectId,
-      workspace.id,
-      workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
-      "/设定/角色.md",
+    (
+      await workspaceDomain.readAuxByPathAt(
+        workspace.projectId,
+        workspace.id,
+        workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+        "/设定/角色.md",
+      )
     )?.content,
   ).toBe("新内容");
 });
 
 test("write_file overlays inherited files without changing earlier timeline points", async () => {
-  const workspace = seedProject("assistant_tools_write_overlay_inherit");
+  const workspace = await seedProject("assistant_tools_write_overlay_inherit");
   auxMkdir(workspace, "/设定");
   auxWrite(workspace, "/设定/角色.md", "origin 内容");
-  const timelinePoint = workspaceDomain.createTimelinePoint({
+  const timelinePoint = await workspaceDomain.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
@@ -1033,25 +1045,29 @@ test("write_file overlays inherited files without changing earlier timeline poin
     },
   });
   expect(
-    workspaceDomain.readAuxByPathAt(
-      workspace.projectId,
-      workspace.id,
-      workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
-      "/设定/角色.md",
+    (
+      await workspaceDomain.readAuxByPathAt(
+        workspace.projectId,
+        workspace.id,
+        workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+        "/设定/角色.md",
+      )
     )?.content,
   ).toBe("origin 内容");
   expect(
-    workspaceDomain.readAuxByPathAt(
-      workspace.projectId,
-      workspace.id,
-      timelinePoint.id,
-      "/设定/角色.md",
+    (
+      await workspaceDomain.readAuxByPathAt(
+        workspace.projectId,
+        workspace.id,
+        timelinePoint.id,
+        "/设定/角色.md",
+      )
     )?.content,
   ).toBe("draft 内容");
 });
 
 test("write_file returns an error when the parent directory does not exist", async () => {
-  seedProject("assistant_tools_write_missing_parent");
+  await seedProject("assistant_tools_write_missing_parent");
   const tools = createAssistantTools({
     projectId: "assistant_tools_write_missing_parent",
     runtimeContext: createRuntimeContext(),
@@ -1069,7 +1085,7 @@ test("write_file returns an error when the parent directory does not exist", asy
 });
 
 test("write_file returns an error when the target path is a directory", async () => {
-  const workspace = seedProject("assistant_tools_write_dir_guard");
+  const workspace = await seedProject("assistant_tools_write_dir_guard");
   auxMkdir(workspace, "/设定");
   const tools = createAssistantTools({
     projectId: "assistant_tools_write_dir_guard",
@@ -1088,7 +1104,7 @@ test("write_file returns an error when the target path is a directory", async ()
 });
 
 test("move_path renames a file in the same directory", async () => {
-  const workspace = seedProject("assistant_tools_move_rename");
+  const workspace = await seedProject("assistant_tools_move_rename");
   auxMkdir(workspace, "/设定");
   auxWrite(workspace, "/设定/角色.md", "主角设定");
   const tools = createAssistantTools({
@@ -1111,7 +1127,7 @@ test("move_path renames a file in the same directory", async () => {
     },
   });
   expect(
-    workspaceDomain.readAuxByPathAt(
+    await workspaceDomain.readAuxByPathAt(
       workspace.projectId,
       workspace.id,
       workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
@@ -1119,17 +1135,19 @@ test("move_path renames a file in the same directory", async () => {
     ),
   ).toBeNull();
   expect(
-    workspaceDomain.readAuxByPathAt(
-      workspace.projectId,
-      workspace.id,
-      workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
-      "/设定/主角.md",
+    (
+      await workspaceDomain.readAuxByPathAt(
+        workspace.projectId,
+        workspace.id,
+        workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+        "/设定/主角.md",
+      )
     )?.path,
   ).toBe("/设定/主角.md");
 });
 
 test("move_path moves a file across directories", async () => {
-  const workspace = seedProject("assistant_tools_move_cross_dir");
+  const workspace = await seedProject("assistant_tools_move_cross_dir");
   auxMkdir(workspace, "/设定");
   auxMkdir(workspace, "/资料库");
   auxWrite(workspace, "/设定/角色.md", "主角设定");
@@ -1152,17 +1170,19 @@ test("move_path moves a file across directories", async () => {
     },
   });
   expect(
-    workspaceDomain.readAuxByPathAt(
-      workspace.projectId,
-      workspace.id,
-      workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
-      "/资料库/角色.md",
+    (
+      await workspaceDomain.readAuxByPathAt(
+        workspace.projectId,
+        workspace.id,
+        workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+        "/资料库/角色.md",
+      )
     )?.path,
   ).toBe("/资料库/角色.md");
 });
 
 test("move_path moves a directory", async () => {
-  const workspace = seedProject("assistant_tools_move_dir");
+  const workspace = await seedProject("assistant_tools_move_dir");
   auxMkdir(workspace, "/设定");
   auxMkdir(workspace, "/资料库");
   auxMkdir(workspace, "/设定/角色");
@@ -1185,17 +1205,19 @@ test("move_path moves a directory", async () => {
     },
   });
   expect(
-    workspaceDomain.readAuxByPathAt(
-      workspace.projectId,
-      workspace.id,
-      workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
-      "/资料库/角色档案",
+    (
+      await workspaceDomain.readAuxByPathAt(
+        workspace.projectId,
+        workspace.id,
+        workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+        "/资料库/角色档案",
+      )
     )?.path,
   ).toBe("/资料库/角色档案");
 });
 
 test("move_path returns an error when the target path already exists", async () => {
-  const workspace = seedProject("assistant_tools_move_conflict");
+  const workspace = await seedProject("assistant_tools_move_conflict");
   auxMkdir(workspace, "/设定");
   auxWrite(workspace, "/设定/角色.md", "a");
   auxWrite(workspace, "/设定/主角.md", "b");
@@ -1216,7 +1238,7 @@ test("move_path returns an error when the target path already exists", async () 
 });
 
 test("move_path returns an error when the target parent directory does not exist", async () => {
-  const workspace = seedProject("assistant_tools_move_missing_parent");
+  const workspace = await seedProject("assistant_tools_move_missing_parent");
   auxMkdir(workspace, "/设定");
   auxWrite(workspace, "/设定/角色.md", "a");
   const tools = createAssistantTools({
@@ -1236,7 +1258,7 @@ test("move_path returns an error when the target parent directory does not exist
 });
 
 test("move_path rejects moving a directory under its own subtree", async () => {
-  const workspace = seedProject("assistant_tools_move_into_child");
+  const workspace = await seedProject("assistant_tools_move_into_child");
   auxMkdir(workspace, "/设定");
   auxMkdir(workspace, "/设定/角色");
   const tools = createAssistantTools({
@@ -1256,11 +1278,11 @@ test("move_path rejects moving a directory under its own subtree", async () => {
 });
 
 test("move_path respects the active timeline point from context", async () => {
-  const workspace = seedProject("assistant_tools_move_timeline");
+  const workspace = await seedProject("assistant_tools_move_timeline");
   auxMkdir(workspace, "/设定");
   auxMkdir(workspace, "/资料库");
   auxWrite(workspace, "/设定/角色.md", "origin");
-  const timelinePoint = workspaceDomain.createTimelinePoint({
+  const timelinePoint = await workspaceDomain.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
@@ -1284,25 +1306,29 @@ test("move_path respects the active timeline point from context", async () => {
   });
 
   expect(
-    workspaceDomain.readAuxByPathAt(
-      workspace.projectId,
-      workspace.id,
-      workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
-      "/设定/角色.md",
+    (
+      await workspaceDomain.readAuxByPathAt(
+        workspace.projectId,
+        workspace.id,
+        workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+        "/设定/角色.md",
+      )
     )?.path,
   ).toBe("/设定/角色.md");
   expect(
-    workspaceDomain.readAuxByPathAt(
-      workspace.projectId,
-      workspace.id,
-      timelinePoint.id,
-      "/资料库/角色.md",
+    (
+      await workspaceDomain.readAuxByPathAt(
+        workspace.projectId,
+        workspace.id,
+        timelinePoint.id,
+        "/资料库/角色.md",
+      )
     )?.path,
   ).toBe("/资料库/角色.md");
 });
 
 test("create_symlink creates a symlink to a file", async () => {
-  const workspace = seedProject("assistant_tools_symlink_file");
+  const workspace = await seedProject("assistant_tools_symlink_file");
   auxMkdir(workspace, "/设定");
   auxMkdir(workspace, "/索引");
   auxWrite(workspace, "/设定/角色.md", "主角设定");
@@ -1325,34 +1351,38 @@ test("create_symlink creates a symlink to a file", async () => {
     },
   });
   expect(
-    workspaceDomain.readAuxByPathAt(
-      workspace.projectId,
-      workspace.id,
-      workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
-      "/索引/角色.md",
+    (
+      await workspaceDomain.readAuxByPathAt(
+        workspace.projectId,
+        workspace.id,
+        workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+        "/索引/角色.md",
+      )
     )?.path,
   ).toBe("/索引/角色.md");
   expect(
-    workspaceDomain.readAuxByPathAt(
-      workspace.projectId,
-      workspace.id,
-      workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
-      "/索引/角色.md",
+    (
+      await workspaceDomain.readAuxByPathAt(
+        workspace.projectId,
+        workspace.id,
+        workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+        "/索引/角色.md",
+      )
     )?.nodeType,
   ).toBe("symlink");
   expect(
-    workspaceDomain
-      .exportAuxSnapshotTree(
+    (
+      await workspaceDomain.exportAuxSnapshotTree(
         workspace.projectId,
         workspace.id,
         workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
       )
-      .nodes.find((node) => node.path === "/索引")?.children[0]?.symlinkTargetPath,
+    ).nodes.find((node) => node.path === "/索引")?.children[0]?.symlinkTargetPath,
   ).toBe("/设定/角色.md");
 });
 
 test("create_symlink creates a symlink to a directory", async () => {
-  const workspace = seedProject("assistant_tools_symlink_dir");
+  const workspace = await seedProject("assistant_tools_symlink_dir");
   auxMkdir(workspace, "/设定");
   auxMkdir(workspace, "/索引");
   const tools = createAssistantTools({
@@ -1373,36 +1403,40 @@ test("create_symlink creates a symlink to a directory", async () => {
       targetPath: "/设定",
     },
   });
-  const indexNode = workspaceDomain
-    .exportAuxSnapshotTree(
+  const indexNode = (
+    await workspaceDomain.exportAuxSnapshotTree(
       workspace.projectId,
       workspace.id,
       workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
     )
-    .nodes.find((node) => node.path === "/索引");
+  ).nodes.find((node) => node.path === "/索引");
   expect(
     indexNode?.children.find((node) => node.path === "/索引/设定入口")?.symlinkTargetPath,
   ).toBe("/设定");
   expect(
-    workspaceDomain.readAuxByPathAt(
-      workspace.projectId,
-      workspace.id,
-      workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
-      "/索引/设定入口",
+    (
+      await workspaceDomain.readAuxByPathAt(
+        workspace.projectId,
+        workspace.id,
+        workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+        "/索引/设定入口",
+      )
     )?.path,
   ).toBe("/索引/设定入口");
   expect(
-    workspaceDomain.readAuxByPathAt(
-      workspace.projectId,
-      workspace.id,
-      workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
-      "/索引/设定入口",
+    (
+      await workspaceDomain.readAuxByPathAt(
+        workspace.projectId,
+        workspace.id,
+        workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+        "/索引/设定入口",
+      )
     )?.nodeType,
   ).toBe("symlink");
 });
 
 test("create_symlink accepts a broken logical target path", async () => {
-  const workspace = seedProject("assistant_tools_symlink_missing_target");
+  const workspace = await seedProject("assistant_tools_symlink_missing_target");
   auxMkdir(workspace, "/索引");
   const tools = createAssistantTools({
     projectId: "assistant_tools_symlink_missing_target",
@@ -1423,17 +1457,19 @@ test("create_symlink accepts a broken logical target path", async () => {
     },
   });
   expect(
-    workspaceDomain.readAuxByPathAt(
-      workspace.projectId,
-      workspace.id,
-      workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
-      "/索引/角色.md",
+    (
+      await workspaceDomain.readAuxByPathAt(
+        workspace.projectId,
+        workspace.id,
+        workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+        "/索引/角色.md",
+      )
     )?.symlinkTargetPath,
   ).toBe("/设定/角色.md");
 });
 
 test("create_symlink returns an error when the destination path already exists", async () => {
-  const workspace = seedProject("assistant_tools_symlink_conflict");
+  const workspace = await seedProject("assistant_tools_symlink_conflict");
   auxMkdir(workspace, "/设定");
   auxMkdir(workspace, "/索引");
   auxWrite(workspace, "/设定/角色.md", "主角设定");
@@ -1455,7 +1491,7 @@ test("create_symlink returns an error when the destination path already exists",
 });
 
 test("create_symlink suggests retarget_symlink when the destination is an existing symlink", async () => {
-  const workspace = seedProject("assistant_tools_symlink_retarget_hint");
+  const workspace = await seedProject("assistant_tools_symlink_retarget_hint");
   auxMkdir(workspace, "/设定");
   auxMkdir(workspace, "/场景");
   auxMkdir(workspace, "/索引");
@@ -1476,17 +1512,19 @@ test("create_symlink suggests retarget_symlink when the destination is an existi
       "创建辅助资料符号链接失败：同路径已存在符号链接。通常你想要的是调用 retarget_symlink 来修改它的目标。",
   });
   expect(
-    workspaceDomain.readAuxByPathAt(
-      workspace.projectId,
-      workspace.id,
-      workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
-      "/场景",
+    (
+      await workspaceDomain.readAuxByPathAt(
+        workspace.projectId,
+        workspace.id,
+        workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+        "/场景",
+      )
     )?.path,
   ).toBe("/场景");
 });
 
 test("retarget_symlink resolves the source path without following the symlink", async () => {
-  const workspace = seedProject("assistant_tools_symlink_retarget_source");
+  const workspace = await seedProject("assistant_tools_symlink_retarget_source");
   auxMkdir(workspace, "/大纲");
   auxWrite(workspace, "/大纲/序幕大纲.md", "序幕");
   auxWrite(workspace, "/大纲/第一幕大纲.md", "第一幕");
@@ -1510,27 +1548,29 @@ test("retarget_symlink resolves the source path without following the symlink", 
     },
   });
   expect(
-    workspaceDomain.readAuxByPathAt(
-      workspace.projectId,
-      workspace.id,
-      workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
-      "/当前大纲",
+    (
+      await workspaceDomain.readAuxByPathAt(
+        workspace.projectId,
+        workspace.id,
+        workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
+        "/当前大纲",
+      )
     )?.path,
   ).toBe("/当前大纲");
   expect(
-    workspaceDomain
-      .exportAuxSnapshotTree(
+    (
+      await workspaceDomain.exportAuxSnapshotTree(
         workspace.projectId,
         workspace.id,
         workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
       )
-      .nodes.find((node) => node.path === "/当前大纲")?.symlinkTargetPath,
+    ).nodes.find((node) => node.path === "/当前大纲")?.symlinkTargetPath,
   ).toBe("/大纲/第一幕大纲.md");
 });
 
 test("aux write tools respect the active timeline point from context", async () => {
-  const workspace = seedProject("assistant_tools_timeline");
-  const timelinePoint = workspaceDomain.createTimelinePoint({
+  const workspace = await seedProject("assistant_tools_timeline");
+  const timelinePoint = await workspaceDomain.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
@@ -1551,7 +1591,7 @@ test("aux write tools respect the active timeline point from context", async () 
   await executeTool(tools.create_dir!, { path: "/草稿" });
 
   expect(
-    workspaceDomain.readAuxByPathAt(
+    await workspaceDomain.readAuxByPathAt(
       workspace.projectId,
       workspace.id,
       workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
@@ -1559,14 +1599,20 @@ test("aux write tools respect the active timeline point from context", async () 
     ),
   ).toBeNull();
   expect(
-    workspaceDomain.readAuxByPathAt(workspace.projectId, workspace.id, timelinePoint.id, "/草稿")
-      ?.nodeType,
+    (
+      await workspaceDomain.readAuxByPathAt(
+        workspace.projectId,
+        workspace.id,
+        timelinePoint.id,
+        "/草稿",
+      )
+    )?.nodeType,
   ).toBe("dir");
 });
 
 test("set_current_timeline updates runtime context for later file tools", async () => {
-  const workspace = seedProject("assistant_tools_set_timeline");
-  const timelinePoint = workspaceDomain.createTimelinePoint({
+  const workspace = await seedProject("assistant_tools_set_timeline");
+  const timelinePoint = await workspaceDomain.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
@@ -1600,11 +1646,17 @@ test("set_current_timeline updates runtime context for later file tools", async 
   });
   expect(runtimeContext.snapshot?.activeTimelinePointId).toBe(timelinePoint.id);
   expect(
-    workspaceDomain.readAuxByPathAt(workspace.projectId, workspace.id, timelinePoint.id, "/草稿")
-      ?.nodeType,
+    (
+      await workspaceDomain.readAuxByPathAt(
+        workspace.projectId,
+        workspace.id,
+        timelinePoint.id,
+        "/草稿",
+      )
+    )?.nodeType,
   ).toBe("dir");
   expect(
-    workspaceDomain.readAuxByPathAt(
+    await workspaceDomain.readAuxByPathAt(
       workspace.projectId,
       workspace.id,
       workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
@@ -1614,8 +1666,8 @@ test("set_current_timeline updates runtime context for later file tools", async 
 });
 
 test("set_current_timeline accepts origin", async () => {
-  const workspace = seedProject("assistant_tools_set_origin");
-  const timelinePoint = workspaceDomain.createTimelinePoint({
+  const workspace = await seedProject("assistant_tools_set_origin");
+  const timelinePoint = await workspaceDomain.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
@@ -1652,8 +1704,8 @@ test("set_current_timeline accepts origin", async () => {
 });
 
 test("set_current_timeline accepts timeline label as fallback and returns warning", async () => {
-  const workspace = seedProject("assistant_tools_set_timeline_by_label");
-  const timelinePoint = workspaceDomain.createTimelinePoint({
+  const workspace = await seedProject("assistant_tools_set_timeline_by_label");
+  const timelinePoint = await workspaceDomain.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
@@ -1696,7 +1748,7 @@ test("set_current_timeline accepts timeline label as fallback and returns warnin
 });
 
 test("list_story_timeline_points includes aux change summary counts", async () => {
-  const { workspace, pointA, pointB } = seedTimelineAuxDiffScenario(
+  const { workspace, pointA, pointB } = await seedTimelineAuxDiffScenario(
     "assistant_tools_timeline_aux_summary",
   );
   const tools = createAssistantTools({
@@ -1760,7 +1812,9 @@ test("list_story_timeline_points includes aux change summary counts", async () =
 });
 
 test("list_current_timeline_aux_changes enumerates current timeline changes without file content", async () => {
-  const { pointA, pointB } = seedTimelineAuxDiffScenario("assistant_tools_timeline_aux_changes");
+  const { pointA, pointB } = await seedTimelineAuxDiffScenario(
+    "assistant_tools_timeline_aux_changes",
+  );
   const runtimeContext = createRuntimeContext({
     workspaceId: null,
     activeContentNodeId: null,
@@ -1816,14 +1870,14 @@ test("list_current_timeline_aux_changes enumerates current timeline changes with
 });
 
 test("create_story_timeline_points accepts afterPointId as timeline label", async () => {
-  const workspace = seedProject("assistant_tools_create_timeline_after_label");
-  const prologue = workspaceDomain.createTimelinePoint({
+  const workspace = await seedProject("assistant_tools_create_timeline_after_label");
+  const prologue = await workspaceDomain.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
     label: "序幕",
   });
-  workspaceDomain.createTimelinePoint({
+  await workspaceDomain.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: prologue.id,
@@ -1847,21 +1901,21 @@ test("create_story_timeline_points accepts afterPointId as timeline label", asyn
     },
   });
   expect(
-    workspaceDomain
-      .listTimelinePoints(workspace.projectId, workspace.id)
-      .map((point) => point.label),
+    (await workspaceDomain.listTimelinePoints(workspace.projectId, workspace.id)).map(
+      (point) => point.label,
+    ),
   ).toEqual(["原点", "序幕", "转折", "第一章"]);
 });
 
 test("create_story_timeline_points prefers exact id over matching label", async () => {
-  const workspace = seedProject("assistant_tools_create_timeline_after_id_priority");
-  const firstPoint = workspaceDomain.createTimelinePoint({
+  const workspace = await seedProject("assistant_tools_create_timeline_after_id_priority");
+  const firstPoint = await workspaceDomain.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
     label: "第一章",
   });
-  workspaceDomain.createTimelinePoint({
+  await workspaceDomain.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: firstPoint.id,
@@ -1878,15 +1932,15 @@ test("create_story_timeline_points prefers exact id over matching label", async 
   });
 
   expect(
-    workspaceDomain
-      .listTimelinePoints(workspace.projectId, workspace.id)
-      .map((point) => point.label),
+    (await workspaceDomain.listTimelinePoints(workspace.projectId, workspace.id)).map(
+      (point) => point.label,
+    ),
   ).toEqual(["原点", "第一章", "插入点", firstPoint.id]);
 });
 
 test("create_story_timeline_points creates multiple points in one batch", async () => {
-  const workspace = seedProject("assistant_tools_create_timeline_batch");
-  workspaceDomain.createTimelinePoint({
+  const workspace = await seedProject("assistant_tools_create_timeline_batch");
+  await workspaceDomain.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
@@ -1914,30 +1968,34 @@ test("create_story_timeline_points creates multiple points in one batch", async 
     },
   });
   expect(
-    workspaceDomain
-      .listTimelinePoints(workspace.projectId, workspace.id)
-      .map((point) => point.label),
+    (await workspaceDomain.listTimelinePoints(workspace.projectId, workspace.id)).map(
+      (point) => point.label,
+    ),
   ).toEqual(["原点", "序幕", "第一章", "第二章", "第三章"]);
 });
 
 test("move_story_timeline_point accepts pointId and afterPointId as timeline labels", async () => {
-  const workspace = seedProject("assistant_tools_move_timeline_by_label");
-  workspaceDomain.createTimelinePoint({
+  const workspace = await seedProject("assistant_tools_move_timeline_by_label");
+  await workspaceDomain.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
     label: "序幕",
   });
-  workspaceDomain.createTimelinePoint({
+  await workspaceDomain.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
-    afterPointId: workspaceDomain.listTimelinePoints(workspace.projectId, workspace.id)[1]!.id,
+    afterPointId: await (
+      await workspaceDomain.listTimelinePoints(workspace.projectId, workspace.id)
+    )[1]!.id,
     label: "第一章",
   });
-  workspaceDomain.createTimelinePoint({
+  await workspaceDomain.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
-    afterPointId: workspaceDomain.listTimelinePoints(workspace.projectId, workspace.id)[2]!.id,
+    afterPointId: await (
+      await workspaceDomain.listTimelinePoints(workspace.projectId, workspace.id)
+    )[2]!.id,
     label: "第二章",
   });
   const tools = createAssistantTools({
@@ -1959,14 +2017,14 @@ test("move_story_timeline_point accepts pointId and afterPointId as timeline lab
     },
   });
   expect(
-    workspaceDomain
-      .listTimelinePoints(workspace.projectId, workspace.id)
-      .map((point) => point.label),
+    (await workspaceDomain.listTimelinePoints(workspace.projectId, workspace.id)).map(
+      (point) => point.label,
+    ),
   ).toEqual(["原点", "序幕", "第二章", "第一章"]);
 });
 
 test("move_story_timeline_point rejects origin by name", async () => {
-  const workspace = seedProject("assistant_tools_move_timeline_origin_guard");
+  const workspace = await seedProject("assistant_tools_move_timeline_origin_guard");
   const tools = createAssistantTools({
     projectId: "assistant_tools_move_timeline_origin_guard",
     runtimeContext: createRuntimeContext(),
@@ -1984,17 +2042,19 @@ test("move_story_timeline_point rejects origin by name", async () => {
 });
 
 test("delete_story_timeline_point accepts pointId as timeline label", async () => {
-  const workspace = seedProject("assistant_tools_delete_timeline_by_label");
-  workspaceDomain.createTimelinePoint({
+  const workspace = await seedProject("assistant_tools_delete_timeline_by_label");
+  await workspaceDomain.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: workspaceDomain.ORIGIN_TIMELINE_POINT_ID,
     label: "序幕",
   });
-  workspaceDomain.createTimelinePoint({
+  await workspaceDomain.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
-    afterPointId: workspaceDomain.listTimelinePoints(workspace.projectId, workspace.id)[1]!.id,
+    afterPointId: await (
+      await workspaceDomain.listTimelinePoints(workspace.projectId, workspace.id)
+    )[1]!.id,
     label: "第一章",
   });
   const tools = createAssistantTools({
@@ -2015,14 +2075,14 @@ test("delete_story_timeline_point accepts pointId as timeline label", async () =
     },
   });
   expect(
-    workspaceDomain
-      .listTimelinePoints(workspace.projectId, workspace.id)
-      .map((point) => point.label),
+    (await workspaceDomain.listTimelinePoints(workspace.projectId, workspace.id)).map(
+      (point) => point.label,
+    ),
   ).toEqual(["原点", "第一章"]);
 });
 
 test("delete_story_timeline_point rejects origin by name", async () => {
-  seedProject("assistant_tools_delete_timeline_origin_guard");
+  await seedProject("assistant_tools_delete_timeline_origin_guard");
   const tools = createAssistantTools({
     projectId: "assistant_tools_delete_timeline_origin_guard",
     runtimeContext: createRuntimeContext(),

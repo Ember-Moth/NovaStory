@@ -9,17 +9,17 @@ const requestCtx = { req: new Request("http://localhost/api/rpc") } as unknown a
   typeof auxHandlers.snapshotTree.handler
 >[1];
 
-function seedProject(projectId: string) {
-  seedProjectRecord(projectId);
-  if (!service.getDefaultWorkspace(projectId)) {
-    service.createDefaultWorkspace(projectId);
+async function seedProject(projectId: string) {
+  await seedProjectRecord(projectId);
+  if (!(await service.getDefaultWorkspace(projectId))) {
+    await service.createDefaultWorkspace(projectId);
   }
-  return service.getDefaultWorkspace(projectId)!;
+  return (await service.getDefaultWorkspace(projectId))!;
 }
 
 test("aux snapshot tree watches the active point snapshot key instead of workspace timeline", async () => {
-  const workspace = seedProject("rpc_aux_snapshot_watch");
-  const point = service.createTimelinePoint({
+  const workspace = await seedProject("rpc_aux_snapshot_watch");
+  const point = await service.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
@@ -42,8 +42,8 @@ test("aux snapshot tree watches the active point snapshot key instead of workspa
 });
 
 test("timeline label updates do not invalidate aux snapshots", async () => {
-  const workspace = seedProject("rpc_timeline_update");
-  const point = service.createTimelinePoint({
+  const workspace = await seedProject("rpc_timeline_update");
+  const point = await service.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
@@ -64,14 +64,14 @@ test("timeline label updates do not invalidate aux snapshots", async () => {
 });
 
 test("deleting a point invalidates the aux workspace cache", async () => {
-  const workspace = seedProject("rpc_timeline_delete");
-  const pointA = service.createTimelinePoint({
+  const workspace = await seedProject("rpc_timeline_delete");
+  const pointA = await service.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "Point A",
   });
-  const pointB = service.createTimelinePoint({
+  const pointB = await service.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: pointA.id,
@@ -94,14 +94,14 @@ test("deleting a point invalidates the aux workspace cache", async () => {
 });
 
 test("creating a point invalidates the aux workspace cache", async () => {
-  const workspace = seedProject("rpc_timeline_create");
-  const pointA = service.createTimelinePoint({
+  const workspace = await seedProject("rpc_timeline_create");
+  const pointA = await service.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "Point A",
   });
-  const pointB = service.createTimelinePoint({
+  const pointB = await service.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: pointA.id,
@@ -125,21 +125,21 @@ test("creating a point invalidates the aux workspace cache", async () => {
 });
 
 test("restoring a deleted aux path invalidates the aux workspace cache", async () => {
-  const workspace = seedProject("rpc_aux_restore_deleted");
-  service.writeFileAt({
+  const workspace = await seedProject("rpc_aux_restore_deleted");
+  await service.writeFileAt({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: service.ORIGIN_TIMELINE_POINT_ID,
     path: "/notes.md",
     content: "origin",
   });
-  const point = service.createTimelinePoint({
+  const point = await service.createTimelinePoint({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     afterPointId: service.ORIGIN_TIMELINE_POINT_ID,
     label: "Point A",
   });
-  service.deleteAuxNodeAt({
+  await service.deleteAuxNodeAt({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
     timelinePointId: point.id,

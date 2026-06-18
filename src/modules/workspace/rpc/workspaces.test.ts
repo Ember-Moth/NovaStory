@@ -8,16 +8,16 @@ const requestCtx = { req: new Request("http://localhost/api/rpc") } as unknown a
   typeof workspaceHandlers.list.handler
 >[1];
 
-function seedProject(projectId: string) {
-  seedProjectRecord(projectId);
-  if (!service.getDefaultWorkspace(projectId)) {
-    service.createDefaultWorkspace(projectId);
+async function seedProject(projectId: string) {
+  await seedProjectRecord(projectId);
+  if (!(await service.getDefaultWorkspace(projectId))) {
+    await service.createDefaultWorkspace(projectId);
   }
-  return service.getDefaultWorkspace(projectId)!;
+  return (await service.getDefaultWorkspace(projectId))!;
 }
 
 test("workspace detail query watches the workspace tag and returns the workspace", async () => {
-  const workspace = seedProject("rpc_workspace_detail");
+  const workspace = await seedProject("rpc_workspace_detail");
 
   const result = await workspaceHandlers.get.handler(
     { projectId: workspace.projectId, workspaceId: workspace.id },

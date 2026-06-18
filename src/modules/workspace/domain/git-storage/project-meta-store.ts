@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { invariant } from "@/shared/lib/domain";
 
-import { commitCustomRefSync, metaRef, readFilesAtRefSync } from "./git-store";
+import { commitCustomRef, metaRef, readFilesAtRef } from "./git-store";
 import { parseJsonl, stringifyJsonl } from "./jsonl";
 import { ensureStorageRoot } from "./paths";
 import type {
@@ -52,21 +52,21 @@ function parsePayload(files: Record<string, string>): ProjectMetaPayload {
   });
 }
 
-export function tryReadProjectMetaSync(projectId: string): ProjectMetaPayload | null {
+export async function tryReadProjectMeta(projectId: string): Promise<ProjectMetaPayload | null> {
   try {
-    return parsePayload(readFilesAtRefSync({ projectId, ref: metaRef() }));
+    return parsePayload(await readFilesAtRef({ projectId, ref: metaRef() }));
   } catch {
     return null;
   }
 }
 
-export function readProjectMetaSync(projectId: string): ProjectMetaPayload {
-  const payload = tryReadProjectMetaSync(projectId);
+export async function readProjectMeta(projectId: string): Promise<ProjectMetaPayload> {
+  const payload = await tryReadProjectMeta(projectId);
   invariant(payload, "未找到项目。");
   return payload;
 }
 
-export function listProjectIdsFromReposSync() {
+export function listProjectIdsFromRepos() {
   const reposDir = path.join(ensureStorageRoot(), "repos");
   const entries = fs.existsSync(reposDir) ? fs.readdirSync(reposDir, { withFileTypes: true }) : [];
   return entries
@@ -78,25 +78,30 @@ export function listProjectIdsFromReposSync() {
     .sort((left, right) => left.localeCompare(right));
 }
 
-export function listProjectMetaSync() {
-  return listProjectIdsFromReposSync()
-    .flatMap((projectId) => {
-      const payload = tryReadProjectMetaSync(projectId);
-      return payload ? [payload] : [];
-    })
+export async function listProjectMeta() {
+  const projectIds = listProjectIdsFromRepos();
+  const results = await Promise.all(
+    projectIds.map(async (projectId) => {
+      const payload = await tryReadProjectMeta(projectId);
+      return payload;
+    }),
+  );
+  return results
+    .filter((payload): payload is ProjectMetaPayload => payload != null)
     .sort((left, right) => right.project.updatedAt - left.project.updatedAt);
 }
 
-export function listProjectRowsSync() {
-  return listProjectMetaSync().map((payload) => payload.project);
+export async function listProjectRows() {
+  const meta = await listProjectMeta();
+  return meta.map((payload) => payload.project);
 }
 
-export function writeProjectMetaSync(
+export async function writeProjectMeta(
   payload: ProjectMetaPayload,
   message = "Update project metadata",
 ) {
   const normalized = normalizePayload(payload);
-  commitCustomRefSync({
+  await commitCustomRef({
     projectId: normalized.project.id,
     ref: metaRef(),
     message,
@@ -110,8 +115,8 @@ export function writeProjectMetaSync(
   return normalized;
 }
 
-export function createProjectMetaSync(project: ProjectIndexRow) {
-  return writeProjectMetaSync(
+export async function createProjectMeta(project: ProjectIndexRow) {
+  return await writeProjectMeta(
     {
       project,
       branches: [],
@@ -121,12 +126,13 @@ export function createProjectMetaSync(project: ProjectIndexRow) {
   );
 }
 
-export function updateProjectMetaSync(
+export async function updateProjectMeta(
   projectId: string,
   updater: (_payload: ProjectMetaPayload) => ProjectMetaPayload,
   message = "Update project metadata",
 ) {
-  const next = updater(readProjectMetaSync(projectId));
+  const payload = await readProjectMeta(projectId);
+  const next = updater(payload);
   invariant(next.project.id === projectId, "项目 ID 不可变。");
-  return writeProjectMetaSync(next, message);
+  return await writeProjectMeta(next, message);
 }

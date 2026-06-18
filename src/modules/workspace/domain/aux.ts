@@ -51,8 +51,8 @@ interface OverlaySnapshotNode extends ResolvedAuxSnapshotNode {
   symlinkTargetPath: string | null;
 }
 
-function touchWorkspace(projectId: string, workspaceId: string) {
-  touchWorkspaceMeta(projectId, workspaceId, now());
+async function touchWorkspace(projectId: string, workspaceId: string) {
+  await touchWorkspaceMeta(projectId, workspaceId, now());
 }
 
 export function normalizeTimelinePointId(pointId: TimelinePointRef) {
@@ -235,8 +235,8 @@ function readAuxContentFromSnapshot(node: OverlaySnapshotNode) {
   return readTextSync(node.fsPath);
 }
 
-function buildSnapshot(projectId: string, workspaceId: string, pointId: TimelinePointRef) {
-  const workspace = getWorkspace(projectId, workspaceId);
+async function buildSnapshot(projectId: string, workspaceId: string, pointId: TimelinePointRef) {
+  const workspace = await getWorkspace(projectId, workspaceId);
   const worktreePath = getProjectWorktreeDir(workspace.projectId, workspace.id);
   const state = readWorktreeState(worktreePath);
   const normalizedPointId = assertTimelinePoint(state, pointId);
@@ -323,7 +323,7 @@ function writeWhiteout(root: string, auxPath: string) {
   );
 }
 
-function lowerSnapshotForLayer(
+async function lowerSnapshotForLayer(
   projectId: string,
   workspaceId: string,
   state: WorktreeState,
@@ -334,7 +334,7 @@ function lowerSnapshotForLayer(
   }
   const point = orderTimelineRows(state.timeline).find((item) => item.id === pointId);
   invariant(point, "辅助资料时间点不存在。");
-  return buildSnapshot(projectId, workspaceId, point.prevPointId ?? null).snapshot;
+  return (await buildSnapshot(projectId, workspaceId, point.prevPointId ?? null)).snapshot;
 }
 
 function pruneInvalidWhiteouts(root: string, lowerSnapshot: Map<string, OverlaySnapshotNode>) {
@@ -363,7 +363,7 @@ function pruneInvalidWhiteouts(root: string, lowerSnapshot: Map<string, OverlayS
   walk(root, "/");
 }
 
-function currentLayerDeletedEntries(input: {
+async function currentLayerDeletedEntries(input: {
   projectId: string;
   workspaceId: string;
   state: WorktreeState;
@@ -371,7 +371,7 @@ function currentLayerDeletedEntries(input: {
   pointId: string | null;
 }) {
   if (input.pointId == null) return [];
-  const lowerSnapshot = lowerSnapshotForLayer(
+  const lowerSnapshot = await lowerSnapshotForLayer(
     input.projectId,
     input.workspaceId,
     input.state,
@@ -398,7 +398,7 @@ function currentLayerDeletedEntries(input: {
   });
 }
 
-function deleteVisiblePathFromLayer(input: {
+async function deleteVisiblePathFromLayer(input: {
   projectId: string;
   workspaceId: string;
   state: WorktreeState;
@@ -407,7 +407,7 @@ function deleteVisiblePathFromLayer(input: {
   auxPath: string;
 }) {
   const root = currentLayerRoot(input.worktreePath, input.pointId);
-  const lowerSnapshot = lowerSnapshotForLayer(
+  const lowerSnapshot = await lowerSnapshotForLayer(
     input.projectId,
     input.workspaceId,
     input.state,
@@ -457,13 +457,13 @@ function materializeSubtreeAt(input: {
   }
 }
 
-export function mkdirAt(input: {
+export async function mkdirAt(input: {
   projectId: string;
   workspaceId: string;
   timelinePointId?: TimelinePointRef;
   path: string;
 }) {
-  const { workspace, state, pointId, snapshot } = buildSnapshot(
+  const { workspace, state, pointId, snapshot } = await buildSnapshot(
     input.projectId,
     input.workspaceId,
     input.timelinePointId,
@@ -477,18 +477,18 @@ export function mkdirAt(input: {
   const targetPath = fsPathForAuxPath(root, normalizedPath);
   clearUpperNodeForWrite(root, normalizedPath);
   writeKeepFile(targetPath);
-  touchWorkspace(workspace.projectId, workspace.id);
+  await touchWorkspace(workspace.projectId, workspace.id);
   return { path: normalizedPath, workspaceId: workspace.id, nodeType: "dir" as const };
 }
 
-export function writeFileAt(input: {
+export async function writeFileAt(input: {
   projectId: string;
   workspaceId: string;
   timelinePointId?: TimelinePointRef;
   path: string;
   content: string;
 }) {
-  const { workspace, pointId, snapshot } = buildSnapshot(
+  const { workspace, pointId, snapshot } = await buildSnapshot(
     input.projectId,
     input.workspaceId,
     input.timelinePointId,
@@ -503,18 +503,18 @@ export function writeFileAt(input: {
   clearUpperNodeForWrite(root, normalizedPath);
   ensureDirSync(path.dirname(targetPath));
   fs.writeFileSync(targetPath, input.content, "utf8");
-  touchWorkspace(workspace.projectId, workspace.id);
+  await touchWorkspace(workspace.projectId, workspace.id);
   return { path: normalizedPath, workspaceId: workspace.id, nodeType: "file" as const };
 }
 
-export function linkAt(input: {
+export async function linkAt(input: {
   projectId: string;
   workspaceId: string;
   timelinePointId?: TimelinePointRef;
   path: string;
   targetPath: string;
 }) {
-  const { workspace, pointId, snapshot } = buildSnapshot(
+  const { workspace, pointId, snapshot } = await buildSnapshot(
     input.projectId,
     input.workspaceId,
     input.timelinePointId,
@@ -529,7 +529,7 @@ export function linkAt(input: {
   clearUpperNodeForWrite(root, normalizedPath);
   ensureDirSync(path.dirname(targetPath));
   fs.symlinkSync(normalizedTargetPath, targetPath);
-  touchWorkspace(workspace.projectId, workspace.id);
+  await touchWorkspace(workspace.projectId, workspace.id);
   return {
     path: normalizedPath,
     workspaceId: workspace.id,
@@ -537,14 +537,14 @@ export function linkAt(input: {
   };
 }
 
-export function moveAuxNodeAt(input: {
+export async function moveAuxNodeAt(input: {
   projectId: string;
   workspaceId: string;
   timelinePointId?: TimelinePointRef;
   path: string;
   newPath: string;
 }) {
-  const { workspace, state, pointId, snapshot } = buildSnapshot(
+  const { workspace, state, pointId, snapshot } = await buildSnapshot(
     input.projectId,
     input.workspaceId,
     input.timelinePointId,
@@ -564,7 +564,7 @@ export function moveAuxNodeAt(input: {
     sourcePath,
     targetPath,
   });
-  deleteVisiblePathFromLayer({
+  await deleteVisiblePathFromLayer({
     projectId: input.projectId,
     workspaceId: workspace.id,
     state,
@@ -572,7 +572,7 @@ export function moveAuxNodeAt(input: {
     pointId,
     auxPath: sourcePath,
   });
-  touchWorkspace(workspace.projectId, workspace.id);
+  await touchWorkspace(workspace.projectId, workspace.id);
   return {
     path: targetPath,
     previousPath: sourcePath,
@@ -581,14 +581,14 @@ export function moveAuxNodeAt(input: {
   };
 }
 
-export function retargetAuxSymlinkAt(input: {
+export async function retargetAuxSymlinkAt(input: {
   projectId: string;
   workspaceId: string;
   timelinePointId?: TimelinePointRef;
   path: string;
   targetPath: string;
 }) {
-  const { workspace, pointId, snapshot } = buildSnapshot(
+  const { workspace, pointId, snapshot } = await buildSnapshot(
     input.projectId,
     input.workspaceId,
     input.timelinePointId,
@@ -603,24 +603,24 @@ export function retargetAuxSymlinkAt(input: {
   clearUpperNodeForWrite(root, normalizedPath);
   ensureDirSync(path.dirname(targetPath));
   fs.symlinkSync(normalizedTargetPath, targetPath);
-  touchWorkspace(workspace.projectId, workspace.id);
+  await touchWorkspace(workspace.projectId, workspace.id);
   return { path: normalizedPath, workspaceId: workspace.id, nodeType: "symlink" as const };
 }
 
-export function deleteAuxNodeAt(input: {
+export async function deleteAuxNodeAt(input: {
   projectId: string;
   workspaceId: string;
   timelinePointId?: TimelinePointRef;
   path: string;
 }) {
-  const { workspace, state, pointId, snapshot } = buildSnapshot(
+  const { workspace, state, pointId, snapshot } = await buildSnapshot(
     input.projectId,
     input.workspaceId,
     input.timelinePointId,
   );
   const normalizedPath = normalizeAuxPath(input.path, "删除辅助资料");
   invariant(snapshot.has(normalizedPath), "辅助信息不存在。");
-  deleteVisiblePathFromLayer({
+  await deleteVisiblePathFromLayer({
     projectId: input.projectId,
     workspaceId: workspace.id,
     state,
@@ -628,29 +628,34 @@ export function deleteAuxNodeAt(input: {
     pointId,
     auxPath: normalizedPath,
   });
-  touchWorkspace(workspace.projectId, workspace.id);
+  await touchWorkspace(workspace.projectId, workspace.id);
 }
 
-export function restoreDeletedAuxNodeAt(input: {
+export async function restoreDeletedAuxNodeAt(input: {
   projectId: string;
   workspaceId: string;
   timelinePointId: TimelinePointRef;
   path: string;
 }) {
-  const workspace = getWorkspace(input.projectId, input.workspaceId);
+  const workspace = await getWorkspace(input.projectId, input.workspaceId);
   const worktreePath = getProjectWorktreeDir(workspace.projectId, workspace.id);
   const state = readWorktreeState(worktreePath);
   const pointId = assertTimelinePoint(state, input.timelinePointId);
   invariant(pointId !== null, "原点没有可恢复的辅助资料删除标记。");
   const normalizedPath = normalizeAuxPath(input.path, "恢复辅助资料");
-  const lowerSnapshot = lowerSnapshotForLayer(input.projectId, input.workspaceId, state, pointId);
+  const lowerSnapshot = await lowerSnapshotForLayer(
+    input.projectId,
+    input.workspaceId,
+    state,
+    pointId,
+  );
   invariant(snapshotHasPathOrDescendant(lowerSnapshot, normalizedPath), "没有可恢复的辅助资料。");
   const root = currentLayerRoot(worktreePath, pointId);
   const whiteoutPath = whiteoutPathForAuxPath(root, normalizedPath);
   invariant(fs.existsSync(whiteoutPath), "没有可恢复的辅助资料删除标记。");
   fs.rmSync(whiteoutPath, { force: true });
   pruneInvalidWhiteouts(root, lowerSnapshot);
-  touchWorkspace(workspace.projectId, workspace.id);
+  await touchWorkspace(workspace.projectId, workspace.id);
   return {
     path: normalizedPath,
     workspaceId: workspace.id,
@@ -658,7 +663,7 @@ export function restoreDeletedAuxNodeAt(input: {
   };
 }
 
-export function readAuxByPathAt(
+export async function readAuxByPathAt(
   projectId: string,
   workspaceId: string,
   pointId: TimelinePointRef,
@@ -667,16 +672,16 @@ export function readAuxByPathAt(
 ) {
   const normalized = normalizeAuxPath(auxPath, "读取辅助资料", { allowRoot: true });
   if (normalized === "/") return null;
-  return buildSnapshot(projectId, workspaceId, pointId).snapshot.get(normalized) ?? null;
+  return (await buildSnapshot(projectId, workspaceId, pointId)).snapshot.get(normalized) ?? null;
 }
 
-export function listAuxDirAt(
+export async function listAuxDirAt(
   projectId: string,
   workspaceId: string,
   pointId: TimelinePointRef,
   input: { path?: string } = {},
-): AuxDirListTreeNode[] {
-  const snapshot = buildSnapshot(projectId, workspaceId, pointId).snapshot;
+): Promise<AuxDirListTreeNode[]> {
+  const snapshot = (await buildSnapshot(projectId, workspaceId, pointId)).snapshot;
   const dirPath = input.path
     ? normalizeAuxPath(input.path, "列出辅助资料目录", { allowRoot: true })
     : "/";
@@ -693,7 +698,7 @@ export function listAuxDirAt(
   return build(dirPath);
 }
 
-export function listAuxTreeAt(
+export async function listAuxTreeAt(
   projectId: string,
   workspaceId: string,
   pointId: TimelinePointRef,
@@ -718,23 +723,23 @@ export function listAuxTreeAt(
       };
     });
   return {
-    nodes: trimDepth(listAuxDirAt(projectId, workspaceId, pointId, input), 1),
+    nodes: trimDepth(await listAuxDirAt(projectId, workspaceId, pointId, input), 1),
     truncated: false,
   };
 }
 
-export function exportAuxSnapshotTree(
+export async function exportAuxSnapshotTree(
   projectId: string,
   workspaceId: string,
   pointId?: TimelinePointRef,
-): ExportedAuxSnapshotTree {
+): Promise<ExportedAuxSnapshotTree> {
   const {
     state,
     pointId: normalizedPointId,
     snapshot,
     worktreePath,
-  } = buildSnapshot(projectId, workspaceId, pointId);
-  const deletedEntries = currentLayerDeletedEntries({
+  } = await buildSnapshot(projectId, workspaceId, pointId);
+  const deletedEntries = await currentLayerDeletedEntries({
     projectId,
     workspaceId,
     state,
@@ -786,19 +791,20 @@ function comparableNode(node: OverlaySnapshotNode | undefined) {
   };
 }
 
-export function listAuxTimelineChangesAt(
+export async function listAuxTimelineChangesAt(
   projectId: string,
   workspaceId: string,
   pointId: TimelinePointRef,
-): AuxTimelineChangeView[] {
-  const current = buildSnapshot(projectId, workspaceId, pointId).snapshot;
+): Promise<AuxTimelineChangeView[]> {
+  const current = (await buildSnapshot(projectId, workspaceId, pointId)).snapshot;
   const normalizedPointId = normalizePointId(pointId);
-  const workspace = getWorkspace(projectId, workspaceId);
+  const workspace = await getWorkspace(projectId, workspaceId);
   const state = readWorktreeState(getProjectWorktreeDir(workspace.projectId, workspace.id));
   const point = normalizedPointId
     ? orderTimelineRows(state.timeline).find((item) => item.id === normalizedPointId)
     : null;
-  const previous = buildSnapshot(projectId, workspaceId, point?.prevPointId ?? null).snapshot;
+  const previous = (await buildSnapshot(projectId, workspaceId, point?.prevPointId ?? null))
+    .snapshot;
   const paths = [...new Set([...current.keys(), ...previous.keys()])].sort((a, b) =>
     a.localeCompare(b),
   );
@@ -851,23 +857,24 @@ export function listAuxTimelineChangesAt(
   return changes;
 }
 
-export function listAuxChangesAt(
+export async function listAuxChangesAt(
   projectId: string,
   workspaceId: string,
   pointId: TimelinePointRef,
 ) {
-  return listAuxTimelineChangesAt(projectId, workspaceId, pointId).map((change) => ({
+  const changes = await listAuxTimelineChangesAt(projectId, workspaceId, pointId);
+  return changes.map((change) => ({
     path: change.path,
     isDeleted: change.kind === "deleted",
   }));
 }
 
-export function summarizeAuxTimelineChangesAt(
+export async function summarizeAuxTimelineChangesAt(
   projectId: string,
   workspaceId: string,
   pointId: TimelinePointRef,
-): AuxTimelineChangeSummary {
-  const changes = listAuxTimelineChangesAt(projectId, workspaceId, pointId);
+): Promise<AuxTimelineChangeSummary> {
+  const changes = await listAuxTimelineChangesAt(projectId, workspaceId, pointId);
   return {
     hasChanges: changes.length > 0,
     added: changes.filter((change) => change.kind === "added").length,

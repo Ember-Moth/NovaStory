@@ -29,8 +29,8 @@ export function buildContentReadTools({ projectId, runtimeContext }: ToolBuildCo
       execute: ({ rootNodeId, depth }) =>
         withProjectWorkspace({
           projectId,
-          execute: (workspace) => {
-            const list = listManuscriptNodes(workspace.projectId, workspace.id, rootNodeId, {
+          execute: async (workspace) => {
+            const list = await listManuscriptNodes(workspace.projectId, workspace.id, rootNodeId, {
               depth,
             });
             return {
@@ -59,7 +59,7 @@ export function buildContentReadTools({ projectId, runtimeContext }: ToolBuildCo
       execute: ({ nodeId }) =>
         withProjectWorkspace({
           projectId,
-          execute: (workspace) => {
+          execute: async (workspace) => {
             const targetNodeId =
               nodeId ?? resolveActiveContentNodeId(runtimeContext.snapshot, null);
             if (!targetNodeId) {
@@ -70,7 +70,7 @@ export function buildContentReadTools({ projectId, runtimeContext }: ToolBuildCo
               ok: true as const,
               truncated: false,
               data: {
-                node: readManuscriptNode(workspace.projectId, workspace.id, targetNodeId),
+                node: await readManuscriptNode(workspace.projectId, workspace.id, targetNodeId),
               },
             };
           },

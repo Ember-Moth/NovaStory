@@ -128,7 +128,7 @@ function unwrapToolOutput(output: unknown) {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : output;
 }
 
-function extractWorkspaceRefreshRequestedEventFromToolResult({
+async function extractWorkspaceRefreshRequestedEventFromToolResult({
   projectId,
   toolName,
   output,
@@ -136,7 +136,7 @@ function extractWorkspaceRefreshRequestedEventFromToolResult({
   projectId: string;
   toolName: string;
   output: unknown;
-}): WorkspaceRefreshRequestedEvent | null {
+}): Promise<WorkspaceRefreshRequestedEvent | null> {
   if (
     !CONTENT_WRITE_TOOL_NAME_SET.has(toolName) &&
     !AUX_WRITE_TOOL_NAME_SET.has(toolName) &&
@@ -145,7 +145,7 @@ function extractWorkspaceRefreshRequestedEventFromToolResult({
     return null;
   }
 
-  const workspace = getDefaultWorkspace(projectId);
+  const workspace = await getDefaultWorkspace(projectId);
   if (!workspace) {
     return null;
   }
@@ -205,7 +205,7 @@ function extractWorkspaceRefreshRequestedEventFromToolResult({
   };
 }
 
-function extractTimelineSelectionUpdatedEventFromToolResult({
+async function extractTimelineSelectionUpdatedEventFromToolResult({
   projectId,
   toolName,
   output,
@@ -213,12 +213,12 @@ function extractTimelineSelectionUpdatedEventFromToolResult({
   projectId: string;
   toolName: string;
   output: unknown;
-}): TimelineSelectionUpdatedEvent | null {
+}): Promise<TimelineSelectionUpdatedEvent | null> {
   if (toolName !== "set_current_timeline") {
     return null;
   }
 
-  const workspace = getDefaultWorkspace(projectId);
+  const workspace = await getDefaultWorkspace(projectId);
   if (!workspace) {
     return null;
   }
@@ -350,18 +350,18 @@ export async function handleProjectChatRequest(request: Request) {
     const projectId = normalizeProjectId(body.projectId);
     const chatId = normalizeChatId(body.chatId);
     const incomingMessages = normalizeIncomingMessages(body.messages);
-    const chat = getProjectChat(projectId, chatId);
+    const chat = await getProjectChat(projectId, chatId);
     if (!chat) {
       return jsonError("Chat not found", 404);
     }
 
-    const currentMessages = getProjectChatMessages(projectId, chatId);
+    const currentMessages = await getProjectChatMessages(projectId, chatId);
     const currentMessageIds = new Set(currentMessages.map((message) => message.id));
     const syncedIncoming = materializeIncomingProjectChatMessages({
       currentMessages,
       incomingMessages: incomingMessages as StoredProjectChatMessage[],
     });
-    writeProjectChatMessages(
+    await writeProjectChatMessages(
       projectId,
       chatId,
       syncedIncoming.messages,
@@ -370,7 +370,7 @@ export async function handleProjectChatRequest(request: Request) {
 
     for (const message of syncedIncoming.visibleMessages) {
       if (!currentMessageIds.has(message.id)) {
-        selectProjectChatMessageChild(projectId, chatId, message.parentMessageId, message.id);
+        await selectProjectChatMessageChild(projectId, chatId, message.parentMessageId, message.id);
       }
     }
 
@@ -383,7 +383,7 @@ export async function handleProjectChatRequest(request: Request) {
       },
       activeTools: body.activeTools,
     });
-    const tools = createAssistantTools({
+    const tools = await createAssistantTools({
       projectId,
       runtimeContext,
     });
@@ -417,17 +417,18 @@ export async function handleProjectChatRequest(request: Request) {
         : {}),
       stopWhen: stepCountIs(getAiAssistantMaxSteps()),
       abortSignal: abortController.signal,
-      experimental_onToolCallFinish: (event) => {
+      experimental_onToolCallFinish: async (event) => {
         if (!event.success) {
           return;
         }
 
         const toolName = event.toolCall.toolName;
-        const workspaceRefreshRequestedEvent = extractWorkspaceRefreshRequestedEventFromToolResult({
-          projectId,
-          toolName,
-          output: event.output,
-        });
+        const workspaceRefreshRequestedEvent =
+          await extractWorkspaceRefreshRequestedEventFromToolResult({
+            projectId,
+            toolName,
+            output: event.output,
+          });
         if (workspaceRefreshRequestedEvent) {
           emitProjectChatStreamData(streamWriter, bufferedDataParts, {
             type: "workspace-refresh-requested",
@@ -435,11 +436,12 @@ export async function handleProjectChatRequest(request: Request) {
           });
         }
 
-        const timelineSelectionUpdatedEvent = extractTimelineSelectionUpdatedEventFromToolResult({
-          projectId,
-          toolName,
-          output: event.output,
-        });
+        const timelineSelectionUpdatedEvent =
+          await extractTimelineSelectionUpdatedEventFromToolResult({
+            projectId,
+            toolName,
+            output: event.output,
+          });
         if (timelineSelectionUpdatedEvent) {
           emitProjectChatStreamData(streamWriter, bufferedDataParts, {
             type: "timeline-selection-updated",
@@ -463,7 +465,7 @@ export async function handleProjectChatRequest(request: Request) {
               // Unregister stream when finished
               streamRegistry.unregister(streamId);
 
-              const latestMessages = getProjectChatMessages(projectId, chatId);
+              const latestMessages = await getProjectChatMessages(projectId, chatId);
               const responseIndex = latestMessages.findIndex(
                 (message) => message.id === responseMessage.id,
               );
@@ -482,7 +484,7 @@ export async function handleProjectChatRequest(request: Request) {
               } else {
                 latestMessages.push(storedResponse);
               }
-              writeProjectChatMessages(
+              await writeProjectChatMessages(
                 projectId,
                 chatId,
                 latestMessages,
@@ -490,7 +492,7 @@ export async function handleProjectChatRequest(request: Request) {
               );
 
               if (!isContinuation) {
-                selectProjectChatMessageChild(
+                await selectProjectChatMessageChild(
                   projectId,
                   chatId,
                   parentMessageId,
@@ -503,7 +505,7 @@ export async function handleProjectChatRequest(request: Request) {
                 ...(isContinuation ? [] : [storedResponse]),
               ];
               const derivedTitle = maybeDeriveChatTitle(chat.title, nextVisibleMessages);
-              updateProjectChat(projectId, chatId, {
+              await updateProjectChat(projectId, chatId, {
                 ...(derivedTitle ? { title: derivedTitle } : {}),
                 updatedAt: now(),
               });
@@ -536,7 +538,7 @@ export async function handleProjectChatsRequest(request: Request) {
       const projectId = normalizeProjectId(url.searchParams.get("projectId"));
       const archived = url.searchParams.get("archived");
       return Response.json({
-        chats: listProjectChats(projectId, {
+        chats: await listProjectChats(projectId, {
           archived: archived == null ? undefined : archived === "true",
         }),
       });
@@ -549,7 +551,7 @@ export async function handleProjectChatsRequest(request: Request) {
     };
     const projectId = normalizeProjectId(body.projectId);
     return Response.json({
-      chat: createProjectChat(projectId, {
+      chat: await createProjectChat(projectId, {
         title: body.title,
         modelConfig: body.modelConfig,
       }),
@@ -565,11 +567,11 @@ export async function handleProjectChatDetailRequest(request: Request, chatId: s
     if (request.method === "GET") {
       const url = new URL(request.url);
       const projectId = normalizeProjectId(url.searchParams.get("projectId"));
-      const chat = getProjectChat(projectId, normalizedChatId);
+      const chat = await getProjectChat(projectId, normalizedChatId);
       if (!chat) {
         return jsonError("Chat not found", 404);
       }
-      return Response.json(getProjectChatDetail(projectId, normalizedChatId));
+      return Response.json(await getProjectChatDetail(projectId, normalizedChatId));
     }
 
     if (request.method === "PUT") {
@@ -580,7 +582,7 @@ export async function handleProjectChatDetailRequest(request: Request, chatId: s
       };
       const projectId = normalizeProjectId(body.projectId);
       return Response.json({
-        chat: updateProjectChat(projectId, normalizedChatId, {
+        chat: await updateProjectChat(projectId, normalizedChatId, {
           ...(body.title !== undefined ? { title: body.title } : {}),
           ...(body.modelConfig ? { modelConfig: body.modelConfig } : {}),
         }),
@@ -589,7 +591,7 @@ export async function handleProjectChatDetailRequest(request: Request, chatId: s
 
     const url = new URL(request.url);
     const projectId = normalizeProjectId(url.searchParams.get("projectId"));
-    deleteProjectChat(projectId, normalizedChatId);
+    await deleteProjectChat(projectId, normalizedChatId);
     return Response.json({ success: true });
   } catch (error) {
     return jsonError(normalizeError(error).message);
@@ -601,12 +603,12 @@ export async function handleProjectChatStateRequest(request: Request, chatId: st
     const url = new URL(request.url);
     const projectId = normalizeProjectId(url.searchParams.get("projectId"));
     const normalizedChatId = normalizeChatId(chatId);
-    const chat = getProjectChat(projectId, normalizedChatId);
+    const chat = await getProjectChat(projectId, normalizedChatId);
     if (!chat) {
       return jsonError("Chat not found", 404);
     }
 
-    const detail = getProjectChatDetail(projectId, normalizedChatId);
+    const detail = await getProjectChatDetail(projectId, normalizedChatId);
     return Response.json({
       state: detail.state,
       visibleMessages: detail.visibleMessages,
@@ -622,7 +624,7 @@ export async function handleProjectChatSelectionRequest(request: Request, chatId
     const url = new URL(request.url);
     const projectId = normalizeProjectId(url.searchParams.get("projectId"));
     const normalizedChatId = normalizeChatId(chatId);
-    const chat = getProjectChat(projectId, normalizedChatId);
+    const chat = await getProjectChat(projectId, normalizedChatId);
     if (!chat) {
       return jsonError("Chat not found", 404);
     }
@@ -632,13 +634,13 @@ export async function handleProjectChatSelectionRequest(request: Request, chatId
       childMessageId?: string;
     };
     const childMessageId = normalizeChatId(body.childMessageId);
-    const state = selectProjectChatMessageChild(
+    const state = await selectProjectChatMessageChild(
       projectId,
       normalizedChatId,
       body.parentMessageId ?? null,
       childMessageId,
     );
-    const detail = getProjectChatDetail(projectId, normalizedChatId);
+    const detail = await getProjectChatDetail(projectId, normalizedChatId);
     return Response.json({
       state,
       visibleMessages: detail.visibleMessages,
@@ -653,11 +655,11 @@ export async function handleProjectModelConfigRequest(request: Request, projectI
   try {
     const normalizedProjectId = normalizeProjectId(projectId);
     if (request.method === "GET") {
-      return Response.json(getProjectChatDefaultModelConfig(normalizedProjectId));
+      return Response.json(await getProjectChatDefaultModelConfig(normalizedProjectId));
     }
 
     const body = (await request.json()) as Partial<ProjectChatModelConfig>;
-    return Response.json(updateProjectChatDefaultModelConfig(normalizedProjectId, body));
+    return Response.json(await updateProjectChatDefaultModelConfig(normalizedProjectId, body));
   } catch (error) {
     return jsonError(normalizeError(error).message);
   }
@@ -672,7 +674,7 @@ export async function handleProjectChatArchiveRequest(request: Request, chatId: 
     const projectId = normalizeProjectId(body.projectId);
     const normalizedChatId = normalizeChatId(chatId);
     return Response.json({
-      chat: archiveProjectChat(projectId, normalizedChatId, body.archived === true),
+      chat: await archiveProjectChat(projectId, normalizedChatId, body.archived === true),
     });
   } catch (error) {
     return jsonError(normalizeError(error).message);

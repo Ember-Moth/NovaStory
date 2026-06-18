@@ -26,9 +26,9 @@ export async function getWorkingTreeStatus(
   projectId: string,
   branchId: string,
 ): Promise<WorkingTreeStatus> {
-  const branch = getBranch(projectId, branchId);
+  const branch = await getBranch(projectId, branchId);
   const headCommitId = await getBranchHeadCommitId(projectId, branch.id);
-  const workspace = getWorkspaceForBranchId(projectId, branch.id);
+  const workspace = await getWorkspaceForBranchId(projectId, branch.id);
   if (!workspace) {
     return {
       hasChanges: false,

@@ -24,8 +24,8 @@ import {
 } from "./git-storage/worktree-state";
 import type { ManuscriptNodeDiskState } from "./git-storage/types";
 
-function touchWorkspace(projectId: string, workspaceId: string) {
-  touchWorkspaceMeta(projectId, workspaceId, now());
+async function touchWorkspace(projectId: string, workspaceId: string) {
+  await touchWorkspaceMeta(projectId, workspaceId, now());
 }
 
 function toExportedNode(node: ManuscriptNodeDiskState): ExportedContentNode {
@@ -80,7 +80,7 @@ function toListNode(
   };
 }
 
-export function createContentNode(input: {
+export async function createContentNode(input: {
   projectId: string;
   workspaceId: string;
   parentId: string | null;
@@ -89,7 +89,7 @@ export function createContentNode(input: {
   title?: string | null;
   body?: string | null;
 }) {
-  const workspace = getWorkspace(input.projectId, input.workspaceId);
+  const workspace = await getWorkspace(input.projectId, input.workspaceId);
   const worktreePath = getProjectWorktreeDir(workspace.projectId, workspace.id);
   const state = readWorktreeState(worktreePath);
   if (input.parentId) {
@@ -113,7 +113,7 @@ export function createContentNode(input: {
     afterSiblingId: input.afterSiblingId,
   });
   writeWorktreeStateSync(worktreePath, state);
-  touchWorkspace(workspace.projectId, workspace.id);
+  await touchWorkspace(workspace.projectId, workspace.id);
   const created = findManuscriptNode(state, node.id);
   return {
     id: created.id,
@@ -127,14 +127,14 @@ export function createContentNode(input: {
   };
 }
 
-export function moveContentNode(input: {
+export async function moveContentNode(input: {
   projectId: string;
   workspaceId: string;
   nodeId: string;
   newParentId: string | null;
   afterSiblingId?: string | null;
 }) {
-  const workspace = getWorkspace(input.projectId, input.workspaceId);
+  const workspace = await getWorkspace(input.projectId, input.workspaceId);
   const worktreePath = getProjectWorktreeDir(workspace.projectId, workspace.id);
   const state = readWorktreeState(worktreePath);
   if (input.newParentId) {
@@ -146,7 +146,7 @@ export function moveContentNode(input: {
     afterSiblingId: input.afterSiblingId,
   });
   writeWorktreeStateSync(worktreePath, state);
-  touchWorkspace(workspace.projectId, workspace.id);
+  await touchWorkspace(workspace.projectId, workspace.id);
   const node = findManuscriptNode(state, moved.id);
   return {
     id: node.id,
@@ -160,20 +160,20 @@ export function moveContentNode(input: {
   };
 }
 
-export function deleteContentNode(input: {
+export async function deleteContentNode(input: {
   projectId: string;
   workspaceId: string;
   nodeId: string;
 }) {
-  const workspace = getWorkspace(input.projectId, input.workspaceId);
+  const workspace = await getWorkspace(input.projectId, input.workspaceId);
   const worktreePath = getProjectWorktreeDir(workspace.projectId, workspace.id);
   const state = readWorktreeState(worktreePath);
   removeManuscriptNode(worktreePath, state, input.nodeId);
   writeWorktreeStateSync(worktreePath, state);
-  touchWorkspace(workspace.projectId, workspace.id);
+  await touchWorkspace(workspace.projectId, workspace.id);
 }
 
-export function updateContentNode(input: {
+export async function updateContentNode(input: {
   projectId: string;
   workspaceId: string;
   nodeId: string;
@@ -181,7 +181,7 @@ export function updateContentNode(input: {
   title?: string | null;
   body?: string | null;
 }) {
-  const workspace = getWorkspace(input.projectId, input.workspaceId);
+  const workspace = await getWorkspace(input.projectId, input.workspaceId);
   const worktreePath = getProjectWorktreeDir(workspace.projectId, workspace.id);
   const state = readWorktreeState(worktreePath);
   const node = findManuscriptNode(state, input.nodeId);
@@ -195,7 +195,7 @@ export function updateContentNode(input: {
     node.body = input.body ?? "";
   }
   writeWorktreeStateSync(worktreePath, state);
-  touchWorkspace(workspace.projectId, workspace.id);
+  await touchWorkspace(workspace.projectId, workspace.id);
   return {
     id: node.id,
     parentId: node.parentId,
@@ -208,12 +208,12 @@ export function updateContentNode(input: {
   };
 }
 
-export function exportContentSubtree(
+export async function exportContentSubtree(
   projectId: string,
   workspaceId: string,
   rootNodeId?: string,
-): ExportedContentSubtree {
-  const workspace = getWorkspace(projectId, workspaceId);
+): Promise<ExportedContentSubtree> {
+  const workspace = await getWorkspace(projectId, workspaceId);
   const state = readWorktreeState(getProjectWorktreeDir(workspace.projectId, workspace.id));
   const roots = rootNodeId
     ? [findManuscriptNode(state, rootNodeId)]
@@ -223,13 +223,13 @@ export function exportContentSubtree(
   };
 }
 
-export function listManuscriptNodes(
+export async function listManuscriptNodes(
   projectId: string,
   workspaceId: string,
   rootNodeId?: string,
   options: { depth?: number } = {},
-): ManuscriptNodeList {
-  const workspace = getWorkspace(projectId, workspaceId);
+): Promise<ManuscriptNodeList> {
+  const workspace = await getWorkspace(projectId, workspaceId);
   const state = readWorktreeState(getProjectWorktreeDir(workspace.projectId, workspace.id));
   const roots = rootNodeId
     ? [findManuscriptNode(state, rootNodeId)]
@@ -248,12 +248,12 @@ export function listManuscriptNodes(
   };
 }
 
-export function readManuscriptNode(
+export async function readManuscriptNode(
   projectId: string,
   workspaceId: string,
   nodeId: string,
-): ManuscriptNodeRead {
-  const workspace = getWorkspace(projectId, workspaceId);
+): Promise<ManuscriptNodeRead> {
+  const workspace = await getWorkspace(projectId, workspaceId);
   const state = readWorktreeState(getProjectWorktreeDir(workspace.projectId, workspace.id));
   const node = findManuscriptNode(state, nodeId);
   return {
@@ -268,8 +268,8 @@ export function readManuscriptNode(
   };
 }
 
-export function listAnchoredTimelinePointIds(projectId: string, workspaceId: string) {
-  const workspace = getWorkspace(projectId, workspaceId);
+export async function listAnchoredTimelinePointIds(projectId: string, workspaceId: string) {
+  const workspace = await getWorkspace(projectId, workspaceId);
   const state = readWorktreeState(getProjectWorktreeDir(workspace.projectId, workspace.id));
   return new Set(
     flattenManuscriptNodes(state)

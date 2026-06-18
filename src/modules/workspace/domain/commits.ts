@@ -3,7 +3,7 @@ import { invariant, now } from "@/shared/lib/domain";
 import { branchRef } from "./git-storage/git-store";
 import { getBranch, getBranchHeadCommitId } from "./branches";
 import { addAllAndCommit, checkoutCommitToWorktree, listLog } from "./git-storage/git-store";
-import { readProjectMetaSync, updateProjectMetaSync } from "./git-storage/project-meta-store";
+import { readProjectMeta, updateProjectMeta } from "./git-storage/project-meta-store";
 import { getWorkspace, getWorkspaceForBranchId } from "./lifecycle";
 
 export interface CommitParentRow {
@@ -32,8 +32,8 @@ export async function createCommit(input: {
   author?: string | null;
   extraParents?: Array<{ parentId: string; mergeRole?: "normal" | "mainline" | "merged" }>;
 }) {
-  const branch = getBranch(input.projectId, input.branchId);
-  const workspace = getWorkspaceForBranchId(input.projectId, branch.id);
+  const branch = await getBranch(input.projectId, input.branchId);
+  const workspace = await getWorkspaceForBranchId(input.projectId, branch.id);
   invariant(workspace, "无法提交：该分支没有关联的工作区。");
   const message = input.message.trim();
   invariant(message, "无法提交：提交信息不能为空。");
@@ -51,7 +51,7 @@ export async function createCommit(input: {
     parents: parents.length ? parents : undefined,
   });
   const timestamp = now();
-  updateProjectMetaSync(
+  await updateProjectMeta(
     branch.projectId,
     (payload) => ({
       ...payload,
@@ -73,7 +73,7 @@ export async function checkoutCommit(input: {
   workspaceId: string;
   commitId: string;
 }) {
-  const workspace = getWorkspace(input.projectId, input.workspaceId);
+  const workspace = await getWorkspace(input.projectId, input.workspaceId);
   await checkoutCommitToWorktree({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
@@ -83,7 +83,8 @@ export async function checkoutCommit(input: {
 }
 
 export async function getCommit(commitId: string, projectId: string): Promise<CommitRow> {
-  const branches = readProjectMetaSync(projectId).branches.map((branch) => branch.id);
+  const meta = await readProjectMeta(projectId);
+  const branches = meta.branches.map((branch) => branch.id);
   for (const branchId of branches) {
     const commits = await listLog({ projectId, ref: branchRef(branchId) });
     const found = commits.find((entry) => entry.oid === commitId);
@@ -118,7 +119,7 @@ function mapLogEntry(
 }
 
 export async function listCommits(projectId: string, branchId: string) {
-  const branch = getBranch(projectId, branchId);
+  const branch = await getBranch(projectId, branchId);
   const commits = await listLog({ projectId: branch.projectId, ref: branchRef(branch.id) });
   return commits.map((entry) => mapLogEntry(branch.projectId, entry));
 }

@@ -49,7 +49,7 @@ function normalizeOptionalUpdatedTitle(value: string | undefined) {
   return normalized;
 }
 
-function buildContentAnchorTimelineWarnings(input: {
+async function buildContentAnchorTimelineWarnings(input: {
   projectId: string;
   workspaceId: string;
   currentTimelinePointId: string;
@@ -65,13 +65,13 @@ function buildContentAnchorTimelineWarnings(input: {
       message:
         "当前章节锚定的时间轴锚点未被选中，如果需要读取章节锚定的上下文，请执行 set_current_timeline。",
       currentTimelinePointId: input.currentTimelinePointId,
-      currentTimelineLabel: getTimelineLabelById(
+      currentTimelineLabel: await getTimelineLabelById(
         input.projectId,
         input.workspaceId,
         input.currentTimelinePointId,
       ),
       nodeTimelinePointId: input.nodeTimelinePointId,
-      nodeTimelineLabel: getTimelineLabelById(
+      nodeTimelineLabel: await getTimelineLabelById(
         input.projectId,
         input.workspaceId,
         input.nodeTimelinePointId,
@@ -132,10 +132,10 @@ export function buildContentWriteTools({ projectId, runtimeContext }: ToolBuildC
 
             const resultPromise = previousCreate
               .catch(() => normalizedAfterSiblingId)
-              .then((queuedAfterSiblingId) => {
+              .then(async (queuedAfterSiblingId) => {
                 const effectiveAfterSiblingId = queuedAfterSiblingId ?? normalizedAfterSiblingId;
                 const resolvedTimelinePointId = resolveCurrentTimelinePointId(runtimeContext);
-                const node = createContentNode({
+                const node = await createContentNode({
                   projectId: workspace.projectId,
                   workspaceId: workspace.id,
                   parentId: normalizedParentId,
@@ -203,11 +203,11 @@ export function buildContentWriteTools({ projectId, runtimeContext }: ToolBuildC
       execute: ({ nodeId, title, body, anchorPointId }) =>
         withProjectWorkspace({
           projectId,
-          execute: (workspace) => {
+          execute: async (workspace) => {
             const normalizedNodeId = normalizeRequiredNodeId(nodeId, "nodeId");
             const normalizedTitle = normalizeOptionalUpdatedTitle(title);
             const currentTimelinePointId = resolveCurrentTimelinePointId(runtimeContext);
-            const node = updateContentNode({
+            const node = await updateContentNode({
               projectId: workspace.projectId,
               workspaceId: workspace.id,
               nodeId: normalizedNodeId,
@@ -218,7 +218,7 @@ export function buildContentWriteTools({ projectId, runtimeContext }: ToolBuildC
             const warnings =
               body === undefined
                 ? []
-                : buildContentAnchorTimelineWarnings({
+                : await buildContentAnchorTimelineWarnings({
                     projectId: workspace.projectId,
                     workspaceId: workspace.id,
                     currentTimelinePointId,
@@ -270,11 +270,11 @@ export function buildContentWriteTools({ projectId, runtimeContext }: ToolBuildC
       execute: ({ nodeId, newParentId, afterSiblingId }) =>
         withProjectWorkspace({
           projectId,
-          execute: (workspace) => {
+          execute: async (workspace) => {
             const normalizedNodeId = normalizeRequiredNodeId(nodeId, "nodeId");
             const normalizedParentId = normalizeOptionalStringToNull(newParentId);
             const normalizedAfterSiblingId = normalizeOptionalStringToNull(afterSiblingId);
-            const node = moveContentNode({
+            const node = await moveContentNode({
               projectId: workspace.projectId,
               workspaceId: workspace.id,
               nodeId: normalizedNodeId,
@@ -311,10 +311,14 @@ export function buildContentWriteTools({ projectId, runtimeContext }: ToolBuildC
       execute: ({ nodeId }) =>
         withProjectWorkspace({
           projectId,
-          execute: (workspace) => {
+          execute: async (workspace) => {
             const normalizedNodeId = normalizeRequiredNodeId(nodeId, "nodeId");
-            const node = readManuscriptNode(workspace.projectId, workspace.id, normalizedNodeId);
-            deleteContentNode({
+            const node = await readManuscriptNode(
+              workspace.projectId,
+              workspace.id,
+              normalizedNodeId,
+            );
+            await deleteContentNode({
               projectId: workspace.projectId,
               workspaceId: workspace.id,
               nodeId: normalizedNodeId,

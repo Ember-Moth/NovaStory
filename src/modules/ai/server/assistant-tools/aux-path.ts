@@ -22,7 +22,7 @@ export function splitAuxPath(path: string, actionLabel: string) {
   };
 }
 
-export function assertParentDirPath(input: {
+export async function assertParentDirPath(input: {
   projectId: string;
   workspaceId: string;
   timelinePointId: string;
@@ -31,7 +31,7 @@ export function assertParentDirPath(input: {
 }) {
   if (input.parentPath === "/") return "/";
 
-  const parentNode = readAuxByPathAt(
+  const parentNode = await readAuxByPathAt(
     input.projectId,
     input.workspaceId,
     input.timelinePointId,
@@ -42,7 +42,7 @@ export function assertParentDirPath(input: {
   return parentNode.path;
 }
 
-export function resolveAuxNodeByPathOrThrow(input: {
+export async function resolveAuxNodeByPathOrThrow(input: {
   projectId: string;
   workspaceId: string;
   timelinePointId: string;
@@ -50,7 +50,7 @@ export function resolveAuxNodeByPathOrThrow(input: {
   actionLabel: string;
   followSymlinks?: boolean;
 }) {
-  const node = readAuxByPathAt(
+  const node = await readAuxByPathAt(
     input.projectId,
     input.workspaceId,
     input.timelinePointId,
