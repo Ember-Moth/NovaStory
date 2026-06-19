@@ -52,7 +52,7 @@ test("creating a branch with workspace invalidates branches and workspaces", asy
     message: "base",
   });
 
-  const result = await branchHandlers.createWithWorkspace.handler(
+  const result = await branchHandlers.create.handler(
     { projectId: "rpc_branch_create", name: "feature", fromCommitId: commit.id },
     requestCtx,
   );
@@ -64,7 +64,7 @@ test("creating a branch with workspace invalidates branches and workspaces", asy
     rpcTags.project("rpc_branch_create"),
     rpcTags.projectsList(),
   ]);
-  expect(result.data.branchId).not.toBe(workspace.branchId);
+  expect(result.data.id).not.toBe(workspace.id);
 });
 
 test("deleting a branch invalidates branch, workspace, and project tags", async () => {
@@ -92,7 +92,7 @@ test("deleting a branch invalidates branch, workspace, and project tags", async 
   ]);
   await expect(
     service.getWorkspace(featureWorkspace.projectId, featureWorkspace.id),
-  ).rejects.toThrow("未找到工作区。");
+  ).rejects.toThrow("未找到分支。");
 });
 
 test("commit create invalidates history and branch tags", async () => {

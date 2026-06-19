@@ -16,15 +16,6 @@ export interface BranchIndexRow {
   updatedAt: number;
 }
 
-export interface WorkspaceIndexRow {
-  id: string;
-  projectId: string;
-  branchId: string;
-  name: string;
-  createdAt: number;
-  updatedAt: number;
-}
-
 export interface ManuscriptNodeDiskState {
   id: string;
   parentId: string | null;
@@ -44,5 +35,4 @@ export interface TimelineMetaRow {
 export interface ProjectMetaPayload {
   project: ProjectIndexRow;
   branches: BranchIndexRow[];
-  workspaces: WorkspaceIndexRow[];
 }

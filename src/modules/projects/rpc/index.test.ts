@@ -41,7 +41,7 @@ async function projectIndexCounts() {
     ).reduce((a, b) => a + b, 0),
     workspaces: (
       await Promise.all(
-        rows.map(async (project) => (await readProjectMeta(project.id)).workspaces.length),
+        rows.map(async (project) => (await readProjectMeta(project.id)).branches.length),
       )
     ).reduce((a, b) => a + b, 0),
   };

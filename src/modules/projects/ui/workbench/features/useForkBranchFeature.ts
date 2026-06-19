@@ -46,7 +46,7 @@ export function useForkBranchFeature() {
   const { navigateToBranch } = useProjectWorkbenchNavigation();
   const workbenchStore = useProjectWorkbenchStoreApi();
   const dialogControls = useForkBranchDialogControls();
-  const createBranchWithWorkspace = rpc.useMutation("branches.createWithWorkspace");
+  const createBranch = rpc.useMutation("branches.create");
 
   const submit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
@@ -64,33 +64,26 @@ export function useForkBranchFeature() {
       }
 
       try {
-        const workspace = await createBranchWithWorkspace.mutate({
+        const workspace = await createBranch.mutate({
           projectId,
           name: trimmedName,
           fromCommitId: forkCommit.id,
         });
         dialogControls.closeDialog();
-        navigateToBranch(workspace.branchId);
+        navigateToBranch(workspace.id);
       } catch (mutationError) {
         setForkBranchError(
           mutationError instanceof Error ? mutationError.message : "Fork 分支失败，请稍后重试。",
         );
       }
     },
-    [
-      createBranchWithWorkspace,
-      dialogControls,
-      model.project,
-      navigateToBranch,
-      projectId,
-      workbenchStore,
-    ],
+    [createBranch, dialogControls, model.project, navigateToBranch, projectId, workbenchStore],
   );
 
   return {
     ...dialogControls,
     submit,
-    errorMessage: createBranchWithWorkspace.error?.message ?? null,
-    isPending: createBranchWithWorkspace.isPending,
+    errorMessage: createBranch.error?.message ?? null,
+    isPending: createBranch.isPending,
   };
 }

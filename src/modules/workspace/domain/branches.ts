@@ -2,11 +2,18 @@ import fs from "node:fs";
 
 import { createId, invariant, now } from "@/shared/lib/domain";
 
-import { branchRef, deleteRef, resolveRef, writeRef } from "./git-storage/git-store";
+import {
+  branchRef,
+  checkoutCommitToWorktree,
+  deleteRef,
+  resolveRef,
+  writeRef,
+} from "./git-storage/git-store";
 import { getProjectWorktreeDir } from "./git-storage/paths";
 import type { BranchIndexRow, ProjectIndexRow } from "./git-storage/types";
 import { readProjectMeta, updateProjectMeta } from "./git-storage/project-meta-store";
-import { getWorkspaceForBranchId } from "./lifecycle";
+import { mkdirSync } from "node:fs";
+import { seedEmptyWorktree } from "./git-storage/worktree-state";
 
 export type BranchRow = BranchIndexRow;
 
@@ -64,6 +71,19 @@ export async function createBranch(input: {
     }),
     "Create branch metadata",
   );
+
+  // worktree 目录直接使用 branchId
+  const worktreePath = getProjectWorktreeDir(project.id, branchId);
+  mkdirSync(worktreePath, { recursive: true });
+  seedEmptyWorktree(worktreePath);
+  if (initialHeadCommitId) {
+    await checkoutCommitToWorktree({
+      projectId: project.id,
+      workspaceId: branchId,
+      commitId: initialHeadCommitId,
+    });
+  }
+
   return await getBranch(project.id, branchId);
 }
 
@@ -99,13 +119,10 @@ export async function deleteBranch(projectId: string, branchId: string) {
     project.defaultBranchId !== branch.id,
     "无法删除：这是项目的默认分支。请先切换默认分支。",
   );
-  const workspace = await getWorkspaceForBranchId(projectId, branch.id);
-  if (workspace) {
-    await fs.promises.rm(getProjectWorktreeDir(workspace.projectId, workspace.id), {
-      recursive: true,
-      force: true,
-    });
-  }
+  await fs.promises.rm(getProjectWorktreeDir(projectId, branch.id), {
+    recursive: true,
+    force: true,
+  });
   await deleteRef({ projectId, ref: branchRef(branch.id) });
   await updateProjectMeta(
     project.id,
@@ -118,7 +135,6 @@ export async function deleteBranch(projectId: string, branchId: string) {
           updatedAt: timestamp,
         },
         branches: payload.branches.filter((item) => item.id !== branch.id),
-        workspaces: payload.workspaces.filter((item) => item.branchId !== branch.id),
       };
     },
     "Delete branch metadata",

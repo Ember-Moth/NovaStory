@@ -2,7 +2,6 @@ import { mutation, query } from "@codehz/rpc/core";
 
 import {
   createBranch,
-  createBranchWorkspace,
   deleteBranch,
   getBranch,
   listBranchHeads,
@@ -45,25 +44,11 @@ export const create = mutation<
   invalidate: (input) => [
     rpcTags.branchesByProject(input.projectId),
     rpcTags.branchHeadsByProject(input.projectId),
-    rpcTags.project(input.projectId),
-    rpcTags.projectsList(),
-  ],
-  handler: async (input) => await createBranch(input),
-});
-
-export const createWithWorkspace = mutation<
-  { projectId: string; name: string; fromCommitId?: string | null; workspaceName?: string },
-  Awaited<ReturnType<typeof createBranchWorkspace>>,
-  RpcTagList
->({
-  invalidate: (input) => [
-    rpcTags.branchesByProject(input.projectId),
-    rpcTags.branchHeadsByProject(input.projectId),
     rpcTags.workspacesByProject(input.projectId),
     rpcTags.project(input.projectId),
     rpcTags.projectsList(),
   ],
-  handler: async (input) => await createBranchWorkspace(input),
+  handler: async (input) => await createBranch(input),
 });
 
 export const deleteMutation = mutation<{ projectId: string; branchId: string }, void, RpcTagList>({

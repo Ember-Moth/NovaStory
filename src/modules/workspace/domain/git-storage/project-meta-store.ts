@@ -6,12 +6,7 @@ import { invariant } from "@/shared/lib/domain";
 import { commitCustomRef, metaRef, readFilesAtRef } from "./git-store";
 import { parseJsonl, stringifyJsonl } from "./jsonl";
 import { ensureStorageRoot } from "./paths";
-import type {
-  BranchIndexRow,
-  ProjectIndexRow,
-  ProjectMetaPayload,
-  WorkspaceIndexRow,
-} from "./types";
+import type { BranchIndexRow, ProjectIndexRow, ProjectMetaPayload } from "./types";
 
 function repoProjectIdFromDirname(dirname: string) {
   return dirname.endsWith(".git") ? dirname.slice(0, -4) : null;
@@ -28,9 +23,6 @@ function normalizePayload(payload: ProjectMetaPayload): ProjectMetaPayload {
       ...branch,
       forkedFromCommitId: branch.forkedFromCommitId ?? null,
     })),
-    workspaces: payload.workspaces.map((workspace) => ({
-      ...workspace,
-    })),
   };
 }
 
@@ -39,8 +31,6 @@ function parsePayload(files: Record<string, string>): ProjectMetaPayload {
   invariant(projectJson, "缺少 project.json。");
   const project = JSON.parse(projectJson) as ProjectIndexRow;
   const branches = parseJsonl<BranchIndexRow>(files["branches.jsonl"]);
-  const workspaces = parseJsonl<WorkspaceIndexRow>(files["workspaces.jsonl"]);
-
   return normalizePayload({
     project: {
       ...project,
@@ -48,7 +38,6 @@ function parsePayload(files: Record<string, string>): ProjectMetaPayload {
       defaultBranchId: project.defaultBranchId ?? null,
     },
     branches,
-    workspaces,
   });
 }
 
@@ -109,7 +98,6 @@ export async function writeProjectMeta(
     files: {
       "project.json": `${JSON.stringify(normalized.project, null, 2)}\n`,
       "branches.jsonl": stringifyJsonl(normalized.branches),
-      "workspaces.jsonl": stringifyJsonl(normalized.workspaces),
     },
   });
   return normalized;
@@ -120,7 +108,6 @@ export async function createProjectMeta(project: ProjectIndexRow) {
     {
       project,
       branches: [],
-      workspaces: [],
     },
     "Create project metadata",
   );

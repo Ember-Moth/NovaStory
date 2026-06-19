@@ -39,7 +39,7 @@ export function useCreateBranchFeature() {
   const { navigateToBranch } = useProjectWorkbenchNavigation();
   const workbenchStore = useProjectWorkbenchStoreApi();
   const dialogControls = useCreateBranchDialogControls();
-  const createBranchWithWorkspace = rpc.useMutation("branches.createWithWorkspace");
+  const createBranch = rpc.useMutation("branches.create");
 
   const submit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
@@ -60,13 +60,13 @@ export function useCreateBranchFeature() {
           model.branchHeads,
           model.project.defaultBranchId,
         );
-        const workspace = await createBranchWithWorkspace.mutate({
+        const workspace = await createBranch.mutate({
           projectId,
           name: trimmedName,
           fromCommitId: sourceCommitId,
         });
         dialogControls.closeDialog();
-        navigateToBranch(workspace.branchId);
+        navigateToBranch(workspace.id);
       } catch (mutationError) {
         setNewBranchError(
           mutationError instanceof Error ? mutationError.message : "创建分支失败，请稍后重试。",
@@ -74,7 +74,7 @@ export function useCreateBranchFeature() {
       }
     },
     [
-      createBranchWithWorkspace,
+      createBranch,
       dialogControls,
       model.branchHeads,
       model.project,
@@ -87,7 +87,7 @@ export function useCreateBranchFeature() {
   return {
     ...dialogControls,
     submit,
-    errorMessage: createBranchWithWorkspace.error?.message ?? null,
-    isPending: createBranchWithWorkspace.isPending,
+    errorMessage: createBranch.error?.message ?? null,
+    isPending: createBranch.isPending,
   };
 }

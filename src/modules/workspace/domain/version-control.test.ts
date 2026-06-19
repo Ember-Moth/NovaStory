@@ -277,7 +277,7 @@ test("deleting a branch also deletes its workspace", async () => {
   ).rejects.toThrow("未找到分支。");
   await expect(
     service.getWorkspace(featureWorkspace.projectId, featureWorkspace.id),
-  ).rejects.toThrow("未找到工作区。");
+  ).rejects.toThrow("未找到分支。");
   expect((await service.getWorkspace(workspace.projectId, workspace.id)).branchId).toBe(
     workspace.branchId,
   );

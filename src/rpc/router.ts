@@ -59,7 +59,6 @@ export const branches = {
   get: branchHandlers.get,
   heads: branchHandlers.heads,
   create: branchHandlers.create,
-  createWithWorkspace: branchHandlers.createWithWorkspace,
   delete: branchHandlers.deleteMutation,
 };
 
