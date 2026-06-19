@@ -11,6 +11,12 @@ const buttonBase =
 export const secondaryButton = `${buttonBase} border border-border bg-sidebar-background text-foreground hover:bg-list-hover-background`;
 export const primaryButton = `${buttonBase} bg-accent-background text-foreground hover:brightness-110`;
 
+const compactButtonBase =
+  "inline-flex h-7 items-center gap-1 rounded px-2 text-xs font-medium leading-none transition disabled:cursor-not-allowed disabled:opacity-50";
+
+export const compactSecondaryButton = `${compactButtonBase} border border-border bg-sidebar-background text-foreground hover:bg-list-hover-background`;
+export const compactPrimaryButton = `${compactButtonBase} bg-accent-background text-foreground hover:brightness-110`;
+
 export function InlineError({ message }: { message: string }) {
   return (
     <div className="flex items-center gap-2 rounded-md border border-border bg-editor-background px-3 py-2 text-sm text-accent-foreground">

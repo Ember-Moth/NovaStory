@@ -7,11 +7,12 @@ import { useProjectBranchAdminFeature } from "../features/useProjectBranchAdminF
 import { useProjectCommitFeature } from "../features/useProjectCommitFeature";
 import { useForkBranchDialogControls } from "../features/useForkBranchFeature";
 import {
+  compactPrimaryButton,
+  compactSecondaryButton,
   dateFormatter,
   formatCommitId,
   InlineError,
   primaryButton,
-  secondaryButton,
 } from "../../shared/projectUi";
 import { useProjectCommitDraft, useProjectHistorySelection } from "../state/projectWorkbenchStore";
 import {
@@ -46,15 +47,16 @@ export function ProjectBranchDetailPanel() {
   const workspaceMissing = selectedWorkspace == null;
 
   return (
-    <div className="mx-auto grid min-h-full w-full max-w-6xl gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]">
-      <section className="flex min-h-0 flex-col overflow-hidden rounded-md border border-border bg-sidebar-background">
-        <BranchHeader />
-        {workspaceMissing ? (
-          <div className="mx-3 mt-2 rounded-md border border-border bg-editor-background px-3 py-2 text-xs text-accent-foreground">
-            该分支当前没有对应 workspace，只支持只读查看历史，不能打开编辑器或直接提交。
-          </div>
-        ) : null}
-        <div className="mt-2 min-h-0 flex-1">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <BranchHeader />
+      {workspaceMissing ? (
+        <div className="shrink-0 border-b border-border bg-editor-background px-4 py-2 text-xs text-accent-foreground">
+          该分支当前没有对应 workspace，只支持只读查看历史，不能打开编辑器或直接提交。
+        </div>
+      ) : null}
+
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <section className="flex min-h-0 w-[24rem] shrink-0 flex-col overflow-hidden border-r border-border">
           <ProjectHistoryTimeline
             commitHistory={model.commitHistory}
             commitHistoryLoading={model.commitHistoryLoading}
@@ -65,20 +67,20 @@ export function ProjectBranchDetailPanel() {
             selection={selection}
             onSelect={setSelection}
           />
-        </div>
-      </section>
+        </section>
 
-      <section className="rounded-md border border-border bg-sidebar-background p-3">
-        {selection.kind === "commit" ? (
-          <ProjectCommitDetailPanel
-            commitId={selection.commitId}
-            selectedBranchHeadCommitId={model.selectedBranchHeadCommitId}
-            onOpenFork={forkBranchDialog.openDialog}
-          />
-        ) : (
-          <WorkingChangesDetail workspaceMissing={workspaceMissing} />
-        )}
-      </section>
+        <section className="min-h-0 flex-1 overflow-y-auto p-4">
+          {selection.kind === "commit" ? (
+            <ProjectCommitDetailPanel
+              commitId={selection.commitId}
+              selectedBranchHeadCommitId={model.selectedBranchHeadCommitId}
+              onOpenFork={forkBranchDialog.openDialog}
+            />
+          ) : (
+            <WorkingChangesDetail workspaceMissing={workspaceMissing} />
+          )}
+        </section>
+      </div>
     </div>
   );
 }
@@ -99,81 +101,76 @@ function BranchHeader() {
   }
 
   return (
-    <div className="shrink-0 border-b border-border p-3">
-      <div className="flex flex-wrap items-start gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h2 className="truncate text-[14px] font-semibold text-foreground">
-              {selectedBranch.name}
-            </h2>
-            {project.defaultBranchId === selectedBranch.id ? (
-              <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-accent-foreground">
-                默认分支
-              </span>
-            ) : null}
-          </div>
-          <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-foreground-muted">
-            <span>更新时间 {dateFormatter.format(selectedBranch.updatedAt)}</span>
-            <span>
-              HEAD{" "}
-              {model.selectedBranchHeadCommitId ? (
-                <span className="font-mono">
-                  {formatCommitId(model.selectedBranchHeadCommitId)}
-                </span>
-              ) : (
-                "—"
-              )}
+    <div className="flex shrink-0 items-center gap-3 border-b border-border bg-title-bar-background px-4 py-2">
+      <span className="icon-[material-symbols--fork-right] shrink-0 text-lg text-accent-foreground" />
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <div className="flex min-w-0 items-center gap-2">
+          <h2 className="truncate text-[14px] font-semibold text-foreground">
+            {selectedBranch.name}
+          </h2>
+          {project.defaultBranchId === selectedBranch.id ? (
+            <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium text-accent-foreground">
+              默认分支
             </span>
-            <span>
-              Fork 自{" "}
-              {selectedBranch.forkedFromCommitId ? (
-                <span className="font-mono">
-                  {formatCommitId(selectedBranch.forkedFromCommitId)}
-                </span>
-              ) : (
-                "空分支"
-              )}
-            </span>
-          </div>
+          ) : null}
         </div>
-
-        <div className="flex flex-wrap gap-1.5">
-          {selectedWorkspace ? (
-            <button
-              type="button"
-              onClick={() => navigate(`/project/${project.id}/workspace/${selectedWorkspace.id}`)}
-              className={primaryButton}
-            >
-              <span className="icon-[material-symbols--edit] text-base" />
-              打开 workspace
-            </button>
-          ) : (
-            <button type="button" disabled className={primaryButton}>
-              <span className="icon-[material-symbols--warning] text-base" />无 workspace
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => void branchAdmin.handleSetDefaultBranch(selectedBranch)}
-            disabled={project.defaultBranchId === selectedBranch.id || branchAdmin.isSettingDefault}
-            className={secondaryButton}
-          >
-            <span className="icon-[material-symbols--target] text-base" />
-            设为默认
-          </button>
-          <button
-            type="button"
-            onClick={() => void branchAdmin.handleDeleteBranch(selectedBranch)}
-            disabled={project.defaultBranchId === selectedBranch.id || branchAdmin.isDeletingBranch}
-            className={cn(
-              secondaryButton,
-              "text-accent-foreground hover:bg-red-500/10 hover:text-red-200",
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] leading-none text-foreground-muted">
+          <span>更新时间 {dateFormatter.format(selectedBranch.updatedAt)}</span>
+          <span>
+            HEAD{" "}
+            {model.selectedBranchHeadCommitId ? (
+              <span className="font-mono">{formatCommitId(model.selectedBranchHeadCommitId)}</span>
+            ) : (
+              "—"
             )}
-          >
-            <span className="icon-[material-symbols--delete] text-base" />
-            删除分支
-          </button>
+          </span>
+          <span>
+            Fork 自{" "}
+            {selectedBranch.forkedFromCommitId ? (
+              <span className="font-mono">{formatCommitId(selectedBranch.forkedFromCommitId)}</span>
+            ) : (
+              "空分支"
+            )}
+          </span>
         </div>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-1.5">
+        {selectedWorkspace ? (
+          <button
+            type="button"
+            onClick={() => navigate(`/project/${project.id}/workspace/${selectedWorkspace.id}`)}
+            className={compactPrimaryButton}
+          >
+            <span className="icon-[material-symbols--edit] text-sm" />
+            打开 workspace
+          </button>
+        ) : (
+          <button type="button" disabled className={compactPrimaryButton}>
+            <span className="icon-[material-symbols--warning] text-sm" />无 workspace
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => void branchAdmin.handleSetDefaultBranch(selectedBranch)}
+          disabled={project.defaultBranchId === selectedBranch.id || branchAdmin.isSettingDefault}
+          className={compactSecondaryButton}
+        >
+          <span className="icon-[material-symbols--target] text-sm" />
+          设为默认
+        </button>
+        <button
+          type="button"
+          onClick={() => void branchAdmin.handleDeleteBranch(selectedBranch)}
+          disabled={project.defaultBranchId === selectedBranch.id || branchAdmin.isDeletingBranch}
+          className={cn(
+            compactSecondaryButton,
+            "text-accent-foreground hover:bg-red-500/10 hover:text-red-200",
+          )}
+        >
+          <span className="icon-[material-symbols--delete] text-sm" />
+          删除分支
+        </button>
       </div>
     </div>
   );
