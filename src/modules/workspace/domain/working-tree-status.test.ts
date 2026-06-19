@@ -1,4 +1,7 @@
-import { expect, test } from "bun:test";
+import type fs from "node:fs";
+
+import { expect, spyOn, test } from "bun:test";
+import git from "isomorphic-git";
 
 import { seedProjectRecord } from "@/test/project";
 import * as service from "./index";
@@ -9,6 +12,37 @@ async function seedProject(projectId: string) {
     await service.createDefaultWorkspace(projectId);
   }
   return (await service.getDefaultWorkspace(projectId))!;
+}
+
+function mockStatusMatrixWithoutRacyGitShortcut() {
+  const originalStatusMatrix = git.statusMatrix;
+
+  return spyOn(git, "statusMatrix").mockImplementation((args) => {
+    const baseFs = args.fs as typeof fs;
+    const promises = Object.create(baseFs.promises) as typeof baseFs.promises;
+
+    promises.lstat = async (path) => {
+      const stat = await baseFs.promises.lstat(path);
+      const bumpedTime = 1000;
+
+      return Object.assign(Object.create(Object.getPrototypeOf(stat)), stat, {
+        mtimeMs: stat.mtimeMs + bumpedTime,
+        ctimeMs: stat.ctimeMs + bumpedTime,
+        mtime: new Date(stat.mtimeMs + bumpedTime),
+        ctime: new Date(stat.ctimeMs + bumpedTime),
+      });
+    };
+
+    return originalStatusMatrix({
+      ...args,
+      fs: Object.defineProperty({ ...baseFs }, "promises", {
+        value: promises,
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      }) as typeof fs,
+    });
+  });
 }
 
 test("empty branch before first commit reports no diff areas", async () => {
@@ -334,6 +368,7 @@ test("inserting a new node before existing ones does not mark them as order-chan
 });
 
 test("truly swapping two nodes marks both as order-changed", async () => {
+  using _statusMatrixSpy = mockStatusMatrixWithoutRacyGitShortcut();
   const workspace = await seedProject("status_true_reorder_uniq");
   const nodeA = await service.createContentNode({
     projectId: workspace.projectId,
@@ -355,9 +390,6 @@ test("truly swapping two nodes marks both as order-changed", async () => {
     branchId: workspace.branchId,
     message: "base",
   });
-
-  // workaround for racy git
-  await Bun.sleep(1000);
 
   // 将 B 移到最前面 → [B, A]
   await service.moveContentNode({
