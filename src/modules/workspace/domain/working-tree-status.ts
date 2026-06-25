@@ -406,9 +406,6 @@ async function getWorkingTreeStatusFromWorkdir(
   workdir: VirtualWorkdir,
 ): Promise<WorkingTreeStatus> {
   const state = readWorktreeStateFromWorkdir(workdir);
-  if (!headCommitId && state.content.length === 0 && state.timeline.length === 0) {
-    return emptyStatus(null);
-  }
   const headFiles = headCommitId
     ? await readFilesAtCommit({ projectId, commitId: headCommitId })
     : {};
