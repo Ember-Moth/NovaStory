@@ -536,7 +536,7 @@ export async function handleProjectChatsRequest(request: Request) {
       const archived = url.searchParams.get("archived");
       return Response.json({
         chats: await listProjectChats(projectId, {
-          archived: archived == null ? undefined : archived === "true",
+          archived: archived == null ? undefined : archived === "all" ? "all" : archived === "true",
         }),
       });
     }

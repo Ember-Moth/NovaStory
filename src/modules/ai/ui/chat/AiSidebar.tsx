@@ -62,7 +62,7 @@ function useProjectChats(projectId: string) {
   const reload = useCallback(async () => {
     setIsLoading(true);
     const data = await requestJson<{ chats: ProjectChatInfo[] }>(
-      `/api/chats?projectId=${projectId}&archived=${showArchived ? "true" : "false"}`,
+      `/api/chats?projectId=${projectId}&archived=${showArchived ? "all" : "false"}`,
     );
     setChats(data.chats);
     setIsLoading(false);

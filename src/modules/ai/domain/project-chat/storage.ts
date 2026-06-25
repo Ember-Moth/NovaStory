@@ -72,15 +72,16 @@ function ensureProjectChatModelConfig(projectId: string): ProjectChatModelConfig
 
 export async function listProjectChats(
   projectId: string,
-  options?: { archived?: boolean },
+  options?: { archived?: boolean | "all" },
 ): Promise<ProjectChatInfo[]> {
   const chatList = readProjectChatList(projectId);
   const archived = options?.archived;
 
   const filtered = chatList.chats
-    .filter((entry) =>
-      archived == null ? true : archived ? entry.archivedAt != null : entry.archivedAt == null,
-    )
+    .filter((entry) => {
+      if (archived == null || archived === "all") return true;
+      return archived ? entry.archivedAt != null : entry.archivedAt == null;
+    })
     .sort((left, right) => right.updatedAt - left.updatedAt);
 
   // Read per-chat files for full metadata (modelConfig is not in the lightweight index)

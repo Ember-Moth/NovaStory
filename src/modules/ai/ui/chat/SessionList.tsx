@@ -27,12 +27,6 @@ export function SessionList({
 }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex items-center gap-1 border-b border-border px-2 py-1.5">
-        <div className="text-[11px] text-foreground-muted">
-          {showArchived ? "已显示归档会话" : "当前仅显示未归档会话"}
-        </div>
-      </div>
-
       <div className="flex min-h-0 flex-1 flex-col">
         {chats.length === 0 ? (
           <div className="px-3 py-3 text-[12px] text-foreground-muted">暂无会话。</div>
@@ -50,6 +44,7 @@ export function SessionList({
                   active
                     ? "bg-list-active-background text-foreground"
                     : "text-foreground-muted hover:bg-list-hover-background hover:text-foreground",
+                  showArchived && archived && "opacity-50",
                 )}
               >
                 <span
