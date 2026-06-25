@@ -1,5 +1,7 @@
 import { createId, invariant } from "@/shared/lib/domain";
 
+import type { SHA1 } from "nano-git";
+
 import { getBranch, getBranchHeadCommitId } from "./branches";
 import { getWorkspace, getWorkspaceForBranchId, touchWorkspaceMeta } from "./lifecycle";
 import { readFilesAtCommit } from "./git-storage/git-store";
@@ -317,7 +319,7 @@ export async function revertContentChange(input: {
 
   // 读取 HEAD 状态作为撤回基线。无 HEAD（空仓库）时previousState为空。
   const previousFiles = headCommitId
-    ? await readFilesAtCommit({ projectId: input.projectId, commitId: headCommitId })
+    ? await readFilesAtCommit({ projectId: input.projectId, commitId: headCommitId as SHA1 })
     : {};
   const previousState = readWorktreeStateFromFiles(previousFiles);
 

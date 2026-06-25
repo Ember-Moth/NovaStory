@@ -67,11 +67,11 @@ export async function createCommit(input: {
 export async function checkoutCommit(input: {
   projectId: string;
   workspaceId: string;
-  commitId: string;
+  commitId: SHA1;
 }) {
   const workspace = await getWorkspace(input.projectId, input.workspaceId);
   const repo = getOrInitRepo(input.projectId);
-  const commit = repo.catFile(input.commitId as SHA1);
+  const commit = repo.catFile(input.commitId);
   if (commit.type !== "commit") {
     throw new Error(`Expected commit at ${input.commitId}, got ${commit.type}`);
   }

@@ -56,7 +56,7 @@ export async function createBranch(input: {
     await writeRef({
       projectId: project.id,
       ref: branchRef(branchId),
-      value: initialHeadCommitId,
+      value: initialHeadCommitId as SHA1,
     });
   }
 

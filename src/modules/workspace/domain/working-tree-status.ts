@@ -1,4 +1,7 @@
 import { ORIGIN_TIMELINE_POINT_ID } from "./constants";
+import type { SHA1 } from "nano-git";
+import type { VirtualWorkdir } from "nano-git/workdir/core";
+
 import { getBranch, getBranchHeadCommitId } from "./branches";
 import { readFilesAtCommit } from "./git-storage/git-store";
 import { getWorkdirForBranch } from "./git-storage/git-store";
@@ -9,7 +12,6 @@ import {
   readWorktreeStateFromWorkdir,
 } from "./git-storage/worktree-state";
 import { getWorkspaceForBranchId } from "./lifecycle";
-import type { VirtualWorkdir } from "nano-git/workdir/core";
 import type { ContentChangeAspect, WorkingTreeContentChangeItem, WorkingTreeStatus } from "./types";
 
 type FlatContentNode = ReturnType<typeof flattenManuscriptNodes>[number];
@@ -407,7 +409,7 @@ async function getWorkingTreeStatusFromWorkdir(
 ): Promise<WorkingTreeStatus> {
   const state = readWorktreeStateFromWorkdir(workdir);
   const headFiles = headCommitId
-    ? await readFilesAtCommit({ projectId, commitId: headCommitId })
+    ? await readFilesAtCommit({ projectId, commitId: headCommitId as SHA1 })
     : {};
   const headState = headCommitId
     ? readWorktreeStateFromFiles(headFiles)

@@ -1,3 +1,4 @@
+import type { SHA1 } from "nano-git";
 import { mutation, query } from "@codehz/rpc/core";
 
 import {
@@ -90,7 +91,7 @@ export const checkout = mutation<
   Awaited<ReturnType<typeof checkoutCommit>>,
   RpcTagList
 >(async (input, ctx) => {
-  const commit = await checkoutCommit(input);
+  const commit = await checkoutCommit({ ...input, commitId: input.commitId as SHA1 });
   const workspace = await getWorkspace(input.projectId, input.workspaceId);
   ctx.invalidate(
     rpcTags.workspace(workspace.id),

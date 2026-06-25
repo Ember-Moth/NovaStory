@@ -1,3 +1,4 @@
+import type { SHA1 } from "nano-git";
 import { expect, test } from "bun:test";
 
 import { setupMockDatabase } from "@/test/mock-db";
@@ -91,7 +92,7 @@ test("commit then checkout round-trips content, timeline and aux state", async (
   await service.checkoutCommit({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
-    commitId: commit.id,
+    commitId: commit.id as SHA1,
   });
 
   expect(await service.exportContentSubtree(workspace.projectId, workspace.id)).toEqual(before);
@@ -149,10 +150,10 @@ test("branch off a commit shares the same head and forked metadata", async () =>
   });
 
   const branch = await service.getBranch(featureWorkspace.projectId, featureWorkspace.branchId);
-  expect(branch.forkedFromCommitId).toBe(commit.id);
+  expect(branch.forkedFromCommitId).toBe(commit.id as SHA1);
   expect(
     await service.getBranchHeadCommitId(featureWorkspace.projectId, featureWorkspace.branchId),
-  ).toBe(commit.id);
+  ).toBe(commit.id as SHA1);
 
   // The new workspace is checked out from the commit and has the same content.
   const exported = await service.exportContentSubtree(

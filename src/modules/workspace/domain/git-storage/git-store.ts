@@ -80,9 +80,9 @@ function readTreeFiles(repo: FileRepository, treeOid: SHA1): Record<string, stri
   return files;
 }
 
-export async function writeRef(input: { projectId: string; ref: string; value: string }) {
+export async function writeRef(input: { projectId: string; ref: string; value: SHA1 }) {
   const repo = getOrInitRepo(input.projectId);
-  repo.updateRef(input.ref, input.value as SHA1);
+  repo.updateRef(input.ref, input.value);
 }
 
 export async function deleteRef(input: { projectId: string; ref: string }) {
@@ -99,11 +99,11 @@ export async function writeTreeAtRef(input: {
   projectId: string;
   ref: string;
   files: Record<string, string>;
-}) {
+}): Promise<SHA1> {
   const repo = getOrInitRepo(input.projectId);
   const tree = writeTreeFromFiles(repo, input.files);
   repo.updateRef(input.ref, tree);
-  return tree as string;
+  return tree;
 }
 
 export async function readTreeAtRef(input: {
@@ -182,14 +182,14 @@ export async function commitCustomRef(input: {
 
   const { rootHash } = patchTree(repo.objects, base, ops);
   repo.updateRef(input.ref, rootHash);
-  return rootHash as string;
+  return rootHash;
 }
 
 export async function readFileAtRef(input: { projectId: string; ref: string; filepath: string }) {
   const repo = getOrInitRepo(input.projectId);
   const oid = repo.readRef(input.ref);
   if (!oid) throw new Error(`Ref not found: ${input.ref}`);
-  const entries = readTree(repo.objects, oid as SHA1);
+  const entries = readTree(repo.objects, oid);
   const entry = entries.find((e) => e.path === input.filepath);
   if (!entry) throw new Error(`File not found: ${input.filepath}`);
   const obj = repo.catFile(entry.hash);
@@ -201,19 +201,19 @@ export async function readFilesAtRef(input: { projectId: string; ref: string }) 
   const repo = getOrInitRepo(input.projectId);
   const oid = repo.readRef(input.ref);
   if (!oid) return {};
-  return readTreeFiles(repo, oid as SHA1);
+  return readTreeFiles(repo, oid);
 }
 
-export async function readFilesAtCommit(input: { projectId: string; commitId: string }) {
+export async function readFilesAtCommit(input: { projectId: string; commitId: SHA1 }) {
   const repo = getOrInitRepo(input.projectId);
-  const commit = repo.catFile(input.commitId as SHA1);
+  const commit = repo.catFile(input.commitId);
   if (commit.type !== "commit") return {};
   return readTreeFiles(repo, commit.tree);
 }
 
-export async function readCommit(projectId: string, oid: string) {
+export async function readCommit(projectId: string, oid: SHA1) {
   const repo = getOrInitRepo(projectId);
-  const obj = repo.catFile(oid as SHA1);
+  const obj = repo.catFile(oid);
   if (obj.type !== "commit") throw new Error(`Expected commit, got ${obj.type}`);
   return obj;
 }
@@ -226,7 +226,7 @@ export async function touchProjectRepo(projectId: string) {
 
 export async function resolveRef(projectId: string, ref: string) {
   const repo = getOrInitRepo(projectId);
-  return repo.readRef(ref) as string | null;
+  return repo.readRef(ref);
 }
 
 export async function listLog(input: { projectId: string; ref: string; depth?: number }) {
@@ -235,11 +235,11 @@ export async function listLog(input: { projectId: string; ref: string; depth?: n
   if (!head) return [];
   const entries = [...walkLogEntries(repo.objects, { from: [head], maxCount: input.depth })];
   return entries.map((entry) => ({
-    oid: entry.hash as string,
+    oid: entry.hash,
     commit: {
       message: entry.commit.message,
-      tree: entry.commit.tree as string,
-      parent: entry.commit.parents.map((p) => p as string),
+      tree: entry.commit.tree,
+      parent: entry.commit.parents,
       author: {
         name: entry.commit.author.name,
         email: entry.commit.author.email,

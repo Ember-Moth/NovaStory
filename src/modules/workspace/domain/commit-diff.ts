@@ -1,3 +1,5 @@
+import type { SHA1 } from "nano-git";
+
 import { readFilesAtCommit } from "./git-storage/git-store";
 import { flattenManuscriptNodes, readWorktreeStateFromFiles } from "./git-storage/worktree-state";
 import { getCommit } from "./commits";
@@ -26,9 +28,9 @@ export async function getCommitDiff(projectId: string, commitId: string): Promis
   const baseCommitId = commit.parents[0]?.parentId ?? null;
   const isRoot = baseCommitId == null;
 
-  const nextFiles = await readFilesAtCommit({ projectId, commitId });
+  const nextFiles = await readFilesAtCommit({ projectId, commitId: commitId as SHA1 });
   const previousFiles = baseCommitId
-    ? await readFilesAtCommit({ projectId, commitId: baseCommitId })
+    ? await readFilesAtCommit({ projectId, commitId: baseCommitId as SHA1 })
     : {};
 
   const previousState = readWorktreeStateFromFiles(previousFiles);

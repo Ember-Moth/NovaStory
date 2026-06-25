@@ -1,3 +1,4 @@
+import type { SHA1 } from "nano-git";
 import { expect, test } from "bun:test";
 
 import { seedProjectRecord } from "@/test/project";
@@ -284,7 +285,7 @@ test("reverting workspace to head clears the diff summary", async () => {
   await service.checkoutCommit({
     projectId: workspace.projectId,
     workspaceId: workspace.id,
-    commitId: commit.id,
+    commitId: commit.id as SHA1,
   });
 
   const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchId);
