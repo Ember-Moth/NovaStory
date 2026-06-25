@@ -108,7 +108,7 @@ function BranchHeader() {
           <h2 className="truncate text-[14px] font-semibold text-foreground">
             {selectedBranch.name}
           </h2>
-          {project.defaultBranchId === selectedBranch.id ? (
+          {project.defaultBranchName === selectedBranch.name ? (
             <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium text-accent-foreground">
               默认分支
             </span>
@@ -121,14 +121,6 @@ function BranchHeader() {
               <span className="font-mono">{formatCommitId(model.selectedBranchHeadCommitId)}</span>
             ) : (
               "—"
-            )}
-          </span>
-          <span>
-            Fork 自{" "}
-            {selectedBranch.forkedFromCommitId ? (
-              <span className="font-mono">{formatCommitId(selectedBranch.forkedFromCommitId)}</span>
-            ) : (
-              "空分支"
             )}
           </span>
         </div>
@@ -152,7 +144,9 @@ function BranchHeader() {
         <button
           type="button"
           onClick={() => void branchAdmin.handleSetDefaultBranch(selectedBranch)}
-          disabled={project.defaultBranchId === selectedBranch.id || branchAdmin.isSettingDefault}
+          disabled={
+            project.defaultBranchName === selectedBranch.name || branchAdmin.isSettingDefault
+          }
           className={compactSecondaryButton}
         >
           <span className="icon-[material-symbols--target] text-sm" />
@@ -161,7 +155,9 @@ function BranchHeader() {
         <button
           type="button"
           onClick={() => void branchAdmin.handleDeleteBranch(selectedBranch)}
-          disabled={project.defaultBranchId === selectedBranch.id || branchAdmin.isDeletingBranch}
+          disabled={
+            project.defaultBranchName === selectedBranch.name || branchAdmin.isDeletingBranch
+          }
           className={cn(
             compactSecondaryButton,
             "text-accent-foreground hover:bg-red-500/10 hover:text-red-200",

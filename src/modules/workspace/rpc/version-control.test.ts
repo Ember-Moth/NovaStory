@@ -22,7 +22,7 @@ test("branch list watches the project branches tag and includes the default bran
   const result = await branchHandlers.list.handler({ projectId: "rpc_branch_list" }, requestCtx);
 
   expect(result.watch).toEqual([rpcTags.branchesByProject("rpc_branch_list")]);
-  expect(result.data.map((branch) => branch.id)).toContain(workspace.branchId);
+  expect(result.data.map((branch) => branch.name)).toContain(workspace.branchName);
   expect(result.data[0]).not.toHaveProperty("headCommitId");
   expect(result.data[0]).not.toHaveProperty("ref");
 });
@@ -33,7 +33,7 @@ test("branch heads watches the project branch-heads tag and resolves current hea
 
   expect(result.watch).toEqual([rpcTags.branchHeadsByProject("rpc_branch_heads")]);
   expect(result.data).toContainEqual({
-    branchId: workspace.branchId,
+    branchName: workspace.branchName,
     headCommitId: null,
     headCommitTime: null,
   });
@@ -49,7 +49,7 @@ test("creating a branch with workspace invalidates branches and workspaces", asy
   });
   const commit = await service.createCommit({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     message: "base",
   });
 
@@ -65,7 +65,7 @@ test("creating a branch with workspace invalidates branches and workspaces", asy
     rpcTags.project("rpc_branch_create"),
     rpcTags.projectsList(),
   ]);
-  expect(result.data.id).not.toBe(workspace.id);
+  expect(result.data.name).not.toBe(workspace.id);
 });
 
 test("deleting a branch invalidates branch, workspace, and project tags", async () => {
@@ -78,7 +78,7 @@ test("deleting a branch invalidates branch, workspace, and project tags", async 
   const result = await branchHandlers.deleteMutation.handler(
     {
       projectId: "rpc_branch_delete",
-      branchId: featureWorkspace.branchId,
+      branchId: featureWorkspace.branchName,
     },
     requestCtx,
   );
@@ -86,14 +86,14 @@ test("deleting a branch invalidates branch, workspace, and project tags", async 
   expect(result.invalidate).toEqual([
     rpcTags.branchesByProject("rpc_branch_delete"),
     rpcTags.branchHeadsByProject("rpc_branch_delete"),
-    rpcTags.branch(featureWorkspace.branchId),
+    rpcTags.branch(featureWorkspace.branchName),
     rpcTags.workspacesByProject("rpc_branch_delete"),
     rpcTags.project("rpc_branch_delete"),
     rpcTags.projectsList(),
   ]);
   await expect(
     service.getWorkspace(featureWorkspace.projectId, featureWorkspace.id),
-  ).rejects.toThrow("未找到分支。");
+  ).rejects.toThrow("未找到分支");
 });
 
 test("commit create invalidates history and branch tags", async () => {
@@ -106,13 +106,13 @@ test("commit create invalidates history and branch tags", async () => {
   });
 
   const result = await commitHandlers.create.handler(
-    { projectId: workspace.projectId, branchId: workspace.branchId, message: "one" },
+    { projectId: workspace.projectId, branchId: workspace.branchName, message: "one" },
     requestCtx,
   );
 
   expect(result.invalidate).toEqual([
-    rpcTags.commitHistory(workspace.branchId),
-    rpcTags.branch(workspace.branchId),
+    rpcTags.commitHistory(workspace.branchName),
+    rpcTags.branch(workspace.branchName),
     rpcTags.branchHeadsByProject("rpc_commit_create"),
     rpcTags.branchesByProject("rpc_commit_create"),
     rpcTags.project("rpc_commit_create"),
@@ -131,7 +131,7 @@ test("commit checkout invalidates the workspace content views", async () => {
   });
   const commit = await service.createCommit({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     message: "one",
   });
 
@@ -152,13 +152,13 @@ test("working tree status watches branch, history and workspace tags", async () 
   const workspace = await seedProject("rpc_working_tree_status");
 
   const result = await commitHandlers.workingTreeStatus.handler(
-    { projectId: workspace.projectId, branchId: workspace.branchId },
+    { projectId: workspace.projectId, branchId: workspace.branchName },
     requestCtx,
   );
 
   expect(result.watch).toEqual([
-    rpcTags.branch(workspace.branchId),
-    rpcTags.commitHistory(workspace.branchId),
+    rpcTags.branch(workspace.branchName),
+    rpcTags.commitHistory(workspace.branchName),
     rpcTags.contentTree(workspace.id),
     rpcTags.timelineList(workspace.id),
     rpcTags.auxWorkspace(workspace.id),
@@ -177,7 +177,7 @@ test("commit history returns the mainline newest first", async () => {
   });
   const c1 = await service.createCommit({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     message: "one",
   });
   await service.createContentNode({
@@ -188,15 +188,15 @@ test("commit history returns the mainline newest first", async () => {
   });
   const c2 = await service.createCommit({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     message: "two",
   });
 
   const result = await commitHandlers.history.handler(
-    { projectId: workspace.projectId, branchId: workspace.branchId },
+    { projectId: workspace.projectId, branchId: workspace.branchName },
     requestCtx,
   );
 
-  expect(result.watch).toEqual([rpcTags.commitHistory(workspace.branchId)]);
+  expect(result.watch).toEqual([rpcTags.commitHistory(workspace.branchName)]);
   expect(result.data.map((commit) => commit.id)).toEqual([c2.id, c1.id]);
 });

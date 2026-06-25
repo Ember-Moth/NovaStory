@@ -2,7 +2,7 @@ import { ORIGIN_TIMELINE_POINT_ID } from "@/modules/workspace/domain/constants";
 import { createId, invariant } from "@/shared/lib/domain";
 
 import { getWorkspace, touchWorkspaceMeta } from "./lifecycle";
-import { getWorkdirForBranch } from "./git-storage/git-store";
+import { getWorkdirForBranch, getBranchMapping } from "./git-storage/git-store";
 import type { TimelinePointRef, TimelinePointView } from "./types";
 import {
   AUX_TIMELINE_DIR,
@@ -19,16 +19,23 @@ function touchWorkspaceAsync(projectId: string, workspaceId: string) {
   return touchWorkspaceMeta(projectId, workspaceId);
 }
 
+/** 通过 workspaceId（即分支名）解析 workdir key，再获取 VirtualWorkdir */
+function resolveWorkdir(projectId: string, workspaceId: string) {
+  const workdirKey = getBranchMapping(projectId, workspaceId);
+  invariant(workdirKey, `没有关联的 workdir key: ${workspaceId}`);
+  return getWorkdirForBranch(projectId, workdirKey);
+}
+
 /** 从 VirtualWorkdir 读取并返回状态 */
 function readWorkdirState(projectId: string, workspaceId: string): WorktreeState {
-  const wd = getWorkdirForBranch(projectId, workspaceId);
+  const wd = resolveWorkdir(projectId, workspaceId);
   invariant(wd, "工作目录未初始化");
   return readWorktreeStateFromWorkdir(wd);
 }
 
 /** 写回 VirtualWorkdir */
 function writeWorkdirState(projectId: string, workspaceId: string, state: WorktreeState) {
-  const wd = getWorkdirForBranch(projectId, workspaceId);
+  const wd = resolveWorkdir(projectId, workspaceId);
   invariant(wd, "工作目录未初始化");
   writeWorktreeStateToWorkdir(wd, state);
 }
@@ -164,7 +171,7 @@ export async function deleteTimelinePoint(
 ) {
   invariant(pointId !== ORIGIN_TIMELINE_POINT_ID, "无法删除原点时间点。");
   const workspace = await getWorkspace(projectId, workspaceId);
-  const wd = getWorkdirForBranch(workspace.projectId, workspace.id);
+  const wd = resolveWorkdir(workspace.projectId, workspace.id);
   invariant(wd, "工作目录未初始化");
   const state = readWorktreeStateFromWorkdir(wd);
   const point = state.timeline.find((item) => item.id === pointId);

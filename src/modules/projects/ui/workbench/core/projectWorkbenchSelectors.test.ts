@@ -8,12 +8,12 @@ import {
   sortProjectBranches,
 } from "./projectWorkbenchSelectors";
 
-const branches = [{ id: "branch_old" }, { id: "branch_default" }, { id: "branch_new" }];
+const branches = [{ name: "branch_old" }, { name: "branch_default" }, { name: "branch_new" }];
 
 const branchHeads = [
-  { branchId: "branch_old", headCommitId: "commit_old" },
-  { branchId: "branch_default", headCommitId: "commit_default" },
-  { branchId: "branch_new", headCommitId: "commit_new" },
+  { branchName: "branch_old", headCommitId: "commit_old" },
+  { branchName: "branch_default", headCommitId: "commit_default" },
+  { branchName: "branch_new", headCommitId: "commit_new" },
 ];
 
 const branchRecency = new Map<string, number>([
@@ -24,12 +24,12 @@ const branchRecency = new Map<string, number>([
 
 test("sortProjectBranches keeps the default branch first, then sorts by recency", () => {
   expect(
-    sortProjectBranches(branches, "branch_default", branchRecency).map((branch) => branch.id),
+    sortProjectBranches(branches, "branch_default", branchRecency).map((branch) => branch.name),
   ).toEqual(["branch_default", "branch_new", "branch_old"]);
 });
 
 test("sortProjectBranches falls back to insertion order when recency is missing", () => {
-  expect(sortProjectBranches(branches, "branch_default").map((branch) => branch.id)).toEqual([
+  expect(sortProjectBranches(branches, "branch_default").map((branch) => branch.name)).toEqual([
     "branch_default",
     "branch_old",
     "branch_new",
@@ -51,7 +51,7 @@ test("resolveNewBranchSourceCommitId uses the default branch head when present",
   expect(resolveNewBranchSourceCommitId(branchHeads, "branch_default")).toBe("commit_default");
   expect(
     resolveNewBranchSourceCommitId(
-      [{ branchId: "branch_empty", headCommitId: null }],
+      [{ branchName: "branch_empty", headCommitId: null }],
       "branch_empty",
     ),
   ).toBeNull();

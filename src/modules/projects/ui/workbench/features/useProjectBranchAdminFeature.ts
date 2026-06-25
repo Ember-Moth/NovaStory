@@ -25,13 +25,13 @@ export function useProjectBranchAdminFeature() {
   const handleSetDefaultBranch = useCallback(
     async (branch: BranchRow) => {
       const project = model.project;
-      if (!project || project.defaultBranchId === branch.id) {
+      if (!project || project.defaultBranchName === branch.name) {
         return;
       }
 
       await setDefaultBranch.mutate({
         projectId: project.id,
-        branchId: branch.id,
+        branchId: branch.name,
       });
     },
     [model.project, setDefaultBranch],
@@ -50,15 +50,15 @@ export function useProjectBranchAdminFeature() {
 
       const nextSelectedBranchId = resolveSelectedBranchIdAfterDelete(
         model.sortedBranches,
-        branch.id,
+        branch.name,
         model.selectedBranchId,
-        project.defaultBranchId,
+        project.defaultBranchName,
       );
-      const deletedWorkspace = model.workspaceMap.get(branch.id) ?? null;
+      const deletedWorkspace = model.workspaceMap.get(branch.name) ?? null;
 
       await deleteBranch.mutate({
         projectId,
-        branchId: branch.id,
+        branchId: branch.name,
       });
 
       setLastWorkspaceRoute((current) =>

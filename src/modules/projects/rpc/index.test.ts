@@ -53,19 +53,19 @@ test("project get watches the project tag and returns the project", async () => 
   });
 });
 
-test("setDefaultBranch rejects branches from another project", async () => {
-  await seedProject("project_default_a");
-  const workspaceB = await seedProject("project_default_b");
+// name-based 分支下，"main" 在每个项目初始都存在，所以用不存在的分支名测试
+test("setDefaultBranch rejects non-existent branch name", async () => {
+  const workspace = await seedProject("project_default_nonexistent");
 
   await expect(
     projectHandlers.setDefaultBranch.handler(
       {
-        projectId: "project_default_a",
-        branchId: workspaceB.branchId,
+        projectId: workspace.projectId,
+        branchId: "nonexistent-branch",
       },
       requestCtx,
     ),
-  ).rejects.toThrow("未找到分支。");
+  ).rejects.toThrow("未找到分支");
 });
 
 test("setDefaultBranch invalidates project list and detail tags", async () => {
@@ -78,7 +78,7 @@ test("setDefaultBranch invalidates project list and detail tags", async () => {
   });
   const baseCommit = await workspaceService.createCommit({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     message: "base",
   });
   const featureWorkspace = await workspaceService.createBranchWorkspace({
@@ -90,7 +90,7 @@ test("setDefaultBranch invalidates project list and detail tags", async () => {
   const result = await projectHandlers.setDefaultBranch.handler(
     {
       projectId: "project_default_switch",
-      branchId: featureWorkspace.branchId,
+      branchId: featureWorkspace.branchName,
     },
     requestCtx,
   );
@@ -99,8 +99,8 @@ test("setDefaultBranch invalidates project list and detail tags", async () => {
     rpcTags.projectsList(),
     rpcTags.project("project_default_switch"),
   ]);
-  expect((await readProjectMeta("project_default_switch")).project.defaultBranchId).toBe(
-    featureWorkspace.branchId,
+  expect((await readProjectMeta("project_default_switch")).project.defaultBranchName).toBe(
+    featureWorkspace.branchName,
   );
 });
 

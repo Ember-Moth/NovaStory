@@ -4,24 +4,21 @@ import { readProjectMeta, updateProjectMeta } from "./git-storage/project-meta-s
 import { touchProjectRepo } from "./git-storage/git-store";
 
 // ---------------------------------------------------------------------------
-// WorkspaceRow 是桥接类型 — workspaceId === branchId
-// 所有 RPC/UI/AI 层继续传 workspaceId，域内映射到 branchId。
+// WorkspaceRow — workspaceId === branchName
+// RPC/UI/AI 层继续传 workspaceId，域内视为分支名。
 // ---------------------------------------------------------------------------
 export interface WorkspaceRow {
   id: string;
   projectId: string;
-  branchId: string;
+  branchName: string;
   name: string;
 }
 
-function branchToWorkspaceRow(
-  projectId: string,
-  branch: { id: string; name: string },
-): WorkspaceRow {
+function branchToWorkspaceRow(projectId: string, branch: { name: string }): WorkspaceRow {
   return {
-    id: branch.id,
+    id: branch.name,
     projectId,
-    branchId: branch.id,
+    branchName: branch.name,
     name: branch.name,
   };
 }
@@ -53,8 +50,8 @@ export async function listWorkspaces(projectId: string): Promise<WorkspaceRow[]>
 
 export async function getDefaultWorkspace(projectId: string): Promise<WorkspaceRow | undefined> {
   const project = (await readProjectMeta(projectId)).project;
-  if (!project.defaultBranchId) return undefined;
-  return (await getWorkspaceForBranchId(projectId, project.defaultBranchId)) ?? undefined;
+  if (!project.defaultBranchName) return undefined;
+  return (await getWorkspaceForBranchId(projectId, project.defaultBranchName)) ?? undefined;
 }
 
 export async function createDefaultWorkspace(projectId: string, name = "main") {
@@ -63,10 +60,10 @@ export async function createDefaultWorkspace(projectId: string, name = "main") {
     ...payload,
     project: {
       ...payload.project,
-      defaultBranchId: branch.id,
+      defaultBranchName: branch.name,
     },
   }));
-  return await getWorkspace(projectId, branch.id);
+  return await getWorkspace(projectId, branch.name);
 }
 
 export async function createBranchWorkspace(input: {
@@ -75,7 +72,7 @@ export async function createBranchWorkspace(input: {
   fromCommitId?: string | null;
 }) {
   const branch = await createBranch(input);
-  return await getWorkspace(input.projectId, branch.id);
+  return await getWorkspace(input.projectId, branch.name);
 }
 
 export async function touchWorkspaceMeta(projectId: string, _workspaceId: string) {

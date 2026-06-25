@@ -42,7 +42,7 @@ export function ProjectListRoute() {
               id: input.id,
               name: input.name,
               description: input.description ?? null,
-              defaultBranchId: null,
+              defaultBranchName: null,
               updatedAt: Date.now(),
             }),
           );

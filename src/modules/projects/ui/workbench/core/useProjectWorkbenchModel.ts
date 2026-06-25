@@ -63,24 +63,26 @@ export function useProjectWorkbenchModel(
   const workspaces = workspacesQuery.data ?? [];
   const branchHeads = branchHeadsQuery.data ?? [];
   const branchHeadCommitIdById = new Map(
-    branchHeads.map((branchHead) => [branchHead.branchId, branchHead.headCommitId] as const),
+    branchHeads.map((branchHead) => [branchHead.branchName, branchHead.headCommitId] as const),
   );
   const branchRecency = new Map(
-    branchHeads.map((branchHead) => [branchHead.branchId, branchHead.headCommitTime ?? 0] as const),
+    branchHeads.map(
+      (branchHead) => [branchHead.branchName, branchHead.headCommitTime ?? 0] as const,
+    ),
   );
   const sortedBranches = sortProjectBranches(
     branches,
-    project?.defaultBranchId ?? null,
+    project?.defaultBranchName ?? null,
     branchRecency,
   );
   const selectedBranchId = resolveSelectedBranchId(
     sortedBranches,
     branchIdFromRoute,
-    project?.defaultBranchId ?? null,
+    project?.defaultBranchName ?? null,
   );
-  const selectedBranch = sortedBranches.find((branch) => branch.id === selectedBranchId) ?? null;
+  const selectedBranch = sortedBranches.find((branch) => branch.name === selectedBranchId) ?? null;
   const selectedBranchHeadCommitId = selectedBranch
-    ? (branchHeadCommitIdById.get(selectedBranch.id) ?? null)
+    ? (branchHeadCommitIdById.get(selectedBranch.name) ?? null)
     : null;
 
   const commitHistoryQuery = rpc.useQuery(
@@ -97,9 +99,9 @@ export function useProjectWorkbenchModel(
   const workingTreeStatus = workingTreeStatusQuery.data ?? null;
 
   const workspaceMap = new Map(
-    workspaces.map((workspace) => [workspace.branchId, workspace] as const),
+    workspaces.map((workspace) => [workspace.branchName, workspace] as const),
   );
-  const selectedWorkspace = selectedBranch ? (workspaceMap.get(selectedBranch.id) ?? null) : null;
+  const selectedWorkspace = selectedBranch ? (workspaceMap.get(selectedBranch.name) ?? null) : null;
 
   return {
     project,

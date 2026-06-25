@@ -15,7 +15,7 @@ function normalizePayload(payload: ProjectMetaPayload): ProjectMetaPayload {
   return {
     project: {
       ...payload.project,
-      defaultBranchId: payload.project.defaultBranchId ?? null,
+      defaultBranchName: payload.project.defaultBranchName ?? null,
       description: payload.project.description ?? null,
     },
   };
@@ -29,7 +29,7 @@ function parsePayload(files: Record<string, string>): ProjectMetaPayload {
     project: {
       ...project,
       description: project.description ?? null,
-      defaultBranchId: project.defaultBranchId ?? null,
+      defaultBranchName: project.defaultBranchName ?? null,
     },
   });
 }

@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 
 import { seedProjectRecord } from "@/test/project";
-import { getWorkdirForBranch } from "./git-storage/git-store";
+import { getWorkdirForBranch, getBranchMapping } from "./git-storage/git-store";
 import * as service from "./index";
 
 type ExportedAuxNode = Awaited<ReturnType<typeof service.exportAuxSnapshotTree>>["nodes"][number];
@@ -15,7 +15,9 @@ async function seedProject(projectId: string) {
 }
 
 function wdFor(workspace: { projectId: string; id: string }) {
-  return getWorkdirForBranch(workspace.projectId, workspace.id);
+  const workdirKey = getBranchMapping(workspace.projectId, workspace.id);
+  if (!workdirKey) return undefined;
+  return getWorkdirForBranch(workspace.projectId, workdirKey);
 }
 
 function flattenAuxNodes(nodes: ExportedAuxNode[]): ExportedAuxNode[] {

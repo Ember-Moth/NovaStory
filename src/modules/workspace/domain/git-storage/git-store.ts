@@ -12,16 +12,12 @@ import type { VirtualDiffEntry, VirtualWorkdir } from "nano-git/workdir/core";
 import { getProjectRepoGitDir } from "./paths";
 import type { WorkingTreeStatus } from "@/modules/workspace/domain/types";
 
-export function branchRef(branchId: string) {
-  return `refs/heads/${branchId}`;
+export function branchRef(name: string) {
+  return `refs/heads/${name}`;
 }
 
 export function metaRef() {
   return `refs/novel-evolver/meta`;
-}
-
-export function branchMetaRef(branchId: string) {
-  return `refs/novel-evolver/branch-meta/${branchId}`;
 }
 
 export async function ensureProjectRepo(projectId: string) {
@@ -116,45 +112,6 @@ export async function readTreeAtRef(input: {
   return readTreeFiles(repo, oid);
 }
 
-// ---------------------------------------------------------------------------
-// Branch metadata (stored as individual blobs, one per branch)
-// ---------------------------------------------------------------------------
-
-export async function writeBranchMeta(
-  projectId: string,
-  branchId: string,
-  data: Record<string, unknown>,
-) {
-  const repo = getOrInitRepo(projectId);
-  const blob = Buffer.from(JSON.stringify(data), "utf8");
-  const oid = repo.writeBlob(blob);
-  repo.updateRef(branchMetaRef(branchId), oid);
-}
-
-export async function readBranchMeta<T = Record<string, unknown>>(
-  projectId: string,
-  branchId: string,
-): Promise<T | null> {
-  const repo = getOrInitRepo(projectId);
-  const oid = repo.readRef(branchMetaRef(branchId));
-  if (!oid) return null;
-  const obj = repo.catFile(oid);
-  if (obj.type !== "blob") return null;
-  return JSON.parse(obj.content.toString("utf8")) as T;
-}
-
-export async function deleteBranchMeta(projectId: string, branchId: string) {
-  await deleteRef({ projectId, ref: branchMetaRef(branchId) });
-}
-
-export async function listBranchMetaIds(projectId: string): Promise<string[]> {
-  const repo = getOrInitRepo(projectId);
-  return repo.refs
-    .list("refs/novel-evolver/branch-meta/")
-    .map((r) => r.split("/").pop()!)
-    .sort();
-}
-
 export async function commitCustomRef(input: {
   projectId: string;
   ref: string;
@@ -221,6 +178,15 @@ export async function touchProjectRepo(projectId: string) {
 export async function resolveRef(projectId: string, ref: string) {
   const repo = getOrInitRepo(projectId);
   return repo.readRef(ref);
+}
+
+/** 列出 refs/heads/ 下所有分支名 */
+export function listBranchNames(projectId: string): string[] {
+  const repo = getOrInitRepo(projectId);
+  return repo.refs
+    .list("refs/heads/")
+    .map((r) => r.slice("refs/heads/".length))
+    .sort();
 }
 
 export async function listLog(input: { projectId: string; ref: string; depth?: number }) {
@@ -298,8 +264,8 @@ export function clearRepoCache(): void {
 
 const workdirCache = new Map<string, VirtualWorkdir>();
 
-function workdirCacheKey(projectId: string, branchId: string) {
-  return `${projectId}:${branchId}`;
+function workdirCacheKey(projectId: string, workdirKey: string) {
+  return `${projectId}:${workdirKey}`;
 }
 
 function workdirDbPath(projectId: string) {
@@ -307,28 +273,25 @@ function workdirDbPath(projectId: string) {
 }
 
 /**
- * 获取分支的 VirtualWorkdir 实例。
+ * 通过 workdirKey 获取 VirtualWorkdir 实例。
  *
- * 先查运行时缓存，缓存未命中时尝试从 SQLite 重新打开（重启恢复）。
- * 如果 SQLite 中也不存在，返回 undefined。
+ * workdirKey 是不透明字符串（由 branch-map.json 维护），不依赖分支名。
  */
 export function getWorkdirForBranch(
   projectId: string,
-  branchId: string,
+  workdirKey: string,
 ): VirtualWorkdir | undefined {
-  const cached = workdirCache.get(workdirCacheKey(projectId, branchId));
+  const cached = workdirCache.get(workdirCacheKey(projectId, workdirKey));
   if (cached) return cached;
 
-  // Cache miss: try re-opening from persistent SQLite DB
-  // 传入 empty tree 作为 baseTree 占位——当 key 已存在时会被忽略
   const dbPath = workdirDbPath(projectId);
   if (fs.existsSync(dbPath)) {
     try {
       const repo = getOrInitRepo(projectId);
-      const workdir = openSqliteVirtualWorkdir(repo.objects, dbPath, branchId, {
+      const workdir = openSqliteVirtualWorkdir(repo.objects, dbPath, workdirKey, {
         baseTree: ensureEmptyTree(repo),
       });
-      workdirCache.set(workdirCacheKey(projectId, branchId), workdir);
+      workdirCache.set(workdirCacheKey(projectId, workdirKey), workdir);
       return workdir;
     } catch {
       // SQLite 中没有该 key 的数据，返回 undefined
@@ -339,23 +302,20 @@ export function getWorkdirForBranch(
 }
 
 /**
- * 为分支创建或重置 VirtualWorkdir 实例（持久化到 SQLite）。
+ * 创建或重置一个 workdirKey 对应的 VirtualWorkdir 实例（持久化到 SQLite）。
  *
- * @param projectId - 项目 ID
- * @param branchId - 分支 ID（同时也是 workspaceId）
+ * @param workdirKey - 不透明 workdir key，不由分支名直接派生
  * @param baseTree - 基线 tree 哈希，不传则使用空树
- * @returns VirtualWorkdir 实例
  */
 export function setWorkdirForBranch(
   projectId: string,
-  branchId: string,
+  workdirKey: string,
   baseTree?: SHA1,
 ): VirtualWorkdir {
   const repo = getOrInitRepo(projectId);
   const dbPath = workdirDbPath(projectId);
 
-  // 清除已有的缓存实例和 SQLite 旧数据，确保从 baseTree 重新初始化
-  const key = workdirCacheKey(projectId, branchId);
+  const key = workdirCacheKey(projectId, workdirKey);
   const existing = workdirCache.get(key);
   if (existing) {
     const disp = existing as { [Symbol.dispose]?: () => void };
@@ -363,12 +323,12 @@ export function setWorkdirForBranch(
     workdirCache.delete(key);
   }
   try {
-    deleteSqliteVirtualWorkdir(dbPath, branchId);
+    deleteSqliteVirtualWorkdir(dbPath, workdirKey);
   } catch {
     // 兼容：数据可能不存在
   }
 
-  const workdir = openSqliteVirtualWorkdir(repo.objects, dbPath, branchId, {
+  const workdir = openSqliteVirtualWorkdir(repo.objects, dbPath, workdirKey, {
     baseTree: baseTree ?? ensureEmptyTree(repo),
     create: true,
     walMode: true,
@@ -378,11 +338,11 @@ export function setWorkdirForBranch(
 }
 
 /**
- * 基于已有 commit 为分支创建 VirtualWorkdir。
+ * 基于已有 commit 的 tree 创建 VirtualWorkdir。
  */
 export function setWorkdirFromCommit(
   projectId: string,
-  branchId: string,
+  workdirKey: string,
   commitId: SHA1,
 ): VirtualWorkdir {
   const repo = getOrInitRepo(projectId);
@@ -390,14 +350,14 @@ export function setWorkdirFromCommit(
   if (commit.type !== "commit") {
     throw new Error(`Expected commit at ${commitId}, got ${commit.type}`);
   }
-  return setWorkdirForBranch(projectId, branchId, commit.tree);
+  return setWorkdirForBranch(projectId, workdirKey, commit.tree);
 }
 
 /**
- * 删除分支的 VirtualWorkdir 实例（清理缓存 + SQLite 持久数据）。
+ * 删除 workdirKey 对应的 VirtualWorkdir 实例（清理缓存 + SQLite 持久数据）。
  */
-export function deleteWorkdirForBranch(projectId: string, branchId: string): void {
-  const key = workdirCacheKey(projectId, branchId);
+export function deleteWorkdirForBranch(projectId: string, workdirKey: string): void {
+  const key = workdirCacheKey(projectId, workdirKey);
   const instance = workdirCache.get(key);
   if (instance) {
     const disp = instance as { [Symbol.dispose]?: () => void };
@@ -405,7 +365,7 @@ export function deleteWorkdirForBranch(projectId: string, branchId: string): voi
     workdirCache.delete(key);
   }
   try {
-    deleteSqliteVirtualWorkdir(workdirDbPath(projectId), branchId);
+    deleteSqliteVirtualWorkdir(workdirDbPath(projectId), workdirKey);
   } catch {
     // 兼容：数据可能已不存在
   }
@@ -459,4 +419,73 @@ export function virtualDiffToStatus(
       aux: { changed: false, changes: [] },
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Branch name ↔ workdir key 映射
+// 存储在 <gitdir>/branch-map.json，不进 git 对象/引用，纯本地状态。
+// ---------------------------------------------------------------------------
+
+function branchMapPath(projectId: string): string {
+  return path.join(getProjectRepoGitDir(projectId), "branch-map.json");
+}
+
+function readBranchMap(projectId: string): Record<string, string> {
+  try {
+    const raw = fs.readFileSync(branchMapPath(projectId), "utf8");
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+function writeBranchMap(projectId: string, map: Record<string, string>): void {
+  const filePath = branchMapPath(projectId);
+  const tmpPath = filePath + ".tmp";
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(tmpPath, JSON.stringify(map), "utf8");
+  fs.renameSync(tmpPath, filePath);
+}
+
+/** 生成一个不依赖分支名的稳定 workdir key */
+export function generateWorkdirKey(): string {
+  const buf = new Uint8Array(8);
+  crypto.getRandomValues(buf);
+  const hex = Array.from(buf)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  return `wd_${hex}`;
+}
+
+export function setBranchMapping(projectId: string, name: string, workdirKey: string): void {
+  const map = readBranchMap(projectId);
+  map[name] = workdirKey;
+  writeBranchMap(projectId, map);
+}
+
+export function getBranchMapping(projectId: string, name: string): string | null {
+  const map = readBranchMap(projectId);
+  return map[name] ?? null;
+}
+
+export function deleteBranchMapping(projectId: string, name: string): void {
+  const map = readBranchMap(projectId);
+  if (name in map) {
+    delete map[name];
+    writeBranchMap(projectId, map);
+  }
+}
+
+export function renameBranchMapping(projectId: string, oldName: string, newName: string): void {
+  const map = readBranchMap(projectId);
+  if (oldName in map) {
+    map[newName] = map[oldName]!;
+    delete map[oldName];
+    writeBranchMap(projectId, map);
+  }
+}
+
+export function listBranchMappings(projectId: string): string[] {
+  const map = readBranchMap(projectId);
+  return Object.keys(map).sort();
 }

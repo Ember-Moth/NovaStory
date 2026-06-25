@@ -4,7 +4,7 @@ import type { SHA1 } from "nano-git";
 
 import { getBranch, getBranchHeadCommitId } from "./branches";
 import { getWorkspace, getWorkspaceForBranchId, touchWorkspaceMeta } from "./lifecycle";
-import { readFilesAtCommit } from "./git-storage/git-store";
+import { readFilesAtCommit, getBranchMapping } from "./git-storage/git-store";
 import { getWorkdirForBranch } from "./git-storage/git-store";
 import type {
   ExportedContentNode,
@@ -36,15 +36,22 @@ async function touchWorkspace(projectId: string, workspaceId: string) {
 }
 
 /** 从 VirtualWorkdir 读取状态 */
+/** 通过 workspaceId（即分支名）解析 workdir key，再获取 VirtualWorkdir */
+function resolveWorkdir(projectId: string, workspaceId: string) {
+  const workdirKey = getBranchMapping(projectId, workspaceId);
+  invariant(workdirKey, `没有关联的 workdir key: ${workspaceId}`);
+  return getWorkdirForBranch(projectId, workdirKey);
+}
+
 function readWorkdirState(projectId: string, workspaceId: string): WorktreeState {
-  const wd = getWorkdirForBranch(projectId, workspaceId);
+  const wd = resolveWorkdir(projectId, workspaceId);
   invariant(wd, "工作目录未初始化");
   return readWorktreeStateFromWorkdir(wd);
 }
 
 /** 写回 VirtualWorkdir */
 function writeWorkdirState(projectId: string, workspaceId: string, state: WorktreeState) {
-  const wd = getWorkdirForBranch(projectId, workspaceId);
+  const wd = resolveWorkdir(projectId, workspaceId);
   invariant(wd, "工作目录未初始化");
   writeWorktreeStateToWorkdir(wd, state);
 }
@@ -311,8 +318,8 @@ export async function revertContentChange(input: {
   kind: "added" | "deleted" | "modified";
 }) {
   const branch = await getBranch(input.projectId, input.branchId);
-  const headCommitId = await getBranchHeadCommitId(input.projectId, branch.id);
-  const workspace = await getWorkspaceForBranchId(input.projectId, branch.id);
+  const headCommitId = await getBranchHeadCommitId(input.projectId, branch.name);
+  const workspace = await getWorkspaceForBranchId(input.projectId, branch.name);
   invariant(workspace, "该分支没有关联的工作区。");
 
   const state = readWorkdirState(workspace.projectId, workspace.id);

@@ -115,16 +115,16 @@ function ProjectBranchListPanel({
     <div className="py-1">
       {branches.map((branch) => (
         <SidebarListRow
-          key={branch.id}
-          isActive={branch.id === selectedBranch?.id}
-          onClick={() => onSelectBranch(branch.id)}
+          key={branch.name}
+          isActive={branch.name === selectedBranch?.name}
+          onClick={() => onSelectBranch(branch.name)}
           icon={
             <span className="icon-[material-symbols--fork-right] text-base text-foreground-muted" />
           }
           label={
             <div className="flex min-w-0 items-center gap-2">
               <span className="truncate">{branch.name}</span>
-              {project.defaultBranchId === branch.id ? (
+              {project.defaultBranchName === branch.name ? (
                 <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-accent-foreground">
                   默认
                 </span>
@@ -132,8 +132,8 @@ function ProjectBranchListPanel({
             </div>
           }
           trailing={
-            branchHeadCommitIdById.get(branch.id)
-              ? formatCommitId(branchHeadCommitIdById.get(branch.id)!)
+            branchHeadCommitIdById.get(branch.name)
+              ? formatCommitId(branchHeadCommitIdById.get(branch.name)!)
               : "空分支"
           }
         />

@@ -3,7 +3,7 @@ import type { SHA1 } from "nano-git";
 import type { VirtualWorkdir } from "nano-git/workdir/core";
 
 import { getBranch, getBranchHeadCommitId } from "./branches";
-import { readFilesAtCommit } from "./git-storage/git-store";
+import { readFilesAtCommit, getBranchMapping } from "./git-storage/git-store";
 import { getWorkdirForBranch } from "./git-storage/git-store";
 import {
   flattenManuscriptNodes,
@@ -376,16 +376,18 @@ export async function getWorkingTreeStatus(
   branchId: string,
 ): Promise<WorkingTreeStatus> {
   const branch = await getBranch(projectId, branchId);
-  const headCommitId = await getBranchHeadCommitId(projectId, branch.id);
-  const workspace = await getWorkspaceForBranchId(projectId, branch.id);
+  const headCommitId = await getBranchHeadCommitId(projectId, branch.name);
+  const workspace = await getWorkspaceForBranchId(projectId, branch.name);
   if (!workspace) {
     return emptyStatus(headCommitId);
   }
 
-  // Phase 3: VirtualWorkdir-based status (content + timeline + aux all synced)
-  const wd = getWorkdirForBranch(branch.projectId, branch.id);
+  // 通过 branch-map.json 解析 workdir key
+  const workdirKey = getBranchMapping(projectId, branch.name);
+  if (!workdirKey) return emptyStatus(headCommitId);
+  const wd = getWorkdirForBranch(projectId, workdirKey);
   if (!wd) return emptyStatus(headCommitId);
-  return getWorkingTreeStatusFromWorkdir(projectId, branch.id, headCommitId, wd);
+  return getWorkingTreeStatusFromWorkdir(projectId, branch.name, headCommitId, wd);
 }
 
 function emptyStatus(headCommitId: string | null): WorkingTreeStatus {
@@ -431,10 +433,13 @@ async function getWorkingTreeStatusFromWorkdir(
 
   // Timeline & aux: compare workdir files against HEAD files
   const workdirFiles = collectWorkdirFiles(workdir);
+  // 无 HEAD 时，timeline.jsonl 若无实际数据则不算变更
+  const skipTimelineFile = !headCommitId && state.timeline.length === 0;
   const allPaths = [...new Set([...Object.keys(headFiles), ...Object.keys(workdirFiles)])];
   for (const filepath of allPaths) {
     const areaKey = areaForPath(filepath);
     if (areaKey === "content") continue;
+    if (skipTimelineFile && filepath === "timeline.jsonl") continue;
     const headContent = headFiles[filepath];
     const wdContent = workdirFiles[filepath];
     if (headContent === undefined && wdContent !== undefined) {

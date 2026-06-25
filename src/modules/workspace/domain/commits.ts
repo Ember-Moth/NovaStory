@@ -1,9 +1,9 @@
 import { invariant } from "@/shared/lib/domain";
 
-import { branchRef, touchProjectRepo } from "./git-storage/git-store";
+import { branchRef, touchProjectRepo, getBranchMapping } from "./git-storage/git-store";
 import { getBranch, getBranchHeadCommitId } from "./branches";
 import { listLog } from "./git-storage/git-store";
-import { getWorkspace, getWorkspaceForBranchId } from "./lifecycle";
+import { getWorkspaceForBranchId } from "./lifecycle";
 import { getWorkdirForBranch, setWorkdirForBranch, getOrInitRepo } from "./git-storage/git-store";
 import type { GitAuthor, SHA1 } from "nano-git";
 
@@ -34,18 +34,20 @@ export async function createCommit(input: {
   extraParents?: Array<{ parentId: string; mergeRole?: "normal" | "mainline" | "merged" }>;
 }) {
   const branch = await getBranch(input.projectId, input.branchId);
-  const workspace = await getWorkspaceForBranchId(input.projectId, branch.id);
+  const workspace = await getWorkspaceForBranchId(input.projectId, branch.name);
   invariant(workspace, "无法提交：该分支没有关联的工作区。");
   const message = input.message.trim();
   invariant(message, "无法提交：提交信息不能为空。");
-  const headCommitId = await getBranchHeadCommitId(input.projectId, branch.id);
+  const headCommitId = await getBranchHeadCommitId(input.projectId, branch.name);
   const parents = [
     ...(headCommitId ? [headCommitId] : []),
     ...(input.extraParents?.map((parent) => parent.parentId) ?? []),
   ];
 
-  // VirtualWorkdir-based commit（SQLite 持久化 after Phase 0）
-  const wd = getWorkdirForBranch(input.projectId, input.branchId);
+  // 通过 branch-map.json 解析 workdir key
+  const workdirKey = getBranchMapping(input.projectId, branch.name);
+  invariant(workdirKey, "无法提交：该分支没有关联的 workdir。");
+  const wd = getWorkdirForBranch(input.projectId, workdirKey);
   invariant(wd, "无法提交：该分支没有可用的工作目录。请确保工作区已初始化。");
   const repo = getOrInitRepo(input.projectId);
   const treeHash = wd.writeTree();
@@ -58,7 +60,7 @@ export async function createCommit(input: {
   };
   const parentHashes = parents.length > 0 ? (parents as SHA1[]) : [];
   const commitHash = repo.createCommit(treeHash, parentHashes, input.message, author);
-  repo.updateRef(branchRef(branch.id), commitHash);
+  repo.updateRef(branchRef(branch.name), commitHash);
   wd.reset(treeHash);
   await touchProjectRepo(branch.projectId);
   return await getCommit(commitHash as string, branch.projectId);
@@ -69,14 +71,17 @@ export async function checkoutCommit(input: {
   workspaceId: string;
   commitId: SHA1;
 }) {
-  const workspace = await getWorkspace(input.projectId, input.workspaceId);
+  const workspace = await getWorkspaceForBranchId(input.projectId, input.workspaceId);
+  invariant(workspace, "未找到工作区。");
   const repo = getOrInitRepo(input.projectId);
   const commit = repo.catFile(input.commitId);
   if (commit.type !== "commit") {
     throw new Error(`Expected commit at ${input.commitId}, got ${commit.type}`);
   }
-  // 重置 VirtualWorkdir 到指定 commit 的 tree（SQLite 持久化）
-  setWorkdirForBranch(input.projectId, workspace.id, commit.tree);
+  // 通过 branch-map.json 解析 workdir key
+  const workdirKey = getBranchMapping(input.projectId, workspace.branchName);
+  invariant(workdirKey, "无法 checkout：该分支没有关联的 workdir。");
+  setWorkdirForBranch(input.projectId, workdirKey, commit.tree);
   return await getCommit(input.commitId, workspace.projectId);
 }
 
@@ -84,7 +89,7 @@ export async function getCommit(commitId: string, projectId: string): Promise<Co
   const { listBranches } = await import("./branches");
   const branches = await listBranches(projectId);
   for (const branch of branches) {
-    const commits = await listLog({ projectId, ref: branchRef(branch.id) });
+    const commits = await listLog({ projectId, ref: branchRef(branch.name) });
     const found = commits.find((entry) => entry.oid === commitId);
     if (found) {
       return mapLogEntry(projectId, found);
@@ -118,6 +123,6 @@ function mapLogEntry(
 
 export async function listCommits(projectId: string, branchId: string) {
   const branch = await getBranch(projectId, branchId);
-  const commits = await listLog({ projectId: branch.projectId, ref: branchRef(branch.id) });
+  const commits = await listLog({ projectId: branch.projectId, ref: branchRef(branch.name) });
   return commits.map((entry) => mapLogEntry(branch.projectId, entry));
 }

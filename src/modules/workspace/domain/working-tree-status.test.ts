@@ -15,7 +15,7 @@ async function seedProject(projectId: string) {
 test("empty branch before first commit reports no diff areas", async () => {
   const workspace = await seedProject("status_empty_branch");
 
-  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchId);
+  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchName);
 
   expect(status.hasChanges).toBe(false);
   expect(status.headCommitId).toBeNull();
@@ -50,7 +50,7 @@ test("uncommitted edits before first commit appear as additions", async () => {
     content: "world building",
   });
 
-  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchId);
+  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchName);
 
   expect(status.hasChanges).toBe(true);
   expect(status.headCommitId).toBeNull();
@@ -92,11 +92,11 @@ test("committed workspace with no edits reports hasChanges false", async () => {
   });
   await service.createCommit({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     message: "first",
   });
 
-  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchId);
+  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchName);
 
   expect(status.hasChanges).toBe(false);
   expect(status.headCommitId).toMatch(/^[0-9a-f]{40}$/);
@@ -132,7 +132,7 @@ test("content, timeline and aux edits appear in the diff summary", async () => {
   });
   await service.createCommit({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     message: "base",
   });
 
@@ -167,7 +167,7 @@ test("content, timeline and aux edits appear in the diff summary", async () => {
     content: "timeline-specific note",
   });
 
-  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchId);
+  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchName);
   const chapterChange = status.areas.content.changes.find((change) => change.nodeId === chapter.id);
 
   expect(status.hasChanges).toBe(true);
@@ -215,7 +215,7 @@ test("content move and anchor updates are summarized semantically", async () => 
   });
   await service.createCommit({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     message: "base",
   });
 
@@ -232,7 +232,7 @@ test("content move and anchor updates are summarized semantically", async () => 
     anchorPointId: middlePoint.id,
   });
 
-  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchId);
+  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchName);
   const chapterChange = status.areas.content.changes.find(
     (change) => change.nodeId === chapterB.id,
   );
@@ -267,7 +267,7 @@ test("reverting workspace to head clears the diff summary", async () => {
   });
   const commit = await service.createCommit({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     message: "first",
   });
 
@@ -279,7 +279,7 @@ test("reverting workspace to head clears the diff summary", async () => {
     body: "different",
   });
   expect(
-    (await service.getWorkingTreeStatus(workspace.projectId, workspace.branchId)).hasChanges,
+    (await service.getWorkingTreeStatus(workspace.projectId, workspace.branchName)).hasChanges,
   ).toBe(true);
 
   await service.checkoutCommit({
@@ -288,7 +288,7 @@ test("reverting workspace to head clears the diff summary", async () => {
     commitId: commit.id as SHA1,
   });
 
-  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchId);
+  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchName);
   expect(status.hasChanges).toBe(false);
   expect(status.areas.content.changes).toEqual([]);
 });
@@ -311,7 +311,7 @@ test("inserting a new node before existing ones does not mark them as order-chan
   });
   await service.createCommit({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     message: "base",
   });
 
@@ -324,7 +324,7 @@ test("inserting a new node before existing ones does not mark them as order-chan
     body: "",
   });
 
-  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchId);
+  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchName);
 
   const changeA = status.areas.content.changes.find((c) => c.nodeId === nodeA.id);
   const changeB = status.areas.content.changes.find((c) => c.nodeId === nodeB.id);
@@ -353,7 +353,7 @@ test("truly swapping two nodes marks both as order-changed", async () => {
   });
   await service.createCommit({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     message: "base",
   });
 
@@ -366,7 +366,7 @@ test("truly swapping two nodes marks both as order-changed", async () => {
     afterSiblingId: null,
   });
 
-  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchId);
+  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchName);
 
   const changeA = status.areas.content.changes.find((c) => c.nodeId === nodeA.id);
   const changeB = status.areas.content.changes.find((c) => c.nodeId === nodeB.id);
@@ -388,7 +388,7 @@ test("revertContentChange('modified') restores title and body", async () => {
   });
   await service.createCommit({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     message: "base",
   });
 
@@ -402,12 +402,12 @@ test("revertContentChange('modified') restores title and body", async () => {
 
   await service.revertContentChange({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     nodeId: node.id,
     kind: "modified",
   });
 
-  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchId);
+  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchName);
   expect(status.hasChanges).toBe(false);
 
   const read = await service.readManuscriptNode(workspace.projectId, workspace.id, node.id);
@@ -419,7 +419,7 @@ test("revertContentChange('added') removes the node", async () => {
   const workspace = await seedProject("revert_added");
   await service.createCommit({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     message: "base",
   });
 
@@ -432,17 +432,17 @@ test("revertContentChange('added') removes the node", async () => {
   });
 
   expect(
-    (await service.getWorkingTreeStatus(workspace.projectId, workspace.branchId)).hasChanges,
+    (await service.getWorkingTreeStatus(workspace.projectId, workspace.branchName)).hasChanges,
   ).toBe(true);
 
   await service.revertContentChange({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     nodeId: node.id,
     kind: "added",
   });
 
-  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchId);
+  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchName);
   expect(status.hasChanges).toBe(false);
   expect(status.areas.content.changes).toEqual([]);
 });
@@ -465,7 +465,7 @@ test("revertContentChange('deleted') restores the node and its subtree", async (
   });
   await service.createCommit({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     message: "base",
   });
 
@@ -476,17 +476,17 @@ test("revertContentChange('deleted') restores the node and its subtree", async (
   });
 
   expect(
-    (await service.getWorkingTreeStatus(workspace.projectId, workspace.branchId)).hasChanges,
+    (await service.getWorkingTreeStatus(workspace.projectId, workspace.branchName)).hasChanges,
   ).toBe(true);
 
   await service.revertContentChange({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     nodeId: parent.id,
     kind: "deleted",
   });
 
-  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchId);
+  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchName);
   expect(status.hasChanges).toBe(false);
 
   const read = await service.readManuscriptNode(workspace.projectId, workspace.id, parent.id);
@@ -513,7 +513,7 @@ test("deleted node within a deleted parent reports revertable as false", async (
   });
   await service.createCommit({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     message: "base",
   });
 
@@ -524,7 +524,7 @@ test("deleted node within a deleted parent reports revertable as false", async (
     nodeId: parent.id,
   });
 
-  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchId);
+  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchName);
   const childChange = status.areas.content.changes.find((c) => c.nodeId === child.id);
   expect(childChange?.kind).toBe("deleted");
   expect(childChange?.revertable).toBe(false);

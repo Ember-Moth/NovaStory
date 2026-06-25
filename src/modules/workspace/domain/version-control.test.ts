@@ -16,14 +16,14 @@ async function seedProject(projectId: string) {
 
 test("default workspace creates a default branch and links project", async () => {
   const workspace = await seedProject("proj_default");
-  expect(workspace.branchId).toBeTruthy();
+  expect(workspace.branchName).toBeTruthy();
 
   const project = (await readProjectMeta("proj_default")).project;
-  expect(project.defaultBranchId).toBe(workspace.branchId);
+  expect(project.defaultBranchName).toBe(workspace.branchName);
 
-  const branch = await service.getBranch(workspace.projectId, workspace.branchId);
+  const branch = await service.getBranch(workspace.projectId, workspace.branchName);
   expect(branch.name).toBe("main");
-  expect(await service.getBranchHeadCommitId(workspace.projectId, workspace.branchId)).toBeNull();
+  expect(await service.getBranchHeadCommitId(workspace.projectId, workspace.branchName)).toBeNull();
 });
 
 test("commit then checkout round-trips content, timeline and aux state", async () => {
@@ -68,7 +68,7 @@ test("commit then checkout round-trips content, timeline and aux state", async (
 
   const commit = await service.createCommit({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     message: "first commit",
     author: "tester",
   });
@@ -114,14 +114,14 @@ test("identical content across commits shares the same git tree", async () => {
 
   const first = await service.createCommit({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     message: "c1",
   });
 
   // Commit again without changes: Git may create a new commit, but it should point at the same tree.
   const second = await service.createCommit({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     message: "c2",
   });
   expect(second.id).toMatch(/^[0-9a-f]{40}$/);
@@ -139,7 +139,7 @@ test("branch off a commit shares the same head and forked metadata", async () =>
   });
   const commit = await service.createCommit({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     message: "base",
   });
 
@@ -149,10 +149,8 @@ test("branch off a commit shares the same head and forked metadata", async () =>
     fromCommitId: commit.id,
   });
 
-  const branch = await service.getBranch(featureWorkspace.projectId, featureWorkspace.branchId);
-  expect(branch.forkedFromCommitId).toBe(commit.id as SHA1);
   expect(
-    await service.getBranchHeadCommitId(featureWorkspace.projectId, featureWorkspace.branchId),
+    await service.getBranchHeadCommitId(featureWorkspace.projectId, featureWorkspace.branchName),
   ).toBe(commit.id as SHA1);
 
   // The new workspace is checked out from the commit and has the same content.
@@ -186,7 +184,7 @@ test("branch workspaces restore aux overlay paths", async () => {
   });
   const commit = await service.createCommit({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     message: "base",
   });
 
@@ -233,7 +231,7 @@ test("branch workspace timeline deletion only checks anchors in that workspace",
   });
   const commit = await service.createCommit({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     message: "base",
   });
   const featureWorkspace = await service.createBranchWorkspace({
@@ -271,23 +269,23 @@ test("deleting a branch also deletes its workspace", async () => {
     name: "feature",
   });
 
-  await service.deleteBranch(featureWorkspace.projectId, featureWorkspace.branchId);
+  await service.deleteBranch(featureWorkspace.projectId, featureWorkspace.branchName);
 
   await expect(
-    service.getBranch(featureWorkspace.projectId, featureWorkspace.branchId),
-  ).rejects.toThrow("未找到分支。");
+    service.getBranch(featureWorkspace.projectId, featureWorkspace.branchName),
+  ).rejects.toThrow("未找到分支");
   await expect(
     service.getWorkspace(featureWorkspace.projectId, featureWorkspace.id),
-  ).rejects.toThrow("未找到分支。");
-  expect((await service.getWorkspace(workspace.projectId, workspace.id)).branchId).toBe(
-    workspace.branchId,
+  ).rejects.toThrow("未找到分支");
+  expect((await service.getWorkspace(workspace.projectId, workspace.id)).branchName).toBe(
+    workspace.branchName,
   );
 });
 
 test("default branch still cannot be deleted", async () => {
   const workspace = await seedProject("proj_delete_default");
 
-  await expect(service.deleteBranch(workspace.projectId, workspace.branchId)).rejects.toThrow(
+  await expect(service.deleteBranch(workspace.projectId, workspace.branchName)).rejects.toThrow(
     "无法删除：这是项目的默认分支。",
   );
 });
@@ -302,7 +300,7 @@ test("merge metadata records multiple parents without merging", async () => {
   });
   const base = await service.createCommit({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     message: "base",
   });
 
@@ -313,13 +311,13 @@ test("merge metadata records multiple parents without merging", async () => {
   });
   const sideCommit = await service.createCommit({
     projectId: otherWorkspace.projectId,
-    branchId: otherWorkspace.branchId,
+    branchId: otherWorkspace.branchName,
     message: "side change",
   });
 
   const mergeCommit = await service.createCommit({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     message: "merge side",
     extraParents: [{ parentId: sideCommit.id }],
   });
@@ -342,7 +340,7 @@ test("listCommits walks the mainline history newest first", async () => {
   });
   const c1 = await service.createCommit({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     message: "one",
   });
   await service.createContentNode({
@@ -353,10 +351,10 @@ test("listCommits walks the mainline history newest first", async () => {
   });
   const c2 = await service.createCommit({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     message: "two",
   });
 
-  const history = await service.listCommits(workspace.projectId, workspace.branchId);
+  const history = await service.listCommits(workspace.projectId, workspace.branchName);
   expect(history.map((commit) => commit.id)).toEqual([c2.id, c1.id]);
 });

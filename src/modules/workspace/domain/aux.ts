@@ -14,7 +14,7 @@ import type {
   TimelinePointRef,
 } from "./types";
 import { getWorkspace, touchWorkspaceMeta } from "./lifecycle";
-import { getWorkdirForBranch } from "./git-storage/git-store";
+import { getBranchMapping, getWorkdirForBranch } from "./git-storage/git-store";
 import type { VirtualWorkdir } from "nano-git/workdir/core";
 import {
   assertTimelinePoint,
@@ -45,6 +45,13 @@ interface OverlaySnapshotNode extends ResolvedAuxSnapshotNode {
   nodeType: OverlayNodeType;
   fsPath: string | null;
   symlinkTargetPath: string | null;
+}
+
+/** 通过 workspaceId（即分支名）解析 workdir key，再获取 VirtualWorkdir */
+function resolveWorkdir(projectId: string, workspaceId: string) {
+  const workdirKey = getBranchMapping(projectId, workspaceId);
+  invariant(workdirKey, `没有关联的 workdir key: ${workspaceId}`);
+  return getWorkdirForBranch(projectId, workdirKey);
 }
 
 async function touchWorkspace(projectId: string, workspaceId: string) {
@@ -228,7 +235,7 @@ function readLayerEntriesFromWorkdir(
 
 async function buildSnapshot(projectId: string, workspaceId: string, pointId: TimelinePointRef) {
   const workspace = await getWorkspace(projectId, workspaceId);
-  const wd = getWorkdirForBranch(workspace.projectId, workspace.id);
+  const wd = resolveWorkdir(workspace.projectId, workspace.id);
   invariant(wd, "工作目录未初始化");
   const state = readWorktreeStateFromWorkdir(wd);
   const normalizedPointId = assertTimelinePoint(state, pointId);
@@ -328,7 +335,7 @@ async function currentLayerDeletedEntries(input: {
   );
   const selectedPaths: string[] = [];
   const deletedEntries: OverlayLayerEntry[] = [];
-  const wd = getWorkdirForBranch(input.projectId, input.workspaceId);
+  const wd = resolveWorkdir(input.projectId, input.workspaceId);
   if (!wd) return [];
 
   for (const entry of readLayerEntriesFromWorkdir(wd, input.pointId)) {
@@ -364,7 +371,7 @@ export async function mkdirAt(input: {
   const { normalizedPath, parentPath } = splitAuxPath(input.path, "创建辅助资料目录");
   assertParentDir(snapshot, parentPath);
   assertPathAvailable(snapshot, normalizedPath);
-  const wd = getWorkdirForBranch(workspace.projectId, workspace.id);
+  const wd = resolveWorkdir(workspace.projectId, workspace.id);
   invariant(wd, "工作目录未初始化");
   const wp = auxWorkdirRelPath(pointId, normalizedPath);
   wd.mkdir(wp, { recursive: true });
@@ -389,7 +396,7 @@ export async function writeFileAt(input: {
   const existing = snapshot.get(normalizedPath);
   invariant(!existing || existing.nodeType === "file", "目标路径不是文件。");
   assertParentDir(snapshot, parentPath);
-  const wd = getWorkdirForBranch(workspace.projectId, workspace.id);
+  const wd = resolveWorkdir(workspace.projectId, workspace.id);
   invariant(wd, "工作目录未初始化");
   const wp = auxWorkdirRelPath(pointId, normalizedPath);
   ensureWorkdirDir(wd, posix.dirname(wp));
@@ -414,7 +421,7 @@ export async function linkAt(input: {
   const normalizedTargetPath = normalizeAuxPath(input.targetPath, "创建辅助资料链接");
   assertParentDir(snapshot, parentPath);
   assertPathAvailable(snapshot, normalizedPath);
-  const wd = getWorkdirForBranch(workspace.projectId, workspace.id);
+  const wd = resolveWorkdir(workspace.projectId, workspace.id);
   invariant(wd, "工作目录未初始化");
   const wp = auxWorkdirRelPath(pointId, normalizedPath);
   ensureWorkdirDir(wd, posix.dirname(wp));
@@ -447,7 +454,7 @@ export async function moveAuxNodeAt(input: {
   invariant(!targetPath.startsWith(`${sourcePath}/`), "不能把目录移动到自身子目录中。");
   assertParentDir(snapshot, parentPath);
   assertPathAvailable(snapshot, targetPath, sourcePath);
-  const wd = getWorkdirForBranch(workspace.projectId, workspace.id);
+  const wd = resolveWorkdir(workspace.projectId, workspace.id);
   invariant(wd, "工作目录未初始化");
   const sourceRawPointId = normalizePointId(existing.timelinePointId);
   const fromWp = auxWorkdirRelPath(sourceRawPointId, sourcePath);
@@ -489,7 +496,7 @@ export async function retargetAuxSymlinkAt(input: {
   const normalizedTargetPath = normalizeAuxPath(input.targetPath, "重定向辅助资料链接");
   const existing = snapshot.get(normalizedPath);
   invariant(existing?.nodeType === "symlink", "当前辅助信息不是链接。");
-  const wd = getWorkdirForBranch(workspace.projectId, workspace.id);
+  const wd = resolveWorkdir(workspace.projectId, workspace.id);
   invariant(wd, "工作目录未初始化");
   const wp = auxWorkdirRelPath(pointId, normalizedPath);
   ensureWorkdirDir(wd, posix.dirname(wp));
@@ -511,7 +518,7 @@ export async function deleteAuxNodeAt(input: {
   );
   const pointId = assertTimelinePoint(state, input.timelinePointId);
   const normalizedPath = normalizeAuxPath(input.path, "删除辅助资料");
-  const wd = getWorkdirForBranch(workspace.projectId, workspace.id);
+  const wd = resolveWorkdir(workspace.projectId, workspace.id);
   invariant(wd, "工作目录未初始化");
   const wp = auxWorkdirRelPath(pointId, normalizedPath);
   const lowerSnapshot = await lowerSnapshotForLayer(input.projectId, workspace.id, state, pointId);
@@ -535,7 +542,7 @@ export async function restoreDeletedAuxNodeAt(input: {
   path: string;
 }) {
   const workspace = await getWorkspace(input.projectId, input.workspaceId);
-  const wd = getWorkdirForBranch(workspace.projectId, workspace.id);
+  const wd = resolveWorkdir(workspace.projectId, workspace.id);
   invariant(wd, "工作目录未初始化");
   const state = readWorktreeStateFromWorkdir(wd);
   const pointId = assertTimelinePoint(state, input.timelinePointId);
@@ -695,7 +702,7 @@ export async function listAuxTimelineChangesAt(
   const current = (await buildSnapshot(projectId, workspaceId, pointId)).snapshot;
   const normalizedPointId = normalizePointId(pointId);
   const workspace = await getWorkspace(projectId, workspaceId);
-  const wd = getWorkdirForBranch(workspace.projectId, workspace.id);
+  const wd = resolveWorkdir(workspace.projectId, workspace.id);
   invariant(wd, "工作目录未初始化");
   const state = readWorktreeStateFromWorkdir(wd);
   const point = normalizedPointId

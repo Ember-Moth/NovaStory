@@ -58,7 +58,7 @@ export function useCreateBranchFeature() {
       try {
         const sourceCommitId = resolveNewBranchSourceCommitId(
           model.branchHeads,
-          model.project.defaultBranchId,
+          model.project.defaultBranchName,
         );
         const workspace = await createBranch.mutate({
           projectId,

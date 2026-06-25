@@ -22,7 +22,7 @@ test("getCommitDiff reports added content for the root commit", async () => {
   });
   const commit = await workspaceService.createCommit({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     message: "root",
   });
 
@@ -48,7 +48,7 @@ test("getCommitDiff compares a commit against its first parent", async () => {
   });
   await workspaceService.createCommit({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     message: "base",
   });
 
@@ -61,7 +61,7 @@ test("getCommitDiff compares a commit against its first parent", async () => {
   });
   const second = await workspaceService.createCommit({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     message: "revise",
   });
 
@@ -87,12 +87,12 @@ test("getCommitDiff reports no changes for an empty-message-only commit", async 
   });
   await workspaceService.createCommit({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     message: "base",
   });
   const second = await workspaceService.createCommit({
     projectId: workspace.projectId,
-    branchId: workspace.branchId,
+    branchId: workspace.branchName,
     message: "no content change",
   });
 

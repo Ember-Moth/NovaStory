@@ -2,15 +2,8 @@ export interface ProjectIndexRow {
   id: string;
   name: string;
   description: string | null;
-  defaultBranchId: string | null;
+  defaultBranchName: string | null;
   updatedAt: number;
-}
-
-export interface BranchIndexRow {
-  id: string;
-  projectId: string;
-  name: string;
-  forkedFromCommitId: string | null;
 }
 
 export interface ManuscriptNodeDiskState {

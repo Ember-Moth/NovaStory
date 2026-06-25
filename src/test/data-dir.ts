@@ -3,6 +3,13 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+let onReset: (() => void) | null = null;
+
+/** 注册每次重置数据目录时调用的清理回调 */
+export function onDataDirReset(callback: () => void) {
+  onReset = callback;
+}
+
 let currentDataDir: string | null = null;
 const TEST_DATA_DIR_HOOKS_KEY = "__NOVEL_EVOLVER_TEST_DATA_DIR_HOOKS__";
 
@@ -43,6 +50,7 @@ export function setupGlobalTestDataDirIsolation() {
 
   beforeEach(() => {
     resetTestDataDir();
+    onReset?.();
   });
 
   afterAll(() => {

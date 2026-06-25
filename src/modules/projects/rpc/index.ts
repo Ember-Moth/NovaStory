@@ -35,7 +35,7 @@ export const create = mutation<ProjectMutationInput, { workspaceId: string }, Rp
       id: input.id,
       name: input.name,
       description: input.description ?? null,
-      defaultBranchId: null,
+      defaultBranchName: null,
       updatedAt: 0,
     });
     const workspace = await createDefaultWorkspace(input.id);
@@ -67,7 +67,7 @@ export const setDefaultBranch = mutation<{ projectId: string; branchId: string }
         ...current,
         project: {
           ...current.project,
-          defaultBranchId: branch.id,
+          defaultBranchName: branch.name,
         },
       }));
     },

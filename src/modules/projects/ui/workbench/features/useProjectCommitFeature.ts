@@ -76,7 +76,7 @@ export function useProjectCommitFeature() {
         setCommitError(null);
         await createCommit.mutate({
           projectId,
-          branchId: model.selectedBranch.id,
+          branchId: model.selectedBranch.name,
           message: trimmedMessage,
         });
         setCommitMessage("");

@@ -30,7 +30,7 @@ export function useRevertContentChangeFeature() {
 
       await revertContentChange.mutate({
         projectId,
-        branchId: model.selectedBranch.id,
+        branchId: model.selectedBranch.name,
         nodeId,
         kind,
       });

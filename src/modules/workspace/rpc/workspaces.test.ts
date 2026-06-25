@@ -29,7 +29,7 @@ test("workspace detail query watches the workspace tag and returns the workspace
     id: workspace.id,
     projectId: "rpc_workspace_detail",
     name: "main",
-    branchId: workspace.branchId,
+    branchName: workspace.branchName,
   });
   expect(result.data).not.toHaveProperty("worktreePath");
 });
