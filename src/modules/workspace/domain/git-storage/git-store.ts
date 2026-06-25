@@ -21,7 +21,7 @@ export function metaRef() {
 }
 
 export function branchMetaRef(branchId: string) {
-  return `refs/novel-evolver/branches/${branchId}/meta`;
+  return `refs/novel-evolver/branches/${branchId}`;
 }
 
 export async function ensureProjectRepo(projectId: string) {
@@ -149,16 +149,10 @@ export async function deleteBranchMeta(projectId: string, branchId: string) {
 
 export async function listBranchMetaIds(projectId: string): Promise<string[]> {
   const repo = getOrInitRepo(projectId);
-  const branchesDir = path.join(repo.gitDir, "refs", "novel-evolver", "branches");
-  try {
-    const entries = await fs.promises.readdir(branchesDir, { withFileTypes: true });
-    return entries
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => entry.name)
-      .sort();
-  } catch {
-    return [];
-  }
+  return repo.refs
+    .list("refs/novel-evolver/branches/")
+    .map((r) => r.split("/").pop()!)
+    .sort();
 }
 
 export async function commitCustomRef(input: {
