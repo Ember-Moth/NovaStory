@@ -1,8 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import git from "isomorphic-git";
-
 import { getProjectRepoGitDir, getProjectWorktreeDir } from "./paths";
 import { withProjectLock } from "./lock";
 import { getOrInitRepo } from "./nano-git-store";
@@ -29,21 +27,9 @@ export function branchMetaRef(branchId: string) {
 }
 
 export async function ensureProjectRepo(projectId: string) {
-  const gitdir = getProjectRepoGitDir(projectId);
-  await fs.promises.mkdir(gitdir, { recursive: true });
-  if (!fs.existsSync(path.join(gitdir, "HEAD"))) {
-    await git.init({ fs, gitdir, bare: true, defaultBranch: "main" });
-  }
-  // isomorphic-git's writeObjectLoose does not create object subdirectories
-  // (e.g. objects/e2/xxx). Pre-create all 256 possible subdirs.
-  const objectsDir = path.join(gitdir, "objects");
-  await fs.promises.mkdir(objectsDir, { recursive: true }).catch(() => {});
-  await fs.promises.mkdir(path.join(objectsDir, "pack"), { recursive: true }).catch(() => {});
-  for (let i = 0; i < 256; i++) {
-    const sub = i.toString(16).padStart(2, "0");
-    await fs.promises.mkdir(path.join(objectsDir, sub), { recursive: true }).catch(() => {});
-  }
-  return gitdir;
+  // Delegated to getOrInitRepo — kept for backward compat
+  getOrInitRepo(projectId);
+  return getProjectRepoGitDir(projectId);
 }
 
 function readPhysicalWorktreeFiles(dir: string): Record<string, string> {

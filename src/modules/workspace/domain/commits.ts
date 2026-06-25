@@ -4,8 +4,12 @@ import { branchRef, touchProjectRepo } from "./git-storage/git-store";
 import { getBranch, getBranchHeadCommitId } from "./branches";
 import { addAllAndCommit, checkoutCommitToWorktree, listLog } from "./git-storage/git-store";
 import { getWorkspace, getWorkspaceForBranchId } from "./lifecycle";
-import { setWorkdirForBranch, getOrInitRepo } from "./git-storage/nano-git-store";
-import type { SHA1 } from "nano-git";
+import {
+  getWorkdirForBranch,
+  setWorkdirForBranch,
+  getOrInitRepo,
+} from "./git-storage/nano-git-store";
+import type { GitAuthor, SHA1 } from "nano-git";
 
 export interface CommitParentRow {
   commitId: string;
@@ -44,10 +48,27 @@ export async function createCommit(input: {
     ...(input.extraParents?.map((parent) => parent.parentId) ?? []),
   ];
 
-  // Phase 2 (workdir-based commit): getWorkdirForBranch would be used here
-  // Currently disabled because aux read operations still use physical fs.
+  // Phase 3: VirtualWorkdir-based commit
+  const wd = getWorkdirForBranch(input.projectId, input.branchId);
+  if (wd) {
+    const repo = getOrInitRepo(input.projectId);
+    const treeHash = wd.writeTree();
+    const timestamp = Math.floor(Date.now() / 1000);
+    const author: GitAuthor = {
+      name: input.author || "NovelEvolver",
+      email: "noreply@novel-evolver.local",
+      timestamp,
+      timezone: "+0000",
+    };
+    const parentHashes = parents.length > 0 ? (parents as SHA1[]) : [];
+    const commitHash = repo.createCommit(treeHash, parentHashes, input.message, author);
+    repo.updateRef(branchRef(branch.id), commitHash);
+    wd.reset(treeHash);
+    await touchProjectRepo(branch.projectId);
+    return await getCommit(commitHash as string, branch.projectId);
+  }
 
-  // Fallback: physical worktree
+  // Fallback: physical worktree (legacy)
   const oid = await addAllAndCommit({
     projectId: branch.projectId,
     workspaceId: workspace.id,

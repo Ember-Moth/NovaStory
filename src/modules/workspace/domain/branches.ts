@@ -19,7 +19,7 @@ import {
 import { getProjectWorktreeDir } from "./git-storage/paths";
 import type { BranchIndexRow, ProjectIndexRow } from "./git-storage/types";
 import { readProjectMeta } from "./git-storage/project-meta-store";
-import { seedEmptyWorktree } from "./git-storage/worktree-state";
+import { seedEmptyWorktree, writeWorktreeStateToWorkdir } from "./git-storage/worktree-state";
 import {
   deleteWorkdirForBranch,
   setWorkdirForBranch,
@@ -90,7 +90,9 @@ export async function createBranch(input: {
   if (initialHeadCommitId) {
     setWorkdirFromCommit(project.id, branchId, initialHeadCommitId as SHA1);
   } else {
-    setWorkdirForBranch(project.id, branchId);
+    const wd = setWorkdirForBranch(project.id, branchId);
+    // 同步初始文件到 VirtualWorkdir，与 seedEmptyWorktree 一致
+    writeWorktreeStateToWorkdir(wd, { content: [], timeline: [] });
   }
 
   return (await getBranch(project.id, branchId))!;

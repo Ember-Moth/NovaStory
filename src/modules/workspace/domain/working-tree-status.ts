@@ -1,24 +1,16 @@
-import fs from "node:fs";
-
-import git from "isomorphic-git";
-
 import { ORIGIN_TIMELINE_POINT_ID } from "./constants";
 import { getBranch, getBranchHeadCommitId } from "./branches";
-import { branchRef, ensureProjectRepo, readFilesAtCommit } from "./git-storage/git-store";
+import { readFilesAtCommit } from "./git-storage/git-store";
+import { getWorkdirForBranch } from "./git-storage/nano-git-store";
 import {
   flattenManuscriptNodes,
   pointIdOrOrigin,
-  readWorktreeState,
   readWorktreeStateFromFiles,
+  readWorktreeStateFromWorkdir,
 } from "./git-storage/worktree-state";
-import { getProjectWorktreeDir } from "./git-storage/paths";
 import { getWorkspaceForBranchId } from "./lifecycle";
-import type {
-  ContentChangeAspect,
-  WorkingTreeContentChangeItem,
-  WorkingTreePathChangeItem,
-  WorkingTreeStatus,
-} from "./types";
+import type { VirtualWorkdir } from "nano-git/workdir/core";
+import type { ContentChangeAspect, WorkingTreeContentChangeItem, WorkingTreeStatus } from "./types";
 
 type FlatContentNode = ReturnType<typeof flattenManuscriptNodes>[number];
 
@@ -26,13 +18,6 @@ type TimelinePointLike = {
   id: string;
   label: string;
 };
-
-function kindFromMatrix(head: number, workdir: number): WorkingTreePathChangeItem["kind"] | null {
-  if (head === 0 && workdir !== 0) return "added";
-  if (head !== 0 && workdir === 0) return "deleted";
-  if (head !== workdir) return "modified";
-  return null;
-}
 
 export function areaForPath(
   filepath: string,
@@ -395,28 +380,41 @@ export async function getWorkingTreeStatus(
     return emptyStatus(headCommitId);
   }
 
-  // Phase 2 (workdir-based status): getWorkdirForBranch would be checked here
-  // Currently disabled because aux read operations still use physical fs.
-  // Re-enable when exportAuxSnapshotTree etc. are also workdir-based.
+  // Phase 3: VirtualWorkdir-based status (content + timeline + aux all synced)
+  const wd = getWorkdirForBranch(branch.projectId, branch.id);
+  if (!wd) return emptyStatus(headCommitId);
+  return getWorkingTreeStatusFromWorkdir(projectId, branch.id, headCommitId, wd);
+}
 
-  // Fallback: physical worktree
-  const worktreePath = getProjectWorktreeDir(workspace.projectId, workspace.id);
-  const gitdir = await ensureProjectRepo(branch.projectId);
-  const matrix = await git.statusMatrix({
-    fs,
-    dir: worktreePath,
-    gitdir,
-    ref: branchRef(branch.id),
-  });
-  const state = readWorktreeState(worktreePath);
+function emptyStatus(headCommitId: string | null): WorkingTreeStatus {
+  return {
+    hasChanges: false,
+    headCommitId,
+    areas: {
+      content: { changed: false, changes: [] },
+      timeline: { changed: false, changes: [] },
+      aux: { changed: false, changes: [] },
+    },
+  };
+}
+
+/** VirtualWorkdir-based status: compare workdir state against HEAD commit */
+async function getWorkingTreeStatusFromWorkdir(
+  projectId: string,
+  _branchId: string,
+  headCommitId: string | null,
+  workdir: VirtualWorkdir,
+): Promise<WorkingTreeStatus> {
+  const state = readWorktreeStateFromWorkdir(workdir);
   if (!headCommitId && state.content.length === 0 && state.timeline.length === 0) {
     return emptyStatus(null);
   }
-
-  const contentFileChanges = matrix.filter(([filepath, head, workdirStatus]) => {
-    const kind = kindFromMatrix(head, workdirStatus);
-    return kind != null && areaForPath(filepath) === "content";
-  });
+  const headFiles = headCommitId
+    ? await readFilesAtCommit({ projectId, commitId: headCommitId })
+    : {};
+  const headState = headCommitId
+    ? readWorktreeStateFromFiles(headFiles)
+    : { content: [], timeline: [] };
 
   const areas: WorkingTreeStatus["areas"] = {
     content: { changed: false, changes: [] },
@@ -424,24 +422,29 @@ export async function getWorkingTreeStatus(
     aux: { changed: false, changes: [] },
   };
 
-  if (contentFileChanges.length > 0) {
-    const previousState = headCommitId
-      ? readWorktreeStateFromFiles(await readFilesAtCommit({ projectId, commitId: headCommitId }))
-      : { content: [], timeline: [] };
-    areas.content.changes = compareContentStates(
-      flattenManuscriptNodes(previousState),
-      flattenManuscriptNodes(state),
-      previousState.timeline,
-      state.timeline,
-    );
-  }
+  // Content: semantic diff
+  areas.content.changes = compareContentStates(
+    flattenManuscriptNodes(headState),
+    flattenManuscriptNodes(state),
+    headState.timeline,
+    state.timeline,
+  );
 
-  for (const [filepath, head, workdirStatus] of matrix) {
-    const kind = kindFromMatrix(head, workdirStatus);
-    if (!kind) continue;
+  // Timeline & aux: compare workdir files against HEAD files
+  const workdirFiles = collectWorkdirFiles(workdir);
+  const allPaths = [...new Set([...Object.keys(headFiles), ...Object.keys(workdirFiles)])];
+  for (const filepath of allPaths) {
     const areaKey = areaForPath(filepath);
     if (areaKey === "content") continue;
-    areas[areaKey].changes.push({ label: filepath, kind });
+    const headContent = headFiles[filepath];
+    const wdContent = workdirFiles[filepath];
+    if (headContent === undefined && wdContent !== undefined) {
+      areas[areaKey].changes.push({ label: filepath, kind: "added" });
+    } else if (headContent !== undefined && wdContent === undefined) {
+      areas[areaKey].changes.push({ label: filepath, kind: "deleted" });
+    } else if (headContent !== wdContent) {
+      areas[areaKey].changes.push({ label: filepath, kind: "modified" });
+    }
   }
 
   for (const area of Object.values(areas)) {
@@ -455,14 +458,23 @@ export async function getWorkingTreeStatus(
   };
 }
 
-function emptyStatus(headCommitId: string | null): WorkingTreeStatus {
-  return {
-    hasChanges: false,
-    headCommitId,
-    areas: {
-      content: { changed: false, changes: [] },
-      timeline: { changed: false, changes: [] },
-      aux: { changed: false, changes: [] },
-    },
-  };
+/** Collect all blob paths and their content from a VirtualWorkdir. */
+function collectWorkdirFiles(workdir: VirtualWorkdir): Record<string, string> {
+  const files: Record<string, string> = {};
+  function walk(dirPath: string) {
+    for (const entry of workdir.readdir(dirPath)) {
+      const fullPath = dirPath ? `${dirPath}/${entry.name}` : entry.name;
+      if (entry.kind === "blob") {
+        files[fullPath] = workdir.readFile(fullPath).toString("utf8");
+      } else if (entry.kind === "tree") {
+        walk(fullPath);
+      }
+    }
+  }
+  try {
+    walk("");
+  } catch {
+    // empty workdir
+  }
+  return files;
 }
