@@ -429,7 +429,10 @@ export function readWorktreeStateFromWorkdir(workdir: VirtualWorkdir): WorktreeS
  * 等价于 writeWorktreeStateSync(dir, state)，但基于 VirtualWorkdir 而非文件系统。
  */
 export function writeWorktreeStateToWorkdir(workdir: VirtualWorkdir, state: WorktreeState) {
-  // write index.jsonl
+  // delete-then-write to work around SQLite root-level overwrite issue
+  if (workdir.exists("index.jsonl")) {
+    workdir.delete("index.jsonl", { force: true });
+  }
   const indexLines: string[] = [];
   for (const row of dfsRows(state.content)) {
     indexLines.push(JSON.stringify(row));
@@ -438,6 +441,9 @@ export function writeWorktreeStateToWorkdir(workdir: VirtualWorkdir, state: Work
   workdir.writeFile("index.jsonl", Buffer.from(indexLines.join("\n"), "utf8"));
 
   // write timeline.jsonl
+  if (workdir.exists("timeline.jsonl")) {
+    workdir.delete("timeline.jsonl", { force: true });
+  }
   workdir.writeFile("timeline.jsonl", Buffer.from(stringifyJsonl(state.timeline), "utf8"));
 
   // write manuscript/<id>.md

@@ -1,11 +1,7 @@
-import fs from "node:fs";
-import { mkdirSync } from "node:fs";
-
 import { createId, invariant } from "@/shared/lib/domain";
 
 import {
   branchRef,
-  checkoutCommitToWorktree,
   deleteBranchMeta,
   deleteRef,
   listBranchMetaIds,
@@ -16,10 +12,9 @@ import {
   writeBranchMeta,
   writeRef,
 } from "./git-storage/git-store";
-import { getProjectWorktreeDir } from "./git-storage/paths";
 import type { BranchIndexRow, ProjectIndexRow } from "./git-storage/types";
 import { readProjectMeta } from "./git-storage/project-meta-store";
-import { seedEmptyWorktree, writeWorktreeStateToWorkdir } from "./git-storage/worktree-state";
+import { writeWorktreeStateToWorkdir } from "./git-storage/worktree-state";
 import {
   deleteWorkdirForBranch,
   setWorkdirForBranch,
@@ -74,24 +69,11 @@ export async function createBranch(input: {
   });
   await touchProjectRepo(project.id);
 
-  // worktree 目录直接使用 branchId
-  const worktreePath = getProjectWorktreeDir(project.id, branchId);
-  mkdirSync(worktreePath, { recursive: true });
-  seedEmptyWorktree(worktreePath);
-  if (initialHeadCommitId) {
-    await checkoutCommitToWorktree({
-      projectId: project.id,
-      workspaceId: branchId,
-      commitId: initialHeadCommitId,
-    });
-  }
-
-  // Phase 2: create VirtualWorkdir for this branch
+  // 创建持久化 VirtualWorkdir（SQLite workdir.db）
   if (initialHeadCommitId) {
     setWorkdirFromCommit(project.id, branchId, initialHeadCommitId as SHA1);
   } else {
     const wd = setWorkdirForBranch(project.id, branchId);
-    // 同步初始文件到 VirtualWorkdir，与 seedEmptyWorktree 一致
     writeWorktreeStateToWorkdir(wd, { content: [], timeline: [] });
   }
 
@@ -141,10 +123,6 @@ export async function deleteBranch(projectId: string, branchId: string) {
     project.defaultBranchId !== branch.id,
     "无法删除：这是项目的默认分支。请先切换默认分支。",
   );
-  await fs.promises.rm(getProjectWorktreeDir(projectId, branch.id), {
-    recursive: true,
-    force: true,
-  });
   await deleteRef({ projectId, ref: branchRef(branch.id) });
   await deleteBranchMeta(projectId, branch.id);
   deleteWorkdirForBranch(projectId, branch.id);

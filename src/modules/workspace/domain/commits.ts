@@ -2,7 +2,7 @@ import { invariant } from "@/shared/lib/domain";
 
 import { branchRef, touchProjectRepo } from "./git-storage/git-store";
 import { getBranch, getBranchHeadCommitId } from "./branches";
-import { addAllAndCommit, checkoutCommitToWorktree, listLog } from "./git-storage/git-store";
+import { listLog } from "./git-storage/git-store";
 import { getWorkspace, getWorkspaceForBranchId } from "./lifecycle";
 import {
   getWorkdirForBranch,
@@ -48,37 +48,24 @@ export async function createCommit(input: {
     ...(input.extraParents?.map((parent) => parent.parentId) ?? []),
   ];
 
-  // Phase 3: VirtualWorkdir-based commit
+  // VirtualWorkdir-based commit（SQLite 持久化 after Phase 0）
   const wd = getWorkdirForBranch(input.projectId, input.branchId);
-  if (wd) {
-    const repo = getOrInitRepo(input.projectId);
-    const treeHash = wd.writeTree();
-    const timestamp = Math.floor(Date.now() / 1000);
-    const author: GitAuthor = {
-      name: input.author || "NovelEvolver",
-      email: "noreply@novel-evolver.local",
-      timestamp,
-      timezone: "+0000",
-    };
-    const parentHashes = parents.length > 0 ? (parents as SHA1[]) : [];
-    const commitHash = repo.createCommit(treeHash, parentHashes, input.message, author);
-    repo.updateRef(branchRef(branch.id), commitHash);
-    wd.reset(treeHash);
-    await touchProjectRepo(branch.projectId);
-    return await getCommit(commitHash as string, branch.projectId);
-  }
-
-  // Fallback: physical worktree (legacy)
-  const oid = await addAllAndCommit({
-    projectId: branch.projectId,
-    workspaceId: workspace.id,
-    branchRef: branchRef(branch.id),
-    message,
-    author: input.author,
-    parents: parents.length ? parents : undefined,
-  });
+  invariant(wd, "无法提交：该分支没有可用的工作目录。请确保工作区已初始化。");
+  const repo = getOrInitRepo(input.projectId);
+  const treeHash = wd.writeTree();
+  const timestamp = Math.floor(Date.now() / 1000);
+  const author: GitAuthor = {
+    name: input.author || "NovelEvolver",
+    email: "noreply@novel-evolver.local",
+    timestamp,
+    timezone: "+0000",
+  };
+  const parentHashes = parents.length > 0 ? (parents as SHA1[]) : [];
+  const commitHash = repo.createCommit(treeHash, parentHashes, input.message, author);
+  repo.updateRef(branchRef(branch.id), commitHash);
+  wd.reset(treeHash);
   await touchProjectRepo(branch.projectId);
-  return await getCommit(oid, branch.projectId);
+  return await getCommit(commitHash as string, branch.projectId);
 }
 
 export async function checkoutCommit(input: {
@@ -87,23 +74,13 @@ export async function checkoutCommit(input: {
   commitId: string;
 }) {
   const workspace = await getWorkspace(input.projectId, input.workspaceId);
-
-  // Phase 2 (incomplete): update VirtualWorkdir cache if it exists
-  try {
-    const repo = getOrInitRepo(input.projectId);
-    const commit = repo.catFile(input.commitId as SHA1);
-    if (commit.type === "commit") {
-      setWorkdirForBranch(input.projectId, workspace.id, commit.tree);
-    }
-  } catch {
-    // VirtualWorkdir setup is best-effort; continue with physical checkout
+  const repo = getOrInitRepo(input.projectId);
+  const commit = repo.catFile(input.commitId as SHA1);
+  if (commit.type !== "commit") {
+    throw new Error(`Expected commit at ${input.commitId}, got ${commit.type}`);
   }
-
-  await checkoutCommitToWorktree({
-    projectId: workspace.projectId,
-    workspaceId: workspace.id,
-    commitId: input.commitId,
-  });
+  // 重置 VirtualWorkdir 到指定 commit 的 tree（SQLite 持久化）
+  setWorkdirForBranch(input.projectId, workspace.id, commit.tree);
   return await getCommit(input.commitId, workspace.projectId);
 }
 

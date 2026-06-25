@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { getProjectRepoGitDir, getProjectWorktreeDir } from "./paths";
+import { getProjectRepoGitDir } from "./paths";
 import { getOrInitRepo } from "./nano-git-store";
 import type { GitAuthor, GitCommit, SHA1, TreeEntry, FileRepository } from "nano-git";
 import { readTree } from "nano-git/repository/tree/tree-walk";
@@ -29,102 +29,6 @@ export async function ensureProjectRepo(projectId: string) {
   // Delegated to getOrInitRepo — kept for backward compat
   getOrInitRepo(projectId);
   return getProjectRepoGitDir(projectId);
-}
-
-function readPhysicalWorktreeFiles(dir: string): Record<string, string> {
-  const files: Record<string, string> = {};
-  function walk(prefix: string, currentDir: string) {
-    for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {
-      if (entry.name === ".git") continue;
-      const fullPath = path.join(currentDir, entry.name);
-      const relPath = prefix ? `${prefix}/${entry.name}` : entry.name;
-      if (entry.isFile()) {
-        files[relPath] = fs.readFileSync(fullPath, "utf8");
-      } else if (entry.isDirectory()) {
-        walk(relPath, fullPath);
-      }
-    }
-  }
-  walk("", dir);
-  return files;
-}
-
-export async function addAllAndCommit(input: {
-  projectId: string;
-  workspaceId: string;
-  branchRef: string;
-  message: string;
-  author?: string | null;
-  parents?: string[];
-}) {
-  const repo = getOrInitRepo(input.projectId);
-  const dir = getProjectWorktreeDir(input.projectId, input.workspaceId);
-  const files = readPhysicalWorktreeFiles(dir);
-  const tree = writeTreeFromFiles(repo, files);
-  const timestamp = Math.floor(Date.now() / 1000);
-  const author: GitAuthor = {
-    name: input.author || AUTHOR.name,
-    email: AUTHOR.email,
-    timestamp,
-    timezone: "+0000",
-  };
-  const parentHashes = (input.parents ?? []) as SHA1[];
-  const commitHash = repo.createCommit(tree, parentHashes, input.message, author);
-  repo.updateRef(input.branchRef, commitHash);
-  return commitHash as string;
-}
-
-function writeTreeToDirectory(repo: FileRepository, treeHash: SHA1, dir: string) {
-  // Clear existing versioned files
-  for (const entry of ["index.jsonl", "timeline.jsonl", "manuscript", "aux"]) {
-    fs.rmSync(path.join(dir, entry), { recursive: true, force: true });
-  }
-
-  // Write all tree entries to disk
-  const entries = readTree(repo.objects, treeHash);
-  for (const entry of entries) {
-    if (entry.mode === "040000") continue; // skip directories
-    const filePath = path.join(dir, entry.path);
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    const obj = repo.catFile(entry.hash);
-    if (obj.type === "blob") {
-      fs.writeFileSync(filePath, obj.content);
-    }
-  }
-
-  // Ensure aux directories exist
-  fs.mkdirSync(path.join(dir, "aux", "origin"), { recursive: true });
-  fs.mkdirSync(path.join(dir, "aux", "timeline"), { recursive: true });
-}
-
-export async function checkoutRefToWorktree(input: {
-  projectId: string;
-  workspaceId: string;
-  ref: string;
-}) {
-  const repo = getOrInitRepo(input.projectId);
-  const dir = getProjectWorktreeDir(input.projectId, input.workspaceId);
-  fs.mkdirSync(dir, { recursive: true });
-
-  const commitOid = repo.readRef(input.ref);
-  if (!commitOid) return;
-  const commit = repo.catFile(commitOid);
-  if (commit.type !== "commit") return;
-  writeTreeToDirectory(repo, commit.tree, dir);
-}
-
-export async function checkoutCommitToWorktree(input: {
-  projectId: string;
-  workspaceId: string;
-  commitId: string;
-}) {
-  const repo = getOrInitRepo(input.projectId);
-  const dir = getProjectWorktreeDir(input.projectId, input.workspaceId);
-  fs.mkdirSync(dir, { recursive: true });
-
-  const commit = repo.catFile(input.commitId as SHA1);
-  if (commit.type !== "commit") return;
-  writeTreeToDirectory(repo, commit.tree, dir);
 }
 
 function splitTreeFiles(files: Record<string, string>) {

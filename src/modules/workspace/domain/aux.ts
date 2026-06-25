@@ -26,8 +26,7 @@ import {
   normalizePointId,
   orderTimelineRows,
   pointIdOrOrigin,
-  readTextSync,
-  readWorktreeState,
+  readWorktreeStateFromWorkdir,
 } from "./git-storage/worktree-state";
 import type { WorktreeState } from "./git-storage/worktree-state";
 
@@ -331,36 +330,23 @@ function readLayerEntriesFromWorkdir(
   });
 }
 
-function readAuxContentFromSnapshot(node: OverlaySnapshotNode) {
-  if (node.nodeType !== "file" || node.fsPath == null) return null;
-  return readTextSync(node.fsPath);
-}
-
 async function buildSnapshot(projectId: string, workspaceId: string, pointId: TimelinePointRef) {
   const workspace = await getWorkspace(projectId, workspaceId);
-  const worktreePath = getProjectWorktreeDir(workspace.projectId, workspace.id);
-  const state = readWorktreeState(worktreePath);
+  const wd = getWorkdirForBranch(workspace.projectId, workspace.id);
+  invariant(wd, "工作目录未初始化");
+  const state = readWorktreeStateFromWorkdir(wd);
   const normalizedPointId = assertTimelinePoint(state, pointId);
   const snapshot = new Map<string, OverlaySnapshotNode>();
   const layers = [null, ...timelineLayerPointIds(state, normalizedPointId)];
 
-  // Phase 2.2: VirtualWorkdir read path
-  const wd = getWorkdirForBranch(projectId, workspaceId);
-
   for (const layerPointId of layers) {
-    const entries = wd
-      ? readLayerEntriesFromWorkdir(wd, layerPointId)
-      : readLayerEntries(worktreePath, layerPointId);
+    const entries = readLayerEntriesFromWorkdir(wd, layerPointId);
     for (const entry of entries) {
       if (entry.kind === "whiteout") {
         removeFromSnapshot(snapshot, entry.path);
         continue;
       }
-      if (!wd) {
-        invariant(entry.nodeType && entry.fsPath, "辅助信息层节点缺少类型或路径。");
-      } else {
-        invariant(entry.nodeType, "辅助信息层节点缺少类型。");
-      }
+      invariant(entry.nodeType, "辅助信息层节点缺少类型。");
       if (entry.nodeType !== "dir") {
         removeFromSnapshot(snapshot, entry.path);
       } else {
@@ -377,23 +363,21 @@ async function buildSnapshot(projectId: string, workspaceId: string, pointId: Ti
         symlinkTargetPath: entry.symlinkTargetPath ?? null,
         timelinePointId: pointIdOrOrigin(entry.timelinePointId),
         reachable: true,
-        fsPath: entry.fsPath ?? null,
+        fsPath: null,
       });
     }
   }
 
   for (const node of snapshot.values()) {
-    if (wd && node.nodeType === "file" && node.fsPath == null) {
+    if (node.nodeType === "file") {
       const rawPointId = normalizePointId(node.timelinePointId);
       const wp = auxWorkdirRelPath(rawPointId, node.path);
       const buf = wd.readFile(wp);
       node.content = buf ? buf.toString("utf8") : null;
-    } else {
-      node.content = readAuxContentFromSnapshot(node);
     }
   }
 
-  return { workspace, worktreePath, state, pointId: normalizedPointId, snapshot };
+  return { workspace, worktreePath: "", state, pointId: normalizedPointId, snapshot };
 }
 
 function sortedSnapshotNodes(snapshot: Map<string, OverlaySnapshotNode>) {
@@ -811,21 +795,24 @@ export async function deleteAuxNodeAt(input: {
     pointId,
     auxPath: normalizedPath,
   });
-  // Phase 2.2: sync to VirtualWorkdir
+  // 同步到 VirtualWorkdir：仅当更低层有该路径时才写入 whiteout，否则直接删除
   {
     const wd = getWorkdirForBranch(workspace.projectId, workspace.id);
     if (wd) {
       const wp = auxWorkdirRelPath(pointId, normalizedPath);
-      // 与物理 fs 行为一致：
-      // - 对于原点层（无更下层），直接删除路径
-      // - 对于 timeline 层，写入 whiteout 文件
-      if (pointId == null) {
+      const lowerSnapshot = await lowerSnapshotForLayer(
+        input.projectId,
+        workspace.id,
+        state,
+        pointId,
+      );
+      const hasLower = snapshotHasPathOrDescendant(lowerSnapshot, normalizedPath);
+      if (pointId == null || !hasLower) {
         wd.delete(wp, { force: true });
       } else {
         const whiteoutDir = posix.dirname(wp);
         const basename = posix.basename(normalizedPath);
         ensureWorkdirDir(wd, whiteoutDir);
-        // 与物理 fs 一致：先从当前层移除文件，再写入 whiteout
         wd.delete(wp, { force: true });
         wd.writeFile(`${whiteoutDir}/.wh.${basename}`, Buffer.from(""));
       }
@@ -841,8 +828,9 @@ export async function restoreDeletedAuxNodeAt(input: {
   path: string;
 }) {
   const workspace = await getWorkspace(input.projectId, input.workspaceId);
-  const worktreePath = getProjectWorktreeDir(workspace.projectId, workspace.id);
-  const state = readWorktreeState(worktreePath);
+  const wd = getWorkdirForBranch(workspace.projectId, workspace.id);
+  invariant(wd, "工作目录未初始化");
+  const state = readWorktreeStateFromWorkdir(wd);
   const pointId = assertTimelinePoint(state, input.timelinePointId);
   invariant(pointId !== null, "原点没有可恢复的辅助资料删除标记。");
   const normalizedPath = normalizeAuxPath(input.path, "恢复辅助资料");
@@ -853,22 +841,11 @@ export async function restoreDeletedAuxNodeAt(input: {
     pointId,
   );
   invariant(snapshotHasPathOrDescendant(lowerSnapshot, normalizedPath), "没有可恢复的辅助资料。");
-  const root = currentLayerRoot(worktreePath, pointId);
-  const whiteoutPath = whiteoutPathForAuxPath(root, normalizedPath);
-  invariant(fs.existsSync(whiteoutPath), "没有可恢复的辅助资料删除标记。");
-  fs.rmSync(whiteoutPath, { force: true });
-  pruneInvalidWhiteouts(root, lowerSnapshot);
-  // Phase 2.2: sync to VirtualWorkdir — 删除 workdir 中的 whiteout 文件
-  {
-    const wd = getWorkdirForBranch(workspace.projectId, workspace.id);
-    if (wd) {
-      const wp = auxWorkdirRelPath(pointId, normalizedPath);
-      const whiteoutDir = posix.dirname(wp);
-      const basename = posix.basename(normalizedPath);
-      const whiteoutWp = `${whiteoutDir}/.wh.${basename}`;
-      wd.delete(whiteoutWp, { force: true });
-    }
-  }
+  // 通过 VirtualWorkdir 删除 whiteout
+  const wp = auxWorkdirRelPath(pointId, normalizedPath);
+  const whiteoutWp = `${posix.dirname(wp)}/.wh.${posix.basename(normalizedPath)}`;
+  invariant(wd.exists(whiteoutWp), "没有可恢复的辅助资料删除标记。");
+  wd.delete(whiteoutWp, { force: true });
   await touchWorkspace(workspace.projectId, workspace.id);
   return {
     path: normalizedPath,
@@ -1013,7 +990,9 @@ export async function listAuxTimelineChangesAt(
   const current = (await buildSnapshot(projectId, workspaceId, pointId)).snapshot;
   const normalizedPointId = normalizePointId(pointId);
   const workspace = await getWorkspace(projectId, workspaceId);
-  const state = readWorktreeState(getProjectWorktreeDir(workspace.projectId, workspace.id));
+  const wd = getWorkdirForBranch(workspace.projectId, workspace.id);
+  invariant(wd, "工作目录未初始化");
+  const state = readWorktreeStateFromWorkdir(wd);
   const point = normalizedPointId
     ? orderTimelineRows(state.timeline).find((item) => item.id === normalizedPointId)
     : null;
