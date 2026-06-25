@@ -26,6 +26,7 @@ export function useAutoFollowScroll(sessionKey: string, contentVersion: string) 
   const viewportRef = useRef<HTMLElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const shouldAutoFollowRef = useRef(true);
+  const lastContentVersionRef = useRef(contentVersion);
   const [shouldAutoFollow, setShouldAutoFollow] = useState(true);
 
   const updateShouldAutoFollow = useCallback((next: boolean) => {
@@ -103,11 +104,14 @@ export function useAutoFollowScroll(sessionKey: string, contentVersion: string) 
   }, [sessionKey]);
 
   useEffect(() => {
-    if (!shouldAutoFollow) {
+    const didContentChange = lastContentVersionRef.current !== contentVersion;
+    lastContentVersionRef.current = contentVersion;
+
+    if (!shouldAutoFollow || !didContentChange) {
       return;
     }
 
-    let frameId = requestAnimationFrame(() => {
+    const frameId = requestAnimationFrame(() => {
       scrollToBottom("instant");
     });
 
