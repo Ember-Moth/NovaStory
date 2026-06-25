@@ -3,7 +3,7 @@ import { createId, invariant } from "@/shared/lib/domain";
 import { getBranch, getBranchHeadCommitId } from "./branches";
 import { getWorkspace, getWorkspaceForBranchId, touchWorkspaceMeta } from "./lifecycle";
 import { readFilesAtCommit } from "./git-storage/git-store";
-import { getWorkdirForBranch } from "./git-storage/nano-git-store";
+import { getWorkdirForBranch } from "./git-storage/git-store";
 import type {
   ExportedContentNode,
   ExportedContentSubtree,

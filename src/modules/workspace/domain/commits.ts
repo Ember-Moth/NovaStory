@@ -4,11 +4,7 @@ import { branchRef, touchProjectRepo } from "./git-storage/git-store";
 import { getBranch, getBranchHeadCommitId } from "./branches";
 import { listLog } from "./git-storage/git-store";
 import { getWorkspace, getWorkspaceForBranchId } from "./lifecycle";
-import {
-  getWorkdirForBranch,
-  setWorkdirForBranch,
-  getOrInitRepo,
-} from "./git-storage/nano-git-store";
+import { getWorkdirForBranch, setWorkdirForBranch, getOrInitRepo } from "./git-storage/git-store";
 import type { GitAuthor, SHA1 } from "nano-git";
 
 export interface CommitParentRow {

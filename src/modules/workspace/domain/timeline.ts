@@ -2,7 +2,7 @@ import { ORIGIN_TIMELINE_POINT_ID } from "@/modules/workspace/domain/constants";
 import { createId, invariant } from "@/shared/lib/domain";
 
 import { getWorkspace, touchWorkspaceMeta } from "./lifecycle";
-import { getWorkdirForBranch } from "./git-storage/nano-git-store";
+import { getWorkdirForBranch } from "./git-storage/git-store";
 import type { TimelinePointRef, TimelinePointView } from "./types";
 import {
   AUX_TIMELINE_DIR,

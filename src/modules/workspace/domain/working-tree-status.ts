@@ -1,7 +1,7 @@
 import { ORIGIN_TIMELINE_POINT_ID } from "./constants";
 import { getBranch, getBranchHeadCommitId } from "./branches";
 import { readFilesAtCommit } from "./git-storage/git-store";
-import { getWorkdirForBranch } from "./git-storage/nano-git-store";
+import { getWorkdirForBranch } from "./git-storage/git-store";
 import {
   flattenManuscriptNodes,
   pointIdOrOrigin,

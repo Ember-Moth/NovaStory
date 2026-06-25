@@ -14,7 +14,7 @@ import type {
   TimelinePointRef,
 } from "./types";
 import { getWorkspace, touchWorkspaceMeta } from "./lifecycle";
-import { getWorkdirForBranch } from "./git-storage/nano-git-store";
+import { getWorkdirForBranch } from "./git-storage/git-store";
 import type { VirtualWorkdir } from "nano-git/workdir/core";
 import {
   assertTimelinePoint,

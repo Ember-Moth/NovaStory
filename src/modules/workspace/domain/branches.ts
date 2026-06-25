@@ -19,7 +19,7 @@ import {
   deleteWorkdirForBranch,
   setWorkdirForBranch,
   setWorkdirFromCommit,
-} from "./git-storage/nano-git-store";
+} from "./git-storage/git-store";
 import type { SHA1 } from "nano-git";
 
 export type BranchRow = BranchIndexRow;

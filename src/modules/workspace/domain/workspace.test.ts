@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 
 import { seedProjectRecord } from "@/test/project";
-import { getWorkdirForBranch } from "./git-storage/nano-git-store";
+import { getWorkdirForBranch } from "./git-storage/git-store";
 import * as service from "./index";
 
 type ExportedAuxNode = Awaited<ReturnType<typeof service.exportAuxSnapshotTree>>["nodes"][number];
