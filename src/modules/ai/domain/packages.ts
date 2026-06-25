@@ -3,7 +3,7 @@ import type { AiProviderConfigKind } from "./config";
 export const AI_PROVIDER_FACTORY_IDS = [
   "createOpenAI",
   "createAnthropic",
-  "createGoogleGenerativeAI",
+  "createGoogle",
   "createOpenAICompatible",
   "createOpenRouter",
   "createXai",
@@ -46,7 +46,7 @@ export const SUPPORTED_AI_SDK_PACKAGES = [
   {
     sdkPackage: "@ai-sdk/google",
     label: "Google",
-    providerFactoryId: "createGoogleGenerativeAI",
+    providerFactoryId: "createGoogle",
     configKind: "none",
     requiresBaseUrl: false,
     allowsCustomEndpoint: false,

@@ -1,10 +1,10 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createAzure } from "@ai-sdk/azure";
 import { createCerebras } from "@ai-sdk/cerebras";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createGoogle } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import type { LanguageModelV3, ProviderV3 } from "@ai-sdk/provider";
+import type { LanguageModelV4, ProviderV4 } from "@ai-sdk/provider";
 import { createXai } from "@ai-sdk/xai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createGateway } from "ai";
@@ -25,7 +25,7 @@ interface ProviderFactoryInput {
   config: AiConnectionConfig;
 }
 
-type ProviderFactory = (_input: ProviderFactoryInput) => ProviderV3;
+type ProviderFactory = (_input: ProviderFactoryInput) => ProviderV4;
 
 function requireApiKey(connection: AiConnectionRow): string {
   const apiKey = connection.apiKey?.trim();
@@ -39,7 +39,7 @@ function requireBaseUrl(connection: AiConnectionRow): string {
   return baseUrl;
 }
 
-function createAzureProvider({ apiKey, baseUrl, config }: ProviderFactoryInput): ProviderV3 {
+function createAzureProvider({ apiKey, baseUrl, config }: ProviderFactoryInput): ProviderV4 {
   return createAzure({
     apiKey,
     baseURL: baseUrl ?? undefined,
@@ -60,8 +60,8 @@ export const PROVIDER_FACTORY_REGISTRY: Record<AiProviderFactoryId, ProviderFact
       apiKey,
       baseURL: baseUrl ?? undefined,
     }),
-  createGoogleGenerativeAI: ({ apiKey, baseUrl }) =>
-    createGoogleGenerativeAI({
+  createGoogle: ({ apiKey, baseUrl }) =>
+    createGoogle({
       apiKey,
       baseURL: baseUrl ?? undefined,
     }),
@@ -75,7 +75,7 @@ export const PROVIDER_FACTORY_REGISTRY: Record<AiProviderFactoryId, ProviderFact
     createOpenRouter({
       apiKey,
       baseURL: baseUrl ?? undefined,
-    }),
+    }) as unknown as ProviderV4,
   createXai: ({ apiKey, baseUrl }) =>
     createXai({
       apiKey,
@@ -94,7 +94,7 @@ export const PROVIDER_FACTORY_REGISTRY: Record<AiProviderFactoryId, ProviderFact
   createAzure: createAzureProvider,
 };
 
-export function createProviderForConnection(connection: AiConnectionRow): ProviderV3 {
+export function createProviderForConnection(connection: AiConnectionRow): ProviderV4 {
   const recipe = getAiSdkPackageRecipe(connection.sdkPackage);
   invariant(recipe, `不支持这个 AI SDK 包：${connection.sdkPackage}`);
 
@@ -123,7 +123,7 @@ export function createLanguageModelForConnection({
 }: {
   connection: AiConnectionRow;
   modelId: string;
-}): LanguageModelV3 {
+}): LanguageModelV4 {
   const normalizedModelId = modelId.trim();
   invariant(normalizedModelId, "模型 ID 不能为空。");
   return createProviderForConnection(connection).languageModel(normalizedModelId);

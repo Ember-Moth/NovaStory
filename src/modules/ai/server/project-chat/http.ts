@@ -2,8 +2,9 @@ import {
   convertToModelMessages,
   createUIMessageStream,
   createUIMessageStreamResponse,
-  stepCountIs,
+  isStepCount,
   streamText,
+  toUIMessageStream,
   type ToolSet,
   type UIMessage,
   type UIMessageStreamWriter,
@@ -402,7 +403,7 @@ export async function handleProjectChatRequest(request: Request) {
         connection: selection.connection,
         modelId: selection.resolvedModel.modelId,
       }),
-      system: buildProjectAssistantSystemPrompt(),
+      instructions: buildProjectAssistantSystemPrompt(),
       messages: modelMessages,
       tools,
       ...(activeTools.length > 0 ? { activeTools } : {}),
@@ -412,10 +413,10 @@ export async function handleProjectChatRequest(request: Request) {
       ...(chat.modelConfig.maxTokens != null
         ? { maxOutputTokens: chat.modelConfig.maxTokens }
         : {}),
-      stopWhen: stepCountIs(getAiAssistantMaxSteps()),
+      stopWhen: isStepCount(getAiAssistantMaxSteps()),
       abortSignal: abortController.signal,
-      experimental_onToolCallFinish: async (event) => {
-        if (!event.success) {
+      onToolExecutionEnd: async (event) => {
+        if (event.toolOutput.type !== "tool-result") {
           return;
         }
 
@@ -424,7 +425,7 @@ export async function handleProjectChatRequest(request: Request) {
           await extractWorkspaceRefreshRequestedEventFromToolResult({
             projectId,
             toolName,
-            output: event.output,
+            output: event.toolOutput.output,
           });
         if (workspaceRefreshRequestedEvent) {
           emitProjectChatStreamData(streamWriter, bufferedDataParts, {
@@ -437,7 +438,7 @@ export async function handleProjectChatRequest(request: Request) {
           await extractTimelineSelectionUpdatedEventFromToolResult({
             projectId,
             toolName,
-            output: event.output,
+            output: event.toolOutput.output,
           });
         if (timelineSelectionUpdatedEvent) {
           emitProjectChatStreamData(streamWriter, bufferedDataParts, {
@@ -455,7 +456,8 @@ export async function handleProjectChatRequest(request: Request) {
           emitProjectChatStreamData(writer, [], dataPart);
         });
         writer.merge(
-          result.toUIMessageStream({
+          toUIMessageStream({
+            stream: result.stream,
             originalMessages: incomingMessages,
             generateMessageId: () => createId("chat_msg"),
             onFinish: async ({ responseMessage, isContinuation }) => {
