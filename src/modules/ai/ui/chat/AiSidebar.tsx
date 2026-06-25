@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -13,7 +14,11 @@ import {
   lastAssistantMessageIsCompleteWithToolCalls,
 } from "ai";
 
-import type { ProjectChatInfo } from "@/modules/ai/domain/project-chat";
+import { deriveProjectChatTitleFromText } from "@/modules/ai/domain/project-chat/title";
+import type {
+  ProjectChatInfo,
+  ProjectChatModelConfig,
+} from "@/modules/ai/domain/project-chat/types";
 import type {
   ProjectAssistantContextSnapshot,
   ProjectAssistantToolName,
@@ -21,6 +26,7 @@ import type {
   WorkspaceRefreshRequestedEvent,
 } from "@/modules/ai/domain/types";
 import { FullPageMessage } from "@/shared/ui/FullPageMessage";
+import { createId } from "@/shared/lib/domain";
 import { OverlayScrollbar } from "@/shared/ui/OverlayScrollbar";
 
 import { useAssistantSheetLayout } from "../assistant/layout/useAssistantSheetLayout";
@@ -68,21 +74,25 @@ function useProjectChats(projectId: string) {
   }, [reload]);
 
   const createChat = useCallback(
-    async (modelConfig?: { connectionId: string; modelId: string }) => {
+    async (options?: { title?: string; modelConfig?: ProjectChatModelConfig }) => {
       setIsMutating(true);
-      const data = await requestJson<{ chat: ProjectChatInfo }>("/api/chats", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          projectId,
-          ...(modelConfig ? { modelConfig } : {}),
-        }),
-      });
-      await reload();
-      setIsMutating(false);
-      return data.chat;
+      try {
+        const data = await requestJson<{ chat: ProjectChatInfo }>("/api/chats", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            projectId,
+            ...(options?.title ? { title: options.title } : {}),
+            ...(options?.modelConfig ? { modelConfig: options.modelConfig } : {}),
+          }),
+        });
+        await reload();
+        return data.chat;
+      } finally {
+        setIsMutating(false);
+      }
     },
     [projectId, reload],
   );
@@ -90,18 +100,21 @@ function useProjectChats(projectId: string) {
   const archiveChat = useCallback(
     async (chatId: string, archived: boolean) => {
       setIsMutating(true);
-      await requestJson(`/api/chats/${chatId}/archive`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          projectId,
-          archived,
-        }),
-      });
-      await reload();
-      setIsMutating(false);
+      try {
+        await requestJson(`/api/chats/${chatId}/archive`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            projectId,
+            archived,
+          }),
+        });
+        await reload();
+      } finally {
+        setIsMutating(false);
+      }
     },
     [projectId, reload],
   );
@@ -147,10 +160,19 @@ interface ActiveChatControllerValue {
 
 const ActiveChatControllerContext = createContext<ActiveChatControllerValue | null>(null);
 
+type QueuedInitialSubmit = {
+  id: string;
+  chatId: string;
+  payload: AssistantComposerSubmitPayload;
+  activeTools: ProjectAssistantToolName[];
+};
+
 function ActiveChatConversationProvider({
   projectId,
   chatId,
   context,
+  queuedInitialSubmit,
+  onQueuedInitialSubmitConsumed,
   onWorkspaceRefreshRequested,
   onChatChanged,
   children,
@@ -158,6 +180,8 @@ function ActiveChatConversationProvider({
   projectId: string;
   chatId: string;
   context?: ProjectAssistantContextSnapshot | null;
+  queuedInitialSubmit?: QueuedInitialSubmit | null;
+  onQueuedInitialSubmitConsumed?: (_id: string) => void;
   onWorkspaceRefreshRequested?: (
     _event: WorkspaceRefreshRequestedEvent | TimelineSelectionUpdatedEvent,
   ) => void;
@@ -167,17 +191,18 @@ function ActiveChatConversationProvider({
   const chatState = useChatPathState(projectId, chatId);
   const [selectedConnectionId, setSelectedConnectionId] = useState("");
   const [selectedModelId, setSelectedModelId] = useState("");
-  const [pendingActiveTools, setPendingActiveTools] = useState<ProjectAssistantToolName[]>([]);
+  const pendingActiveToolsRef = useRef<ProjectAssistantToolName[]>([]);
   const [isSavingModel, setIsSavingModel] = useState(false);
+  const submittedQueuedIdRef = useRef<string | null>(null);
   const transport = useMemo(
     () =>
       new ProjectChatTransport({
         projectId,
         chatId,
         getContext: () => context ?? null,
-        getActiveTools: () => pendingActiveTools,
+        getActiveTools: () => pendingActiveToolsRef.current,
       }),
-    [chatId, context, pendingActiveTools, projectId],
+    [chatId, context, projectId],
   );
   const { messages, sendMessage, addToolOutput, setMessages, status, stop } =
     useChat<ProjectChatMessage>({
@@ -193,7 +218,7 @@ function ActiveChatConversationProvider({
       },
       onFinish: () => {
         void chatState.reload().then(() => {
-          setPendingActiveTools([]);
+          pendingActiveToolsRef.current = [];
           onChatChanged();
         });
       },
@@ -214,6 +239,33 @@ function ActiveChatConversationProvider({
       },
     );
   }, [chatId, projectId]);
+
+  useEffect(() => {
+    if (
+      !queuedInitialSubmit ||
+      chatState.isLoading ||
+      queuedInitialSubmit.chatId !== chatId ||
+      submittedQueuedIdRef.current === queuedInitialSubmit.id
+    ) {
+      return;
+    }
+
+    submittedQueuedIdRef.current = queuedInitialSubmit.id;
+    pendingActiveToolsRef.current = queuedInitialSubmit.activeTools;
+    void sendMessage({
+      text: queuedInitialSubmit.payload.text,
+      metadata: {
+        mentions: queuedInitialSubmit.payload.mentions,
+      },
+    });
+    onQueuedInitialSubmitConsumed?.(queuedInitialSubmit.id);
+  }, [
+    chatId,
+    chatState.isLoading,
+    onQueuedInitialSubmitConsumed,
+    queuedInitialSubmit,
+    sendMessage,
+  ]);
 
   const commitModelSelection = useCallback(
     (connectionId: string, modelId: string) => {
@@ -288,7 +340,7 @@ function ActiveChatConversationProvider({
 
   const submitComposer = useCallback(
     (payload: AssistantComposerSubmitPayload, activeTools: ProjectAssistantToolName[]) => {
-      setPendingActiveTools(activeTools);
+      pendingActiveToolsRef.current = activeTools;
       void sendMessage({
         text: payload.text,
         metadata: {
@@ -476,6 +528,100 @@ function ActiveChatComposerPane() {
   );
 }
 
+type NewChatComposerPaneProps = {
+  projectId: string;
+  createChat: (_options?: {
+    title?: string;
+    modelConfig?: ProjectChatModelConfig;
+  }) => Promise<ProjectChatInfo>;
+  isMutating: boolean;
+  onChatCreated: (
+    _chat: ProjectChatInfo,
+    _queuedSubmit: Omit<QueuedInitialSubmit, "chatId">,
+  ) => void;
+};
+
+function NewChatComposerPane({
+  projectId,
+  createChat,
+  isMutating,
+  onChatCreated,
+}: NewChatComposerPaneProps) {
+  const [selectedConnectionId, setSelectedConnectionId] = useState("");
+  const [selectedModelId, setSelectedModelId] = useState("");
+  const [isSavingModel, setIsSavingModel] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void requestJson<ProjectChatModelConfig>(`/api/projects/${projectId}/model-config`).then(
+      (modelConfig) => {
+        if (cancelled) {
+          return;
+        }
+        setSelectedConnectionId(modelConfig.connectionId);
+        setSelectedModelId(modelConfig.modelId);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
+
+  const commitModelSelection = useCallback(
+    (connectionId: string, modelId: string) => {
+      setSelectedConnectionId(connectionId);
+      setSelectedModelId(modelId);
+      setIsSavingModel(true);
+      void requestJson(`/api/projects/${projectId}/model-config`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          connectionId,
+          modelId,
+        }),
+      }).finally(() => {
+        setIsSavingModel(false);
+      });
+    },
+    [projectId],
+  );
+
+  const submitComposer = useCallback(
+    (payload: AssistantComposerSubmitPayload, activeTools: ProjectAssistantToolName[]) => {
+      if (!selectedConnectionId || !selectedModelId) {
+        return;
+      }
+
+      void createChat({
+        title: deriveProjectChatTitleFromText(payload.text) ?? undefined,
+        modelConfig: {
+          connectionId: selectedConnectionId,
+          modelId: selectedModelId,
+        },
+      }).then((chat) => {
+        onChatCreated(chat, {
+          id: createId("queued_chat_submit"),
+          payload,
+          activeTools,
+        });
+      });
+    },
+    [createChat, onChatCreated, selectedConnectionId, selectedModelId],
+  );
+
+  return (
+    <ChatComposerPane
+      selectedConnectionId={selectedConnectionId}
+      selectedModelId={selectedModelId}
+      isBusy={isMutating || isSavingModel}
+      onSelectionCommit={commitModelSelection}
+      onSubmit={submitComposer}
+    />
+  );
+}
+
 export function AiSidebar({
   projectId,
   context,
@@ -491,43 +637,30 @@ export function AiSidebar({
     defaultState: "peek",
   });
   const chats = useProjectChats(projectId);
-  const { chats: chatRows, createChat, isLoading, isMutating, showArchived } = chats;
+  const { chats: chatRows, createChat, isLoading, isMutating } = chats;
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
-  const [hasInitializedDefaultSession, setHasInitializedDefaultSession] = useState(false);
+  const [isComposingNewChat, setIsComposingNewChat] = useState(false);
+  const [pendingInitialSubmit, setPendingInitialSubmit] = useState<QueuedInitialSubmit | null>(
+    null,
+  );
+  const visibleChatIds = useMemo(() => chatRows.map((chat) => chat.id), [chatRows]);
+  const shouldShowNewChatComposer = !activeChatId || isComposingNewChat;
 
   useEffect(() => {
-    if (isLoading || isMutating) {
+    if (isLoading || isMutating || isComposingNewChat) {
       return;
     }
 
     const resolved = resolveSidebarActiveChat({
       activeChatId,
-      visibleChatIds: chatRows.map((chat) => chat.id),
-      canAutoCreateWhenEmpty: !hasInitializedDefaultSession && !showArchived,
+      visibleChatIds,
     });
 
     if (resolved.nextActiveChatId !== activeChatId) {
       setActiveChatId(resolved.nextActiveChatId);
     }
-
-    if (!hasInitializedDefaultSession) {
-      setHasInitializedDefaultSession(true);
-    }
-
-    if (resolved.shouldAutoCreate) {
-      void createChat().then((chat) => {
-        setActiveChatId(chat.id);
-      });
-    }
-  }, [
-    activeChatId,
-    chatRows,
-    createChat,
-    hasInitializedDefaultSession,
-    isLoading,
-    isMutating,
-    showArchived,
-  ]);
+    setIsComposingNewChat(!resolved.nextActiveChatId);
+  }, [activeChatId, isComposingNewChat, isLoading, isMutating, visibleChatIds]);
 
   return (
     <aside className="flex h-full w-96 max-w-[42vw] min-w-72 shrink-0 flex-col overflow-hidden border-l border-border bg-sidebar-background">
@@ -552,12 +685,11 @@ export function AiSidebar({
         </button>
         <button
           type="button"
-          onClick={() =>
-            void createChat().then((chat) => {
-              setActiveChatId(chat.id);
-            })
-          }
-          disabled={isMutating}
+          onClick={() => {
+            setActiveChatId(null);
+            setIsComposingNewChat(true);
+          }}
+          disabled={isMutating || shouldShowNewChatComposer}
           className="inline-flex h-7 items-center gap-1 rounded-md border border-border px-2 text-[11px] text-foreground-muted transition hover:bg-list-hover-background hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
         >
           <span className="icon-[material-symbols--add]" />
@@ -576,9 +708,10 @@ export function AiSidebar({
           <OverlayScrollbar variant="panel">
             <SessionList
               chats={chatRows}
-              activeChatId={activeChatId}
+              activeChatId={shouldShowNewChatComposer ? null : activeChatId}
               showArchived={chats.showArchived}
               onActivate={(chatId) => {
+                setIsComposingNewChat(false);
                 setActiveChatId(chatId);
                 if (layout.sheetState === "expanded") {
                   layout.setSheetState("peek");
@@ -587,7 +720,9 @@ export function AiSidebar({
               onArchiveToggle={(chatId, archived) => {
                 void chats.archiveChat(chatId, archived).then(() => {
                   if (activeChatId === chatId && archived) {
-                    setActiveChatId(chatRows.find((chat) => chat.id !== chatId)?.id ?? null);
+                    const nextChatId = chatRows.find((chat) => chat.id !== chatId)?.id ?? null;
+                    setActiveChatId(nextChatId);
+                    setIsComposingNewChat(!nextChatId);
                   }
                 });
               }}
@@ -616,12 +751,16 @@ export function AiSidebar({
             />
           </div>
 
-          {activeChatId ? (
+          {activeChatId && !isComposingNewChat ? (
             <ActiveChatConversationProvider
               key={activeChatId}
               projectId={projectId}
               chatId={activeChatId}
               context={context}
+              queuedInitialSubmit={pendingInitialSubmit}
+              onQueuedInitialSubmitConsumed={(id) => {
+                setPendingInitialSubmit((current) => (current?.id === id ? null : current));
+              }}
               onWorkspaceRefreshRequested={onWorkspaceRefreshRequested}
               onChatChanged={() => {
                 void chats.reload();
@@ -641,11 +780,32 @@ export function AiSidebar({
               description=""
             />
           ) : (
-            <FullPageMessage
-              icon="icon-[material-symbols--chat-bubble-outline]"
-              title="暂无会话"
-              description="创建会话后即可开始对话。"
-            />
+            <>
+              <div className="min-h-0 flex-1 overflow-hidden">
+                <FullPageMessage
+                  icon="icon-[material-symbols--edit-square-outline]"
+                  title="开始一段新对话"
+                  description="输入第一条消息后才会创建会话，并自动使用消息内容作为标题。"
+                  embedded
+                />
+              </div>
+              <div className="shrink-0 border-t border-border">
+                <NewChatComposerPane
+                  projectId={projectId}
+                  createChat={createChat}
+                  isMutating={isMutating}
+                  onChatCreated={(chat, queuedSubmit) => {
+                    setPendingInitialSubmit({
+                      ...queuedSubmit,
+                      chatId: chat.id,
+                    });
+                    setActiveChatId(chat.id);
+                    setIsComposingNewChat(false);
+                    void chats.reload();
+                  }}
+                />
+              </div>
+            </>
           )}
         </div>
       </div>

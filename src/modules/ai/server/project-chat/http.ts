@@ -24,6 +24,7 @@ import {
   updateProjectChat,
   updateProjectChatDefaultModelConfig,
   writeProjectChatMessages,
+  deriveProjectChatTitleFromText,
   type ProjectChatModelConfig,
   type StoredProjectChatMessage,
 } from "@/modules/ai/domain/project-chat";
@@ -311,13 +312,9 @@ function maybeDeriveChatTitle(
   const text = firstUserMessage.parts
     .filter((part): part is { type: "text"; text: string } => part.type === "text")
     .map((part) => part.text)
-    .join(" ")
-    .trim();
-  if (!text) {
-    return null;
-  }
+    .join(" ");
 
-  return text.slice(0, 40);
+  return deriveProjectChatTitleFromText(text);
 }
 
 function normalizeIncomingMessages(input: unknown): UIMessage<ProjectChatRequestMessageMetadata>[] {
