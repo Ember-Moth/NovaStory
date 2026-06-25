@@ -28,6 +28,7 @@ import type {
 import { FullPageMessage } from "@/shared/ui/FullPageMessage";
 import { createId } from "@/shared/lib/domain";
 import { OverlayScrollbar } from "@/shared/ui/OverlayScrollbar";
+import { rpc } from "@/rpc/client";
 
 import { useAssistantSheetLayout } from "../assistant/layout/useAssistantSheetLayout";
 import type { AssistantComposerSubmitPayload } from "../assistant/composer/AssistantComposer";
@@ -44,88 +45,42 @@ import { useChatPathState } from "./hooks/useChatPathState";
 import { ProjectChatTransport } from "./transport/ProjectChatTransport";
 import type { ProjectChatMessage } from "./types";
 
-async function requestJson<T>(input: RequestInfo, init?: RequestInit) {
-  const response = await fetch(input, init);
-  const payload = (await response.json()) as T & { error?: string };
-  if (!response.ok) {
-    throw new Error(payload.error ?? "请求失败。");
-  }
-  return payload;
-}
-
 function useProjectChats(projectId: string) {
-  const [chats, setChats] = useState<ProjectChatInfo[]>([]);
   const [showArchived, setShowArchived] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isMutating, setIsMutating] = useState(false);
 
-  const reload = useCallback(async () => {
-    setIsLoading(true);
-    const data = await requestJson<{ chats: ProjectChatInfo[] }>(
-      `/api/chats?projectId=${projectId}&archived=${showArchived ? "all" : "false"}`,
-    );
-    setChats(data.chats);
-    setIsLoading(false);
-    return data.chats;
-  }, [projectId, showArchived]);
-
-  useEffect(() => {
-    void reload();
-  }, [reload]);
+  const chatsQuery = rpc.useQuery("ai.chats.list", {
+    projectId,
+    archived: showArchived ? "all" : false,
+  });
+  const createChatMutation = rpc.useMutation("ai.chats.create");
+  const archiveChatMutation = rpc.useMutation("ai.chats.archive");
 
   const createChat = useCallback(
     async (options?: { title?: string; modelConfig?: ProjectChatModelConfig }) => {
-      setIsMutating(true);
-      try {
-        const data = await requestJson<{ chat: ProjectChatInfo }>("/api/chats", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            projectId,
-            ...(options?.title ? { title: options.title } : {}),
-            ...(options?.modelConfig ? { modelConfig: options.modelConfig } : {}),
-          }),
-        });
-        await reload();
-        return data.chat;
-      } finally {
-        setIsMutating(false);
-      }
+      const result = await createChatMutation.mutateAsync({
+        projectId,
+        ...(options?.title ? { title: options.title } : {}),
+        ...(options?.modelConfig ? { modelConfig: options.modelConfig } : {}),
+      });
+      return result.chat;
     },
-    [projectId, reload],
+    [projectId, createChatMutation],
   );
 
   const archiveChat = useCallback(
     async (chatId: string, archived: boolean) => {
-      setIsMutating(true);
-      try {
-        await requestJson(`/api/chats/${chatId}/archive`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            projectId,
-            archived,
-          }),
-        });
-        await reload();
-      } finally {
-        setIsMutating(false);
-      }
+      await archiveChatMutation.mutateAsync({ projectId, chatId, archived });
     },
-    [projectId, reload],
+    [projectId, archiveChatMutation],
   );
 
   return {
-    chats,
+    chats: chatsQuery.data?.chats ?? [],
     showArchived,
     setShowArchived,
-    isLoading,
-    isMutating,
-    reload,
+    isLoading: chatsQuery.isLoading,
+    isMutating: createChatMutation.isPending || archiveChatMutation.isPending,
+    reload: () => chatsQuery.refetch(),
     createChat,
     archiveChat,
   };
@@ -227,18 +182,21 @@ function ActiveChatConversationProvider({
         lastAssistantMessageIsCompleteWithApprovalResponses({ messages: chatMessages }),
     });
 
+  const detailQuery = rpc.useQuery("ai.chats.getDetail", { projectId, chatId });
+  const updateChatMutation = rpc.useMutation("ai.chats.update");
+  const setModelConfigMutation = rpc.useMutation("ai.chats.setModelConfig");
+
   useEffect(() => {
     setMessages(chatState.visibleMessages as ProjectChatMessage[]);
   }, [chatState.visibleMessages, setMessages]);
 
   useEffect(() => {
-    void requestJson<{ chat: ProjectChatInfo }>(`/api/chats/${chatId}?projectId=${projectId}`).then(
-      (data) => {
-        setSelectedConnectionId(data.chat.modelConfig.connectionId);
-        setSelectedModelId(data.chat.modelConfig.modelId);
-      },
-    );
-  }, [chatId, projectId]);
+    const chat = detailQuery.data?.chat;
+    if (chat) {
+      setSelectedConnectionId(chat.modelConfig.connectionId);
+      setSelectedModelId(chat.modelConfig.modelId);
+    }
+  }, [detailQuery.data]);
 
   useEffect(() => {
     if (
@@ -273,35 +231,27 @@ function ActiveChatConversationProvider({
       setSelectedModelId(modelId);
       setIsSavingModel(true);
       void Promise.all([
-        requestJson(`/api/chats/${chatId}`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            projectId,
-            modelConfig: {
-              connectionId,
-              modelId,
-            },
-          }),
-        }),
-        requestJson(`/api/projects/${projectId}/model-config`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
+        updateChatMutation.mutateAsync({
+          projectId,
+          chatId,
+          modelConfig: {
             connectionId,
             modelId,
-          }),
+          },
+        }),
+        setModelConfigMutation.mutateAsync({
+          projectId,
+          modelConfig: {
+            connectionId,
+            modelId,
+          },
         }),
       ]).finally(() => {
         setIsSavingModel(false);
         onChatChanged();
       });
     },
-    [chatId, onChatChanged, projectId],
+    [chatId, onChatChanged, projectId, updateChatMutation, setModelConfigMutation],
   );
 
   const selectBranch = useCallback(
@@ -351,13 +301,14 @@ function ActiveChatConversationProvider({
     [sendMessage],
   );
 
+  const abortMutation = rpc.useMutation("ai.chats.abort");
   const abortStream = useCallback(async () => {
-    const aborted = await transport.abortStream();
-    if (aborted) {
+    const result = await abortMutation.mutateAsync({ projectId, chatId });
+    if (result.success) {
       stop();
     }
-    return aborted;
-  }, [transport, stop]);
+    return result.success;
+  }, [projectId, chatId, abortMutation, stop]);
 
   const resumeStream = useCallback(() => {
     // Find the last incomplete assistant message
@@ -551,41 +502,35 @@ function NewChatComposerPane({
   const [selectedModelId, setSelectedModelId] = useState("");
   const [isSavingModel, setIsSavingModel] = useState(false);
 
+  const modelConfigQuery = rpc.useQuery("ai.chats.getModelConfig", { projectId });
+  const setModelConfigMutation = rpc.useMutation("ai.chats.setModelConfig");
+
   useEffect(() => {
-    let cancelled = false;
-    void requestJson<ProjectChatModelConfig>(`/api/projects/${projectId}/model-config`).then(
-      (modelConfig) => {
-        if (cancelled) {
-          return;
-        }
-        setSelectedConnectionId(modelConfig.connectionId);
-        setSelectedModelId(modelConfig.modelId);
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId]);
+    const modelConfig = modelConfigQuery.data;
+    if (modelConfig) {
+      setSelectedConnectionId(modelConfig.connectionId);
+      setSelectedModelId(modelConfig.modelId);
+    }
+  }, [modelConfigQuery.data]);
 
   const commitModelSelection = useCallback(
     (connectionId: string, modelId: string) => {
       setSelectedConnectionId(connectionId);
       setSelectedModelId(modelId);
       setIsSavingModel(true);
-      void requestJson(`/api/projects/${projectId}/model-config`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          connectionId,
-          modelId,
-        }),
-      }).finally(() => {
-        setIsSavingModel(false);
-      });
+      void setModelConfigMutation
+        .mutateAsync({
+          projectId,
+          modelConfig: {
+            connectionId,
+            modelId,
+          },
+        })
+        .finally(() => {
+          setIsSavingModel(false);
+        });
     },
-    [projectId],
+    [projectId, setModelConfigMutation],
   );
 
   const submitComposer = useCallback(

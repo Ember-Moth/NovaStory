@@ -34,6 +34,11 @@ export const rpcTags = defineTags({
   aiConnectionModels: (connectionId: string) =>
     ["ai", "connections", "models", connectionId] as const,
   aiGlobalPrompts: () => ["ai", "global-prompts"] as const,
+
+  projectChats: (projectId: string) => ["ai", "chats", "list", projectId] as const,
+  projectChat: (chatId: string) => ["ai", "chats", "detail", chatId] as const,
+  projectChatModelConfig: (projectId: string) =>
+    ["ai", "chats", "model-config", projectId] as const,
 });
 
 export type RpcTag = TagValue<typeof rpcTags>;

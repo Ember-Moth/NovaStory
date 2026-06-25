@@ -8,9 +8,6 @@ import type {
 import type { ProjectChatMessage } from "../types";
 
 export class ProjectChatTransport extends DefaultChatTransport<ProjectChatMessage> {
-  private projectId: string;
-  private chatId: string;
-
   constructor({
     projectId,
     chatId,
@@ -39,20 +36,5 @@ export class ProjectChatTransport extends DefaultChatTransport<ProjectChatMessag
         api: "/api/chat",
       }),
     });
-    this.projectId = projectId;
-    this.chatId = chatId;
-  }
-
-  async abortStream(): Promise<boolean> {
-    try {
-      const response = await fetch(`/api/chats/${this.chatId}/abort?projectId=${this.projectId}`, {
-        method: "POST",
-      });
-      const data = await response.json();
-      return data.success === true;
-    } catch (error) {
-      console.error("Failed to abort stream:", error);
-      return false;
-    }
   }
 }

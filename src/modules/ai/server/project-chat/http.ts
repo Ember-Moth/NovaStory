@@ -11,22 +11,14 @@ import {
 } from "ai";
 
 import {
-  archiveProjectChat,
-  createProjectChat,
-  deleteProjectChat,
   getProjectChat,
-  getProjectChatDefaultModelConfig,
-  getProjectChatDetail,
   getProjectChatMessages,
-  listProjectChats,
   materializeIncomingProjectChatMessages,
   resolveProjectChatModelSelection,
   selectProjectChatMessageChild,
   updateProjectChat,
-  updateProjectChatDefaultModelConfig,
   writeProjectChatMessages,
   deriveProjectChatTitleFromText,
-  type ProjectChatModelConfig,
   type StoredProjectChatMessage,
 } from "@/modules/ai/domain/project-chat";
 import { streamRegistry } from "./stream-registry";
@@ -524,174 +516,6 @@ export async function handleProjectChatRequest(request: Request) {
       headers: new Headers({
         "X-Stream-Id": streamId,
       }),
-    });
-  } catch (error) {
-    return jsonError(normalizeError(error).message);
-  }
-}
-
-export async function handleProjectChatsRequest(request: Request) {
-  try {
-    if (request.method === "GET") {
-      const url = new URL(request.url);
-      const projectId = normalizeProjectId(url.searchParams.get("projectId"));
-      const archived = url.searchParams.get("archived");
-      return Response.json({
-        chats: await listProjectChats(projectId, {
-          archived: archived == null ? undefined : archived === "all" ? "all" : archived === "true",
-        }),
-      });
-    }
-
-    const body = (await request.json()) as {
-      projectId?: string;
-      title?: string;
-      modelConfig?: ProjectChatModelConfig;
-    };
-    const projectId = normalizeProjectId(body.projectId);
-    return Response.json({
-      chat: await createProjectChat(projectId, {
-        title: body.title,
-        modelConfig: body.modelConfig,
-      }),
-    });
-  } catch (error) {
-    return jsonError(normalizeError(error).message);
-  }
-}
-
-export async function handleProjectChatDetailRequest(request: Request, chatId: string) {
-  try {
-    const normalizedChatId = normalizeChatId(chatId);
-    if (request.method === "GET") {
-      const url = new URL(request.url);
-      const projectId = normalizeProjectId(url.searchParams.get("projectId"));
-      const chat = await getProjectChat(projectId, normalizedChatId);
-      if (!chat) {
-        return jsonError("Chat not found", 404);
-      }
-      return Response.json(await getProjectChatDetail(projectId, normalizedChatId));
-    }
-
-    if (request.method === "PUT") {
-      const body = (await request.json()) as {
-        projectId?: string;
-        title?: string;
-        modelConfig?: ProjectChatModelConfig;
-      };
-      const projectId = normalizeProjectId(body.projectId);
-      return Response.json({
-        chat: await updateProjectChat(projectId, normalizedChatId, {
-          ...(body.title !== undefined ? { title: body.title } : {}),
-          ...(body.modelConfig ? { modelConfig: body.modelConfig } : {}),
-        }),
-      });
-    }
-
-    const url = new URL(request.url);
-    const projectId = normalizeProjectId(url.searchParams.get("projectId"));
-    await deleteProjectChat(projectId, normalizedChatId);
-    return Response.json({ success: true });
-  } catch (error) {
-    return jsonError(normalizeError(error).message);
-  }
-}
-
-export async function handleProjectChatStateRequest(request: Request, chatId: string) {
-  try {
-    const url = new URL(request.url);
-    const projectId = normalizeProjectId(url.searchParams.get("projectId"));
-    const normalizedChatId = normalizeChatId(chatId);
-    const chat = await getProjectChat(projectId, normalizedChatId);
-    if (!chat) {
-      return jsonError("Chat not found", 404);
-    }
-
-    const detail = await getProjectChatDetail(projectId, normalizedChatId);
-    return Response.json({
-      state: detail.state,
-      visibleMessages: detail.visibleMessages,
-      candidateGroups: detail.candidateGroups,
-    });
-  } catch (error) {
-    return jsonError(normalizeError(error).message);
-  }
-}
-
-export async function handleProjectChatSelectionRequest(request: Request, chatId: string) {
-  try {
-    const url = new URL(request.url);
-    const projectId = normalizeProjectId(url.searchParams.get("projectId"));
-    const normalizedChatId = normalizeChatId(chatId);
-    const chat = await getProjectChat(projectId, normalizedChatId);
-    if (!chat) {
-      return jsonError("Chat not found", 404);
-    }
-
-    const body = (await request.json()) as {
-      parentMessageId?: string | null;
-      childMessageId?: string;
-    };
-    const childMessageId = normalizeChatId(body.childMessageId);
-    const state = await selectProjectChatMessageChild(
-      projectId,
-      normalizedChatId,
-      body.parentMessageId ?? null,
-      childMessageId,
-    );
-    const detail = await getProjectChatDetail(projectId, normalizedChatId);
-    return Response.json({
-      state,
-      visibleMessages: detail.visibleMessages,
-      candidateGroups: detail.candidateGroups,
-    });
-  } catch (error) {
-    return jsonError(normalizeError(error).message);
-  }
-}
-
-export async function handleProjectModelConfigRequest(request: Request, projectId: string) {
-  try {
-    const normalizedProjectId = normalizeProjectId(projectId);
-    if (request.method === "GET") {
-      return Response.json(await getProjectChatDefaultModelConfig(normalizedProjectId));
-    }
-
-    const body = (await request.json()) as Partial<ProjectChatModelConfig>;
-    return Response.json(await updateProjectChatDefaultModelConfig(normalizedProjectId, body));
-  } catch (error) {
-    return jsonError(normalizeError(error).message);
-  }
-}
-
-export async function handleProjectChatArchiveRequest(request: Request, chatId: string) {
-  try {
-    const body = (await request.json()) as {
-      projectId?: string;
-      archived?: boolean;
-    };
-    const projectId = normalizeProjectId(body.projectId);
-    const normalizedChatId = normalizeChatId(chatId);
-    return Response.json({
-      chat: await archiveProjectChat(projectId, normalizedChatId, body.archived === true),
-    });
-  } catch (error) {
-    return jsonError(normalizeError(error).message);
-  }
-}
-
-export async function handleProjectChatAbortRequest(request: Request, chatId: string) {
-  try {
-    const url = new URL(request.url);
-    const _projectId = normalizeProjectId(url.searchParams.get("projectId"));
-    const normalizedChatId = normalizeChatId(chatId);
-
-    // Abort the stream for this chat
-    const aborted = streamRegistry.abortByChatId(normalizedChatId);
-
-    return Response.json({
-      success: aborted,
-      message: aborted ? "Stream aborted" : "No active stream found",
     });
   } catch (error) {
     return jsonError(normalizeError(error).message);

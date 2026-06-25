@@ -1,63 +1,41 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 
-import type {
-  ProjectChatCandidateGroup,
-  ProjectChatPathState,
-  StoredProjectChatMessage,
-} from "@/modules/ai/domain/project-chat";
+import { rpc } from "@/rpc/client";
+
+import type { StoredProjectChatMessage } from "@/modules/ai/domain/project-chat";
 
 export function useChatPathState(projectId: string, chatId: string) {
-  const [visibleMessages, setVisibleMessages] = useState<StoredProjectChatMessage[]>([]);
-  const [allMessages, setAllMessages] = useState<StoredProjectChatMessage[]>([]);
-  const [candidateGroups, setCandidateGroups] = useState<ProjectChatCandidateGroup[]>([]);
-  const [state, setState] = useState<ProjectChatPathState>({
-    selectedChildIdByParentId: {},
-  });
-  const [isLoading, setIsLoading] = useState(true);
+  const detailQuery = rpc.useQuery("ai.chats.getDetail", { projectId, chatId });
+  const selectChildMutation = rpc.useMutation("ai.chats.selectChild");
+
+  const allMessages = detailQuery.data?.messages ?? [];
+  const visibleMessages = detailQuery.data?.visibleMessages ?? [];
+  const candidateGroups = detailQuery.data?.candidateGroups ?? [];
+  const state = detailQuery.data?.state ?? { selectedChildIdByParentId: {} };
 
   const reload = useCallback(async () => {
-    setIsLoading(true);
-    const response = await fetch(`/api/chats/${chatId}?projectId=${projectId}`);
-    const data = await response.json();
-    setAllMessages(data.messages);
-    setVisibleMessages(data.visibleMessages);
-    setCandidateGroups(data.candidateGroups);
-    setState(data.state);
-    setIsLoading(false);
-    return data;
-  }, [chatId, projectId]);
+    await detailQuery.refetch();
+  }, [detailQuery]);
 
   const selectChild = useCallback(
     async (parentMessageId: string | null, childMessageId: string) => {
-      const response = await fetch(`/api/chats/${chatId}/selection?projectId=${projectId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          parentMessageId,
-          childMessageId,
-        }),
+      const result = await selectChildMutation.mutateAsync({
+        projectId,
+        chatId,
+        parentMessageId,
+        childMessageId,
       });
-      const data = await response.json();
-      setVisibleMessages(data.visibleMessages);
-      setCandidateGroups(data.candidateGroups);
-      setState(data.state);
-      return data.visibleMessages as StoredProjectChatMessage[];
+      return result.visibleMessages as StoredProjectChatMessage[];
     },
-    [chatId, projectId],
+    [projectId, chatId, selectChildMutation],
   );
-
-  useEffect(() => {
-    void reload();
-  }, [reload]);
 
   return {
     state,
     allMessages,
     visibleMessages,
     candidateGroups,
-    isLoading,
+    isLoading: detailQuery.isLoading,
     reload,
     selectChild,
   };

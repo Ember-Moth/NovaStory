@@ -1,4 +1,5 @@
 import * as aiHandlers from "@/modules/ai/rpc";
+import * as projectChatHandlers from "@/modules/ai/rpc/project-chat";
 import * as configHandlers from "@/modules/config/rpc";
 import * as projectHandlers from "@/modules/projects/rpc";
 import * as auxHandlers from "@/modules/workspace/rpc/aux";
@@ -30,6 +31,20 @@ export const ai = {
   createCustomModel: aiHandlers.createCustomModel,
   updateCustomModel: aiHandlers.updateCustomModel,
   deleteCustomModel: aiHandlers.deleteCustomModel,
+
+  chats: {
+    list: projectChatHandlers.list,
+    create: projectChatHandlers.create,
+    getDetail: projectChatHandlers.getDetail,
+    update: projectChatHandlers.update,
+    delete: projectChatHandlers.deleteMutation,
+    archive: projectChatHandlers.archive,
+    getState: projectChatHandlers.getState,
+    selectChild: projectChatHandlers.selectChild,
+    abort: projectChatHandlers.abort,
+    getModelConfig: projectChatHandlers.getModelConfig,
+    setModelConfig: projectChatHandlers.setModelConfig,
+  },
 };
 
 export const config = {
