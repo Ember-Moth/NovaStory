@@ -4,7 +4,7 @@ import path from "node:path";
 import { openRepository, initRepository } from "nano-git/repository/file";
 import { createVirtualWorkdir } from "nano-git/workdir/memory";
 import type { FileRepository, SHA1 } from "nano-git";
-import type { VirtualDiffEntry } from "nano-git/workdir/core";
+import type { VirtualDiffEntry, VirtualWorkdir } from "nano-git/workdir/core";
 
 import { getProjectRepoGitDir } from "./paths";
 import type { WorkingTreeStatus } from "@/modules/workspace/domain/types";
@@ -59,6 +59,82 @@ export function getOrInitRepo(projectId: string): FileRepository {
  */
 export function clearRepoCache(): void {
   repoCache.clear();
+}
+
+// ---------------------------------------------------------------------------
+// VirtualWorkdir 生命周期管理（per active branch session）
+// ---------------------------------------------------------------------------
+
+const workdirCache = new Map<string, VirtualWorkdir>();
+
+function workdirCacheKey(projectId: string, branchId: string) {
+  return `${projectId}:${branchId}`;
+}
+
+/**
+ * 获取分支当前的 VirtualWorkdir 实例。
+ * 如果不存在，可以创建一个新的（基于空树或指定 tree）。
+ */
+export function getWorkdirForBranch(
+  projectId: string,
+  branchId: string,
+): VirtualWorkdir | undefined {
+  return workdirCache.get(workdirCacheKey(projectId, branchId));
+}
+
+/**
+ * 为分支创建或重置 VirtualWorkdir 实例。
+ *
+ * @param projectId - 项目 ID
+ * @param branchId - 分支 ID（同时也是 workspaceId）
+ * @param baseTree - 基线 tree 哈希，不传则使用空树
+ * @returns VirtualWorkdir 实例
+ */
+export function setWorkdirForBranch(
+  projectId: string,
+  branchId: string,
+  baseTree?: SHA1,
+): VirtualWorkdir {
+  const repo = getOrInitRepo(projectId);
+  const workdir = createWorkdir(repo, baseTree);
+  workdirCache.set(workdirCacheKey(projectId, branchId), workdir);
+  return workdir;
+}
+
+/**
+ * 基于已有 commit 为分支创建 VirtualWorkdir。
+ */
+export function setWorkdirFromCommit(
+  projectId: string,
+  branchId: string,
+  commitId: SHA1,
+): VirtualWorkdir {
+  const repo = getOrInitRepo(projectId);
+  const commit = repo.catFile(commitId);
+  if (commit.type !== "commit") {
+    throw new Error(`Expected commit at ${commitId}, got ${commit.type}`);
+  }
+  return setWorkdirForBranch(projectId, branchId, commit.tree);
+}
+
+/**
+ * 删除分支的 VirtualWorkdir 实例。
+ */
+export function deleteWorkdirForBranch(projectId: string, branchId: string): void {
+  workdirCache.delete(workdirCacheKey(projectId, branchId));
+}
+
+/**
+ * 清除所有缓存的 VirtualWorkdir 实例（测试用）。
+ */
+export function clearWorkdirCache(): void {
+  workdirCache.clear();
+}
+
+/** 清除所有缓存（repo + workdir）。测试用。 */
+export function clearAllCaches(): void {
+  repoCache.clear();
+  workdirCache.clear();
 }
 
 /**

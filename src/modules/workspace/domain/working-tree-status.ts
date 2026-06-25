@@ -392,17 +392,10 @@ export async function getWorkingTreeStatus(
   const headCommitId = await getBranchHeadCommitId(projectId, branch.id);
   const workspace = await getWorkspaceForBranchId(projectId, branch.id);
   if (!workspace) {
-    return {
-      hasChanges: false,
-      headCommitId,
-      areas: {
-        content: { changed: false, changes: [] },
-        timeline: { changed: false, changes: [] },
-        aux: { changed: false, changes: [] },
-      },
-    };
+    return emptyStatus(headCommitId);
   }
 
+  // Fallback: physical worktree (legacy, used until Phase 2 is complete)
   const worktreePath = getProjectWorktreeDir(workspace.projectId, workspace.id);
   const gitdir = await ensureProjectRepo(branch.projectId);
   const matrix = await git.statusMatrix({
@@ -413,27 +406,15 @@ export async function getWorkingTreeStatus(
   });
   const state = readWorktreeState(worktreePath);
   if (!headCommitId && state.content.length === 0 && state.timeline.length === 0) {
-    return {
-      hasChanges: false,
-      headCommitId: null,
-      areas: {
-        content: { changed: false, changes: [] },
-        timeline: { changed: false, changes: [] },
-        aux: { changed: false, changes: [] },
-      },
-    };
+    return emptyStatus(null);
   }
 
-  const contentFileChanges = matrix.filter(([filepath, head, workdir]) => {
-    const kind = kindFromMatrix(head, workdir);
+  const contentFileChanges = matrix.filter(([filepath, head, workdirStatus]) => {
+    const kind = kindFromMatrix(head, workdirStatus);
     return kind != null && areaForPath(filepath) === "content";
   });
 
-  const areas: WorkingTreeStatus["areas"] = {
-    content: { changed: false, changes: [] },
-    timeline: { changed: false, changes: [] },
-    aux: { changed: false, changes: [] },
-  };
+  const areas = buildEmptyAreas();
 
   if (contentFileChanges.length > 0) {
     const previousState = headCommitId
@@ -447,24 +428,45 @@ export async function getWorkingTreeStatus(
     );
   }
 
-  for (const [filepath, head, workdir] of matrix) {
-    const kind = kindFromMatrix(head, workdir);
+  for (const [filepath, head, workdirStatus] of matrix) {
+    const kind = kindFromMatrix(head, workdirStatus);
     if (!kind) continue;
     const areaKey = areaForPath(filepath);
-    if (areaKey === "content") {
-      continue;
-    }
+    if (areaKey === "content") continue;
     areas[areaKey].changes.push({ label: filepath, kind });
   }
 
-  for (const area of Object.values(areas)) {
-    area.changes.sort((a, b) => a.label.localeCompare(b.label));
-    area.changed = area.changes.length > 0;
-  }
-
+  finalizeAreas(areas);
   return {
     hasChanges: Object.values(areas).some((area) => area.changed),
     headCommitId,
     areas,
   };
+}
+
+function emptyStatus(headCommitId: string | null): WorkingTreeStatus {
+  return {
+    hasChanges: false,
+    headCommitId,
+    areas: {
+      content: { changed: false, changes: [] },
+      timeline: { changed: false, changes: [] },
+      aux: { changed: false, changes: [] },
+    },
+  };
+}
+
+function buildEmptyAreas(): WorkingTreeStatus["areas"] {
+  return {
+    content: { changed: false, changes: [] },
+    timeline: { changed: false, changes: [] },
+    aux: { changed: false, changes: [] },
+  };
+}
+
+function finalizeAreas(areas: WorkingTreeStatus["areas"]) {
+  for (const area of Object.values(areas)) {
+    area.changes.sort((a, b) => a.label.localeCompare(b.label));
+    area.changed = area.changes.length > 0;
+  }
 }

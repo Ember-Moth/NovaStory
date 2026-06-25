@@ -4,6 +4,8 @@ import { branchRef, touchProjectRepo } from "./git-storage/git-store";
 import { getBranch, getBranchHeadCommitId } from "./branches";
 import { addAllAndCommit, checkoutCommitToWorktree, listLog } from "./git-storage/git-store";
 import { getWorkspace, getWorkspaceForBranchId } from "./lifecycle";
+import { setWorkdirForBranch, getOrInitRepo } from "./git-storage/nano-git-store";
+import type { SHA1 } from "nano-git";
 
 export interface CommitParentRow {
   commitId: string;
@@ -41,6 +43,9 @@ export async function createCommit(input: {
     ...(headCommitId ? [headCommitId] : []),
     ...(input.extraParents?.map((parent) => parent.parentId) ?? []),
   ];
+
+  // Phase 2 (incomplete): VirtualWorkdir available via getWorkdirForBranch
+  // but not yet used for commits (aux.ts not migrated). Always use physical worktree.
   const oid = await addAllAndCommit({
     projectId: branch.projectId,
     workspaceId: workspace.id,
@@ -59,6 +64,18 @@ export async function checkoutCommit(input: {
   commitId: string;
 }) {
   const workspace = await getWorkspace(input.projectId, input.workspaceId);
+
+  // Phase 2 (incomplete): update VirtualWorkdir cache if it exists
+  try {
+    const repo = getOrInitRepo(input.projectId);
+    const commit = repo.catFile(input.commitId as SHA1);
+    if (commit.type === "commit") {
+      setWorkdirForBranch(input.projectId, workspace.id, commit.tree);
+    }
+  } catch {
+    // VirtualWorkdir setup is best-effort; continue with physical checkout
+  }
+
   await checkoutCommitToWorktree({
     projectId: workspace.projectId,
     workspaceId: workspace.id,

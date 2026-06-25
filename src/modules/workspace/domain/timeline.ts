@@ -6,6 +6,7 @@ import { createId, invariant } from "@/shared/lib/domain";
 
 import { getWorkspace, touchWorkspaceMeta } from "./lifecycle";
 import { getProjectWorktreeDir } from "./git-storage/paths";
+import { getWorkdirForBranch } from "./git-storage/nano-git-store";
 import type { TimelinePointRef, TimelinePointView } from "./types";
 import {
   AUX_TIMELINE_DIR,
@@ -14,11 +15,21 @@ import {
   pointIdOrOrigin,
   readWorktreeState,
   writeWorktreeStateSync,
+  writeWorktreeStateToWorkdir,
 } from "./git-storage/worktree-state";
+import type { WorktreeState } from "./git-storage/worktree-state";
 import { listAnchoredTimelinePointIds } from "./content";
 
 function touchWorkspaceAsync(projectId: string, workspaceId: string) {
   return touchWorkspaceMeta(projectId, workspaceId);
+}
+
+/** 双轨写入：同时写物理 worktree 和 VirtualWorkdir（如果存在） */
+function syncWorktreeToWorkdir(projectId: string, workspaceId: string, state: WorktreeState) {
+  const wd = getWorkdirForBranch(projectId, workspaceId);
+  if (wd) {
+    writeWorktreeStateToWorkdir(wd, state);
+  }
 }
 
 function originTimelinePoint(): TimelinePointView {
@@ -100,6 +111,7 @@ export async function createTimelinePoints(input: {
   });
   if (successor) successor.prevPointId = prevPointId;
   writeWorktreeStateSync(worktreePath, state);
+  syncWorktreeToWorkdir(workspace.projectId, workspace.id, state);
   await touchWorkspaceAsync(workspace.projectId, workspace.id);
   return created;
 }
@@ -124,6 +136,7 @@ export async function moveTimelinePoint(input: {
   point.prevPointId = afterPointId;
   if (targetSuccessor && targetSuccessor.id !== point.id) targetSuccessor.prevPointId = point.id;
   writeWorktreeStateSync(worktreePath, state);
+  syncWorktreeToWorkdir(workspace.projectId, workspace.id, state);
   await touchWorkspaceAsync(workspace.projectId, workspace.id);
   return point;
 }
@@ -144,6 +157,7 @@ export async function updateTimelinePoint(input: {
   if (input.label !== undefined) point.label = input.label;
   if (input.description !== undefined) point.description = input.description;
   writeWorktreeStateSync(worktreePath, state);
+  syncWorktreeToWorkdir(workspace.projectId, workspace.id, state);
   await touchWorkspaceAsync(workspace.projectId, workspace.id);
   return point;
 }
@@ -181,6 +195,7 @@ export async function deleteTimelinePoint(
     });
   }
   writeWorktreeStateSync(worktreePath, state);
+  syncWorktreeToWorkdir(workspace.projectId, workspace.id, state);
   await touchWorkspaceAsync(workspace.projectId, workspace.id);
 }
 

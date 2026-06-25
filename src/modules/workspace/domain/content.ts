@@ -4,6 +4,7 @@ import { getBranch, getBranchHeadCommitId } from "./branches";
 import { getWorkspace, getWorkspaceForBranchId, touchWorkspaceMeta } from "./lifecycle";
 import { getProjectWorktreeDir } from "./git-storage/paths";
 import { readFilesAtCommit } from "./git-storage/git-store";
+import { getWorkdirForBranch } from "./git-storage/nano-git-store";
 import type {
   ExportedContentNode,
   ExportedContentSubtree,
@@ -25,12 +26,21 @@ import {
   readWorktreeStateFromFiles,
   removeNodeFromTree,
   writeWorktreeStateSync,
+  writeWorktreeStateToWorkdir,
 } from "./git-storage/worktree-state";
 import type { ManuscriptNodeDiskState } from "./git-storage/types";
 import type { WorktreeState } from "./git-storage/worktree-state";
 
 async function touchWorkspace(projectId: string, workspaceId: string) {
   await touchWorkspaceMeta(projectId, workspaceId);
+}
+
+/** 双轨写入：同时写物理 worktree 和 VirtualWorkdir（如果存在） */
+function syncWorktreeToWorkdir(projectId: string, workspaceId: string, state: WorktreeState) {
+  const wd = getWorkdirForBranch(projectId, workspaceId);
+  if (wd) {
+    writeWorktreeStateToWorkdir(wd, state);
+  }
 }
 
 function toExportedNode(node: ManuscriptNodeDiskState): ExportedContentNode {
@@ -111,6 +121,7 @@ export async function createContentNode(input: {
     afterSiblingId: input.afterSiblingId,
   });
   writeWorktreeStateSync(worktreePath, state);
+  syncWorktreeToWorkdir(workspace.projectId, workspace.id, state);
   await touchWorkspace(workspace.projectId, workspace.id);
   const created = findManuscriptNode(state, node.id);
   return {
@@ -143,6 +154,7 @@ export async function moveContentNode(input: {
     afterSiblingId: input.afterSiblingId,
   });
   writeWorktreeStateSync(worktreePath, state);
+  syncWorktreeToWorkdir(workspace.projectId, workspace.id, state);
   await touchWorkspace(workspace.projectId, workspace.id);
   const node = findManuscriptNode(state, moved.id);
   return {
@@ -166,6 +178,7 @@ export async function deleteContentNode(input: {
   const state = readWorktreeState(worktreePath);
   removeManuscriptNode(worktreePath, state, input.nodeId);
   writeWorktreeStateSync(worktreePath, state);
+  syncWorktreeToWorkdir(workspace.projectId, workspace.id, state);
   await touchWorkspace(workspace.projectId, workspace.id);
 }
 
@@ -191,6 +204,7 @@ export async function updateContentNode(input: {
     node.body = input.body ?? "";
   }
   writeWorktreeStateSync(worktreePath, state);
+  syncWorktreeToWorkdir(workspace.projectId, workspace.id, state);
   await touchWorkspace(workspace.projectId, workspace.id);
   return {
     id: node.id,
@@ -376,6 +390,7 @@ export async function revertContentChange(input: {
   }
 
   writeWorktreeStateSync(worktreePath, state);
+  syncWorktreeToWorkdir(workspace.projectId, workspace.id, state);
   await touchWorkspace(workspace.projectId, workspace.id);
 }
 

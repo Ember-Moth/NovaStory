@@ -6,6 +6,7 @@ import { invariant } from "@/shared/lib/domain";
 
 import { parseJsonl, stringifyJsonl } from "./jsonl";
 import type { ManuscriptNodeDiskState, TimelineMetaRow } from "./types";
+import type { VirtualWorkdir } from "nano-git/workdir/core";
 
 export interface WorktreeState {
   content: ManuscriptNodeDiskState[];
@@ -385,4 +386,79 @@ export function moveManuscriptNode(
   });
 
   return moved;
+}
+
+// ---------------------------------------------------------------------------
+// VirtualWorkdir-based I/O (Phase 2)
+// ---------------------------------------------------------------------------
+
+/**
+ * 从 VirtualWorkdir 读取工作树状态。
+ * 等价于 readWorktreeState(dir)，但基于 VirtualWorkdir 而非文件系统。
+ */
+export function readWorktreeStateFromWorkdir(workdir: VirtualWorkdir): WorktreeState {
+  const indexContent = workdir.readFile("index.jsonl").toString("utf8");
+  const rows: IndexRow[] = indexContent ? parseJsonl<IndexRow>(indexContent) : [];
+
+  const idToBody = new Map<string, string>();
+  for (const entry of workdir.readdir("manuscript")) {
+    if (entry.kind === "blob" && entry.name.endsWith(".md") && entry.name !== INDEX_FILE) {
+      const id = entry.name.slice(0, -3);
+      const content = workdir.readFile(`manuscript/${entry.name}`).toString("utf8");
+      if (content != null) {
+        idToBody.set(id, normalizeBody(content));
+      }
+    }
+  }
+
+  return {
+    content: rebuildTree("", rows, idToBody),
+    timeline: parseJsonl<TimelineMetaRow>(workdir.readFile("timeline.jsonl").toString("utf8")),
+  };
+}
+
+/**
+ * 将工作树状态写入 VirtualWorkdir。
+ * 等价于 writeWorktreeStateSync(dir, state)，但基于 VirtualWorkdir 而非文件系统。
+ */
+export function writeWorktreeStateToWorkdir(workdir: VirtualWorkdir, state: WorktreeState) {
+  // write index.jsonl
+  const indexLines: string[] = [];
+  for (const row of dfsRows(state.content)) {
+    indexLines.push(JSON.stringify(row));
+  }
+  indexLines.push("");
+  workdir.writeFile("index.jsonl", Buffer.from(indexLines.join("\n"), "utf8"));
+
+  // write timeline.jsonl
+  workdir.writeFile("timeline.jsonl", Buffer.from(stringifyJsonl(state.timeline), "utf8"));
+
+  // write manuscript/<id>.md
+  if (!workdir.exists("manuscript")) {
+    workdir.mkdir("manuscript");
+  }
+  const declaredIds = new Set<string>();
+  for (const node of flattenContent(state.content)) {
+    declaredIds.add(node.id);
+    const body = normalizeBody(node.body);
+    workdir.writeFile(`manuscript/${node.id}.md`, Buffer.from(body, "utf8"));
+  }
+
+  // ensure aux/origin exists
+  if (!workdir.exists("aux")) {
+    workdir.mkdir("aux");
+  }
+  if (!workdir.exists("aux/origin")) {
+    workdir.mkdir("aux/origin");
+  }
+
+  // 删除被移除的 manuscript 文件
+  for (const entry of workdir.readdir("manuscript")) {
+    if (entry.kind === "blob" && entry.name.endsWith(".md") && entry.name !== INDEX_FILE) {
+      const id = entry.name.slice(0, -3);
+      if (!declaredIds.has(id)) {
+        workdir.delete(`manuscript/${entry.name}`);
+      }
+    }
+  }
 }

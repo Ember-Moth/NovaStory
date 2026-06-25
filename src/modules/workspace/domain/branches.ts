@@ -20,6 +20,12 @@ import { getProjectWorktreeDir } from "./git-storage/paths";
 import type { BranchIndexRow, ProjectIndexRow } from "./git-storage/types";
 import { readProjectMeta } from "./git-storage/project-meta-store";
 import { seedEmptyWorktree } from "./git-storage/worktree-state";
+import {
+  deleteWorkdirForBranch,
+  setWorkdirForBranch,
+  setWorkdirFromCommit,
+} from "./git-storage/nano-git-store";
+import type { SHA1 } from "nano-git";
 
 export type BranchRow = BranchIndexRow;
 
@@ -80,6 +86,13 @@ export async function createBranch(input: {
     });
   }
 
+  // Phase 2: create VirtualWorkdir for this branch
+  if (initialHeadCommitId) {
+    setWorkdirFromCommit(project.id, branchId, initialHeadCommitId as SHA1);
+  } else {
+    setWorkdirForBranch(project.id, branchId);
+  }
+
   return (await getBranch(project.id, branchId))!;
 }
 
@@ -132,5 +145,6 @@ export async function deleteBranch(projectId: string, branchId: string) {
   });
   await deleteRef({ projectId, ref: branchRef(branch.id) });
   await deleteBranchMeta(projectId, branch.id);
+  deleteWorkdirForBranch(projectId, branch.id);
   await touchProjectRepo(projectId);
 }
