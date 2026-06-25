@@ -1,17 +1,34 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 
 import { rpc } from "@/rpc/client";
 
-import type { StoredProjectChatMessage } from "@/modules/ai/domain/project-chat";
+import type {
+  ProjectChatCandidateGroup,
+  ProjectChatPathState,
+  StoredProjectChatMessage,
+} from "@/modules/ai/domain/project-chat";
+
+const EMPTY_STATE: ProjectChatPathState = { selectedChildIdByParentId: {} };
 
 export function useChatPathState(projectId: string, chatId: string) {
   const detailQuery = rpc.useQuery("ai.chats.getDetail", { projectId, chatId });
   const selectChildMutation = rpc.useMutation("ai.chats.selectChild");
 
-  const allMessages = detailQuery.data?.messages ?? [];
-  const visibleMessages = detailQuery.data?.visibleMessages ?? [];
-  const candidateGroups = detailQuery.data?.candidateGroups ?? [];
-  const state = detailQuery.data?.state ?? { selectedChildIdByParentId: {} };
+  const queryData = detailQuery.data;
+
+  const allMessages = useMemo(
+    () => queryData?.messages ?? ([] as StoredProjectChatMessage[]),
+    [queryData?.messages],
+  );
+  const visibleMessages = useMemo(
+    () => queryData?.visibleMessages ?? ([] as StoredProjectChatMessage[]),
+    [queryData?.visibleMessages],
+  );
+  const candidateGroups = useMemo(
+    () => queryData?.candidateGroups ?? ([] as ProjectChatCandidateGroup[]),
+    [queryData?.candidateGroups],
+  );
+  const state = useMemo(() => queryData?.state ?? EMPTY_STATE, [queryData?.state]);
 
   const reload = useCallback(async () => {
     await detailQuery.refetch();
