@@ -6,7 +6,7 @@ import { openSqliteVirtualWorkdir, deleteSqliteVirtualWorkdir } from "nano-git/w
 import { readTree } from "nano-git/repository/tree/tree-walk";
 import { patchTree } from "nano-git/repository/tree/tree-patch";
 import { walkLogEntries } from "nano-git/log";
-import type { GitCommit, SHA1, TreeEntry, FileRepository } from "nano-git";
+import type { SHA1, TreeEntry, FileRepository } from "nano-git";
 import type { VirtualDiffEntry, VirtualWorkdir } from "nano-git/workdir/core";
 
 import { getProjectRepoGitDir } from "./paths";
@@ -112,21 +112,37 @@ export function readTreeAtRef(input: { projectId: string; ref: string }): Record
 export function commitCustomRef(input: {
   projectId: string;
   ref: string;
-  files: Record<string, string>;
+  files?: Record<string, string>;
+  filesToDelete?: string[];
   message: string;
   replace?: boolean;
 }) {
   const repo = getOrInitRepo(input.projectId);
+  // The ref stores a tree hash directly (written by repo.updateRef), not a commit.
+  // Use it directly as the base for patchTree when !replace.
   const previous = repo.readRef(input.ref);
-  const base: SHA1 =
-    previous && !input.replace ? (repo.catFile(previous) as GitCommit).tree : repo.createTree([]);
+  const base: SHA1 = previous && !input.replace ? previous : repo.createTree([]);
 
-  const ops = Object.entries(input.files).map(([path, content]) => ({
-    op: "upsert" as const,
-    path,
-    mode: "100644" as const,
-    hash: repo.writeBlob(Buffer.from(content, "utf8")),
-  }));
+  const ops: Array<
+    { op: "upsert"; path: string; mode: string; hash: SHA1 } | { op: "delete"; path: string }
+  > = [];
+
+  if (input.files) {
+    for (const [path, content] of Object.entries(input.files)) {
+      ops.push({
+        op: "upsert" as const,
+        path,
+        mode: "100644" as const,
+        hash: repo.writeBlob(Buffer.from(content, "utf8")),
+      });
+    }
+  }
+
+  if (input.filesToDelete) {
+    for (const path of input.filesToDelete) {
+      ops.push({ op: "delete" as const, path });
+    }
+  }
 
   const { rootHash } = patchTree(repo.objects, base, ops);
   repo.updateRef(input.ref, rootHash);

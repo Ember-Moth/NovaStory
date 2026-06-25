@@ -16,20 +16,22 @@ export interface ProjectChatInfo {
   modelConfig: ProjectChatModelConfig;
 }
 
-export interface ProjectChatIndex {
-  version: "v1";
-  projectId: string;
-  chats: ProjectChatInfo[];
-  updatedAt: number;
-}
-
 export interface ProjectChatPathState {
   selectedChildIdByParentId: Record<string, string>;
 }
 
-export interface ProjectChatState {
+export interface ProjectChatListEntry {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  archivedAt: number | null;
+}
+
+export interface ProjectChatList {
   version: "v1";
-  chats: Record<string, ProjectChatPathState>;
+  projectId: string;
+  chats: ProjectChatListEntry[];
   updatedAt: number;
 }
 

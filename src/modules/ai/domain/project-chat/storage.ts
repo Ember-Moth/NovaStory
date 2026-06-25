@@ -1,5 +1,4 @@
-import { readProjectMeta } from "@/modules/workspace/domain/git-storage/project-meta-store";
-import { commitCustomRef, readFilesAtRef } from "@/modules/workspace/domain/git-storage/git-store";
+import { commitCustomRef, readFileAtRef } from "@/modules/workspace/domain/git-storage/git-store";
 import { createId, invariant, now } from "@/shared/lib/domain";
 
 import {
@@ -13,156 +12,107 @@ import {
 } from "./selection";
 import type {
   ProjectChatDetail,
-  ProjectChatIndex,
   ProjectChatInfo,
+  ProjectChatList,
   ProjectChatModelConfig,
   ProjectChatPathState,
-  ProjectChatState,
   StoredProjectChatMessage,
 } from "./types";
 
-const PROJECT_CHAT_REF = "refs/novel-evolver/ai-chats";
-const CHAT_INDEX_FILE = "index.json";
-const CHAT_STATE_FILE = "state.json";
-const PROJECT_MODEL_CONFIG_FILE = "model-config.json";
-
-type ProjectChatStorageFiles = Record<string, string>;
-
-async function readProjectChatStorageFiles(projectId: string): Promise<ProjectChatStorageFiles> {
-  await readProjectMeta(projectId);
-
-  try {
-    return readFilesAtRef({ projectId, ref: PROJECT_CHAT_REF });
-  } catch {
-    return {};
-  }
-}
-
-function writeProjectChatStorageFiles(
-  projectId: string,
-  files: ProjectChatStorageFiles,
-  message: string,
-) {
-  commitCustomRef({
-    projectId,
-    ref: PROJECT_CHAT_REF,
-    files,
-    message,
-    replace: true,
-  });
-}
+const PROJECT_CHAT_REF = "refs/novel-evolver/chats";
 
 function stringifyJson(value: unknown) {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
-function parseStoredJson<T>(value: string | undefined, fallback: T) {
-  if (!value) {
-    return fallback;
+function readProjectChatFile(projectId: string, filepath: string): string | null {
+  try {
+    return readFileAtRef({ projectId, ref: PROJECT_CHAT_REF, filepath });
+  } catch {
+    return null;
   }
-  return JSON.parse(value) as T;
 }
 
-function emptyChatIndex(projectId: string): ProjectChatIndex {
-  return {
-    version: "v1",
+function patchProjectChatFiles(
+  projectId: string,
+  options: { files?: Record<string, string>; filesToDelete?: string[] },
+  message: string,
+) {
+  commitCustomRef({
     projectId,
-    chats: [],
-    updatedAt: now(),
-  };
+    ref: PROJECT_CHAT_REF,
+    files: options.files,
+    filesToDelete: options.filesToDelete,
+    message,
+  });
 }
 
-function emptyProjectChatState(): ProjectChatState {
-  return {
-    version: "v1",
-    chats: {},
-    updatedAt: now(),
-  };
-}
-
-function normalizeProjectChatPathState(
-  state: ProjectChatPathState | null | undefined,
-): ProjectChatPathState {
-  return {
-    selectedChildIdByParentId: {
-      ...(state?.selectedChildIdByParentId ?? {}),
-    },
-  };
-}
-
-function readProjectChatIndexFromFiles(projectId: string, files: ProjectChatStorageFiles) {
-  return parseStoredJson(files[CHAT_INDEX_FILE], emptyChatIndex(projectId));
-}
-
-function readProjectChatStateFromFiles(files: ProjectChatStorageFiles) {
-  return parseStoredJson(files[CHAT_STATE_FILE], emptyProjectChatState());
-}
-
-function readProjectChatModelConfigFromFiles(
-  files: ProjectChatStorageFiles,
-): ProjectChatModelConfig | null {
-  return parseStoredJson<ProjectChatModelConfig | null>(files[PROJECT_MODEL_CONFIG_FILE], null);
-}
-
-function writeProjectChatFiles({
-  projectId,
-  files,
-  index,
-  state,
-  modelConfig,
-  message,
-}: {
-  projectId: string;
-  files: ProjectChatStorageFiles;
-  index: ProjectChatIndex;
-  state?: ProjectChatState;
-  modelConfig?: ProjectChatModelConfig | null;
-  message: string;
-}) {
-  const nextFiles: ProjectChatStorageFiles = {
-    ...files,
-    [CHAT_INDEX_FILE]: stringifyJson(index),
-  };
-
-  if (state) {
-    nextFiles[CHAT_STATE_FILE] = stringifyJson(state);
+function readProjectChatList(projectId: string): ProjectChatList {
+  const content = readProjectChatFile(projectId, "chat-list.json");
+  if (!content) {
+    return { version: "v1", projectId, chats: [], updatedAt: now() };
   }
-  if (modelConfig) {
-    nextFiles[PROJECT_MODEL_CONFIG_FILE] = stringifyJson(modelConfig);
-  }
-
-  writeProjectChatStorageFiles(projectId, nextFiles, message);
+  return JSON.parse(content) as ProjectChatList;
 }
 
-export async function listProjectChats(projectId: string, options?: { archived?: boolean }) {
-  const files = await readProjectChatStorageFiles(projectId);
-  const index = readProjectChatIndexFromFiles(projectId, files);
+function readProjectChatModelConfig(projectId: string): ProjectChatModelConfig | null {
+  const content = readProjectChatFile(projectId, "model-config.json");
+  if (!content) return null;
+  const parsed = JSON.parse(content) as ProjectChatModelConfig;
+  try {
+    return resolveProjectChatModelSelection(parsed).modelConfig;
+  } catch {
+    return null;
+  }
+}
+
+function ensureProjectChatModelConfig(projectId: string): ProjectChatModelConfig {
+  return readProjectChatModelConfig(projectId) ?? resolveDefaultProjectChatModelConfig();
+}
+
+export async function listProjectChats(
+  projectId: string,
+  options?: { archived?: boolean },
+): Promise<ProjectChatInfo[]> {
+  const chatList = readProjectChatList(projectId);
   const archived = options?.archived;
 
-  return index.chats
-    .filter((chat) =>
-      archived == null ? true : archived ? chat.archivedAt != null : chat.archivedAt == null,
+  const filtered = chatList.chats
+    .filter((entry) =>
+      archived == null ? true : archived ? entry.archivedAt != null : entry.archivedAt == null,
     )
     .sort((left, right) => right.updatedAt - left.updatedAt);
-}
 
-export async function getProjectChat(projectId: string, chatId: string) {
-  const files = await readProjectChatStorageFiles(projectId);
-  const index = readProjectChatIndexFromFiles(projectId, files);
-  return index.chats.find((chat) => chat.id === chatId) ?? null;
-}
-
-export async function getProjectChatIndex(projectId: string) {
-  const files = await readProjectChatStorageFiles(projectId);
-  return readProjectChatIndexFromFiles(projectId, files);
-}
-
-export async function getProjectChatMessages(projectId: string, chatId: string) {
-  const files = await readProjectChatStorageFiles(projectId);
-  const content = files[`${chatId}.jsonl`] ?? "";
-  if (!content.trim()) {
-    return [] as StoredProjectChatMessage[];
+  // Read per-chat files for full metadata (modelConfig is not in the lightweight index)
+  const results: ProjectChatInfo[] = [];
+  for (const entry of filtered) {
+    const chatJson = readProjectChatFile(projectId, `chats/${entry.id}.json`);
+    if (chatJson) {
+      results.push(JSON.parse(chatJson) as ProjectChatInfo);
+    }
   }
+  return results;
+}
+
+export async function getProjectChat(
+  projectId: string,
+  chatId: string,
+): Promise<ProjectChatInfo | null> {
+  const content = readProjectChatFile(projectId, `chats/${chatId}.json`);
+  if (!content) return null;
+  return JSON.parse(content) as ProjectChatInfo;
+}
+
+export async function getProjectChatIndex(projectId: string): Promise<ProjectChatList> {
+  return readProjectChatList(projectId);
+}
+
+export async function getProjectChatMessages(
+  projectId: string,
+  chatId: string,
+): Promise<StoredProjectChatMessage[]> {
+  const content = readProjectChatFile(projectId, `messages/${chatId}.jsonl`) ?? "";
+  if (!content.trim()) return [];
   return content
     .split("\n")
     .filter(Boolean)
@@ -175,21 +125,24 @@ export async function writeProjectChatMessages(
   messages: readonly StoredProjectChatMessage[],
   message: string,
 ) {
-  const files = await readProjectChatStorageFiles(projectId);
-  const index = readProjectChatIndexFromFiles(projectId, files);
-  files[`${chatId}.jsonl`] = messages.map((entry) => JSON.stringify(entry)).join("\n");
-  writeProjectChatFiles({
+  patchProjectChatFiles(
     projectId,
-    files,
-    index,
+    {
+      files: {
+        [`messages/${chatId}.jsonl`]: messages.map((entry) => JSON.stringify(entry)).join("\n"),
+      },
+    },
     message,
-  });
+  );
 }
 
-export async function getProjectChatPathState(projectId: string, chatId: string) {
-  const files = await readProjectChatStorageFiles(projectId);
-  const state = readProjectChatStateFromFiles(files);
-  return normalizeProjectChatPathState(state.chats[chatId]);
+export async function getProjectChatPathState(
+  projectId: string,
+  chatId: string,
+): Promise<ProjectChatPathState> {
+  const content = readProjectChatFile(projectId, `state/${chatId}.json`);
+  if (!content) return { selectedChildIdByParentId: {} };
+  return JSON.parse(content) as ProjectChatPathState;
 }
 
 export async function selectProjectChatMessageChild(
@@ -198,57 +151,43 @@ export async function selectProjectChatMessageChild(
   parentMessageId: string | null,
   childMessageId: string,
 ) {
-  const files = await readProjectChatStorageFiles(projectId);
-  const index = readProjectChatIndexFromFiles(projectId, files);
-  const state = readProjectChatStateFromFiles(files);
-  state.chats[chatId] = selectProjectChatChild(
-    normalizeProjectChatPathState(state.chats[chatId]),
-    parentMessageId,
-    childMessageId,
-  );
-  state.updatedAt = now();
-  writeProjectChatFiles({
+  const state = await getProjectChatPathState(projectId, chatId);
+  const nextState = selectProjectChatChild(state, parentMessageId, childMessageId);
+  patchProjectChatFiles(
     projectId,
-    files,
-    index,
-    state,
-    message: `Select AI chat branch ${chatId}`,
-  });
-  return state.chats[chatId];
-}
-
-function ensureProjectChatModelConfig(files: ProjectChatStorageFiles) {
-  const stored = readProjectChatModelConfigFromFiles(files);
-  if (stored) {
-    return resolveProjectChatModelSelection(stored).modelConfig;
-  }
-  return resolveDefaultProjectChatModelConfig();
+    {
+      files: {
+        [`state/${chatId}.json`]: stringifyJson(nextState),
+      },
+    },
+    `Select AI chat branch ${chatId}`,
+  );
+  return nextState;
 }
 
 export async function getProjectChatDefaultModelConfig(projectId: string) {
-  const files = await readProjectChatStorageFiles(projectId);
-  return ensureProjectChatModelConfig(files);
+  return ensureProjectChatModelConfig(projectId);
 }
 
 export async function updateProjectChatDefaultModelConfig(
   projectId: string,
   updates: Partial<ProjectChatModelConfig>,
 ) {
-  const files = await readProjectChatStorageFiles(projectId);
-  const index = readProjectChatIndexFromFiles(projectId, files);
-  const baseConfig = ensureProjectChatModelConfig(files);
+  const baseConfig = ensureProjectChatModelConfig(projectId);
   const nextConfig = resolveProjectChatModelSelection({
     ...baseConfig,
     ...updates,
   }).modelConfig;
 
-  writeProjectChatFiles({
+  patchProjectChatFiles(
     projectId,
-    files,
-    index,
-    modelConfig: nextConfig,
-    message: "Update AI chat default model config",
-  });
+    {
+      files: {
+        "model-config.json": stringifyJson(nextConfig),
+      },
+    },
+    "Update AI chat default model config",
+  );
   return nextConfig;
 }
 
@@ -259,38 +198,44 @@ export async function createProjectChat(
     modelConfig?: ProjectChatModelConfig;
   },
 ) {
-  const files = await readProjectChatStorageFiles(projectId);
-  const index = readProjectChatIndexFromFiles(projectId, files);
-  const state = readProjectChatStateFromFiles(files);
+  const chatList = readProjectChatList(projectId);
   const timestamp = now();
   const chatId = createId("chat");
-  const existingCount = index.chats.length;
+  const existingCount = chatList.chats.length;
   const resolvedModelConfig = resolveProjectChatModelSelection(
-    options?.modelConfig ?? ensureProjectChatModelConfig(files),
+    options?.modelConfig ?? ensureProjectChatModelConfig(projectId),
   ).modelConfig;
+
   const chat: ProjectChatInfo = {
     id: chatId,
-    title: options?.title?.trim() || `新会话 ${existingCount + 1}`,
+    title: options?.title?.trim() || `\u65b0\u4f1a\u8bdd ${existingCount + 1}`,
     createdAt: timestamp,
     updatedAt: timestamp,
     archivedAt: null,
     modelConfig: resolvedModelConfig,
   };
 
-  index.chats.push(chat);
-  index.updatedAt = timestamp;
-  state.chats[chatId] = normalizeProjectChatPathState(state.chats[chatId]);
-  state.updatedAt = timestamp;
-  files[`${chatId}.jsonl`] = "";
-
-  writeProjectChatFiles({
-    projectId,
-    files,
-    index,
-    state,
-    modelConfig: readProjectChatModelConfigFromFiles(files) ?? ensureProjectChatModelConfig(files),
-    message: `Create AI chat ${chatId}`,
+  chatList.chats.push({
+    id: chatId,
+    title: chat.title,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    archivedAt: null,
   });
+  chatList.updatedAt = timestamp;
+
+  patchProjectChatFiles(
+    projectId,
+    {
+      files: {
+        "chat-list.json": stringifyJson(chatList),
+        [`chats/${chatId}.json`]: stringifyJson(chat),
+        [`state/${chatId}.json`]: stringifyJson({ selectedChildIdByParentId: {} }),
+        [`messages/${chatId}.jsonl`]: "",
+      },
+    },
+    `Create AI chat ${chatId}`,
+  );
   return chat;
 }
 
@@ -299,12 +244,10 @@ export async function updateProjectChat(
   chatId: string,
   updates: Partial<Pick<ProjectChatInfo, "title" | "archivedAt" | "modelConfig" | "updatedAt">>,
 ) {
-  const files = await readProjectChatStorageFiles(projectId);
-  const index = readProjectChatIndexFromFiles(projectId, files);
-  const chatIndex = index.chats.findIndex((chat) => chat.id === chatId);
-  invariant(chatIndex >= 0, "未找到会话。");
+  const chatJson = readProjectChatFile(projectId, `chats/${chatId}.json`);
+  invariant(chatJson, "\u672a\u627e\u5230\u4f1a\u8bdd\u3002");
 
-  const existing = index.chats[chatIndex]!;
+  const existing = JSON.parse(chatJson) as ProjectChatInfo;
   const nextChat: ProjectChatInfo = {
     ...existing,
     ...(updates.title != null ? { title: updates.title.trim() || existing.title } : {}),
@@ -315,15 +258,30 @@ export async function updateProjectChat(
     updatedAt: updates.updatedAt ?? now(),
   };
 
-  index.chats[chatIndex] = nextChat;
-  index.updatedAt = now();
+  // Update chat-list.json entry too
+  const chatList = readProjectChatList(projectId);
+  const listIndex = chatList.chats.findIndex((entry) => entry.id === chatId);
+  if (listIndex >= 0) {
+    chatList.chats[listIndex] = {
+      id: nextChat.id,
+      title: nextChat.title,
+      createdAt: nextChat.createdAt,
+      updatedAt: nextChat.updatedAt,
+      archivedAt: nextChat.archivedAt,
+    };
+    chatList.updatedAt = now();
+  }
 
-  writeProjectChatFiles({
+  patchProjectChatFiles(
     projectId,
-    files,
-    index,
-    message: `Update AI chat ${chatId}`,
-  });
+    {
+      files: {
+        "chat-list.json": stringifyJson(chatList),
+        [`chats/${chatId}.json`]: stringifyJson(nextChat),
+      },
+    },
+    `Update AI chat ${chatId}`,
+  );
   return nextChat;
 }
 
@@ -334,41 +292,35 @@ export async function archiveProjectChat(projectId: string, chatId: string, arch
 }
 
 export async function deleteProjectChat(projectId: string, chatId: string) {
-  const files = await readProjectChatStorageFiles(projectId);
-  const index = readProjectChatIndexFromFiles(projectId, files);
-  const state = readProjectChatStateFromFiles(files);
-  invariant(
-    index.chats.some((chat) => chat.id === chatId),
-    "未找到会话。",
-  );
+  const chatList = readProjectChatList(projectId);
+  const entry = chatList.chats.find((e) => e.id === chatId);
+  invariant(entry, "\u672a\u627e\u5230\u4f1a\u8bdd\u3002");
 
-  index.chats = index.chats.filter((chat) => chat.id !== chatId);
-  index.updatedAt = now();
-  delete files[`${chatId}.jsonl`];
-  delete state.chats[chatId];
-  state.updatedAt = now();
+  chatList.chats = chatList.chats.filter((e) => e.id !== chatId);
+  chatList.updatedAt = now();
 
-  writeProjectChatFiles({
+  patchProjectChatFiles(
     projectId,
-    files,
-    index,
-    state,
-    message: `Delete AI chat ${chatId}`,
-  });
+    {
+      files: {
+        "chat-list.json": stringifyJson(chatList),
+      },
+      filesToDelete: [`chats/${chatId}.json`, `state/${chatId}.json`, `messages/${chatId}.jsonl`],
+    },
+    `Delete AI chat ${chatId}`,
+  );
 }
 
 export async function getProjectChatDetail(
   projectId: string,
   chatId: string,
 ): Promise<ProjectChatDetail> {
-  const files = await readProjectChatStorageFiles(projectId);
-  const index = readProjectChatIndexFromFiles(projectId, files);
-  const state = readProjectChatStateFromFiles(files);
-  const chat = index.chats.find((entry) => entry.id === chatId);
-  invariant(chat, "未找到会话。");
+  const chatJson = readProjectChatFile(projectId, `chats/${chatId}.json`);
+  invariant(chatJson, "\u672a\u627e\u5230\u4f1a\u8bdd\u3002");
+  const chat = JSON.parse(chatJson) as ProjectChatInfo;
 
   const messages = await getProjectChatMessages(projectId, chatId);
-  const chatState = normalizeProjectChatPathState(state.chats[chatId]);
+  const chatState = await getProjectChatPathState(projectId, chatId);
   const visibleMessages = resolveVisibleProjectChatPath(messages, chatState);
 
   return {
