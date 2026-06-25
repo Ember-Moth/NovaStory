@@ -66,7 +66,7 @@ export function useCreateBranchFeature() {
           fromCommitId: sourceCommitId,
         });
         dialogControls.closeDialog();
-        navigateToBranch(workspace.id);
+        navigateToBranch(workspace.name);
       } catch (mutationError) {
         setNewBranchError(
           mutationError instanceof Error ? mutationError.message : "创建分支失败，请稍后重试。",

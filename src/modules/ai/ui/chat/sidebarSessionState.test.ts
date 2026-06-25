@@ -7,11 +7,9 @@ test("resolveSidebarActiveChat keeps the current active chat when it remains vis
     resolveSidebarActiveChat({
       activeChatId: "chat_b",
       visibleChatIds: ["chat_a", "chat_b"],
-      canAutoCreateWhenEmpty: true,
     }),
   ).toEqual({
     nextActiveChatId: "chat_b",
-    shouldAutoCreate: false,
   });
 });
 
@@ -20,11 +18,9 @@ test("resolveSidebarActiveChat falls back to the first visible chat when the act
     resolveSidebarActiveChat({
       activeChatId: "archived_chat",
       visibleChatIds: ["chat_a", "chat_b"],
-      canAutoCreateWhenEmpty: false,
     }),
   ).toEqual({
     nextActiveChatId: "chat_a",
-    shouldAutoCreate: false,
   });
 });
 
@@ -33,23 +29,19 @@ test("resolveSidebarActiveChat does not auto-create when hiding archived leaves 
     resolveSidebarActiveChat({
       activeChatId: "archived_chat",
       visibleChatIds: [],
-      canAutoCreateWhenEmpty: false,
     }),
   ).toEqual({
     nextActiveChatId: null,
-    shouldAutoCreate: false,
   });
 });
 
-test("resolveSidebarActiveChat auto-creates only when the initial empty state allows it", () => {
+test("resolveSidebarActiveChat returns null when both active and visible are empty", () => {
   expect(
     resolveSidebarActiveChat({
       activeChatId: null,
       visibleChatIds: [],
-      canAutoCreateWhenEmpty: true,
     }),
   ).toEqual({
     nextActiveChatId: null,
-    shouldAutoCreate: true,
   });
 });

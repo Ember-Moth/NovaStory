@@ -70,7 +70,7 @@ export function useForkBranchFeature() {
           fromCommitId: forkCommit.id,
         });
         dialogControls.closeDialog();
-        navigateToBranch(workspace.id);
+        navigateToBranch(workspace.name);
       } catch (mutationError) {
         setForkBranchError(
           mutationError instanceof Error ? mutationError.message : "Fork 分支失败，请稍后重试。",

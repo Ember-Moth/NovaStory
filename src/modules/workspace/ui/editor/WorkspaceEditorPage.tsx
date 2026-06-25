@@ -161,7 +161,7 @@ function ProjectWorkspace({
       if (
         current?.projectId === workspaceDetail.projectId &&
         current.workspaceId === workspaceDetail.id &&
-        current.branchId === workspaceDetail.branchId
+        current.branchId === workspaceDetail.branchName
       ) {
         return current;
       }
@@ -169,7 +169,7 @@ function ProjectWorkspace({
       return {
         projectId: workspaceDetail.projectId,
         workspaceId: workspaceDetail.id,
-        branchId: workspaceDetail.branchId,
+        branchId: workspaceDetail.branchName,
       };
     });
   }, [projectId, setLastWorkspaceRoute, workspaceDetail, workspaceId]);
