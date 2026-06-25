@@ -288,15 +288,6 @@ function ensureEmptyTree(repo: FileRepository): SHA1 {
   return repo.createTree([]);
 }
 
-function ensureObjectSubdirs(gitdir: string) {
-  const objectsDir = path.join(gitdir, "objects");
-  fs.mkdirSync(path.join(objectsDir, "pack"), { recursive: true });
-  for (let i = 0; i < 256; i++) {
-    const sub = i.toString(16).padStart(2, "0");
-    fs.mkdirSync(path.join(objectsDir, sub), { recursive: true });
-  }
-}
-
 /**
  * 获取或初始化项目的 bare git repository。
  * Repository 实例将被缓存，同一 projectId 返回同一实例。
@@ -315,7 +306,6 @@ export function getOrInitRepo(projectId: string): FileRepository {
     return openRepository(gitdir);
   })();
 
-  ensureObjectSubdirs(gitdir);
   ensureEmptyTree(repo);
   repoCache.set(projectId, repo);
   return repo;
