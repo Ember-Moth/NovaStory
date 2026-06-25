@@ -6,16 +6,11 @@ import { openSqliteVirtualWorkdir, deleteSqliteVirtualWorkdir } from "nano-git/w
 import { readTree } from "nano-git/repository/tree/tree-walk";
 import { patchTree } from "nano-git/repository/tree/tree-patch";
 import { walkLogEntries } from "nano-git/log";
-import type { GitAuthor, GitCommit, SHA1, TreeEntry, FileRepository } from "nano-git";
+import type { GitCommit, SHA1, TreeEntry, FileRepository } from "nano-git";
 import type { VirtualDiffEntry, VirtualWorkdir } from "nano-git/workdir/core";
 
 import { getProjectRepoGitDir } from "./paths";
 import type { WorkingTreeStatus } from "@/modules/workspace/domain/types";
-
-const AUTHOR = {
-  name: "NovelEvolver",
-  email: "noreply@novel-evolver.local",
-};
 
 export function branchRef(branchId: string) {
   return `refs/heads/branch/${branchId}`;
@@ -186,26 +181,15 @@ export async function commitCustomRef(input: {
   }));
 
   const { rootHash } = patchTree(repo.objects, base, ops);
-  const timestamp = Math.floor(Date.now() / 1000);
-  const author: GitAuthor = {
-    name: AUTHOR.name,
-    email: AUTHOR.email,
-    timestamp,
-    timezone: "+0000",
-  };
-  const commitHash = repo.createCommit(rootHash, previous ? [previous] : [], input.message, author);
-  repo.updateRef(input.ref, commitHash);
-  return commitHash as string;
+  repo.updateRef(input.ref, rootHash);
+  return rootHash as string;
 }
 
 export async function readFileAtRef(input: { projectId: string; ref: string; filepath: string }) {
   const repo = getOrInitRepo(input.projectId);
   const oid = repo.readRef(input.ref);
   if (!oid) throw new Error(`Ref not found: ${input.ref}`);
-  const commit = repo.catFile(oid);
-  if (commit.type !== "commit")
-    throw new Error(`Expected commit at ${input.ref}, got ${commit.type}`);
-  const entries = readTree(repo.objects, commit.tree);
+  const entries = readTree(repo.objects, oid as SHA1);
   const entry = entries.find((e) => e.path === input.filepath);
   if (!entry) throw new Error(`File not found: ${input.filepath}`);
   const obj = repo.catFile(entry.hash);
@@ -217,9 +201,7 @@ export async function readFilesAtRef(input: { projectId: string; ref: string }) 
   const repo = getOrInitRepo(input.projectId);
   const oid = repo.readRef(input.ref);
   if (!oid) return {};
-  const commit = repo.catFile(oid);
-  if (commit.type !== "commit") return {};
-  return readTreeFiles(repo, commit.tree);
+  return readTreeFiles(repo, oid as SHA1);
 }
 
 export async function readFilesAtCommit(input: { projectId: string; commitId: string }) {
