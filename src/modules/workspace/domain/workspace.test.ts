@@ -7,7 +7,7 @@ import * as service from "./index";
 type ExportedAuxNode = Awaited<ReturnType<typeof service.exportAuxSnapshotTree>>["nodes"][number];
 
 async function seedProject(projectId: string) {
-  await seedProjectRecord(projectId);
+  seedProjectRecord(projectId);
   if (!(await service.getDefaultWorkspace(projectId))) {
     await service.createDefaultWorkspace(projectId);
   }

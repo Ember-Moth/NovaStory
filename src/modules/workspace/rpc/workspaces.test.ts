@@ -9,7 +9,7 @@ const requestCtx = { req: new Request("http://localhost/api/rpc") } as unknown a
 >[1];
 
 async function seedProject(projectId: string) {
-  await seedProjectRecord(projectId);
+  seedProjectRecord(projectId);
   if (!(await service.getDefaultWorkspace(projectId))) {
     await service.createDefaultWorkspace(projectId);
   }

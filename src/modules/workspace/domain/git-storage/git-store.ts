@@ -20,7 +20,7 @@ export function metaRef() {
   return `refs/novel-evolver/meta`;
 }
 
-export async function ensureProjectRepo(projectId: string) {
+export function ensureProjectRepo(projectId: string) {
   // Delegated to getOrInitRepo — kept for backward compat
   getOrInitRepo(projectId);
   return getProjectRepoGitDir(projectId);
@@ -76,12 +76,12 @@ function readTreeFiles(repo: FileRepository, treeOid: SHA1): Record<string, stri
   return files;
 }
 
-export async function writeRef(input: { projectId: string; ref: string; value: SHA1 }) {
+export function writeRef(input: { projectId: string; ref: string; value: SHA1 }) {
   const repo = getOrInitRepo(input.projectId);
   repo.updateRef(input.ref, input.value);
 }
 
-export async function deleteRef(input: { projectId: string; ref: string }) {
+export function deleteRef(input: { projectId: string; ref: string }) {
   const repo = getOrInitRepo(input.projectId);
   // nano-git RefStore.delete throws if ref doesn't exist, so we catch
   try {
@@ -91,28 +91,25 @@ export async function deleteRef(input: { projectId: string; ref: string }) {
   }
 }
 
-export async function writeTreeAtRef(input: {
+export function writeTreeAtRef(input: {
   projectId: string;
   ref: string;
   files: Record<string, string>;
-}): Promise<SHA1> {
+}): SHA1 {
   const repo = getOrInitRepo(input.projectId);
   const tree = writeTreeFromFiles(repo, input.files);
   repo.updateRef(input.ref, tree);
   return tree;
 }
 
-export async function readTreeAtRef(input: {
-  projectId: string;
-  ref: string;
-}): Promise<Record<string, string>> {
+export function readTreeAtRef(input: { projectId: string; ref: string }): Record<string, string> {
   const repo = getOrInitRepo(input.projectId);
   const oid = repo.readRef(input.ref);
   if (!oid) return {};
   return readTreeFiles(repo, oid);
 }
 
-export async function commitCustomRef(input: {
+export function commitCustomRef(input: {
   projectId: string;
   ref: string;
   files: Record<string, string>;
@@ -136,7 +133,7 @@ export async function commitCustomRef(input: {
   return rootHash;
 }
 
-export async function readFileAtRef(input: { projectId: string; ref: string; filepath: string }) {
+export function readFileAtRef(input: { projectId: string; ref: string; filepath: string }) {
   const repo = getOrInitRepo(input.projectId);
   const oid = repo.readRef(input.ref);
   if (!oid) throw new Error(`Ref not found: ${input.ref}`);
@@ -148,34 +145,34 @@ export async function readFileAtRef(input: { projectId: string; ref: string; fil
   return obj.content.toString("utf8");
 }
 
-export async function readFilesAtRef(input: { projectId: string; ref: string }) {
+export function readFilesAtRef(input: { projectId: string; ref: string }) {
   const repo = getOrInitRepo(input.projectId);
   const oid = repo.readRef(input.ref);
   if (!oid) return {};
   return readTreeFiles(repo, oid);
 }
 
-export async function readFilesAtCommit(input: { projectId: string; commitId: SHA1 }) {
+export function readFilesAtCommit(input: { projectId: string; commitId: SHA1 }) {
   const repo = getOrInitRepo(input.projectId);
   const commit = repo.catFile(input.commitId);
   if (commit.type !== "commit") return {};
   return readTreeFiles(repo, commit.tree);
 }
 
-export async function readCommit(projectId: string, oid: SHA1) {
+export function readCommit(projectId: string, oid: SHA1) {
   const repo = getOrInitRepo(projectId);
   const obj = repo.catFile(oid);
   if (obj.type !== "commit") throw new Error(`Expected commit, got ${obj.type}`);
   return obj;
 }
 
-export async function touchProjectRepo(projectId: string) {
+export function touchProjectRepo(projectId: string) {
   const gitdir = getProjectRepoGitDir(projectId);
   const now = new Date();
-  await fs.promises.utimes(gitdir, now, now);
+  fs.utimesSync(gitdir, now, now);
 }
 
-export async function resolveRef(projectId: string, ref: string) {
+export function resolveRef(projectId: string, ref: string) {
   const repo = getOrInitRepo(projectId);
   return repo.readRef(ref);
 }
@@ -189,7 +186,7 @@ export function listBranchNames(projectId: string): string[] {
     .sort();
 }
 
-export async function listLog(input: { projectId: string; ref: string; depth?: number }) {
+export function listLog(input: { projectId: string; ref: string; depth?: number }) {
   const repo = getOrInitRepo(input.projectId);
   const head = repo.readRef(input.ref);
   if (!head) return [];

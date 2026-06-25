@@ -17,7 +17,7 @@ const requestCtx = { req: new Request("http://localhost/api/rpc") } as unknown a
 >[1];
 
 async function seedProject(projectId: string) {
-  await seedProjectRecord(projectId);
+  seedProjectRecord(projectId);
   if (!(await workspaceService.getDefaultWorkspace(projectId))) {
     await workspaceService.createDefaultWorkspace(projectId);
   }
@@ -33,10 +33,10 @@ async function projectIndexCounts() {
   return {
     projects: rows.length,
     branches: (
-      await Promise.all(rows.map(async (project) => (await listBranches(project.id)).length))
+      await Promise.all(rows.map(async (project) => listBranches(project.id).length))
     ).reduce((a, b) => a + b, 0),
     workspaces: (
-      await Promise.all(rows.map(async (project) => (await listBranches(project.id)).length))
+      await Promise.all(rows.map(async (project) => listBranches(project.id).length))
     ).reduce((a, b) => a + b, 0),
   };
 }

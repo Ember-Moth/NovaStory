@@ -71,7 +71,7 @@ function message(id: string, parentMessageId: string | null): StoredProjectChatM
 }
 
 test("project chat storage persists messages and branch selection under git custom refs", async () => {
-  await seedProjectRecord("project_chat_storage");
+  seedProjectRecord("project_chat_storage");
   const modelConfig = seedModelSelection();
   const chat = await createProjectChat("project_chat_storage", {
     modelConfig,

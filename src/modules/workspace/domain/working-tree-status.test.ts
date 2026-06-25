@@ -5,7 +5,7 @@ import { seedProjectRecord } from "@/test/project";
 import * as service from "./index";
 
 async function seedProject(projectId: string) {
-  await seedProjectRecord(projectId);
+  seedProjectRecord(projectId);
   if (!(await service.getDefaultWorkspace(projectId))) {
     await service.createDefaultWorkspace(projectId);
   }

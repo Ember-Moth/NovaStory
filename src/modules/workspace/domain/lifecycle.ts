@@ -27,31 +27,28 @@ function branchToWorkspaceRow(projectId: string, branch: { name: string }): Work
 // 对外桥接 API（保持与 RPC / UI / AI 层的兼容）
 // ---------------------------------------------------------------------------
 
-export async function getWorkspace(projectId: string, workspaceId: string): Promise<WorkspaceRow> {
-  const branch = await getBranch(projectId, workspaceId);
+export function getWorkspace(projectId: string, workspaceId: string): WorkspaceRow {
+  const branch = getBranch(projectId, workspaceId);
   return branchToWorkspaceRow(projectId, branch);
 }
 
-export async function getWorkspaceForBranchId(
-  projectId: string,
-  branchId: string,
-): Promise<WorkspaceRow | null> {
+export function getWorkspaceForBranchId(projectId: string, branchId: string): WorkspaceRow | null {
   try {
-    return await getWorkspace(projectId, branchId);
+    return getWorkspace(projectId, branchId);
   } catch {
     return null;
   }
 }
 
-export async function listWorkspaces(projectId: string): Promise<WorkspaceRow[]> {
-  const branches = await listBranches(projectId);
+export function listWorkspaces(projectId: string): WorkspaceRow[] {
+  const branches = listBranches(projectId);
   return branches.map((b) => branchToWorkspaceRow(projectId, b));
 }
 
 export async function getDefaultWorkspace(projectId: string): Promise<WorkspaceRow | undefined> {
   const project = (await readProjectMeta(projectId)).project;
   if (!project.defaultBranchName) return undefined;
-  return (await getWorkspaceForBranchId(projectId, project.defaultBranchName)) ?? undefined;
+  return getWorkspaceForBranchId(projectId, project.defaultBranchName) ?? undefined;
 }
 
 export async function createDefaultWorkspace(projectId: string, name = "main") {
@@ -63,7 +60,7 @@ export async function createDefaultWorkspace(projectId: string, name = "main") {
       defaultBranchName: branch.name,
     },
   }));
-  return await getWorkspace(projectId, branch.name);
+  return getWorkspace(projectId, branch.name);
 }
 
 export async function createBranchWorkspace(input: {
@@ -72,13 +69,13 @@ export async function createBranchWorkspace(input: {
   fromCommitId?: string | null;
 }) {
   const branch = await createBranch(input);
-  return await getWorkspace(input.projectId, branch.name);
+  return getWorkspace(input.projectId, branch.name);
 }
 
-export async function touchWorkspaceMeta(projectId: string, _workspaceId: string) {
-  await touchProjectMeta(projectId);
+export function touchWorkspaceMeta(projectId: string, _workspaceId: string) {
+  touchProjectMeta(projectId);
 }
 
-export async function touchProjectMeta(projectId: string) {
-  await touchProjectRepo(projectId);
+export function touchProjectMeta(projectId: string) {
+  touchProjectRepo(projectId);
 }

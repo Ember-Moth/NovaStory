@@ -73,7 +73,7 @@ export const composeWritingContext = query<
 export const revert = mutation<Parameters<typeof revertContentChange>[0], void, RpcTagList>(
   async (input, ctx) => {
     await revertContentChange(input);
-    const workspace = await getWorkspaceForBranchId(input.projectId, input.branchId);
+    const workspace = getWorkspaceForBranchId(input.projectId, input.branchId);
     if (workspace) {
       ctx.invalidate(rpcTags.contentTree(workspace.id), rpcTags.commitHistory(input.branchId));
     }

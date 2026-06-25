@@ -10,7 +10,7 @@ const requestCtx = { req: new Request("http://localhost/api/rpc") } as unknown a
 >[1];
 
 async function seedProject(projectId: string) {
-  await seedProjectRecord(projectId);
+  seedProjectRecord(projectId);
   if (!(await service.getDefaultWorkspace(projectId))) {
     await service.createDefaultWorkspace(projectId);
   }
@@ -91,9 +91,9 @@ test("deleting a branch invalidates branch, workspace, and project tags", async 
     rpcTags.project("rpc_branch_delete"),
     rpcTags.projectsList(),
   ]);
-  await expect(
-    service.getWorkspace(featureWorkspace.projectId, featureWorkspace.id),
-  ).rejects.toThrow("未找到分支");
+  expect(() => service.getWorkspace(featureWorkspace.projectId, featureWorkspace.id)).toThrow(
+    "未找到分支",
+  );
 });
 
 test("commit create invalidates history and branch tags", async () => {

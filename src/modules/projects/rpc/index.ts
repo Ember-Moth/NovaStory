@@ -31,7 +31,7 @@ export const get = query<{ projectId: string }, ProjectRow, RpcTagList>({
 export const create = mutation<ProjectMutationInput, { workspaceId: string }, RpcTagList>({
   invalidate: (input) => [rpcTags.projectsList(), rpcTags.project(input.id)],
   handler: async (input) => {
-    await createProjectMeta({
+    createProjectMeta({
       id: input.id,
       name: input.name,
       description: input.description ?? null,
@@ -61,7 +61,7 @@ export const setDefaultBranch = mutation<{ projectId: string; branchId: string }
   {
     invalidate: ({ projectId }) => [rpcTags.projectsList(), rpcTags.project(projectId)],
     handler: async ({ projectId, branchId }) => {
-      const branch = await getBranch(projectId, branchId);
+      const branch = getBranch(projectId, branchId);
 
       await updateProjectMeta(projectId, (current) => ({
         ...current,

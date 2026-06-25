@@ -55,7 +55,7 @@ function resolveWorkdir(projectId: string, workspaceId: string) {
 }
 
 async function touchWorkspace(projectId: string, workspaceId: string) {
-  await touchWorkspaceMeta(projectId, workspaceId);
+  touchWorkspaceMeta(projectId, workspaceId);
 }
 
 export function normalizeTimelinePointId(pointId: TimelinePointRef) {

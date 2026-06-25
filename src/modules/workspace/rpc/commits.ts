@@ -16,11 +16,11 @@ import { rpcTags, type RpcTagList } from "@/rpc/tags";
 
 export const history = query<
   { projectId: string; branchId: string },
-  Awaited<ReturnType<typeof listCommits>>,
+  ReturnType<typeof listCommits>,
   RpcTagList
 >({
   watch: ({ branchId }) => [rpcTags.commitHistory(branchId)],
-  handler: async ({ projectId, branchId }) => await listCommits(projectId, branchId),
+  handler: ({ projectId, branchId }) => listCommits(projectId, branchId),
 });
 
 export const workingTreeStatus = query<
@@ -30,7 +30,7 @@ export const workingTreeStatus = query<
 >({
   handler: async ({ projectId, branchId }, ctx) => {
     ctx.watch(rpcTags.branch(branchId), rpcTags.commitHistory(branchId));
-    const workspace = await getWorkspaceForBranchId(projectId, branchId);
+    const workspace = getWorkspaceForBranchId(projectId, branchId);
     if (workspace) {
       ctx.watch(
         rpcTags.contentTree(workspace.id),
@@ -74,7 +74,7 @@ export const create = mutation<
   RpcTagList
 >(async (input, ctx) => {
   const commit = await createCommit(input);
-  const branch = await getBranch(input.projectId, input.branchId);
+  const branch = getBranch(input.projectId, input.branchId);
   ctx.invalidate(
     rpcTags.commitHistory(input.branchId),
     rpcTags.branch(input.branchId),
@@ -92,7 +92,7 @@ export const checkout = mutation<
   RpcTagList
 >(async (input, ctx) => {
   const commit = await checkoutCommit({ ...input, commitId: input.commitId as SHA1 });
-  const workspace = await getWorkspace(input.projectId, input.workspaceId);
+  const workspace = getWorkspace(input.projectId, input.workspaceId);
   ctx.invalidate(
     rpcTags.workspace(workspace.id),
     rpcTags.contentTree(workspace.id),

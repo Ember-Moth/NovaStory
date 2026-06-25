@@ -375,9 +375,9 @@ export async function getWorkingTreeStatus(
   projectId: string,
   branchId: string,
 ): Promise<WorkingTreeStatus> {
-  const branch = await getBranch(projectId, branchId);
-  const headCommitId = await getBranchHeadCommitId(projectId, branch.name);
-  const workspace = await getWorkspaceForBranchId(projectId, branch.name);
+  const branch = getBranch(projectId, branchId);
+  const headCommitId = getBranchHeadCommitId(projectId, branch.name);
+  const workspace = getWorkspaceForBranchId(projectId, branch.name);
   if (!workspace) {
     return emptyStatus(headCommitId);
   }
@@ -411,7 +411,7 @@ async function getWorkingTreeStatusFromWorkdir(
 ): Promise<WorkingTreeStatus> {
   const state = readWorktreeStateFromWorkdir(workdir);
   const headFiles = headCommitId
-    ? await readFilesAtCommit({ projectId, commitId: headCommitId as SHA1 })
+    ? readFilesAtCommit({ projectId, commitId: headCommitId as SHA1 })
     : {};
   const headState = headCommitId
     ? readWorktreeStateFromFiles(headFiles)

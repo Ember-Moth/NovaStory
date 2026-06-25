@@ -36,7 +36,7 @@ function parsePayload(files: Record<string, string>): ProjectMetaPayload {
 
 export async function tryReadProjectMeta(projectId: string): Promise<ProjectMetaPayload | null> {
   try {
-    const payload = parsePayload(await readTreeAtRef({ projectId, ref: metaRef() }));
+    const payload = parsePayload(readTreeAtRef({ projectId, ref: metaRef() }));
     const gitdir = getProjectRepoGitDir(projectId);
     const stat = await fs.promises.stat(gitdir);
     payload.project.updatedAt = stat.mtime.getTime();
@@ -82,22 +82,22 @@ export async function listProjectRows() {
   return meta.map((payload) => payload.project);
 }
 
-export async function writeProjectMeta(payload: ProjectMetaPayload) {
+export function writeProjectMeta(payload: ProjectMetaPayload) {
   const normalized = normalizePayload(payload);
   const { updatedAt: _, ...storableProject } = normalized.project;
-  await writeTreeAtRef({
+  writeTreeAtRef({
     projectId: normalized.project.id,
     ref: metaRef(),
     files: {
       "project.json": `${JSON.stringify(storableProject, null, 2)}\n`,
     },
   });
-  await touchProjectRepo(normalized.project.id);
+  touchProjectRepo(normalized.project.id);
   return normalized;
 }
 
-export async function createProjectMeta(project: ProjectIndexRow) {
-  return await writeProjectMeta({ project });
+export function createProjectMeta(project: ProjectIndexRow) {
+  return writeProjectMeta({ project });
 }
 
 export async function updateProjectMeta(
@@ -107,5 +107,5 @@ export async function updateProjectMeta(
   const payload = await readProjectMeta(projectId);
   const next = updater(payload);
   invariant(next.project.id === projectId, "项目 ID 不可变。");
-  return await writeProjectMeta(next);
+  return writeProjectMeta(next);
 }

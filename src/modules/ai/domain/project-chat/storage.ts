@@ -32,18 +32,18 @@ async function readProjectChatStorageFiles(projectId: string): Promise<ProjectCh
   await readProjectMeta(projectId);
 
   try {
-    return await readFilesAtRef({ projectId, ref: PROJECT_CHAT_REF });
+    return readFilesAtRef({ projectId, ref: PROJECT_CHAT_REF });
   } catch {
     return {};
   }
 }
 
-async function writeProjectChatStorageFiles(
+function writeProjectChatStorageFiles(
   projectId: string,
   files: ProjectChatStorageFiles,
   message: string,
 ) {
-  await commitCustomRef({
+  commitCustomRef({
     projectId,
     ref: PROJECT_CHAT_REF,
     files,
@@ -104,7 +104,7 @@ function readProjectChatModelConfigFromFiles(
   return parseStoredJson<ProjectChatModelConfig | null>(files[PROJECT_MODEL_CONFIG_FILE], null);
 }
 
-async function writeProjectChatFiles({
+function writeProjectChatFiles({
   projectId,
   files,
   index,
@@ -131,7 +131,7 @@ async function writeProjectChatFiles({
     nextFiles[PROJECT_MODEL_CONFIG_FILE] = stringifyJson(modelConfig);
   }
 
-  await writeProjectChatStorageFiles(projectId, nextFiles, message);
+  writeProjectChatStorageFiles(projectId, nextFiles, message);
 }
 
 export async function listProjectChats(projectId: string, options?: { archived?: boolean }) {
@@ -178,7 +178,7 @@ export async function writeProjectChatMessages(
   const files = await readProjectChatStorageFiles(projectId);
   const index = readProjectChatIndexFromFiles(projectId, files);
   files[`${chatId}.jsonl`] = messages.map((entry) => JSON.stringify(entry)).join("\n");
-  await writeProjectChatFiles({
+  writeProjectChatFiles({
     projectId,
     files,
     index,
@@ -207,7 +207,7 @@ export async function selectProjectChatMessageChild(
     childMessageId,
   );
   state.updatedAt = now();
-  await writeProjectChatFiles({
+  writeProjectChatFiles({
     projectId,
     files,
     index,
@@ -242,7 +242,7 @@ export async function updateProjectChatDefaultModelConfig(
     ...updates,
   }).modelConfig;
 
-  await writeProjectChatFiles({
+  writeProjectChatFiles({
     projectId,
     files,
     index,
@@ -283,7 +283,7 @@ export async function createProjectChat(
   state.updatedAt = timestamp;
   files[`${chatId}.jsonl`] = "";
 
-  await writeProjectChatFiles({
+  writeProjectChatFiles({
     projectId,
     files,
     index,
@@ -318,7 +318,7 @@ export async function updateProjectChat(
   index.chats[chatIndex] = nextChat;
   index.updatedAt = now();
 
-  await writeProjectChatFiles({
+  writeProjectChatFiles({
     projectId,
     files,
     index,
@@ -348,7 +348,7 @@ export async function deleteProjectChat(projectId: string, chatId: string) {
   delete state.chats[chatId];
   state.updatedAt = now();
 
-  await writeProjectChatFiles({
+  writeProjectChatFiles({
     projectId,
     files,
     index,

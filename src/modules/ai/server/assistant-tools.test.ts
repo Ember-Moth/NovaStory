@@ -30,7 +30,7 @@ function createRuntimeContext(
 }
 
 async function seedProject(projectId: string) {
-  await seedProjectRecord(projectId);
+  seedProjectRecord(projectId);
   return await workspaceDomain.createDefaultWorkspace(projectId);
 }
 

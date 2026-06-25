@@ -33,12 +33,12 @@ export async function createCommit(input: {
   author?: string | null;
   extraParents?: Array<{ parentId: string; mergeRole?: "normal" | "mainline" | "merged" }>;
 }) {
-  const branch = await getBranch(input.projectId, input.branchId);
-  const workspace = await getWorkspaceForBranchId(input.projectId, branch.name);
+  const branch = getBranch(input.projectId, input.branchId);
+  const workspace = getWorkspaceForBranchId(input.projectId, branch.name);
   invariant(workspace, "无法提交：该分支没有关联的工作区。");
   const message = input.message.trim();
   invariant(message, "无法提交：提交信息不能为空。");
-  const headCommitId = await getBranchHeadCommitId(input.projectId, branch.name);
+  const headCommitId = getBranchHeadCommitId(input.projectId, branch.name);
   const parents = [
     ...(headCommitId ? [headCommitId] : []),
     ...(input.extraParents?.map((parent) => parent.parentId) ?? []),
@@ -62,7 +62,7 @@ export async function createCommit(input: {
   const commitHash = repo.createCommit(treeHash, parentHashes, input.message, author);
   repo.updateRef(branchRef(branch.name), commitHash);
   wd.reset(treeHash);
-  await touchProjectRepo(branch.projectId);
+  touchProjectRepo(branch.projectId);
   return await getCommit(commitHash as string, branch.projectId);
 }
 
@@ -71,7 +71,7 @@ export async function checkoutCommit(input: {
   workspaceId: string;
   commitId: SHA1;
 }) {
-  const workspace = await getWorkspaceForBranchId(input.projectId, input.workspaceId);
+  const workspace = getWorkspaceForBranchId(input.projectId, input.workspaceId);
   invariant(workspace, "未找到工作区。");
   const repo = getOrInitRepo(input.projectId);
   const commit = repo.catFile(input.commitId);
@@ -87,9 +87,9 @@ export async function checkoutCommit(input: {
 
 export async function getCommit(commitId: string, projectId: string): Promise<CommitRow> {
   const { listBranches } = await import("./branches");
-  const branches = await listBranches(projectId);
+  const branches = listBranches(projectId);
   for (const branch of branches) {
-    const commits = await listLog({ projectId, ref: branchRef(branch.name) });
+    const commits = listLog({ projectId, ref: branchRef(branch.name) });
     const found = commits.find((entry) => entry.oid === commitId);
     if (found) {
       return mapLogEntry(projectId, found);
@@ -98,10 +98,7 @@ export async function getCommit(commitId: string, projectId: string): Promise<Co
   throw new Error("未找到提交。");
 }
 
-function mapLogEntry(
-  projectId: string,
-  entry: Awaited<ReturnType<typeof listLog>>[number],
-): CommitRow {
+function mapLogEntry(projectId: string, entry: ReturnType<typeof listLog>[number]): CommitRow {
   const committedAt = entry.commit.committer.timestamp * 1000;
   return {
     id: entry.oid,
@@ -121,8 +118,8 @@ function mapLogEntry(
   };
 }
 
-export async function listCommits(projectId: string, branchId: string) {
-  const branch = await getBranch(projectId, branchId);
-  const commits = await listLog({ projectId: branch.projectId, ref: branchRef(branch.name) });
+export function listCommits(projectId: string, branchId: string) {
+  const branch = getBranch(projectId, branchId);
+  const commits = listLog({ projectId: branch.projectId, ref: branchRef(branch.name) });
   return commits.map((entry) => mapLogEntry(branch.projectId, entry));
 }

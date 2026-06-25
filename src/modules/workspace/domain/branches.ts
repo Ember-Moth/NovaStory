@@ -55,7 +55,7 @@ export async function createBranch(input: {
   // 写入 git ref: refs/heads/<name>
   const initialHeadCommitId = input.fromCommitId ?? null;
   if (initialHeadCommitId) {
-    await writeRef({
+    writeRef({
       projectId: project.id,
       ref: branchRef(name),
       value: initialHeadCommitId as SHA1,
@@ -66,7 +66,7 @@ export async function createBranch(input: {
   const workdirKey = generateWorkdirKey();
   setBranchMapping(project.id, name, workdirKey);
 
-  await touchProjectRepo(project.id);
+  touchProjectRepo(project.id);
 
   // 创建持久化 VirtualWorkdir
   if (initialHeadCommitId) {
@@ -79,37 +79,35 @@ export async function createBranch(input: {
   return { name, projectId: project.id };
 }
 
-export async function listBranches(projectId: string): Promise<BranchRow[]> {
+export function listBranches(projectId: string): BranchRow[] {
   return listBranchMappings(projectId).map((name) => ({ name, projectId }));
 }
 
-export async function getBranch(projectId: string, branchName: string): Promise<BranchRow> {
+export function getBranch(projectId: string, branchName: string): BranchRow {
   const names = listBranchMappings(projectId);
   invariant(names.includes(branchName), `未找到分支「${branchName}」。`);
   return { name: branchName, projectId };
 }
 
-export async function getBranchHeadCommitId(projectId: string, branchName: string) {
-  return await resolveRef(projectId, branchRef(branchName));
+export function getBranchHeadCommitId(projectId: string, branchName: string) {
+  return resolveRef(projectId, branchRef(branchName));
 }
 
-export async function listBranchHeads(projectId: string): Promise<BranchHeadRow[]> {
+export function listBranchHeads(projectId: string): BranchHeadRow[] {
   const names = listBranchMappings(projectId);
-  return await Promise.all(
-    names.map(async (name) => {
-      const headCommitId = await resolveRef(projectId, branchRef(name));
-      let headCommitTime: number | null = null;
-      if (headCommitId) {
-        try {
-          const commit = await readCommit(projectId, headCommitId);
-          headCommitTime = commit.committer.timestamp * 1000;
-        } catch {
-          // ignore broken commits
-        }
+  return names.map((name) => {
+    const headCommitId = resolveRef(projectId, branchRef(name));
+    let headCommitTime: number | null = null;
+    if (headCommitId) {
+      try {
+        const commit = readCommit(projectId, headCommitId);
+        headCommitTime = commit.committer.timestamp * 1000;
+      } catch {
+        // ignore broken commits
       }
-      return { branchName: name, headCommitId, headCommitTime };
-    }),
-  );
+    }
+    return { branchName: name, headCommitId, headCommitTime };
+  });
 }
 
 export async function deleteBranch(projectId: string, branchName: string) {
@@ -120,11 +118,11 @@ export async function deleteBranch(projectId: string, branchName: string) {
     project.defaultBranchName !== branchName,
     "无法删除：这是项目的默认分支。请先切换默认分支。",
   );
-  await deleteRef({ projectId, ref: branchRef(branchName) });
+  deleteRef({ projectId, ref: branchRef(branchName) });
   const workdirKey = getBranchMapping(projectId, branchName);
   if (workdirKey) {
     deleteWorkdirForBranch(projectId, workdirKey);
   }
   deleteBranchMapping(projectId, branchName);
-  await touchProjectRepo(projectId);
+  touchProjectRepo(projectId);
 }

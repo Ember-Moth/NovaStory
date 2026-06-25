@@ -28,9 +28,9 @@ export async function getCommitDiff(projectId: string, commitId: string): Promis
   const baseCommitId = commit.parents[0]?.parentId ?? null;
   const isRoot = baseCommitId == null;
 
-  const nextFiles = await readFilesAtCommit({ projectId, commitId: commitId as SHA1 });
+  const nextFiles = readFilesAtCommit({ projectId, commitId: commitId as SHA1 });
   const previousFiles = baseCommitId
-    ? await readFilesAtCommit({ projectId, commitId: baseCommitId as SHA1 })
+    ? readFilesAtCommit({ projectId, commitId: baseCommitId as SHA1 })
     : {};
 
   const previousState = readWorktreeStateFromFiles(previousFiles);

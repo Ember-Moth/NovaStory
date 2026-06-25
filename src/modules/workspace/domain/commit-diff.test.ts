@@ -4,7 +4,7 @@ import { seedProjectRecord } from "@/test/project";
 import * as workspaceService from "@/modules/workspace/domain";
 
 async function seedProject(projectId: string) {
-  await seedProjectRecord(projectId);
+  seedProjectRecord(projectId);
   if (!(await workspaceService.getDefaultWorkspace(projectId))) {
     await workspaceService.createDefaultWorkspace(projectId);
   }

@@ -10,7 +10,7 @@ setupMockDatabase();
 const service = await import("./index");
 
 async function seedProject(projectId: string) {
-  await seedProjectRecord(projectId);
+  seedProjectRecord(projectId);
   return await service.createDefaultWorkspace(projectId);
 }
 
@@ -21,9 +21,9 @@ test("default workspace creates a default branch and links project", async () =>
   const project = (await readProjectMeta("proj_default")).project;
   expect(project.defaultBranchName).toBe(workspace.branchName);
 
-  const branch = await service.getBranch(workspace.projectId, workspace.branchName);
+  const branch = service.getBranch(workspace.projectId, workspace.branchName);
   expect(branch.name).toBe("main");
-  expect(await service.getBranchHeadCommitId(workspace.projectId, workspace.branchName)).toBeNull();
+  expect(service.getBranchHeadCommitId(workspace.projectId, workspace.branchName)).toBeNull();
 });
 
 test("commit then checkout round-trips content, timeline and aux state", async () => {
@@ -150,7 +150,7 @@ test("branch off a commit shares the same head and forked metadata", async () =>
   });
 
   expect(
-    await service.getBranchHeadCommitId(featureWorkspace.projectId, featureWorkspace.branchName),
+    service.getBranchHeadCommitId(featureWorkspace.projectId, featureWorkspace.branchName),
   ).toBe(commit.id as SHA1);
 
   // The new workspace is checked out from the commit and has the same content.
@@ -271,13 +271,13 @@ test("deleting a branch also deletes its workspace", async () => {
 
   await service.deleteBranch(featureWorkspace.projectId, featureWorkspace.branchName);
 
-  await expect(
-    service.getBranch(featureWorkspace.projectId, featureWorkspace.branchName),
-  ).rejects.toThrow("未找到分支");
-  await expect(
-    service.getWorkspace(featureWorkspace.projectId, featureWorkspace.id),
-  ).rejects.toThrow("未找到分支");
-  expect((await service.getWorkspace(workspace.projectId, workspace.id)).branchName).toBe(
+  expect(() => service.getBranch(featureWorkspace.projectId, featureWorkspace.branchName)).toThrow(
+    "未找到分支",
+  );
+  expect(() => service.getWorkspace(featureWorkspace.projectId, featureWorkspace.id)).toThrow(
+    "未找到分支",
+  );
+  expect(service.getWorkspace(workspace.projectId, workspace.id).branchName).toBe(
     workspace.branchName,
   );
 });
@@ -355,6 +355,6 @@ test("listCommits walks the mainline history newest first", async () => {
     message: "two",
   });
 
-  const history = await service.listCommits(workspace.projectId, workspace.branchName);
+  const history = service.listCommits(workspace.projectId, workspace.branchName);
   expect(history.map((commit) => commit.id)).toEqual([c2.id, c1.id]);
 });
