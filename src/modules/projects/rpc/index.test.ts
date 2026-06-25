@@ -2,10 +2,7 @@ import { expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 
 import { seedProjectRecord } from "@/test/project";
-import {
-  listProjectRows,
-  readProjectMeta,
-} from "@/modules/workspace/domain/git-storage/project-meta-store";
+import { listProjectRows } from "@/modules/workspace/domain/git-storage/project-meta-store";
 import * as auxService from "@/modules/workspace/domain/aux";
 import { getProjectRepoGitDir } from "@/modules/workspace/domain/git-storage/paths";
 import * as workspaceService from "@/modules/workspace/domain";
@@ -99,9 +96,11 @@ test("setDefaultBranch invalidates project list and detail tags", async () => {
     rpcTags.projectsList(),
     rpcTags.project("project_default_switch"),
   ]);
-  expect((await readProjectMeta("project_default_switch")).project.defaultBranchName).toBe(
-    featureWorkspace.branchName,
+  const getResult = await projectHandlers.get.handler(
+    { projectId: "project_default_switch" },
+    requestCtx,
   );
+  expect(getResult.data.defaultBranchName).toBe(featureWorkspace.branchName);
 });
 
 test("delete project cascades default workspace roots", async () => {

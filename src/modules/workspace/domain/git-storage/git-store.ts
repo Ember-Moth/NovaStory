@@ -193,6 +193,18 @@ export function resolveRef(projectId: string, ref: string) {
   return repo.readRef(ref);
 }
 
+/** 获取当前 HEAD 指向的分支名，无 HEAD 或 detached 时返回 null */
+export function getCurrentBranch(projectId: string): string | null {
+  const repo = getOrInitRepo(projectId);
+  return repo.getCurrentBranch();
+}
+
+/** 设置 HEAD 指向指定的分支 */
+export function setHeadRef(projectId: string, branchName: string): void {
+  const repo = getOrInitRepo(projectId);
+  repo.refs.write("HEAD", "ref: refs/heads/" + branchName);
+}
+
 /** 列出 refs/heads/ 下所有分支名 */
 export function listBranchNames(projectId: string): string[] {
   const repo = getOrInitRepo(projectId);

@@ -8,7 +8,6 @@ export function seedProjectRecord(
     id: projectId,
     name: overrides.name ?? `Project ${projectId}`,
     description: overrides.description ?? null,
-    defaultBranchName: null,
     updatedAt: 0,
   });
 }

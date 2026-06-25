@@ -11,20 +11,32 @@ import {
 } from "@/modules/workspace/domain/git-storage/project-meta-store";
 import { getProjectRepoGitDir } from "@/modules/workspace/domain/git-storage/paths";
 import type { ProjectIndexRow } from "@/modules/workspace/domain/git-storage/types";
+import { getCurrentBranch, setHeadRef } from "@/modules/workspace/domain/git-storage/git-store";
 import { rpcTags, type RpcTagList } from "@/rpc/tags";
 
 type ProjectMutationInput = Pick<ProjectIndexRow, "id" | "name" | "description">;
-type ProjectRow = ProjectIndexRow;
+
+/** 在返回给 API 消费者时注入 defaultBranchName（来自 HEAD） */
+type ProjectRow = ProjectIndexRow & { defaultBranchName: string | null };
+
+async function projectRowWithDefaultBranch(row: ProjectIndexRow): Promise<ProjectRow> {
+  const branchName = getCurrentBranch(row.id);
+  return { ...row, defaultBranchName: branchName };
+}
 
 export const list = query<void, ProjectRow[], RpcTagList>({
   watch: () => [rpcTags.projectsList()],
-  handler: async () => await listProjectRows(),
+  handler: async () => {
+    const rows = await listProjectRows();
+    return Promise.all(rows.map(projectRowWithDefaultBranch));
+  },
 });
 
 export const get = query<{ projectId: string }, ProjectRow, RpcTagList>({
   watch: ({ projectId }) => [rpcTags.project(projectId)],
   handler: async ({ projectId }) => {
-    return (await readProjectMeta(projectId)).project;
+    const row = (await readProjectMeta(projectId)).project;
+    return projectRowWithDefaultBranch(row);
   },
 });
 
@@ -35,7 +47,6 @@ export const create = mutation<ProjectMutationInput, { workspaceId: string }, Rp
       id: input.id,
       name: input.name,
       description: input.description ?? null,
-      defaultBranchName: null,
       updatedAt: 0,
     });
     const workspace = await createDefaultWorkspace(input.id);
@@ -62,14 +73,7 @@ export const setDefaultBranch = mutation<{ projectId: string; branchId: string }
     invalidate: ({ projectId }) => [rpcTags.projectsList(), rpcTags.project(projectId)],
     handler: async ({ projectId, branchId }) => {
       const branch = getBranch(projectId, branchId);
-
-      await updateProjectMeta(projectId, (current) => ({
-        ...current,
-        project: {
-          ...current.project,
-          defaultBranchName: branch.name,
-        },
-      }));
+      setHeadRef(projectId, branch.name);
     },
   },
 );

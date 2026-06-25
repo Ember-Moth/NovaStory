@@ -2,7 +2,6 @@ export interface ProjectIndexRow {
   id: string;
   name: string;
   description: string | null;
-  defaultBranchName: string | null;
   updatedAt: number;
 }
 

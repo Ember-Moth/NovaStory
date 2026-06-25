@@ -1,7 +1,6 @@
 import { createBranch } from "./branches";
 import { getBranch, listBranches } from "./branches";
-import { readProjectMeta, updateProjectMeta } from "./git-storage/project-meta-store";
-import { touchProjectRepo } from "./git-storage/git-store";
+import { getCurrentBranch, setHeadRef, touchProjectRepo } from "./git-storage/git-store";
 
 // ---------------------------------------------------------------------------
 // WorkspaceRow — workspaceId === branchName
@@ -46,20 +45,14 @@ export function listWorkspaces(projectId: string): WorkspaceRow[] {
 }
 
 export async function getDefaultWorkspace(projectId: string): Promise<WorkspaceRow | undefined> {
-  const project = (await readProjectMeta(projectId)).project;
-  if (!project.defaultBranchName) return undefined;
-  return getWorkspaceForBranchId(projectId, project.defaultBranchName) ?? undefined;
+  const branchName = getCurrentBranch(projectId);
+  if (!branchName) return undefined;
+  return getWorkspaceForBranchId(projectId, branchName) ?? undefined;
 }
 
 export async function createDefaultWorkspace(projectId: string, name = "main") {
   const branch = await createBranch({ projectId, name });
-  await updateProjectMeta(projectId, (payload) => ({
-    ...payload,
-    project: {
-      ...payload.project,
-      defaultBranchName: branch.name,
-    },
-  }));
+  setHeadRef(projectId, branch.name);
   return getWorkspace(projectId, branch.name);
 }
 

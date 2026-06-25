@@ -12,9 +12,8 @@ import {
   setBranchMapping,
   deleteBranchMapping,
   generateWorkdirKey,
+  getCurrentBranch,
 } from "./git-storage/git-store";
-import type { ProjectIndexRow } from "./git-storage/types";
-import { readProjectMeta } from "./git-storage/project-meta-store";
 import { writeWorktreeStateToWorkdir } from "./git-storage/worktree-state";
 import {
   deleteWorkdirForBranch,
@@ -35,28 +34,23 @@ export interface BranchHeadRow {
   headCommitTime: number | null;
 }
 
-async function getProject(projectId: string): Promise<ProjectIndexRow> {
-  return (await readProjectMeta(projectId)).project;
-}
-
 export async function createBranch(input: {
   projectId: string;
   name: string;
   fromCommitId?: string | null;
 }) {
-  const project = await getProject(input.projectId);
   const name = input.name.trim();
   invariant(name, "无法创建分支：分支名称不能为空。");
 
   // 检查同名分支（通过 branch-map.json）
-  const existing = listBranchMappings(project.id);
+  const existing = listBranchMappings(input.projectId);
   invariant(!existing.includes(name), `无法创建分支：已存在名为「${name}」的分支。`);
 
   // 写入 git ref: refs/heads/<name>
   const initialHeadCommitId = input.fromCommitId ?? null;
   if (initialHeadCommitId) {
     writeRef({
-      projectId: project.id,
+      projectId: input.projectId,
       ref: branchRef(name),
       value: initialHeadCommitId as SHA1,
     });
@@ -64,19 +58,19 @@ export async function createBranch(input: {
 
   // 生成不透明的 workdir key，存入 branch-map.json
   const workdirKey = generateWorkdirKey();
-  setBranchMapping(project.id, name, workdirKey);
+  setBranchMapping(input.projectId, name, workdirKey);
 
-  touchProjectRepo(project.id);
+  touchProjectRepo(input.projectId);
 
   // 创建持久化 VirtualWorkdir
   if (initialHeadCommitId) {
-    setWorkdirFromCommit(project.id, workdirKey, initialHeadCommitId as SHA1);
+    setWorkdirFromCommit(input.projectId, workdirKey, initialHeadCommitId as SHA1);
   } else {
-    const wd = setWorkdirForBranch(project.id, workdirKey);
+    const wd = setWorkdirForBranch(input.projectId, workdirKey);
     writeWorktreeStateToWorkdir(wd, { content: [], timeline: [] });
   }
 
-  return { name, projectId: project.id };
+  return { name, projectId: input.projectId };
 }
 
 export function listBranches(projectId: string): BranchRow[] {
@@ -113,10 +107,10 @@ export function listBranchHeads(projectId: string): BranchHeadRow[] {
 export async function deleteBranch(projectId: string, branchName: string) {
   const names = listBranchMappings(projectId);
   invariant(names.includes(branchName), `未找到分支「${branchName}」。`);
-  const project = await getProject(projectId);
+  const currentBranch = getCurrentBranch(projectId);
   invariant(
-    project.defaultBranchName !== branchName,
-    "无法删除：这是项目的默认分支。请先切换默认分支。",
+    currentBranch !== branchName,
+    "无法删除：这是当前 HEAD 指向的分支。请先切换到其他分支。",
   );
   deleteRef({ projectId, ref: branchRef(branchName) });
   const workdirKey = getBranchMapping(projectId, branchName);

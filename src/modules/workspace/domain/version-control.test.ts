@@ -3,7 +3,7 @@ import { expect, test } from "bun:test";
 
 import { setupMockDatabase } from "@/test/mock-db";
 import { seedProjectRecord } from "@/test/project";
-import { readProjectMeta } from "@/modules/workspace/domain/git-storage/project-meta-store";
+import { getCurrentBranch } from "@/modules/workspace/domain/git-storage/git-store";
 
 setupMockDatabase();
 
@@ -18,8 +18,7 @@ test("default workspace creates a default branch and links project", async () =>
   const workspace = await seedProject("proj_default");
   expect(workspace.branchName).toBeTruthy();
 
-  const project = (await readProjectMeta("proj_default")).project;
-  expect(project.defaultBranchName).toBe(workspace.branchName);
+  expect(getCurrentBranch("proj_default")).toBe(workspace.branchName);
 
   const branch = service.getBranch(workspace.projectId, workspace.branchName);
   expect(branch.name).toBe("main");
@@ -286,7 +285,7 @@ test("default branch still cannot be deleted", async () => {
   const workspace = await seedProject("proj_delete_default");
 
   await expect(service.deleteBranch(workspace.projectId, workspace.branchName)).rejects.toThrow(
-    "无法删除：这是项目的默认分支。",
+    "无法删除：这是当前 HEAD 指向的分支。",
   );
 });
 

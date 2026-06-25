@@ -42,7 +42,7 @@ export function ProjectListRoute() {
               id: input.id,
               name: input.name,
               description: input.description ?? null,
-              defaultBranchName: null,
+              defaultBranchName: null, // 新创建的项目还没有分支，HEAD 尚未设定
               updatedAt: Date.now(),
             }),
           );
