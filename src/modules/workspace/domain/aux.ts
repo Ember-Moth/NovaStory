@@ -17,6 +17,8 @@ import type {
 } from "./types";
 import { getWorkspace, touchWorkspaceMeta } from "./lifecycle";
 import { getProjectWorktreeDir } from "./git-storage/paths";
+import { getWorkdirForBranch } from "./git-storage/nano-git-store";
+import type { VirtualWorkdir } from "nano-git/workdir/core";
 import {
   assertTimelinePoint,
   AUX_ORIGIN_DIR,
@@ -135,6 +137,26 @@ function removeWhiteoutForPath(root: string, auxPath: string) {
   fs.rmSync(whiteoutPathForAuxPath(root, auxPath), { force: true });
 }
 
+// ---------------------------------------------------------------------------
+// VirtualWorkdir 同步辅助（Phase 2.2）
+// ---------------------------------------------------------------------------
+
+/**
+ * 将逻辑 aux 路径转换为 VirtualWorkdir 内的相对路径。
+ * 例如 auxPath="/lore/world.md", pointId=null → "aux/origin/lore/world.md"
+ */
+function auxWorkdirRelPath(pointId: string | null, auxPath: string): string {
+  const base = pointId ? `aux/timeline/${pointId}` : "aux/origin";
+  if (auxPath === "/") return base;
+  const trimmed = auxPath.startsWith("/") ? auxPath.slice(1) : auxPath;
+  return `${base}/${trimmed}`;
+}
+
+/** 确保 VirtualWorkdir 内路径的所有祖先目录存在 */
+function ensureWorkdirDir(wd: VirtualWorkdir, dirPath: string) {
+  wd.mkdir(dirPath, { recursive: true });
+}
+
 function writeKeepFile(dir: string) {
   ensureDirSync(dir);
   fs.closeSync(fs.openSync(path.join(dir, KEEP_FILE), "a"));
@@ -230,8 +252,91 @@ function readLayerEntries(worktreePath: string, pointId: string | null): Overlay
   });
 }
 
+/**
+ * 从 VirtualWorkdir 读取指定层的条目，与 readLayerEntries 语义完全一致。
+ * 保留 whiteout（.wh.*）和 .gitkeep 的完整语义。
+ *
+ * 当前未激活（buildSnapshot 使用物理 fs 路径），待 VirtualWorkdir 读路径迁移完成后再启用。
+ */
+/*
+function readLayerEntriesFromWorkdir(
+  wd: VirtualWorkdir,
+  pointId: string | null,
+): OverlayLayerEntry[] {
+  const rootPath = auxWorkdirRelPath(pointId, "/");
+  if (!wd.exists(rootPath)) return [];
+  const entries: OverlayLayerEntry[] = [];
+
+  const walk = (wdDir: string, logicalDir: string) => {
+    for (const dirent of wd.readdir(wdDir)) {
+      if (dirent.name === KEEP_FILE) continue;
+      const childLogicalPath =
+        logicalDir === "/" ? `/${dirent.name}` : `${logicalDir}/${dirent.name}`;
+      const childWdPath = wdDir ? `${wdDir}/${dirent.name}` : dirent.name;
+
+      if (dirent.name.startsWith(WHITEOUT_PREFIX)) {
+        const name = dirent.name.slice(WHITEOUT_PREFIX.length);
+        if (!name) continue;
+        entries.push({
+          kind: "whiteout",
+          path: logicalDir === "/" ? `/${name}` : `${logicalDir}/${name}`,
+          timelinePointId: pointId,
+        });
+        continue;
+      }
+
+      if (dirent.kind === "symlink") {
+        entries.push({
+          kind: "node",
+          path: childLogicalPath,
+          nodeType: "symlink",
+          fsPath: undefined,
+          symlinkTargetPath: wd.readLink(childWdPath),
+          timelinePointId: pointId,
+        });
+        continue;
+      }
+
+      if (dirent.kind === "tree") {
+        // VirtualWorkdir 中目录由 mkdir 创建，无需 .gitkeep 标记
+        // 但为了与物理 fs 行为一致，仍需检查 .gitkeep 文件
+        if (wd.exists(`${childWdPath}/${KEEP_FILE}`)) {
+          entries.push({
+            kind: "node",
+            path: childLogicalPath,
+            nodeType: "dir",
+            fsPath: undefined,
+            symlinkTargetPath: null,
+            timelinePointId: pointId,
+          });
+        }
+        walk(childWdPath, childLogicalPath);
+        continue;
+      }
+
+      if (dirent.kind === "blob") {
+        entries.push({
+          kind: "node",
+          path: childLogicalPath,
+          nodeType: "file",
+          fsPath: undefined,
+          symlinkTargetPath: null,
+          timelinePointId: pointId,
+        });
+      }
+    }
+  };
+
+  walk(rootPath, "/");
+  return entries.sort((left, right) => {
+    const depth = auxPathSegments(left.path).length - auxPathSegments(right.path).length;
+    return depth || left.path.localeCompare(right.path);
+  });
+}
+*/
+
 function readAuxContentFromSnapshot(node: OverlaySnapshotNode) {
-  if (node.nodeType !== "file" || !node.fsPath) return null;
+  if (node.nodeType !== "file" || node.fsPath == null) return null;
   return readTextSync(node.fsPath);
 }
 
@@ -242,6 +347,10 @@ async function buildSnapshot(projectId: string, workspaceId: string, pointId: Ti
   const normalizedPointId = assertTimelinePoint(state, pointId);
   const snapshot = new Map<string, OverlaySnapshotNode>();
   const layers = [null, ...timelineLayerPointIds(state, normalizedPointId)];
+
+  // Phase 2.2: VirtualWorkdir read path available via readLayerEntriesFromWorkdir.
+  // Currently disabled — cross-layer interactions (moves, whiteouts between layers)
+  // need more thorough validation. Always use physical fs for now.
 
   for (const layerPointId of layers) {
     for (const entry of readLayerEntries(worktreePath, layerPointId)) {
@@ -477,6 +586,15 @@ export async function mkdirAt(input: {
   const targetPath = fsPathForAuxPath(root, normalizedPath);
   clearUpperNodeForWrite(root, normalizedPath);
   writeKeepFile(targetPath);
+  // Phase 2.2: sync to VirtualWorkdir
+  {
+    const wd = getWorkdirForBranch(workspace.projectId, workspace.id);
+    if (wd) {
+      const wp = auxWorkdirRelPath(pointId, normalizedPath);
+      wd.mkdir(wp, { recursive: true });
+      wd.writeFile(`${wp}/${KEEP_FILE}`, Buffer.from(""));
+    }
+  }
   await touchWorkspace(workspace.projectId, workspace.id);
   return { path: normalizedPath, workspaceId: workspace.id, nodeType: "dir" as const };
 }
@@ -503,6 +621,15 @@ export async function writeFileAt(input: {
   clearUpperNodeForWrite(root, normalizedPath);
   ensureDirSync(path.dirname(targetPath));
   fs.writeFileSync(targetPath, input.content, "utf8");
+  // Phase 2.2: sync to VirtualWorkdir
+  {
+    const wd = getWorkdirForBranch(workspace.projectId, workspace.id);
+    if (wd) {
+      const wp = auxWorkdirRelPath(pointId, normalizedPath);
+      ensureWorkdirDir(wd, posix.dirname(wp));
+      wd.writeFile(wp, Buffer.from(input.content, "utf8"));
+    }
+  }
   await touchWorkspace(workspace.projectId, workspace.id);
   return { path: normalizedPath, workspaceId: workspace.id, nodeType: "file" as const };
 }
@@ -529,6 +656,15 @@ export async function linkAt(input: {
   clearUpperNodeForWrite(root, normalizedPath);
   ensureDirSync(path.dirname(targetPath));
   fs.symlinkSync(normalizedTargetPath, targetPath);
+  // Phase 2.2: sync to VirtualWorkdir
+  {
+    const wd = getWorkdirForBranch(workspace.projectId, workspace.id);
+    if (wd) {
+      const wp = auxWorkdirRelPath(pointId, normalizedPath);
+      ensureWorkdirDir(wd, posix.dirname(wp));
+      wd.writeLink(wp, normalizedTargetPath);
+    }
+  }
   await touchWorkspace(workspace.projectId, workspace.id);
   return {
     path: normalizedPath,
@@ -572,6 +708,9 @@ export async function moveAuxNodeAt(input: {
     pointId,
     auxPath: sourcePath,
   });
+  // Note: moveAuxNodeAt workdir sync is intentionally omitted because the source
+  // may reside in a different layer than pointId. The physical materializeSubtreeAt
+  // + deleteVisiblePathFromLayer handles the correct layer semantics.
   await touchWorkspace(workspace.projectId, workspace.id);
   return {
     path: targetPath,
@@ -603,6 +742,15 @@ export async function retargetAuxSymlinkAt(input: {
   clearUpperNodeForWrite(root, normalizedPath);
   ensureDirSync(path.dirname(targetPath));
   fs.symlinkSync(normalizedTargetPath, targetPath);
+  // Phase 2.2: sync to VirtualWorkdir
+  {
+    const wd = getWorkdirForBranch(workspace.projectId, workspace.id);
+    if (wd) {
+      const wp = auxWorkdirRelPath(pointId, normalizedPath);
+      ensureWorkdirDir(wd, posix.dirname(wp));
+      wd.writeLink(wp, normalizedTargetPath);
+    }
+  }
   await touchWorkspace(workspace.projectId, workspace.id);
   return { path: normalizedPath, workspaceId: workspace.id, nodeType: "symlink" as const };
 }
@@ -628,6 +776,26 @@ export async function deleteAuxNodeAt(input: {
     pointId,
     auxPath: normalizedPath,
   });
+  // Phase 2.2: sync to VirtualWorkdir
+  {
+    const wd = getWorkdirForBranch(workspace.projectId, workspace.id);
+    if (wd) {
+      const wp = auxWorkdirRelPath(pointId, normalizedPath);
+      // 与物理 fs 行为一致：
+      // - 对于原点层（无更下层），直接删除路径
+      // - 对于 timeline 层，写入 whiteout 文件
+      if (pointId == null) {
+        wd.delete(wp, { force: true });
+      } else {
+        const whiteoutDir = posix.dirname(wp);
+        const basename = posix.basename(normalizedPath);
+        ensureWorkdirDir(wd, whiteoutDir);
+        // 与物理 fs 一致：先从当前层移除文件，再写入 whiteout
+        wd.delete(wp, { force: true });
+        wd.writeFile(`${whiteoutDir}/.wh.${basename}`, Buffer.from(""));
+      }
+    }
+  }
   await touchWorkspace(workspace.projectId, workspace.id);
 }
 
@@ -655,6 +823,17 @@ export async function restoreDeletedAuxNodeAt(input: {
   invariant(fs.existsSync(whiteoutPath), "没有可恢复的辅助资料删除标记。");
   fs.rmSync(whiteoutPath, { force: true });
   pruneInvalidWhiteouts(root, lowerSnapshot);
+  // Phase 2.2: sync to VirtualWorkdir — 删除 workdir 中的 whiteout 文件
+  {
+    const wd = getWorkdirForBranch(workspace.projectId, workspace.id);
+    if (wd) {
+      const wp = auxWorkdirRelPath(pointId, normalizedPath);
+      const whiteoutDir = posix.dirname(wp);
+      const basename = posix.basename(normalizedPath);
+      const whiteoutWp = `${whiteoutDir}/.wh.${basename}`;
+      wd.delete(whiteoutWp, { force: true });
+    }
+  }
   await touchWorkspace(workspace.projectId, workspace.id);
   return {
     path: normalizedPath,

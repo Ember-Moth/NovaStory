@@ -44,8 +44,10 @@ export async function createCommit(input: {
     ...(input.extraParents?.map((parent) => parent.parentId) ?? []),
   ];
 
-  // Phase 2 (incomplete): VirtualWorkdir available via getWorkdirForBranch
-  // but not yet used for commits (aux.ts not migrated). Always use physical worktree.
+  // Phase 2 (workdir-based commit): getWorkdirForBranch would be used here
+  // Currently disabled because aux read operations still use physical fs.
+
+  // Fallback: physical worktree
   const oid = await addAllAndCommit({
     projectId: branch.projectId,
     workspaceId: workspace.id,

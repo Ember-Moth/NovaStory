@@ -397,23 +397,30 @@ export function moveManuscriptNode(
  * 等价于 readWorktreeState(dir)，但基于 VirtualWorkdir 而非文件系统。
  */
 export function readWorktreeStateFromWorkdir(workdir: VirtualWorkdir): WorktreeState {
-  const indexContent = workdir.readFile("index.jsonl").toString("utf8");
+  const indexContent = workdir.exists("index.jsonl")
+    ? workdir.readFile("index.jsonl").toString("utf8")
+    : "";
   const rows: IndexRow[] = indexContent ? parseJsonl<IndexRow>(indexContent) : [];
 
   const idToBody = new Map<string, string>();
-  for (const entry of workdir.readdir("manuscript")) {
-    if (entry.kind === "blob" && entry.name.endsWith(".md") && entry.name !== INDEX_FILE) {
-      const id = entry.name.slice(0, -3);
-      const content = workdir.readFile(`manuscript/${entry.name}`).toString("utf8");
-      if (content != null) {
-        idToBody.set(id, normalizeBody(content));
+  if (workdir.exists("manuscript")) {
+    for (const entry of workdir.readdir("manuscript")) {
+      if (entry.kind === "blob" && entry.name.endsWith(".md") && entry.name !== INDEX_FILE) {
+        const id = entry.name.slice(0, -3);
+        const content = workdir.readFile(`manuscript/${entry.name}`).toString("utf8");
+        if (content != null) {
+          idToBody.set(id, normalizeBody(content));
+        }
       }
     }
   }
 
+  const timelineContent = workdir.exists("timeline.jsonl")
+    ? workdir.readFile("timeline.jsonl").toString("utf8")
+    : "";
   return {
     content: rebuildTree("", rows, idToBody),
-    timeline: parseJsonl<TimelineMetaRow>(workdir.readFile("timeline.jsonl").toString("utf8")),
+    timeline: parseJsonl<TimelineMetaRow>(timelineContent),
   };
 }
 

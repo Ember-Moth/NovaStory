@@ -395,7 +395,11 @@ export async function getWorkingTreeStatus(
     return emptyStatus(headCommitId);
   }
 
-  // Fallback: physical worktree (legacy, used until Phase 2 is complete)
+  // Phase 2 (workdir-based status): getWorkdirForBranch would be checked here
+  // Currently disabled because aux read operations still use physical fs.
+  // Re-enable when exportAuxSnapshotTree etc. are also workdir-based.
+
+  // Fallback: physical worktree
   const worktreePath = getProjectWorktreeDir(workspace.projectId, workspace.id);
   const gitdir = await ensureProjectRepo(branch.projectId);
   const matrix = await git.statusMatrix({
@@ -414,7 +418,11 @@ export async function getWorkingTreeStatus(
     return kind != null && areaForPath(filepath) === "content";
   });
 
-  const areas = buildEmptyAreas();
+  const areas: WorkingTreeStatus["areas"] = {
+    content: { changed: false, changes: [] },
+    timeline: { changed: false, changes: [] },
+    aux: { changed: false, changes: [] },
+  };
 
   if (contentFileChanges.length > 0) {
     const previousState = headCommitId
@@ -436,7 +444,10 @@ export async function getWorkingTreeStatus(
     areas[areaKey].changes.push({ label: filepath, kind });
   }
 
-  finalizeAreas(areas);
+  for (const area of Object.values(areas)) {
+    area.changes.sort((a, b) => a.label.localeCompare(b.label));
+    area.changed = area.changes.length > 0;
+  }
   return {
     hasChanges: Object.values(areas).some((area) => area.changed),
     headCommitId,
@@ -454,19 +465,4 @@ function emptyStatus(headCommitId: string | null): WorkingTreeStatus {
       aux: { changed: false, changes: [] },
     },
   };
-}
-
-function buildEmptyAreas(): WorkingTreeStatus["areas"] {
-  return {
-    content: { changed: false, changes: [] },
-    timeline: { changed: false, changes: [] },
-    aux: { changed: false, changes: [] },
-  };
-}
-
-function finalizeAreas(areas: WorkingTreeStatus["areas"]) {
-  for (const area of Object.values(areas)) {
-    area.changes.sort((a, b) => a.label.localeCompare(b.label));
-    area.changed = area.changes.length > 0;
-  }
 }

@@ -58,7 +58,7 @@
     "isomorphic-git": "^1.38.4",
     "lexical": "^0.45.0",
     "motion": "^12.40.0",
-    "nano-git": "^0.3.3",
+    "nano-git": "^0.3.4",
     "nanoid": "^5.1.11",
     "partial-json": "^0.1.7",
     "react": "^19",
