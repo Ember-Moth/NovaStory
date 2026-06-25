@@ -13,7 +13,7 @@ import { getProjectRepoGitDir } from "./paths";
 import type { WorkingTreeStatus } from "@/modules/workspace/domain/types";
 
 export function branchRef(branchId: string) {
-  return `refs/heads/branch/${branchId}`;
+  return `refs/heads/${branchId}`;
 }
 
 export function metaRef() {
@@ -21,7 +21,7 @@ export function metaRef() {
 }
 
 export function branchMetaRef(branchId: string) {
-  return `refs/novel-evolver/branches/${branchId}`;
+  return `refs/novel-evolver/branch-meta/${branchId}`;
 }
 
 export async function ensureProjectRepo(projectId: string) {
@@ -150,7 +150,7 @@ export async function deleteBranchMeta(projectId: string, branchId: string) {
 export async function listBranchMetaIds(projectId: string): Promise<string[]> {
   const repo = getOrInitRepo(projectId);
   return repo.refs
-    .list("refs/novel-evolver/branches/")
+    .list("refs/novel-evolver/branch-meta/")
     .map((r) => r.split("/").pop()!)
     .sort();
 }
