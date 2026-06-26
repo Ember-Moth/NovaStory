@@ -45,7 +45,7 @@ export function ProjectCommitDetailPanel({
     return <LoadingBlock label="正在加载提交..." />;
   }
 
-  const { subject, body, fullMessage } = splitCommitMessage(commit.message);
+  const { subject, body } = splitCommitMessage(commit.message);
   const isMerge = commit.parents.length > 1;
   const committedAtLabel = formatDateTimePreferredRelative(commit.committedAt);
 
@@ -76,14 +76,15 @@ export function ProjectCommitDetailPanel({
           <span className="font-mono">{formatCommitId(commit.id)}</span>
         </div>
 
-        <pre
-          className={cn(
-            "font-sans text-sm leading-6 wrap-break-word whitespace-pre-wrap text-foreground",
-            body ? "min-h-18" : null,
-          )}
-        >
-          {fullMessage}
-        </pre>
+        {body ? (
+          <pre
+            className={cn(
+              "font-sans text-sm leading-6 wrap-break-word whitespace-pre-wrap text-foreground",
+            )}
+          >
+            {body}
+          </pre>
+        ) : null}
       </section>
 
       <section>
@@ -166,7 +167,6 @@ function splitCommitMessage(message: string) {
   return {
     subject,
     body,
-    fullMessage: body ? `${subject}\n\n${body}` : subject,
   };
 }
 
