@@ -5,6 +5,10 @@ export const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
   timeStyle: "short",
 });
 
+const relativeTimeFormatter = new Intl.RelativeTimeFormat("zh-CN", {
+  numeric: "auto",
+});
+
 const buttonBase =
   "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50";
 
@@ -51,4 +55,38 @@ export function PageHeader({
 
 export function formatCommitId(id: string) {
   return id;
+}
+
+export function formatDateTimePreferredRelative(value: Date | number) {
+  const date = value instanceof Date ? value : new Date(value);
+  const timestamp = date.getTime();
+
+  if (Number.isNaN(timestamp)) {
+    return "—";
+  }
+
+  const diffSeconds = Math.round((timestamp - Date.now()) / 1000);
+  const absSeconds = Math.abs(diffSeconds);
+
+  if (absSeconds < 60) {
+    return "刚刚";
+  }
+
+  if (absSeconds < 60 * 60) {
+    return relativeTimeFormatter.format(Math.round(diffSeconds / 60), "minute");
+  }
+
+  if (absSeconds < 60 * 60 * 24) {
+    return relativeTimeFormatter.format(Math.round(diffSeconds / (60 * 60)), "hour");
+  }
+
+  if (absSeconds < 60 * 60 * 24 * 30) {
+    return relativeTimeFormatter.format(Math.round(diffSeconds / (60 * 60 * 24)), "day");
+  }
+
+  if (absSeconds < 60 * 60 * 24 * 365) {
+    return relativeTimeFormatter.format(Math.round(diffSeconds / (60 * 60 * 24 * 30)), "month");
+  }
+
+  return relativeTimeFormatter.format(Math.round(diffSeconds / (60 * 60 * 24 * 365)), "year");
 }

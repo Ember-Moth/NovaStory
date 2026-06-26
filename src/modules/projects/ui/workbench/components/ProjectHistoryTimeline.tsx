@@ -2,7 +2,11 @@ import { cn } from "@/shared/lib/cn";
 import { LoadingBlock } from "@/shared/ui/Loading";
 
 import type { CommitHistory, CommitRow, WorkingTreeStatus } from "../../shared/projectTypes";
-import { dateFormatter, formatCommitId, InlineError } from "../../shared/projectUi";
+import {
+  dateFormatter,
+  formatDateTimePreferredRelative,
+  InlineError,
+} from "../../shared/projectUi";
 import type { ProjectHistorySelection } from "../state/projectWorkbenchStore";
 
 /**
@@ -109,7 +113,7 @@ function TimelineRail({
       />
       <span
         className={cn(
-          "relative top-2 h-2.5 w-2.5 rounded-full border-2",
+          "relative top-2.5 h-2.5 w-2.5 rounded-full border-2",
           variant === "working"
             ? "border-dashed border-accent-foreground bg-editor-background"
             : variant === "head"
@@ -177,6 +181,9 @@ function CommitRowItem({
   onClick: () => void;
 }) {
   const isMerge = commit.parents.length > 1;
+  const commitSubject = commit.message.split(/\r?\n/, 1)[0] ?? "";
+  const committedAtLabel = formatDateTimePreferredRelative(commit.committedAt);
+  const committedAtTitle = dateFormatter.format(commit.committedAt);
 
   return (
     <button
@@ -194,8 +201,8 @@ function CommitRowItem({
         variant={isHead ? "head" : "commit"}
       />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5 py-1.5">
-        <div className="flex min-w-0 items-center gap-1.5 leading-none">
-          <span className="truncate text-[13px] text-foreground">{commit.message}</span>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate text-[13px] leading-4.5 text-foreground">{commitSubject}</span>
           {isHead ? (
             <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium text-accent-foreground">
               HEAD
@@ -205,9 +212,8 @@ function CommitRowItem({
             <span className="icon-[material-symbols--merge] shrink-0 text-sm text-foreground-muted" />
           ) : null}
         </div>
-        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-[10px] leading-none text-foreground-muted">
-          <span className="break-all">{formatCommitId(commit.id)}</span>
-          <span className="shrink-0">{dateFormatter.format(commit.committedAt)}</span>
+        <div className="min-w-0 text-[10px] leading-4 text-foreground-muted">
+          <span title={committedAtTitle}>{committedAtLabel}</span>
         </div>
       </div>
     </button>
