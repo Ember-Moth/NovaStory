@@ -57,7 +57,7 @@
     "codemirror": "^6.0.2",
     "lexical": "^0.45.0",
     "motion": "^12.40.0",
-    "nano-git": "^0.3.7",
+    "nano-git": "^0.4.1",
     "nanoid": "^5.1.11",
     "partial-json": "^0.1.7",
     "react": "^19",
