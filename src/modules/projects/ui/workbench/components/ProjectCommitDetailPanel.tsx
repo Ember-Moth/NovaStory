@@ -51,7 +51,7 @@ export function ProjectCommitDetailPanel({
 
   return (
     <div className="flex min-h-0 flex-col gap-4">
-      <section className="space-y-3">
+      <section className="-mx-4 space-y-3 border-b border-border px-4 pb-4">
         <div className="flex min-w-0 flex-wrap items-start gap-x-2 gap-y-1">
           <div className="flex min-w-0 flex-1 items-start gap-2">
             <span className="mt-1 icon-[material-symbols--commit] shrink-0 text-base text-accent-foreground" />
@@ -78,7 +78,7 @@ export function ProjectCommitDetailPanel({
 
         <pre
           className={cn(
-            "border-l border-border pl-3 font-sans text-sm leading-6 wrap-break-word whitespace-pre-wrap text-foreground",
+            "font-sans text-sm leading-6 wrap-break-word whitespace-pre-wrap text-foreground",
             body ? "min-h-18" : null,
           )}
         >
@@ -86,7 +86,7 @@ export function ProjectCommitDetailPanel({
         </pre>
       </section>
 
-      <section className="border-t border-border pt-3">
+      <section>
         <div className="mb-3 flex items-center gap-1 text-[11px] font-semibold tracking-wider text-foreground-muted uppercase">
           <span className="icon-[material-symbols--info-outline] text-sm text-accent-foreground" />
           <h4>元信息</h4>
