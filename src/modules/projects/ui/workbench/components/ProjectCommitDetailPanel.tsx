@@ -1,15 +1,16 @@
 import { skipToken } from "@codehz/rpc/react";
 
 import { rpc } from "@/rpc/client";
+import { cn } from "@/shared/lib/cn";
 import { LoadingBlock } from "@/shared/ui/Loading";
 
 import { useProjectWorkbenchProjectId } from "../core/useProjectWorkbench";
 import type { CommitRow } from "../../shared/projectTypes";
 import {
   dateFormatter,
+  formatDateTimePreferredRelative,
   formatCommitId,
   InlineError,
-  secondaryButton,
 } from "../../shared/projectUi";
 import { ChangeAreasView } from "./ChangeAreasView";
 
@@ -44,51 +45,91 @@ export function ProjectCommitDetailPanel({
     return <LoadingBlock label="正在加载提交..." />;
   }
 
+  const { subject, body, fullMessage } = splitCommitMessage(commit.message);
+  const isMerge = commit.parents.length > 1;
+  const committedAtLabel = formatDateTimePreferredRelative(commit.committedAt);
+
   return (
-    <div className="flex min-h-0 flex-col gap-3">
-      <div>
-        <div className="flex items-start gap-2">
-          <span className="mt-0.5 icon-[material-symbols--commit] shrink-0 text-base text-accent-foreground" />
-          <h3 className="min-w-0 text-sm leading-snug font-semibold wrap-break-word text-foreground">
-            {commit.message}
-          </h3>
+    <div className="flex min-h-0 flex-col gap-4">
+      <section className="space-y-3">
+        <div className="flex min-w-0 flex-wrap items-start gap-x-2 gap-y-1">
+          <div className="flex min-w-0 flex-1 items-start gap-2">
+            <span className="mt-1 icon-[material-symbols--commit] shrink-0 text-base text-accent-foreground" />
+            <h3 className="min-w-0 flex-1 text-base leading-6 font-semibold wrap-break-word whitespace-pre-wrap text-foreground">
+              {subject}
+            </h3>
+          </div>
           {isHead ? (
-            <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium text-accent-foreground">
+            <span className="shrink-0 text-[10px] font-medium tracking-wide text-accent-foreground uppercase">
               HEAD
             </span>
           ) : null}
+          {isMerge ? (
+            <span className="shrink-0 text-[10px] font-medium tracking-wide text-foreground-muted uppercase">
+              Merge
+            </span>
+          ) : null}
         </div>
-      </div>
 
-      <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-xs">
-        <MetaRow label="提交">
-          <span className="font-mono break-all">{formatCommitId(commit.id)}</span>
-        </MetaRow>
-        <MetaRow label="作者">{commit.author ?? "—"}</MetaRow>
-        <MetaRow label="时间">{dateFormatter.format(commit.committedAt)}</MetaRow>
-        <MetaRow label="父提交">
-          {commit.parents.length === 0 ? (
-            <span className="text-foreground-muted">根提交（无父）</span>
-          ) : (
-            <div className="flex flex-col gap-1">
-              {commit.parents.map((parent) => (
-                <div key={parent.parentId} className="flex items-center gap-1.5">
-                  <span className="font-mono break-all">{formatCommitId(parent.parentId)}</span>
-                  {parent.mergeRole !== "normal" ? (
-                    <span className="rounded bg-sidebar-background px-1 py-0.5 text-[9px] text-foreground-muted">
-                      {parent.mergeRole === "mainline" ? "主线" : "并入"}
-                    </span>
-                  ) : null}
-                </div>
-              ))}
-            </div>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-foreground-muted">
+          <span>{committedAtLabel}</span>
+          <span className="font-mono">{formatCommitId(commit.id)}</span>
+        </div>
+
+        <pre
+          className={cn(
+            "border-l border-border pl-3 font-sans text-sm leading-6 wrap-break-word whitespace-pre-wrap text-foreground",
+            body ? "min-h-18" : null,
           )}
-        </MetaRow>
-      </dl>
+        >
+          {fullMessage}
+        </pre>
+      </section>
 
-      <div className="flex flex-wrap gap-1.5">
-        <button type="button" onClick={() => onOpenFork(commit)} className={secondaryButton}>
-          <span className="icon-[material-symbols--fork-right] text-base" />
+      <section className="border-t border-border pt-3">
+        <div className="mb-3 flex items-center gap-1 text-[11px] font-semibold tracking-wider text-foreground-muted uppercase">
+          <span className="icon-[material-symbols--info-outline] text-sm text-accent-foreground" />
+          <h4>元信息</h4>
+        </div>
+        <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+          <MetaRow label="提交">
+            <span className="font-mono break-all">{formatCommitId(commit.id)}</span>
+          </MetaRow>
+          <MetaRow label="作者">{commit.author ?? "—"}</MetaRow>
+          <MetaRow label="时间">
+            <div className="space-y-1">
+              <div>{dateFormatter.format(commit.committedAt)}</div>
+              <div className="text-[11px] text-foreground-muted">{committedAtLabel}</div>
+            </div>
+          </MetaRow>
+          <MetaRow label="父提交" className="sm:col-span-2">
+            {commit.parents.length === 0 ? (
+              <span className="text-foreground-muted">根提交（无父）</span>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {commit.parents.map((parent) => (
+                  <div key={parent.parentId} className="flex flex-wrap items-center gap-1.5">
+                    <span className="font-mono break-all">{formatCommitId(parent.parentId)}</span>
+                    {parent.mergeRole !== "normal" ? (
+                      <span className="text-[10px] text-foreground-muted">
+                        {parent.mergeRole === "mainline" ? "主线" : "并入"}
+                      </span>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            )}
+          </MetaRow>
+        </dl>
+      </section>
+
+      <div>
+        <button
+          type="button"
+          onClick={() => onOpenFork(commit)}
+          className="inline-flex items-center gap-1 text-xs text-foreground-muted transition hover:text-foreground disabled:opacity-50"
+        >
+          <span className="icon-[material-symbols--fork-right] text-sm" />
           从这里 Fork
         </button>
         {/* TODO: Reset 到此提交 / Merge 入口待后端能力补齐后接入。 */}
@@ -99,13 +140,34 @@ export function ProjectCommitDetailPanel({
   );
 }
 
-function MetaRow({ label, children }: { label: string; children: React.ReactNode }) {
+function MetaRow({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <>
-      <dt className="text-foreground-muted">{label}</dt>
-      <dd className="min-w-0 text-foreground">{children}</dd>
-    </>
+    <div className={className}>
+      <dt className="mb-1 text-[11px] font-medium text-foreground-muted">{label}</dt>
+      <dd className="min-w-0 text-sm text-foreground">{children}</dd>
+    </div>
   );
+}
+
+function splitCommitMessage(message: string) {
+  const normalized = message.replace(/\r\n/g, "\n");
+  const [subjectLine = "", ...restLines] = normalized.split("\n");
+  const subject = subjectLine.trim() || "无提交说明";
+  const body = restLines.join("\n").replace(/^\n+|\n+$/g, "");
+
+  return {
+    subject,
+    body,
+    fullMessage: body ? `${subject}\n\n${body}` : subject,
+  };
 }
 
 /**
