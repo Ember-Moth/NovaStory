@@ -1,26 +1,20 @@
 import type { SHA1 } from "nano-git";
 
-import { readFilesAtCommit } from "./git-storage/git-store";
+import { readCommitDiff, readFilesAtCommit } from "./git-storage/git-store";
 import { flattenManuscriptNodes, readWorktreeStateFromFiles } from "./git-storage/worktree-state";
 import { getCommit } from "./commits";
 import {
   buildStructuredAuxChange,
+  didContentPathsChange,
+  didTimelinePathChange,
   compareContentStates,
   compareTimelineStates,
+  diffEntryPathKind,
+  isFileLikeDiffEntry,
   resolveAuxChangeTimelineLabel,
   shouldIgnoreAuxDiffPath,
 } from "./working-tree-status";
-import type { CommitDiff, WorkingTreePathChangeItem } from "./types";
-
-function pathChangeKind(
-  previous: string | undefined,
-  next: string | undefined,
-): WorkingTreePathChangeItem["kind"] | null {
-  if (previous === undefined && next !== undefined) return "added";
-  if (previous !== undefined && next === undefined) return "deleted";
-  if (previous !== next) return "modified";
-  return null;
-}
+import type { CommitDiff } from "./types";
 
 /**
  * 计算单个 commit 相对其首个父提交（根提交则相对空树）的语义化差异。
@@ -33,6 +27,11 @@ export async function getCommitDiff(projectId: string, commitId: string): Promis
   const commit = await getCommit(commitId, projectId);
   const baseCommitId = commit.parents[0]?.parentId ?? null;
   const isRoot = baseCommitId == null;
+  const pathDiff = readCommitDiff({
+    projectId,
+    previousCommitId: baseCommitId as SHA1 | null,
+    currentCommitId: commitId as SHA1,
+  });
 
   const nextFiles = readFilesAtCommit({ projectId, commitId: commitId as SHA1 });
   const previousFiles = baseCommitId
@@ -48,32 +47,34 @@ export async function getCommitDiff(projectId: string, commitId: string): Promis
     aux: { changed: false, changes: [] },
   };
 
-  areas.content.changes = compareContentStates(
-    flattenManuscriptNodes(previousState),
-    flattenManuscriptNodes(nextState),
-    previousState.timeline,
-    nextState.timeline,
-  );
-  areas.timeline.changes = compareTimelineStates(
-    previousState.timeline,
-    nextState.timeline,
-    flattenManuscriptNodes(nextState),
-    Object.keys(nextFiles),
-  );
+  if (didContentPathsChange(pathDiff)) {
+    areas.content.changes = compareContentStates(
+      flattenManuscriptNodes(previousState),
+      flattenManuscriptNodes(nextState),
+      previousState.timeline,
+      nextState.timeline,
+    );
+  }
+  if (didTimelinePathChange(pathDiff)) {
+    areas.timeline.changes = compareTimelineStates(
+      previousState.timeline,
+      nextState.timeline,
+      flattenManuscriptNodes(nextState),
+      Object.keys(nextFiles),
+    );
+  }
   const timelinePointNameMap = new Map(nextState.timeline.map((point) => [point.id, point.label]));
 
-  const allPaths = [...new Set([...Object.keys(previousFiles), ...Object.keys(nextFiles)])];
-  for (const filepath of allPaths) {
-    if (
-      filepath === "timeline.jsonl" ||
-      (!filepath.startsWith("aux/") && !filepath.startsWith("novel-evolver/aux"))
-    ) {
+  for (const entry of pathDiff) {
+    const filepath = entry.path;
+    if (!isFileLikeDiffEntry(entry)) continue;
+    if (!filepath.startsWith("aux/") && !filepath.startsWith("novel-evolver/aux")) {
       continue;
     }
     if (shouldIgnoreAuxDiffPath(filepath)) {
       continue;
     }
-    const kind = pathChangeKind(previousFiles[filepath], nextFiles[filepath]);
+    const kind = diffEntryPathKind(entry);
     if (!kind) {
       continue;
     }

@@ -1,9 +1,10 @@
 import { ORIGIN_TIMELINE_POINT_ID } from "./constants";
+import type { DiffEntry } from "nano-git";
 import type { SHA1 } from "nano-git";
 import type { VirtualWorkdir } from "nano-git/workdir/core";
 
 import { getBranch, getBranchHeadCommitId } from "./branches";
-import { readFilesAtCommit, getBranchMapping } from "./git-storage/git-store";
+import { readFilesAtCommit, readWorkdirDiff, getBranchMapping } from "./git-storage/git-store";
 import { getWorkdirForBranch } from "./git-storage/git-store";
 import {
   flattenManuscriptNodes,
@@ -89,6 +90,32 @@ export function buildStructuredAuxChange(
     isWhiteout: basename.startsWith(".wh."),
     revertable: true,
   };
+}
+
+export function diffEntryPathKind(entry: DiffEntry): WorkingTreePathChangeItem["kind"] | null {
+  if (entry.kind === "create") return "added";
+  if (entry.kind === "remove") return "deleted";
+  if (entry.kind === "update") return "modified";
+  return null;
+}
+
+export function didTimelinePathChange(diff: DiffEntry[]) {
+  return diff.some((entry) => entry.path === "timeline.jsonl");
+}
+
+export function didContentPathsChange(diff: DiffEntry[]) {
+  return diff.some(
+    (entry) =>
+      entry.path === "index.jsonl" ||
+      entry.path === "manuscript" ||
+      entry.path.startsWith("manuscript/"),
+  );
+}
+
+export function isFileLikeDiffEntry(entry: DiffEntry) {
+  if (entry.kind === "create") return entry.current.kind !== "tree";
+  if (entry.kind === "remove") return entry.previous.kind !== "tree";
+  return entry.current.kind !== "tree" || entry.previous.kind !== "tree";
 }
 
 function buildTimelinePointNameMap(points: TimelinePointLike[]) {
@@ -657,6 +684,7 @@ async function getWorkingTreeStatusFromWorkdir(
   headCommitId: string | null,
   workdir: VirtualWorkdir,
 ): Promise<WorkingTreeStatus> {
+  const pathDiff = readWorkdirDiff(workdir);
   const state = readWorktreeStateFromWorkdir(workdir);
   const headFiles = headCommitId
     ? readFilesAtCommit({ projectId, commitId: headCommitId as SHA1 })
@@ -671,47 +699,38 @@ async function getWorkingTreeStatusFromWorkdir(
     aux: { changed: false, changes: [] },
   };
 
-  // Content: semantic diff
-  areas.content.changes = compareContentStates(
-    flattenManuscriptNodes(headState),
-    flattenManuscriptNodes(state),
-    headState.timeline,
-    state.timeline,
-  );
+  if (didContentPathsChange(pathDiff)) {
+    areas.content.changes = compareContentStates(
+      flattenManuscriptNodes(headState),
+      flattenManuscriptNodes(state),
+      headState.timeline,
+      state.timeline,
+    );
+  }
   const workdirFiles = collectWorkdirFiles(workdir);
-  areas.timeline.changes = compareTimelineStates(
-    headState.timeline,
-    state.timeline,
-    flattenManuscriptNodes(state),
-    Object.keys(workdirFiles),
-  );
+  if (didTimelinePathChange(pathDiff)) {
+    areas.timeline.changes = compareTimelineStates(
+      headState.timeline,
+      state.timeline,
+      flattenManuscriptNodes(state),
+      Object.keys(workdirFiles),
+    );
+  }
   const timelinePointNameMap = buildTimelinePointNameMap(state.timeline);
 
-  // Aux: compare workdir files against HEAD files
-  const allPaths = [...new Set([...Object.keys(headFiles), ...Object.keys(workdirFiles)])];
-  for (const filepath of allPaths) {
+  for (const entry of pathDiff) {
+    const filepath = entry.path;
+    if (!isFileLikeDiffEntry(entry)) continue;
     const areaKey = areaForPath(filepath);
     if (areaKey === "content") continue;
     if (areaKey === "timeline") continue;
     if (shouldIgnoreAuxDiffPath(filepath)) continue;
-    const headContent = headFiles[filepath];
-    const wdContent = workdirFiles[filepath];
-    if (headContent === undefined && wdContent !== undefined) {
-      areas[areaKey].changes.push({
-        ...resolveAuxChangeTimelineLabel(buildStructuredAuxChange(filepath), timelinePointNameMap),
-        kind: "added",
-      });
-    } else if (headContent !== undefined && wdContent === undefined) {
-      areas[areaKey].changes.push({
-        ...resolveAuxChangeTimelineLabel(buildStructuredAuxChange(filepath), timelinePointNameMap),
-        kind: "deleted",
-      });
-    } else if (headContent !== wdContent) {
-      areas[areaKey].changes.push({
-        ...resolveAuxChangeTimelineLabel(buildStructuredAuxChange(filepath), timelinePointNameMap),
-        kind: "modified",
-      });
-    }
+    const kind = diffEntryPathKind(entry);
+    if (!kind) continue;
+    areas[areaKey].changes.push({
+      ...resolveAuxChangeTimelineLabel(buildStructuredAuxChange(filepath), timelinePointNameMap),
+      kind,
+    });
   }
 
   for (const area of Object.values(areas)) {

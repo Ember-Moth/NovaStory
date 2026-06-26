@@ -3,11 +3,11 @@ import path from "node:path";
 
 import { openRepository, initRepository } from "nano-git/repository/file";
 import { openSqliteVirtualWorkdir, deleteSqliteVirtualWorkdir } from "nano-git/workdir/sqlite";
-import { readTree } from "nano-git/repository/tree/tree-walk";
+import { diffTrees, readTree } from "nano-git/repository/tree/tree-diff";
 import { patchTree } from "nano-git/repository/tree/tree-patch";
 import { walkLogEntries } from "nano-git/log";
-import type { SHA1, TreeEntry, FileRepository } from "nano-git";
-import type { VirtualDiffEntry, VirtualWorkdir } from "nano-git/workdir/core";
+import type { DiffEntry, SHA1, TreeEntry, FileRepository } from "nano-git";
+import type { VirtualWorkdir } from "nano-git/workdir/core";
 
 import { getProjectRepoGitDir } from "./paths";
 import type { WorkingTreeStatus } from "@/modules/workspace/domain/types";
@@ -173,6 +173,34 @@ export function readFilesAtCommit(input: { projectId: string; commitId: SHA1 }) 
   const commit = repo.catFile(input.commitId);
   if (commit.type !== "commit") return {};
   return readTreeFiles(repo, commit.tree);
+}
+
+export function readCommitDiff(input: {
+  projectId: string;
+  previousCommitId: SHA1 | null;
+  currentCommitId: SHA1;
+}): DiffEntry[] {
+  const repo = getOrInitRepo(input.projectId);
+  const currentCommit = repo.catFile(input.currentCommitId);
+  if (currentCommit.type !== "commit") {
+    throw new Error(`Expected commit, got ${currentCommit.type}`);
+  }
+
+  const previousTree = input.previousCommitId
+    ? (() => {
+        const previousCommit = repo.catFile(input.previousCommitId);
+        if (previousCommit.type !== "commit") {
+          throw new Error(`Expected commit, got ${previousCommit.type}`);
+        }
+        return previousCommit.tree;
+      })()
+    : ensureEmptyTree(repo);
+
+  return diffTrees(repo.objects, previousTree, currentCommit.tree);
+}
+
+export function readWorkdirDiff(workdir: VirtualWorkdir): DiffEntry[] {
+  return workdir.diff();
 }
 
 export function readCommit(projectId: string, oid: SHA1) {
@@ -429,12 +457,9 @@ export function createWorkdir(
 }
 
 /**
- * 将 VirtualDiffEntry[] 转换为 WorkingTreeStatus（适配器）。
+ * 将 DiffEntry[] 转换为 WorkingTreeStatus（适配器）。
  */
-export function virtualDiffToStatus(
-  _diff: VirtualDiffEntry[],
-  _repo: FileRepository,
-): WorkingTreeStatus {
+export function virtualDiffToStatus(_diff: DiffEntry[], _repo: FileRepository): WorkingTreeStatus {
   return {
     hasChanges: false,
     headCommitId: null,
