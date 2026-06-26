@@ -823,28 +823,22 @@ export async function revertAuxChange(input: {
     : input.filepath;
   invariant(normalizedStoragePath.startsWith("aux/"), "仅支持撤回辅助信息路径。");
 
+  if (input.kind === "added") {
+    wd.restore(normalizedStoragePath, { force: true });
+    await touchWorkspace(workspace.projectId, workspace.id);
+    return;
+  }
+
   const headFiles = headCommitId
     ? readFilesAtCommit({ projectId: input.projectId, commitId: headCommitId as SHA1 })
     : {};
   const headContent = headFiles[input.filepath] ?? headFiles[normalizedStoragePath];
-  const currentExists = wd.exists(normalizedStoragePath);
-
-  if (input.kind === "added") {
-    wd.delete(normalizedStoragePath, { force: true });
-    await touchWorkspace(workspace.projectId, workspace.id);
-    return;
-  }
-
-  if (input.kind === "deleted") {
-    invariant(headContent !== undefined, "无法恢复辅助信息：HEAD 中不存在该路径。");
-    ensureWorkdirDir(wd, posix.dirname(normalizedStoragePath));
-    wd.writeFile(normalizedStoragePath, Buffer.from(headContent, "utf8"));
-    await touchWorkspace(workspace.projectId, workspace.id);
-    return;
-  }
-
   invariant(headContent !== undefined, "无法恢复辅助信息：HEAD 中不存在该路径。");
-  invariant(currentExists, "无法恢复辅助信息：当前工作区不存在该路径。");
-  wd.revert(normalizedStoragePath);
+
+  if (input.kind === "modified") {
+    invariant(wd.exists(normalizedStoragePath), "无法恢复辅助信息：当前工作区不存在该路径。");
+  }
+
+  wd.restore(normalizedStoragePath);
   await touchWorkspace(workspace.projectId, workspace.id);
 }
