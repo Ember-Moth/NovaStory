@@ -1,5 +1,6 @@
 import { cn } from "@/shared/lib/cn";
 import { FullPageMessage } from "@/shared/ui/FullPageMessage";
+import { OverlayScrollbar } from "@/shared/ui/OverlayScrollbar";
 
 import { ProjectCommitDetailPanel } from "./ProjectCommitDetailPanel";
 import { ProjectHistoryTimeline } from "./ProjectHistoryTimeline";
@@ -70,17 +71,19 @@ export function ProjectBranchDetailPanel() {
           />
         </section>
 
-        <section className="min-h-0 flex-1 overflow-y-auto p-4">
-          {selection.kind === "commit" ? (
-            <ProjectCommitDetailPanel
-              commitId={selection.commitId}
-              selectedBranchHeadCommitId={model.selectedBranchHeadCommitId}
-              onOpenFork={forkBranchDialog.openDialog}
-            />
-          ) : (
-            <WorkingChangesDetail workspaceMissing={workspaceMissing} />
-          )}
-        </section>
+        <OverlayScrollbar className="min-h-0 flex-1">
+          <section className="p-4">
+            {selection.kind === "commit" ? (
+              <ProjectCommitDetailPanel
+                commitId={selection.commitId}
+                selectedBranchHeadCommitId={model.selectedBranchHeadCommitId}
+                onOpenFork={forkBranchDialog.openDialog}
+              />
+            ) : (
+              <WorkingChangesDetail workspaceMissing={workspaceMissing} />
+            )}
+          </section>
+        </OverlayScrollbar>
       </div>
     </div>
   );
