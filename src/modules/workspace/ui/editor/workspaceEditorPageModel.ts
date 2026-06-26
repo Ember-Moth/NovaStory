@@ -106,3 +106,17 @@ export function shouldRefetchActiveAuxForRefresh({
   const targetTimelinePointId = getAuxRefreshTargetTimelinePointId(event);
   return targetTimelinePointId == null || targetTimelinePointId === activeTimelinePointId;
 }
+
+export function shouldResetWorkspaceLocalEditorState({
+  previousWorkspaceId,
+  nextWorkspaceId,
+}: {
+  previousWorkspaceId: string | null;
+  nextWorkspaceId: string | null;
+}) {
+  return (
+    previousWorkspaceId != null &&
+    nextWorkspaceId != null &&
+    previousWorkspaceId !== nextWorkspaceId
+  );
+}

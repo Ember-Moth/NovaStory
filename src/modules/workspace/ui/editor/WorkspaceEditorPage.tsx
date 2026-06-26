@@ -1,5 +1,5 @@
 import { ScopeProvider } from "bunshi/react";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import { AppShell, AppSidebar } from "@/app/shell/AppShell";
 import { useLastProjectStore } from "@/app/state/lastProject";
@@ -30,6 +30,7 @@ import {
   shouldClearActiveAuxDraftForRefresh,
   shouldClearActiveContentDraftForRefresh,
   shouldHandleWorkspaceRefreshRequested,
+  shouldResetWorkspaceLocalEditorState,
   shouldRefetchActiveAuxForRefresh,
 } from "@/modules/workspace/ui/editor/workspaceEditorPageModel";
 import {
@@ -147,6 +148,7 @@ function ProjectWorkspace({
 
   const { workspaceId, workspaceQuery, workspaceInitialLoading, routeMismatch } = identity;
   const workspaceDetail = workspaceQuery.data ?? null;
+  const previousWorkspaceIdRef = useRef<string | null>(workspaceId ?? null);
   useEffect(() => {
     if (
       !workspaceId ||
@@ -173,6 +175,25 @@ function ProjectWorkspace({
       };
     });
   }, [projectId, setLastWorkspaceRoute, workspaceDetail, workspaceId]);
+  useEffect(() => {
+    const previousWorkspaceId = previousWorkspaceIdRef.current;
+    const nextWorkspaceId = workspaceId ?? null;
+
+    if (
+      shouldResetWorkspaceLocalEditorState({
+        previousWorkspaceId,
+        nextWorkspaceId,
+      })
+    ) {
+      const state = workspaceStore.getState();
+      state.setDrafts({});
+      state.setCommittedBodies({});
+      state.setPendingSaveCounts({});
+      state.setSaveErrors({});
+    }
+
+    previousWorkspaceIdRef.current = nextWorkspaceId;
+  }, [workspaceId, workspaceStore]);
   const {
     query: contentQuery,
     pending: contentPending,

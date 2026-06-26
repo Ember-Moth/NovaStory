@@ -11,6 +11,7 @@ import {
   shouldClearActiveAuxDraftForRefresh,
   shouldClearActiveContentDraftForRefresh,
   shouldHandleWorkspaceRefreshRequested,
+  shouldResetWorkspaceLocalEditorState,
   shouldRefetchActiveAuxForRefresh,
 } from "./workspaceEditorPageModel";
 
@@ -283,6 +284,33 @@ test("shouldRefetchActiveAuxForRefresh skips old aux query when refresh targets 
         areas: ["content"],
       }),
       activeTimelinePointId: "point_active",
+    }),
+  ).toBe(false);
+});
+
+test("shouldResetWorkspaceLocalEditorState only resets when switching to another resolved workspace", () => {
+  expect(
+    shouldResetWorkspaceLocalEditorState({
+      previousWorkspaceId: "workspace_1",
+      nextWorkspaceId: "workspace_2",
+    }),
+  ).toBe(true);
+  expect(
+    shouldResetWorkspaceLocalEditorState({
+      previousWorkspaceId: "workspace_1",
+      nextWorkspaceId: "workspace_1",
+    }),
+  ).toBe(false);
+  expect(
+    shouldResetWorkspaceLocalEditorState({
+      previousWorkspaceId: null,
+      nextWorkspaceId: "workspace_2",
+    }),
+  ).toBe(false);
+  expect(
+    shouldResetWorkspaceLocalEditorState({
+      previousWorkspaceId: "workspace_1",
+      nextWorkspaceId: null,
     }),
   ).toBe(false);
 });
