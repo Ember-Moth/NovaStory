@@ -139,6 +139,13 @@ export function isFileLikeDiffEntry(entry: DiffEntry) {
   return entry.current.kind !== "tree" || entry.previous.kind !== "tree";
 }
 
+export function shouldIncludeAuxDiffEntry(entry: DiffEntry) {
+  if (entry.kind !== "update") {
+    return true;
+  }
+  return entry.current.kind !== "tree" || entry.previous.kind !== "tree";
+}
+
 function buildTimelinePointNameMap(points: TimelinePointLike[]) {
   const map = new Map<string, string>();
   for (const point of points) {
@@ -783,6 +790,7 @@ async function getWorkingTreeStatusFromWorkdir(
     if (areaKey === "content") continue;
     if (areaKey === "timeline") continue;
     if (shouldIgnoreAuxDiffPath(filepath)) continue;
+    if (!shouldIncludeAuxDiffEntry(entry)) continue;
     const kind = diffEntryPathKind(entry);
     if (!kind) continue;
     const structuredChange = buildStructuredAuxChangeFromDiffEntry(entry);

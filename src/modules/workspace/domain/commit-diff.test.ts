@@ -232,6 +232,48 @@ test("getCommitDiff includes aux directory changes", async () => {
   );
 });
 
+test("getCommitDiff filters modified aux directories but keeps modified files", async () => {
+  const workspace = await seedProject("diff_aux_filter_modified_dirs");
+  await workspaceService.mkdirAt({
+    projectId: workspace.projectId,
+    workspaceId: workspace.id,
+    path: "/设定",
+  });
+  await workspaceService.writeFileAt({
+    projectId: workspace.projectId,
+    workspaceId: workspace.id,
+    path: "/设定/角色.md",
+    content: "base",
+  });
+  await workspaceService.createCommit({
+    projectId: workspace.projectId,
+    branchId: workspace.branchName,
+    message: "base",
+  });
+
+  await workspaceService.writeFileAt({
+    projectId: workspace.projectId,
+    workspaceId: workspace.id,
+    path: "/设定/角色.md",
+    content: "updated",
+  });
+  const second = await workspaceService.createCommit({
+    projectId: workspace.projectId,
+    branchId: workspace.branchName,
+    message: "update aux file",
+  });
+
+  const diff = await workspaceService.getCommitDiff(workspace.projectId, second.id);
+
+  expect(diff.areas.aux.changes).toEqual([
+    expect.objectContaining({
+      label: "aux/origin/设定/角色.md",
+      path: "设定/角色.md",
+      kind: "modified",
+    }),
+  ]);
+});
+
 test("getCommitDiff does not infer aux source info when tree diff lacks it", async () => {
   const workspace = await seedProject("diff_aux_no_source_info");
   await workspaceService.mkdirAt({

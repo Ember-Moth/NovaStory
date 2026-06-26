@@ -270,6 +270,43 @@ test("pure manuscript body edit only reports the touched node", async () => {
   ).toBeUndefined();
 });
 
+test("aux changes filter modified directories but keep modified files", async () => {
+  const workspace = await seedProject("status_aux_filter_modified_dirs");
+  await service.mkdirAt({
+    projectId: workspace.projectId,
+    workspaceId: workspace.id,
+    path: "/设定",
+  });
+  await service.writeFileAt({
+    projectId: workspace.projectId,
+    workspaceId: workspace.id,
+    path: "/设定/角色.md",
+    content: "base",
+  });
+  await service.createCommit({
+    projectId: workspace.projectId,
+    branchId: workspace.branchName,
+    message: "base",
+  });
+
+  await service.writeFileAt({
+    projectId: workspace.projectId,
+    workspaceId: workspace.id,
+    path: "/设定/角色.md",
+    content: "updated",
+  });
+
+  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchName);
+
+  expect(status.areas.aux.changes).toEqual([
+    expect.objectContaining({
+      label: "aux/origin/设定/角色.md",
+      path: "设定/角色.md",
+      kind: "modified",
+    }),
+  ]);
+});
+
 test("content move and anchor updates are summarized semantically", async () => {
   const workspace = await seedProject("status_semantic_content_diff");
   const introPoint = await service.createTimelinePoint({

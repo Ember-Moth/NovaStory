@@ -12,6 +12,7 @@ import {
   diffEntryPathKind,
   resolveAuxChangeTimelineLabel,
   shouldIgnoreAuxDiffPath,
+  shouldIncludeAuxDiffEntry,
 } from "./working-tree-status";
 import type { CommitDiff } from "./types";
 
@@ -71,6 +72,9 @@ export async function getCommitDiff(projectId: string, commitId: string): Promis
       continue;
     }
     if (shouldIgnoreAuxDiffPath(filepath)) {
+      continue;
+    }
+    if (!shouldIncludeAuxDiffEntry(entry)) {
       continue;
     }
     const kind = diffEntryPathKind(entry);
