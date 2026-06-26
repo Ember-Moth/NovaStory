@@ -5,9 +5,9 @@ import { flattenManuscriptNodes, readWorktreeStateFromFiles } from "./git-storag
 import { getCommit } from "./commits";
 import {
   buildStructuredAuxChange,
+  compareContentStatesForDiff,
   didContentPathsChange,
   didTimelinePathChange,
-  compareContentStates,
   compareTimelineStates,
   diffEntryPathKind,
   isFileLikeDiffEntry,
@@ -48,7 +48,8 @@ export async function getCommitDiff(projectId: string, commitId: string): Promis
   };
 
   if (didContentPathsChange(pathDiff)) {
-    areas.content.changes = compareContentStates(
+    areas.content.changes = compareContentStatesForDiff(
+      pathDiff,
       flattenManuscriptNodes(previousState),
       flattenManuscriptNodes(nextState),
       previousState.timeline,

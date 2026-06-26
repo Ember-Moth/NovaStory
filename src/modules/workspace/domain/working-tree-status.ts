@@ -112,6 +112,21 @@ export function didContentPathsChange(diff: DiffEntry[]) {
   );
 }
 
+function hasIndexFileChange(diff: DiffEntry[]) {
+  return diff.some((entry) => entry.path === "index.jsonl");
+}
+
+function manuscriptNodeIdFromPath(path: string): string | null {
+  if (!path.startsWith("manuscript/") || !path.endsWith(".md")) {
+    return null;
+  }
+  const relativePath = path.slice("manuscript/".length);
+  if (!relativePath || relativePath.includes("/")) {
+    return null;
+  }
+  return relativePath.slice(0, -".md".length) || null;
+}
+
 export function isFileLikeDiffEntry(entry: DiffEntry) {
   if (entry.kind === "create") return entry.current.kind !== "tree";
   if (entry.kind === "remove") return entry.previous.kind !== "tree";
@@ -646,6 +661,35 @@ export function compareContentStates(
   });
 }
 
+export function compareContentStatesForDiff(
+  diff: DiffEntry[],
+  previousNodes: FlatContentNode[],
+  nextNodes: FlatContentNode[],
+  previousTimeline: TimelinePointLike[],
+  nextTimeline: TimelinePointLike[],
+): WorkingTreeContentChangeItem[] {
+  if (hasIndexFileChange(diff)) {
+    return compareContentStates(previousNodes, nextNodes, previousTimeline, nextTimeline);
+  }
+
+  const changedNodeIds = new Set<string>();
+  for (const entry of diff) {
+    if (!isFileLikeDiffEntry(entry)) continue;
+    const nodeId = manuscriptNodeIdFromPath(entry.path);
+    if (nodeId) {
+      changedNodeIds.add(nodeId);
+    }
+  }
+
+  if (changedNodeIds.size === 0) {
+    return [];
+  }
+
+  return compareContentStates(previousNodes, nextNodes, previousTimeline, nextTimeline).filter(
+    (change) => changedNodeIds.has(change.nodeId),
+  );
+}
+
 export async function getWorkingTreeStatus(
   projectId: string,
   branchId: string,
@@ -700,7 +744,8 @@ async function getWorkingTreeStatusFromWorkdir(
   };
 
   if (didContentPathsChange(pathDiff)) {
-    areas.content.changes = compareContentStates(
+    areas.content.changes = compareContentStatesForDiff(
+      pathDiff,
       flattenManuscriptNodes(headState),
       flattenManuscriptNodes(state),
       headState.timeline,

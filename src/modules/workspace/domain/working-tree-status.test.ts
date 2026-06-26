@@ -2,6 +2,7 @@ import type { SHA1 } from "nano-git";
 import { expect, test } from "bun:test";
 
 import { seedProjectRecord } from "@/test/project";
+import { getWorkdirForBranch, getBranchMapping } from "./git-storage/git-store";
 import * as service from "./index";
 
 async function seedProject(projectId: string) {
@@ -10,6 +11,12 @@ async function seedProject(projectId: string) {
     await service.createDefaultWorkspace(projectId);
   }
   return (await service.getDefaultWorkspace(projectId))!;
+}
+
+function wdFor(workspace: { projectId: string; id: string }) {
+  const workdirKey = getBranchMapping(workspace.projectId, workspace.id);
+  if (!workdirKey) return undefined;
+  return getWorkdirForBranch(workspace.projectId, workdirKey);
 }
 
 test("empty branch before first commit reports no diff areas", async () => {
@@ -214,6 +221,45 @@ test("content, timeline and aux edits appear in the diff summary", async () => {
       }),
     ]),
   );
+});
+
+test("pure manuscript body edit only reports the touched node", async () => {
+  const workspace = await seedProject("status_manuscript_only_body_diff");
+  const chapterA = await service.createContentNode({
+    projectId: workspace.projectId,
+    workspaceId: workspace.id,
+    parentId: null,
+    title: "Chapter A",
+    body: "A",
+  });
+  const chapterB = await service.createContentNode({
+    projectId: workspace.projectId,
+    workspaceId: workspace.id,
+    parentId: null,
+    title: "Chapter B",
+    body: "B",
+  });
+  await service.createCommit({
+    projectId: workspace.projectId,
+    branchId: workspace.branchName,
+    message: "base",
+  });
+
+  const wd = wdFor(workspace);
+  wd!.writeFile(`manuscript/${chapterA.id}.md`, Buffer.from("AA", "utf8"));
+
+  const status = await service.getWorkingTreeStatus(workspace.projectId, workspace.branchName);
+
+  expect(status.areas.content.changes).toHaveLength(1);
+  expect(status.areas.content.changes[0]).toMatchObject({
+    nodeId: chapterA.id,
+    kind: "modified",
+    changedAspects: ["body"],
+    bodyCharDelta: { added: 1, removed: 0 },
+  });
+  expect(
+    status.areas.content.changes.find((change) => change.nodeId === chapterB.id),
+  ).toBeUndefined();
 });
 
 test("content move and anchor updates are summarized semantically", async () => {
