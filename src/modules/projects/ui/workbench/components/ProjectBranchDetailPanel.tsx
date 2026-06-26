@@ -12,6 +12,7 @@ import {
   formatCommitId,
   InlineError,
   primaryButton,
+  secondaryButton,
 } from "../../shared/projectUi";
 import { useProjectCommitDraft, useProjectHistorySelection } from "../state/projectWorkbenchStore";
 import {
@@ -199,23 +200,10 @@ function WorkingChangesDetail({ workspaceMissing }: { workspaceMissing: boolean 
 
   return (
     <>
-      <div className="flex h-7 items-center gap-1 text-[11px] font-semibold tracking-wider text-foreground-muted uppercase">
+      <div className="flex items-center gap-1 text-[11px] font-semibold tracking-wider text-foreground-muted uppercase">
         <span className="icon-[material-symbols--upload] text-base text-accent-foreground" />
         <h3>Commit</h3>
       </div>
-
-      <WorkingTreeStatusPanel
-        status={workingTreeStatus}
-        loading={model.workingTreeStatusLoading}
-        error={model.workingTreeStatusErrorMessage}
-        discardError={discardError ?? commitFeature.discardErrorMessage}
-        canDiscardChanges={canDiscardChanges}
-        isDiscardingChanges={commitFeature.isDiscardingChanges}
-        onDiscardChanges={() => void commitFeature.handleDiscardChanges()}
-        onRevertContentChange={revertFeature.handleRevertContentChange}
-        onRevertTimelineChange={revertFeature.handleRevertTimelineChange}
-        onRevertAuxChange={revertFeature.handleRevertAuxChange}
-      />
 
       <form
         className="mt-2 grid gap-2"
@@ -224,7 +212,7 @@ function WorkingChangesDetail({ workspaceMissing }: { workspaceMissing: boolean 
         <textarea
           value={commitMessage}
           onChange={(event) => setCommitMessage(event.target.value)}
-          rows={4}
+          rows={3}
           disabled={commitDisabled}
           placeholder="描述这次提交做了什么。"
           className="field-sizing-content w-full resize-none rounded-md border border-border bg-editor-background px-3 py-2 text-sm leading-relaxed text-foreground transition outline-none focus:border-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
@@ -232,7 +220,28 @@ function WorkingChangesDetail({ workspaceMissing }: { workspaceMissing: boolean 
         {commitError || commitFeature.commitErrorMessage ? (
           <InlineError message={commitError ?? commitFeature.commitErrorMessage ?? ""} />
         ) : null}
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          {canDiscardChanges ? (
+            <button
+              type="button"
+              onClick={() => void commitFeature.handleDiscardChanges()}
+              disabled={commitFeature.isDiscardingChanges}
+              className={cn(
+                secondaryButton,
+                "text-accent-foreground hover:bg-red-500/10 hover:text-red-200",
+              )}
+            >
+              <span
+                className={cn(
+                  "text-base",
+                  commitFeature.isDiscardingChanges
+                    ? "icon-[material-symbols--sync] animate-spin"
+                    : "icon-[material-symbols--undo]",
+                )}
+              />
+              撤回全部修改
+            </button>
+          ) : null}
           <button type="submit" disabled={commitDisabled} className={primaryButton}>
             <span
               className={cn(
@@ -246,6 +255,16 @@ function WorkingChangesDetail({ workspaceMissing }: { workspaceMissing: boolean 
           </button>
         </div>
       </form>
+
+      <WorkingTreeStatusPanel
+        status={workingTreeStatus}
+        loading={model.workingTreeStatusLoading}
+        error={model.workingTreeStatusErrorMessage}
+        discardError={discardError ?? commitFeature.discardErrorMessage}
+        onRevertContentChange={revertFeature.handleRevertContentChange}
+        onRevertTimelineChange={revertFeature.handleRevertTimelineChange}
+        onRevertAuxChange={revertFeature.handleRevertAuxChange}
+      />
     </>
   );
 }

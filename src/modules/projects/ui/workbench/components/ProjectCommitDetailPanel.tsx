@@ -117,7 +117,7 @@ function DiffSection({ commitId }: { commitId: string }) {
   const diff = diffQuery.data ?? null;
 
   return (
-    <div className="rounded-md border border-border bg-editor-background p-3">
+    <div className="bg-editor-background">
       <div className="flex items-center gap-1">
         <span className="icon-[material-symbols--difference] text-base text-accent-foreground" />
         <h4 className="text-xs font-medium text-foreground-muted">

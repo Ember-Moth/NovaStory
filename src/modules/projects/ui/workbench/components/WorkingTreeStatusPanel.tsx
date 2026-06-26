@@ -1,8 +1,7 @@
-import { cn } from "@/shared/lib/cn";
 import { LoadingBlock } from "@/shared/ui/Loading";
 
 import type { ChangeAreas, WorkingTreeStatus } from "../../shared/projectTypes";
-import { InlineError, secondaryButton } from "../../shared/projectUi";
+import { InlineError } from "../../shared/projectUi";
 import { ChangeAreasView } from "./ChangeAreasView";
 
 export function WorkingTreeStatusPanel({
@@ -10,9 +9,6 @@ export function WorkingTreeStatusPanel({
   loading,
   error,
   discardError,
-  canDiscardChanges,
-  isDiscardingChanges,
-  onDiscardChanges,
   onRevertContentChange,
   onRevertTimelineChange,
   onRevertAuxChange,
@@ -21,9 +17,6 @@ export function WorkingTreeStatusPanel({
   loading: boolean;
   error: string | null;
   discardError: string | null;
-  canDiscardChanges: boolean;
-  isDiscardingChanges: boolean;
-  onDiscardChanges: () => void;
   onRevertContentChange?: (
     nodeId: string,
     kind: ChangeAreas["content"]["changes"][number]["kind"],
@@ -38,29 +31,7 @@ export function WorkingTreeStatusPanel({
   ) => void;
 }) {
   return (
-    <section className="relative mt-2 rounded-md border border-border bg-editor-background p-3">
-      {canDiscardChanges ? (
-        <button
-          type="button"
-          onClick={onDiscardChanges}
-          disabled={isDiscardingChanges}
-          className={cn(
-            secondaryButton,
-            "absolute top-3 right-3 text-accent-foreground hover:bg-red-500/10 hover:text-red-200",
-          )}
-        >
-          <span
-            className={cn(
-              "text-base",
-              isDiscardingChanges
-                ? "icon-[material-symbols--sync] animate-spin"
-                : "icon-[material-symbols--undo]",
-            )}
-          />
-          撤回全部修改
-        </button>
-      ) : null}
-
+    <section className="relative mt-2 bg-editor-background">
       <div className="flex items-center gap-1">
         <span className="icon-[material-symbols--difference] text-base text-accent-foreground" />
         <h4 className="text-xs font-medium text-foreground-muted">未提交变更</h4>
