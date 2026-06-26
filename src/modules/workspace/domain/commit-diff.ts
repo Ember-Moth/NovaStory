@@ -4,7 +4,7 @@ import { readCommitDiff, readFilesAtCommit } from "./git-storage/git-store";
 import { flattenManuscriptNodes, readWorktreeStateFromFiles } from "./git-storage/worktree-state";
 import { getCommit } from "./commits";
 import {
-  buildStructuredAuxChange,
+  buildStructuredAuxChangeFromDiffEntry,
   compareContentStatesForDiff,
   didContentPathsChange,
   didTimelinePathChange,
@@ -77,7 +77,7 @@ export async function getCommitDiff(projectId: string, commitId: string): Promis
     if (!kind) {
       continue;
     }
-    const structuredChange = buildStructuredAuxChange(filepath);
+    const structuredChange = buildStructuredAuxChangeFromDiffEntry(entry);
     if (structuredChange.path.length === 0) {
       continue;
     }

@@ -146,6 +146,7 @@ export interface ResolvedAuxSnapshotNode extends ResolvedAuxNode {
 }
 
 export type WorkingTreeChangeKind = "added" | "modified" | "deleted";
+export type WorkingTreePathSourceKind = "move" | "copy";
 
 export type ContentChangeAspect = "title" | "body" | "parent" | "order" | "anchor";
 export type TimelineChangeAspect = "label" | "description" | "order";
@@ -156,6 +157,10 @@ export interface WorkingTreePathChangeItem {
   kind: WorkingTreeChangeKind;
   timelinePointId?: string | typeof ORIGIN_TIMELINE_POINT_ID | null;
   timelinePointLabel?: string | null;
+  sourceKind?: WorkingTreePathSourceKind;
+  sourcePath?: string | null;
+  sourceTimelinePointId?: string | typeof ORIGIN_TIMELINE_POINT_ID | null;
+  sourceTimelinePointLabel?: string | null;
   isWhiteout?: boolean;
   revertable?: boolean;
 }

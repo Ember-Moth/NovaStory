@@ -231,3 +231,44 @@ test("getCommitDiff includes aux directory changes", async () => {
     ]),
   );
 });
+
+test("getCommitDiff does not infer aux source info when tree diff lacks it", async () => {
+  const workspace = await seedProject("diff_aux_no_source_info");
+  await workspaceService.mkdirAt({
+    projectId: workspace.projectId,
+    workspaceId: workspace.id,
+    path: "/设定",
+  });
+  await workspaceService.writeFileAt({
+    projectId: workspace.projectId,
+    workspaceId: workspace.id,
+    path: "/设定/角色.md",
+    content: "base",
+  });
+  await workspaceService.createCommit({
+    projectId: workspace.projectId,
+    branchId: workspace.branchName,
+    message: "base",
+  });
+
+  await workspaceService.moveAuxNodeAt({
+    projectId: workspace.projectId,
+    workspaceId: workspace.id,
+    path: "/设定/角色.md",
+    newPath: "/设定/主角.md",
+  });
+  const second = await workspaceService.createCommit({
+    projectId: workspace.projectId,
+    branchId: workspace.branchName,
+    message: "move aux",
+  });
+
+  const diff = await workspaceService.getCommitDiff(workspace.projectId, second.id);
+  const targetChange = diff.areas.aux.changes.find((change) => change.path === "设定/主角.md");
+
+  expect(targetChange?.kind).toBe("added");
+  expect(targetChange?.sourceKind).toBeUndefined();
+  expect(targetChange?.sourcePath).toBeUndefined();
+  expect(targetChange?.sourceTimelinePointId).toBeUndefined();
+  expect(targetChange?.sourceTimelinePointLabel).toBeUndefined();
+});

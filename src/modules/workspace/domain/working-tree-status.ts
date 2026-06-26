@@ -49,6 +49,7 @@ export function shouldIgnoreAuxDiffPath(filepath: string) {
   return (
     normalizedPath === "aux/origin/.gitkeep" ||
     normalizedPath.endsWith("/.gitkeep") ||
+    normalizedPath === "aux" ||
     normalizedPath === "aux/origin" ||
     normalizedPath === "aux/timeline"
   );
@@ -95,6 +96,33 @@ export function buildStructuredAuxChange(
     isWhiteout: basename.startsWith(".wh."),
     revertable: true,
   };
+}
+
+function buildStructuredAuxSource(
+  sourcePath: string,
+): Pick<
+  WorkingTreePathChangeItem,
+  "sourcePath" | "sourceTimelinePointId" | "sourceTimelinePointLabel"
+> {
+  const structured = buildStructuredAuxChange(sourcePath);
+  return {
+    sourcePath: structured.path,
+    sourceTimelinePointId: structured.timelinePointId ?? null,
+    sourceTimelinePointLabel: structured.timelinePointLabel ?? null,
+  };
+}
+
+function readDiffEntrySource(entry: DiffEntry): { kind: "move" | "copy"; path: string } | null {
+  const source = Reflect.get(entry, "source");
+  if (typeof source !== "object" || source == null) {
+    return null;
+  }
+  const kind = Reflect.get(source, "kind");
+  const path = Reflect.get(source, "path");
+  if ((kind !== "move" && kind !== "copy") || typeof path !== "string") {
+    return null;
+  }
+  return { kind, path };
 }
 
 export function diffEntryPathKind(entry: DiffEntry): WorkingTreePathChangeItem["kind"] | null {
@@ -150,12 +178,37 @@ export function resolveAuxChangeTimelineLabel(
   change: Omit<WorkingTreePathChangeItem, "kind">,
   timelineLabelMap: Map<string, string>,
 ): Omit<WorkingTreePathChangeItem, "kind"> {
-  if (!change.timelinePointId || change.timelinePointId === ORIGIN_TIMELINE_POINT_ID) {
-    return change;
+  const resolvedChange = { ...change };
+  if (
+    resolvedChange.timelinePointId &&
+    resolvedChange.timelinePointId !== ORIGIN_TIMELINE_POINT_ID
+  ) {
+    resolvedChange.timelinePointLabel =
+      timelineLabelMap.get(resolvedChange.timelinePointId) ?? resolvedChange.timelinePointId;
+  }
+  if (
+    resolvedChange.sourceTimelinePointId &&
+    resolvedChange.sourceTimelinePointId !== ORIGIN_TIMELINE_POINT_ID
+  ) {
+    resolvedChange.sourceTimelinePointLabel =
+      timelineLabelMap.get(resolvedChange.sourceTimelinePointId) ??
+      resolvedChange.sourceTimelinePointId;
+  }
+  return resolvedChange;
+}
+
+export function buildStructuredAuxChangeFromDiffEntry(
+  entry: DiffEntry,
+): Omit<WorkingTreePathChangeItem, "kind"> {
+  const structured = buildStructuredAuxChange(entry.path);
+  const source = readDiffEntrySource(entry);
+  if (!source) {
+    return structured;
   }
   return {
-    ...change,
-    timelinePointLabel: timelineLabelMap.get(change.timelinePointId) ?? change.timelinePointId,
+    ...structured,
+    sourceKind: source.kind,
+    ...buildStructuredAuxSource(source.path),
   };
 }
 
@@ -776,7 +829,7 @@ async function getWorkingTreeStatusFromWorkdir(
     if (shouldIgnoreAuxDiffPath(filepath)) continue;
     const kind = diffEntryPathKind(entry);
     if (!kind) continue;
-    const structuredChange = buildStructuredAuxChange(filepath);
+    const structuredChange = buildStructuredAuxChangeFromDiffEntry(entry);
     if (structuredChange.path.length === 0) continue;
     areas[areaKey].changes.push({
       ...resolveAuxChangeTimelineLabel(structuredChange, timelinePointNameMap),

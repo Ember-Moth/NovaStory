@@ -181,6 +181,15 @@ function WorkingTreeChangeLabel({
   const isWhiteout = change.isWhiteout === true && filename.startsWith(".wh.");
   const whiteoutTarget = isWhiteout ? filename.slice(4) : null;
   const timelineLabel = change.timelinePointLabel ?? change.timelinePointId ?? "辅助信息";
+  const sourceTimelineLabel =
+    change.sourceTimelinePointLabel ?? change.sourceTimelinePointId ?? "辅助信息";
+  const sourcePath = change.sourcePath ?? null;
+  const sourceValue =
+    sourcePath == null
+      ? null
+      : sourceTimelineLabel === timelineLabel
+        ? sourcePath || "/"
+        : `${sourceTimelineLabel} · ${sourcePath || "/"}`;
 
   return (
     <div className="min-w-0">
@@ -212,8 +221,15 @@ function WorkingTreeChangeLabel({
           <span className="min-w-0 truncate font-medium text-foreground">{filename || "/"}</span>
         )}
       </div>
-      <div className="mt-1">
+      <div className="mt-1 flex flex-wrap gap-1.5">
         <SemanticPlacementChip label="位于" value={timelineLabel} tone="sky" />
+        {sourceValue ? (
+          <SemanticPlacementChip
+            label={change.sourceKind === "copy" ? "复制自" : "来自"}
+            value={sourceValue}
+            tone="slate"
+          />
+        ) : null}
       </div>
     </div>
   );
