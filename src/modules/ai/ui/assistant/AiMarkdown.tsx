@@ -1,11 +1,11 @@
 import type { ComponentProps, ReactNode } from "react";
 import { BlockPolicy, harden } from "rehype-harden";
-import { Streamdown, defaultRehypePlugins, type StreamdownProps } from "streamdown";
+import { defaultRehypePlugins, Streamdown, type StreamdownProps } from "streamdown";
 
 import { cn } from "@/shared/lib/cn";
-import { SidebarMarkdownTable } from "./SidebarMarkdownTable";
 import { MarkdownTable } from "@/shared/ui/markdown/MarkdownTable";
 import { OverlayScrollbar } from "@/shared/ui/OverlayScrollbar";
+import { SidebarMarkdownTable } from "./SidebarMarkdownTable";
 
 const AI_MARKDOWN_REHYPE_PLUGINS: NonNullable<StreamdownProps["rehypePlugins"]> = [
   defaultRehypePlugins.sanitize!,
@@ -99,14 +99,14 @@ function MarkdownCode({
           className="ai-code-scrollbar"
           data-streamdown="code-block-body"
         >
-          <pre className="font-mono text-[12px] leading-5 text-foreground">
+          <pre className="font-mono text-[12px] text-foreground leading-5">
             <code>
               {lines.map((line, index) => (
                 <span
                   key={`line:${index + 1}`}
                   className="grid grid-cols-[2.5rem_minmax(0,max-content)] gap-4"
                 >
-                  <span className="text-right text-foreground-muted/55 select-none">
+                  <span className="select-none text-right text-foreground-muted/55">
                     {index + 1}
                   </span>
                   <span className="whitespace-pre">{line.length > 0 ? line : "\u00a0"}</span>

@@ -1,16 +1,14 @@
+import { AutoTransition } from "auto-transition";
 import { useState } from "react";
-
 import { AuxNodeIcon, ContentNodeIcon } from "@/modules/workspace/ui/editor/components/icons";
-import { MainTextEditor } from "@/shared/ui/editor/MainTextEditor";
-import { cn } from "@/shared/lib/cn";
 import type {
   AuxTreeNodeVM,
   ContentTreeNodeVM,
   SaveState,
 } from "@/modules/workspace/ui/editor/model/types";
-
+import { cn } from "@/shared/lib/cn";
+import { MainTextEditor } from "@/shared/ui/editor/MainTextEditor";
 import { WorkspaceMarkdownPreview } from "./WorkspaceMarkdownPreview";
-import { AutoTransition } from "auto-transition";
 
 const EDITOR_HEADER_CLASS =
   "flex h-10 shrink-0 items-center gap-2 border-b border-border bg-title-bar-background px-4";
@@ -128,7 +126,7 @@ export function EditorArea({
 
   if (!target) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-foreground-muted">
+      <div className="flex h-full items-center justify-center text-foreground-muted text-sm">
         选择一个正文节点或辅助文件开始编辑
       </div>
     );
@@ -209,7 +207,7 @@ export function EditorArea({
             时间点: {timelineLabel}
           </span>
         </div>
-        <div className="flex flex-1 items-center justify-center px-4 text-sm text-foreground-muted">
+        <div className="flex flex-1 items-center justify-center px-4 text-foreground-muted text-sm">
           {isAuxSymlinkTargetPickerActive
             ? "正在选择新的符号链接目标，请从左侧辅助信息树中点击有效节点。"
             : placeholder}
@@ -219,7 +217,7 @@ export function EditorArea({
   }
 
   return (
-    <div className="flex h-full items-center justify-center text-sm text-foreground-muted">
+    <div className="flex h-full items-center justify-center text-foreground-muted text-sm">
       选择一个正文节点或辅助文件开始编辑
     </div>
   );

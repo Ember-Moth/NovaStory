@@ -1,4 +1,4 @@
-import { type FormEvent } from "react";
+import type { FormEvent } from "react";
 
 import { ProjectDialog } from "../shared/ProjectDialog";
 import { useProjectListState } from "./state/projectListStore";
@@ -44,24 +44,23 @@ function CreateProjectDialogFields() {
   return (
     <>
       <label className="block space-y-1.5">
-        <span className="text-xs font-medium text-foreground-muted">项目名</span>
+        <span className="font-medium text-foreground-muted text-xs">项目名</span>
         <input
-          autoFocus
           value={name}
           onChange={(event) => setName(event.target.value)}
           placeholder="例如：雾港编年史"
-          className="w-full rounded-md border border-border bg-editor-background px-3 py-1.5 text-sm text-foreground transition outline-none placeholder:text-foreground-muted/50 focus:border-accent-foreground"
+          className="w-full rounded-md border border-border bg-editor-background px-3 py-1.5 text-foreground text-sm outline-none transition placeholder:text-foreground-muted/50 focus:border-accent-foreground"
         />
       </label>
 
       <label className="block space-y-1.5">
-        <span className="text-xs font-medium text-foreground-muted">描述</span>
+        <span className="font-medium text-foreground-muted text-xs">描述</span>
         <textarea
           value={description}
           onChange={(event) => setDescription(event.target.value)}
           rows={3}
           placeholder="可选"
-          className="w-full resize-none rounded-md border border-border bg-editor-background px-3 py-1.5 text-sm leading-relaxed text-foreground transition outline-none placeholder:text-foreground-muted/50 focus:border-accent-foreground"
+          className="w-full resize-none rounded-md border border-border bg-editor-background px-3 py-1.5 text-foreground text-sm leading-relaxed outline-none transition placeholder:text-foreground-muted/50 focus:border-accent-foreground"
         />
       </label>
     </>

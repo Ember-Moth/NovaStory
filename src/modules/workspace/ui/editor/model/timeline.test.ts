@@ -1,9 +1,8 @@
 import { expect, test } from "bun:test";
 
 import { ORIGIN_TIMELINE_POINT_ID } from "@/modules/workspace/domain/constants";
-
-import type { TimelinePointVM } from "./types";
 import { resolveTimelineMoveAfterPointId } from "./timeline";
+import type { TimelinePointVM } from "./types";
 
 function createTimelinePoint(
   overrides: Partial<TimelinePointVM> & Pick<TimelinePointVM, "id" | "label">,

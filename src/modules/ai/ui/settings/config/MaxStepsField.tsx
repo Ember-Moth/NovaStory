@@ -40,19 +40,19 @@ export function MaxStepsField({
             event.currentTarget.blur();
           }
         }}
-        className="h-8 w-28 rounded-md border border-border bg-sidebar-background px-2 text-sm text-foreground outline-none placeholder:text-foreground-muted/50 focus:border-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+        className="h-8 w-28 rounded-md border border-border bg-sidebar-background px-2 text-foreground text-sm outline-none placeholder:text-foreground-muted/50 focus:border-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
         placeholder={String(AI_ASSISTANT_MAX_STEPS_DEFAULT)}
       />
       <button
         type="button"
         disabled={isPending}
         onClick={onReset}
-        className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-sidebar-background px-2.5 text-sm text-foreground transition hover:bg-list-hover-background disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-sidebar-background px-2.5 text-foreground text-sm transition hover:bg-list-hover-background disabled:cursor-not-allowed disabled:opacity-50"
       >
         <span className="icon-[material-symbols--restart-alt] text-base" />
         重置
       </button>
-      <span className="text-xs text-foreground-muted">
+      <span className="text-foreground-muted text-xs">
         范围 {AI_ASSISTANT_MAX_STEPS_MIN}-{AI_ASSISTANT_MAX_STEPS_MAX}
       </span>
     </div>

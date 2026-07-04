@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
 
 import { ProjectDialog } from "../../shared/ProjectDialog";
-import { useProjectCreateBranchDraft } from "../state/projectWorkbenchStore";
 import { useCreateBranchFeature } from "../features/useCreateBranchFeature";
+import { useProjectCreateBranchDraft } from "../state/projectWorkbenchStore";
 
 export function CreateBranchDialog() {
   const createBranch = useCreateBranchFeature();
@@ -40,13 +40,12 @@ export function CreateBranchDialog() {
       submitLabel="创建分支"
     >
       <label className="block space-y-1.5">
-        <span className="text-xs font-medium text-foreground-muted">分支名</span>
+        <span className="font-medium text-foreground-muted text-xs">分支名</span>
         <input
-          autoFocus
           value={newBranchName}
           onChange={(event) => setNewBranchName(event.target.value)}
           placeholder="例如：feature-outline"
-          className="w-full rounded-md border border-border bg-editor-background px-3 py-1.5 text-sm text-foreground transition outline-none placeholder:text-foreground-muted/50 focus:border-accent-foreground"
+          className="w-full rounded-md border border-border bg-editor-background px-3 py-1.5 text-foreground text-sm outline-none transition placeholder:text-foreground-muted/50 focus:border-accent-foreground"
         />
       </label>
     </ProjectDialog>

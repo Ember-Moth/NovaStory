@@ -1,4 +1,4 @@
-import { type FormEvent, type ReactNode } from "react";
+import type { FormEvent, ReactNode } from "react";
 
 import { cn } from "@/shared/lib/cn";
 
@@ -39,9 +39,9 @@ export function ProjectDialog({
       )}
     >
       <form onSubmit={onSubmit} className="min-w-0">
-        <div className="flex items-center gap-2 border-b border-border px-4 py-2">
-          <span className={cn(icon, "text-base text-accent-foreground")} />
-          <span className="text-sm font-medium">{title}</span>
+        <div className="flex items-center gap-2 border-border border-b px-4 py-2">
+          <span className={cn(icon, "text-accent-foreground text-base")} />
+          <span className="font-medium text-sm">{title}</span>
           <button
             type="button"
             onClick={onClose}
@@ -56,7 +56,7 @@ export function ProjectDialog({
           {error ? <InlineError message={error} /> : null}
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
+        <div className="flex items-center justify-end gap-2 border-border border-t px-4 py-3">
           <button type="button" onClick={onClose} className={secondaryButton}>
             取消
           </button>

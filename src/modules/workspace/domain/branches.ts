@@ -1,26 +1,23 @@
+import type { SHA1 } from "nano-git";
 import { invariant } from "@/shared/lib/domain";
-
 import {
   branchRef,
+  deleteBranchMapping,
   deleteRef,
+  deleteWorkdirForBranch,
+  generateWorkdirKey,
+  getBranchMapping,
+  getCurrentBranch,
+  listBranchMappings,
   readCommit,
   resolveRef,
-  touchProjectRepo,
-  writeRef,
-  listBranchMappings,
-  getBranchMapping,
   setBranchMapping,
-  deleteBranchMapping,
-  generateWorkdirKey,
-  getCurrentBranch,
-} from "./git-storage/git-store";
-import { writeWorktreeStateToWorkdir } from "./git-storage/worktree-state";
-import {
-  deleteWorkdirForBranch,
   setWorkdirForBranch,
   setWorkdirFromCommit,
+  touchProjectRepo,
+  writeRef,
 } from "./git-storage/git-store";
-import type { SHA1 } from "nano-git";
+import { writeWorktreeStateToWorkdir } from "./git-storage/worktree-state";
 
 /** 分支 = 一个名字 + 所属项目。不再有独立 ID。 */
 export interface BranchRow {

@@ -2,7 +2,7 @@ import { cn } from "@/shared/lib/cn";
 
 export function LoadingBlock({ label = "加载中..." }: { label?: string }) {
   return (
-    <div className="flex items-center justify-center gap-2 rounded-md border border-dashed border-border px-4 py-10 text-sm text-foreground-muted">
+    <div className="flex items-center justify-center gap-2 rounded-md border border-border border-dashed px-4 py-10 text-foreground-muted text-sm">
       <span className="icon-[material-symbols--sync] animate-spin text-base" />
       {label}
     </div>

@@ -1,8 +1,8 @@
 import { markdown } from "@codemirror/lang-markdown";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
-import CodeMirror, { type ReactCodeMirrorProps } from "@uiw/react-codemirror";
 import { EditorView } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
+import CodeMirror, { type ReactCodeMirrorProps } from "@uiw/react-codemirror";
 
 import { cn } from "@/shared/lib/cn";
 

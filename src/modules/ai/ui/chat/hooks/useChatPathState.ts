@@ -1,12 +1,10 @@
 import { useCallback, useMemo } from "react";
-
-import { rpc } from "@/rpc/client";
-
 import type {
   ProjectChatCandidateGroup,
   ProjectChatPathState,
   StoredProjectChatMessage,
 } from "@/modules/ai/domain/project-chat";
+import { rpc } from "@/rpc/client";
 
 const EMPTY_STATE: ProjectChatPathState = { selectedChildIdByParentId: {} };
 

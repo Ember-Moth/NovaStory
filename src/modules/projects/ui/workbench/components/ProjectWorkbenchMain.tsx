@@ -1,9 +1,9 @@
 import { PageHeader, secondaryButton } from "../../shared/projectUi";
-import { ProjectBranchDetailPanel } from "./ProjectBranchDetailPanel";
 import {
   useProjectWorkbenchNavigation,
   useProjectWorkbenchViewModel,
 } from "../core/useProjectWorkbench";
+import { ProjectBranchDetailPanel } from "./ProjectBranchDetailPanel";
 
 export function ProjectWorkbenchMain() {
   const model = useProjectWorkbenchViewModel();

@@ -10,7 +10,7 @@ import {
   revertContentChange,
   updateContentNode,
 } from "@/modules/workspace/domain";
-import { rpcTags, type RpcTagList } from "@/rpc/tags";
+import { type RpcTagList, rpcTags } from "@/rpc/tags";
 
 export const create = mutation<
   Parameters<typeof createContentNode>[0],

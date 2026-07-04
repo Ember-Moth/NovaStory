@@ -1,14 +1,14 @@
 import { expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-
-import { seedProjectRecord } from "@/test/project";
-import { listProjectRows } from "@/modules/workspace/domain/git-storage/project-meta-store";
-import * as auxService from "@/modules/workspace/domain/aux";
-import { getProjectRepoGitDir } from "@/modules/workspace/domain/git-storage/paths";
 import * as workspaceService from "@/modules/workspace/domain";
+import * as auxService from "@/modules/workspace/domain/aux";
 import { listBranches } from "@/modules/workspace/domain/branches";
+import { getProjectRepoGitDir } from "@/modules/workspace/domain/git-storage/paths";
+import { listProjectRows } from "@/modules/workspace/domain/git-storage/project-meta-store";
 import { rpcTags } from "@/rpc/tags";
+import { seedProjectRecord } from "@/test/project";
 import * as projectHandlers from "./index";
+
 const requestCtx = { req: new Request("http://localhost/api/rpc") } as unknown as Parameters<
   typeof projectHandlers.list.handler
 >[1];

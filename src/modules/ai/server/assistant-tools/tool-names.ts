@@ -45,4 +45,4 @@ type AllAssistantToolNames =
 type MissingFromPartition = Exclude<ProjectAssistantToolName, AllAssistantToolNames>;
 type ExtraneousInPartition = Exclude<AllAssistantToolNames, ProjectAssistantToolName>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-const toolNamePartitionCheck: MissingFromPartition | ExtraneousInPartition = undefined!;
+const _toolNamePartitionCheck: MissingFromPartition | ExtraneousInPartition = undefined!;

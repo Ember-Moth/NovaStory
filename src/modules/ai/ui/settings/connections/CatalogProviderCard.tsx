@@ -66,7 +66,7 @@ export function CatalogProviderCard({
       >
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="truncate text-sm font-semibold text-foreground">{provider.name}</span>
+            <span className="truncate font-semibold text-foreground text-sm">{provider.name}</span>
             {provider.isSupported ? (
               <span
                 role="button"
@@ -81,12 +81,12 @@ export function CatalogProviderCard({
                     onQuickConnect(provider.id);
                   }
                 }}
-                className="cursor-pointer rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-300 transition hover:bg-emerald-500/20"
+                className="cursor-pointer rounded-full bg-emerald-500/10 px-2 py-0.5 font-medium text-[10px] text-emerald-300 transition hover:bg-emerald-500/20"
               >
                 快速接入
               </span>
             ) : (
-              <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-300">
+              <span className="rounded-full bg-amber-500/10 px-2 py-0.5 font-medium text-[10px] text-amber-300">
                 暂不支持
               </span>
             )}
@@ -102,12 +102,12 @@ export function CatalogProviderCard({
           </div>
         </div>
         <span
-          className={`text-xl text-foreground-muted ${expanded ? "icon-[material-symbols--keyboard-arrow-up]" : "icon-[material-symbols--keyboard-arrow-down]"}`}
+          className={`text-foreground-muted text-xl ${expanded ? "icon-[material-symbols--keyboard-arrow-up]" : "icon-[material-symbols--keyboard-arrow-down]"}`}
         />
       </button>
 
       {expanded ? (
-        <div className="border-t border-border px-4 py-3">
+        <div className="border-border border-t px-4 py-3">
           <div className="mb-3 space-y-1 text-[11px] text-foreground-muted">
             <div>API: {provider.apiUrl ?? "—"}</div>
             <div>ENV: {provider.envKeys.length > 0 ? provider.envKeys.join(", ") : "—"}</div>

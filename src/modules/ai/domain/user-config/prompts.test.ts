@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
-import { YAML } from "bun";
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { YAML } from "bun";
 
 import { ensureConfigDir } from "@/shared/lib/storage-paths";
 import * as globalPrompts from "./prompts";

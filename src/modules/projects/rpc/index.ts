@@ -1,18 +1,18 @@
-import { mutation, query } from "@codehz/rpc/core";
 import { rmSync } from "node:fs";
+import { mutation, query } from "@codehz/rpc/core";
 
 import { createDefaultWorkspace } from "@/modules/workspace/domain";
 import { getBranch } from "@/modules/workspace/domain/branches";
+import { getCurrentBranch, setHeadRef } from "@/modules/workspace/domain/git-storage/git-store";
+import { getProjectRepoGitDir } from "@/modules/workspace/domain/git-storage/paths";
 import {
   createProjectMeta,
   listProjectRows,
   readProjectMeta,
   updateProjectMeta,
 } from "@/modules/workspace/domain/git-storage/project-meta-store";
-import { getProjectRepoGitDir } from "@/modules/workspace/domain/git-storage/paths";
 import type { ProjectIndexRow } from "@/modules/workspace/domain/git-storage/types";
-import { getCurrentBranch, setHeadRef } from "@/modules/workspace/domain/git-storage/git-store";
-import { rpcTags, type RpcTagList } from "@/rpc/tags";
+import { type RpcTagList, rpcTags } from "@/rpc/tags";
 
 type ProjectMutationInput = Pick<ProjectIndexRow, "id" | "name" | "description">;
 

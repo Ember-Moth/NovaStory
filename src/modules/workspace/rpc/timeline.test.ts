@@ -1,10 +1,10 @@
 import { expect, test } from "bun:test";
-
-import { seedProjectRecord } from "@/test/project";
 import * as service from "@/modules/workspace/domain";
 import { rpcTags } from "@/rpc/tags";
+import { seedProjectRecord } from "@/test/project";
 import * as auxHandlers from "./aux";
 import * as timelineHandlers from "./timeline";
+
 const requestCtx = { req: new Request("http://localhost/api/rpc") } as unknown as Parameters<
   typeof auxHandlers.snapshotTree.handler
 >[1];

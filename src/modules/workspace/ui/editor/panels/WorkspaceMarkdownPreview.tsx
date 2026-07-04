@@ -1,6 +1,6 @@
 import type { ComponentProps, ReactNode } from "react";
 import { BlockPolicy, harden } from "rehype-harden";
-import { Streamdown, defaultRehypePlugins, type StreamdownProps } from "streamdown";
+import { defaultRehypePlugins, Streamdown, type StreamdownProps } from "streamdown";
 
 import { cn } from "@/shared/lib/cn";
 import { MarkdownTable } from "@/shared/ui/markdown/MarkdownTable";
@@ -46,12 +46,12 @@ export function WorkspaceMarkdownPreview({
             controls={false}
             rehypePlugins={WORKSPACE_MARKDOWN_REHYPE_PLUGINS}
             components={WORKSPACE_MARKDOWN_COMPONENTS}
-            className="ai-markdown max-w-4xl text-[14px] leading-7 wrap-break-word text-foreground"
+            className="ai-markdown wrap-break-word max-w-4xl text-[14px] text-foreground leading-7"
           >
             {content}
           </Streamdown>
         ) : (
-          <div className="flex min-h-48 items-center justify-center text-sm text-foreground-muted">
+          <div className="flex min-h-48 items-center justify-center text-foreground-muted text-sm">
             {emptyLabel}
           </div>
         )}
@@ -76,7 +76,7 @@ function WorkspaceMarkdownCode({
       <code
         {...props}
         className={cn(
-          "block overflow-x-auto rounded-none font-mono text-[13px] leading-6 whitespace-pre text-foreground",
+          "block overflow-x-auto whitespace-pre rounded-none font-mono text-[13px] text-foreground leading-6",
           className,
         )}
       >

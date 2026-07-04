@@ -1,4 +1,4 @@
-import { rpc } from "@/rpc/client";
+import type { rpc } from "@/rpc/client";
 
 export type ProjectList = NonNullable<ReturnType<typeof rpc.useQuery<"projects.list">>["data"]>;
 export type ProjectRow = NonNullable<ReturnType<typeof rpc.useQuery<"projects.get">>["data"]>;

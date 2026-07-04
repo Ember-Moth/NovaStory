@@ -1,16 +1,15 @@
 import { expect, test } from "bun:test";
-
+import type { AgentThreadNodeView } from "@/modules/ai/domain/types";
 import {
-  getAssistantAskUserEntries,
   type AssistantAskUserAnswer,
   type AssistantAskUserQuestion,
+  getAssistantAskUserEntries,
 } from "./askUserModel";
 import {
   buildAssistantToolTraceSummary,
   buildStreamingAssistantToolTraceSummary,
   getAssistantToolTrace,
 } from "./toolTraceModel";
-import type { AgentThreadNodeView } from "@/modules/ai/domain/types";
 
 const baseNode = {
   id: "node_base",

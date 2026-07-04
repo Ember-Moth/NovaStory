@@ -1,9 +1,8 @@
-import type { SHA1 } from "nano-git";
 import { expect, test } from "bun:test";
-
+import type { SHA1 } from "nano-git";
+import { getCurrentBranch } from "@/modules/workspace/domain/git-storage/git-store";
 import { setupMockDatabase } from "@/test/mock-db";
 import { seedProjectRecord } from "@/test/project";
-import { getCurrentBranch } from "@/modules/workspace/domain/git-storage/git-store";
 
 setupMockDatabase();
 

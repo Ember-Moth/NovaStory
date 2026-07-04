@@ -1,16 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
-
-import { openRepository, initRepository } from "nano-git/repository/file";
-import { openSqliteVirtualWorkdir, deleteSqliteVirtualWorkdir } from "nano-git/workdir/sqlite";
+import type { DiffEntry, FileRepository, SHA1, TreeEntry } from "nano-git";
+import { walkLogEntries } from "nano-git/log";
+import { initRepository, openRepository } from "nano-git/repository/file";
 import { diffTrees, readTree } from "nano-git/repository/tree/tree-diff";
 import { patchTree } from "nano-git/repository/tree/tree-patch";
-import { walkLogEntries } from "nano-git/log";
-import type { DiffEntry, SHA1, TreeEntry, FileRepository } from "nano-git";
 import type { VirtualWorkdir } from "nano-git/workdir/core";
-
-import { getProjectRepoGitDir } from "./paths";
+import { deleteSqliteVirtualWorkdir, openSqliteVirtualWorkdir } from "nano-git/workdir/sqlite";
 import type { WorkingTreeStatus } from "@/modules/workspace/domain/types";
+import { getProjectRepoGitDir } from "./paths";
 
 export function branchRef(name: string) {
   return `refs/heads/${name}`;
@@ -230,7 +228,7 @@ export function getCurrentBranch(projectId: string): string | null {
 /** 设置 HEAD 指向指定的分支 */
 export function setHeadRef(projectId: string, branchName: string): void {
   const repo = getOrInitRepo(projectId);
-  repo.refs.write("HEAD", "ref: refs/heads/" + branchName);
+  repo.refs.write("HEAD", `ref: refs/heads/${branchName}`);
 }
 
 /** 列出 refs/heads/ 下所有分支名 */
@@ -491,7 +489,7 @@ function readBranchMap(projectId: string): Record<string, string> {
 
 function writeBranchMap(projectId: string, map: Record<string, string>): void {
   const filePath = branchMapPath(projectId);
-  const tmpPath = filePath + ".tmp";
+  const tmpPath = `${filePath}.tmp`;
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(tmpPath, JSON.stringify(map), "utf8");
   fs.renameSync(tmpPath, filePath);

@@ -1,7 +1,6 @@
+import { expect, test } from "bun:test";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-
-import { expect, test } from "bun:test";
 
 import { getStorageRoot } from "@/shared/lib/storage-paths";
 

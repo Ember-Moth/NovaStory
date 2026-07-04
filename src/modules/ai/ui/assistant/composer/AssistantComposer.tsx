@@ -1,17 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
+import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { ContentEditable } from "@lexical/react/LexicalContentEditable";
 import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary";
-import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import { OnChangePlugin } from "@lexical/react/LexicalOnChangePlugin";
-import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
+import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import {
   LexicalTypeaheadMenuPlugin,
   MenuOption,
-  useBasicTypeaheadTriggerMatch,
   type MenuRenderFn,
+  useBasicTypeaheadTriggerMatch,
 } from "@lexical/react/LexicalTypeaheadMenuPlugin";
 import { $createParagraphNode, $createTextNode, $getRoot, type LexicalEditor } from "lexical";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import type { GlobalPromptRow } from "@/modules/ai/domain/types";
@@ -19,10 +19,11 @@ import { rpc } from "@/rpc/client";
 import { cn } from "@/shared/lib/cn";
 import {
   $createAssistantMentionNode,
+  type AssistantComposerSubmitPayload,
   AssistantMentionNode,
   compileAssistantComposerState,
-  type AssistantComposerSubmitPayload,
 } from "./assistantComposerModel";
+
 export type {
   AssistantComposerSubmitPayload,
   AssistantMentionInput,
@@ -156,12 +157,12 @@ function AssistantComposerInner({
             aria-label="AI 对话输入"
             aria-placeholder={placeholder}
             placeholder={
-              <div className="pointer-events-none absolute top-2 left-2.5 text-[13px] leading-5 text-foreground-muted/70">
+              <div className="pointer-events-none absolute top-2 left-2.5 text-[13px] text-foreground-muted/70 leading-5">
                 {placeholder}
               </div>
             }
             spellCheck={false}
-            className="field-sizing-content max-h-48 min-h-5 w-full overflow-y-auto border-none bg-transparent px-2.5 pt-2 text-[13px] leading-5 wrap-break-word whitespace-pre-wrap text-editor-foreground outline-none"
+            className="field-sizing-content wrap-break-word max-h-48 min-h-5 w-full overflow-y-auto whitespace-pre-wrap border-none bg-transparent px-2.5 pt-2 text-[13px] text-editor-foreground leading-5 outline-none"
             onCompositionStart={() => {
               composingRef.current = true;
             }}
@@ -273,13 +274,12 @@ function AssistantPromptTypeaheadPlugin({
           ) : menuOptions.length === 0 ? (
             <div className="px-3 py-2 text-foreground-muted">没有匹配的 Prompt</div>
           ) : (
-            <ul className="max-h-72 overflow-y-auto py-0.5" role="listbox">
+            <ul className="max-h-72 overflow-y-auto py-0.5">
               {menuOptions.map((option, index) => (
                 <li
                   key={option.key}
                   ref={option.setRefElement}
                   id={`typeahead-item-${index}`}
-                  role="option"
                   aria-selected={selectedIndex === index}
                   className={cn(
                     "flex cursor-pointer items-start gap-2 px-2.5 py-2 outline-none",
@@ -293,11 +293,11 @@ function AssistantPromptTypeaheadPlugin({
                     selectOptionAndCleanUp(option);
                   }}
                 >
-                  <span className="mt-0.5 icon-[material-symbols--prompt-suggestion] shrink-0 text-base text-accent-foreground" />
+                  <span className="icon-[material-symbols--prompt-suggestion] mt-0.5 shrink-0 text-accent-foreground text-base" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium">{option.prompt.name}</span>
                     {option.prompt.description ? (
-                      <span className="mt-0.5 line-clamp-2 block text-[11px] leading-4 text-foreground-muted">
+                      <span className="mt-0.5 line-clamp-2 block text-[11px] text-foreground-muted leading-4">
                         {option.prompt.description}
                       </span>
                     ) : null}

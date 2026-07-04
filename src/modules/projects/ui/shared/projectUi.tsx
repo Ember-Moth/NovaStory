@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 export const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
   dateStyle: "medium",
@@ -23,7 +23,7 @@ export const compactPrimaryButton = `${compactButtonBase} bg-accent-background t
 
 export function InlineError({ message }: { message: string }) {
   return (
-    <div className="flex items-center gap-2 rounded-md border border-border bg-editor-background px-3 py-2 text-sm text-accent-foreground">
+    <div className="flex items-center gap-2 rounded-md border border-border bg-editor-background px-3 py-2 text-accent-foreground text-sm">
       <span className="icon-[material-symbols--warning] shrink-0 text-base" />
       {message}
     </div>
@@ -42,13 +42,13 @@ export function PageHeader({
   trailing?: ReactNode;
 }) {
   return (
-    <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-border bg-title-bar-background px-4 py-2">
-      <span className={`${icon} text-xl text-icon-folder`} />
+    <div className="flex shrink-0 flex-wrap items-center gap-3 border-border border-b bg-title-bar-background px-4 py-2">
+      <span className={`${icon} text-icon-folder text-xl`} />
       <div className="min-w-0 flex-1">
-        <h1 className="truncate text-[14px] font-semibold text-foreground">{title}</h1>
+        <h1 className="truncate font-semibold text-[14px] text-foreground">{title}</h1>
         <p className="truncate text-[11px] text-foreground-muted">{subtitle}</p>
       </div>
-      {trailing ? <div className="ml-auto max-w-full min-w-0">{trailing}</div> : null}
+      {trailing ? <div className="ml-auto min-w-0 max-w-full">{trailing}</div> : null}
     </div>
   );
 }

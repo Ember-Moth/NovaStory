@@ -1,5 +1,5 @@
-import { type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import type { ReactNode } from "react";
 
 export interface TreeRowContext<T> {
   node: T;

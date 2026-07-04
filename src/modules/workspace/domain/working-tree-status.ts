@@ -1,11 +1,13 @@
-import { ORIGIN_TIMELINE_POINT_ID } from "./constants";
-import type { DiffEntry } from "nano-git";
-import type { SHA1 } from "nano-git";
+import type { DiffEntry, SHA1 } from "nano-git";
 import type { VirtualWorkdir } from "nano-git/workdir/core";
-
 import { getBranch, getBranchHeadCommitId } from "./branches";
-import { readFilesAtCommit, readWorkdirDiff, getBranchMapping } from "./git-storage/git-store";
-import { getWorkdirForBranch } from "./git-storage/git-store";
+import { ORIGIN_TIMELINE_POINT_ID } from "./constants";
+import {
+  getBranchMapping,
+  getWorkdirForBranch,
+  readFilesAtCommit,
+  readWorkdirDiff,
+} from "./git-storage/git-store";
 import {
   flattenManuscriptNodes,
   orderTimelineRows,

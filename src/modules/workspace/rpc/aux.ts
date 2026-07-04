@@ -7,16 +7,16 @@ import {
   listAuxChangesAt,
   listAuxDirAt,
   mkdirAt,
-  normalizeTimelinePointId,
   moveAuxNodeAt,
-  ORIGIN_TIMELINE_POINT_ID,
+  normalizeTimelinePointId,
+  type ORIGIN_TIMELINE_POINT_ID,
   readAuxByPathAt,
-  revertAuxChange,
   restoreDeletedAuxNodeAt,
   retargetAuxSymlinkAt,
+  revertAuxChange,
   writeFileAt,
 } from "@/modules/workspace/domain";
-import { rpcTags, type RpcTagList } from "@/rpc/tags";
+import { type RpcTagList, rpcTags } from "@/rpc/tags";
 
 function auxSnapshotTags(input: {
   projectId: string;

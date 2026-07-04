@@ -5,20 +5,19 @@ import type {
   StoredProjectChatMessage,
 } from "@/modules/ai/domain/project-chat";
 import type { AssistantMentionInput } from "@/modules/ai/domain/types";
-
+import { AiMarkdown } from "../assistant/AiMarkdown";
+import { AskUserInlineCard } from "../assistant/messages/AskUserInlineCard";
 import type {
   AssistantAskUserAnswer,
   AssistantAskUserQuestion,
 } from "../assistant/messages/askUserModel";
+import { ReasoningTraceCard } from "../assistant/messages/ReasoningTraceCard";
 import { ToolTraceCard } from "../assistant/messages/ToolTraceCard";
 import {
-  buildAssistantToolTraceSummary,
   type AssistantToolTraceEntry,
+  buildAssistantToolTraceSummary,
 } from "../assistant/messages/toolTraceModel";
-import { AskUserInlineCard } from "../assistant/messages/AskUserInlineCard";
-import { ReasoningTraceCard } from "../assistant/messages/ReasoningTraceCard";
 import { UserMessageBubble } from "../assistant/messages/UserMessageBubble";
-import { AiMarkdown } from "../assistant/AiMarkdown";
 import { MessageBranchSwitcher } from "./components/MessageBranchSwitcher";
 import type { ProjectChatMessage } from "./types";
 
@@ -232,7 +231,7 @@ export function MessageList({
   );
 
   return (
-    <div className="flex min-h-full flex-col gap-3 px-3 py-3 select-text">
+    <div className="flex min-h-full select-text flex-col gap-3 px-3 py-3">
       {messages.length === 0 ? (
         <div className="py-8 text-center text-[12px] text-foreground-muted">开始一段新的对话。</div>
       ) : (
@@ -244,9 +243,7 @@ export function MessageList({
                 group.parentMessageId ===
                 (allMessagesById.get(message.id)?.parentMessageId ?? null),
             );
-          const currentBranchIndex = branchGroup
-            ? branchGroup.messageIds.findIndex((candidateId) => candidateId === message.id)
-            : -1;
+          const currentBranchIndex = branchGroup ? branchGroup.messageIds.indexOf(message.id) : -1;
 
           return (
             <div key={message.id} className="flex flex-col gap-1.5">
@@ -258,130 +255,128 @@ export function MessageList({
                   />
                 </div>
               ) : (
-                <>
-                  {message.parts.map((part, index) => {
-                    if (part.type === "text") {
-                      if (!part.text.trim() && !isStreaming) {
-                        return null;
-                      }
-                      return (
-                        <div key={`${message.id}:text:${index}`} className="text-foreground">
-                          <AiMarkdown
-                            content={part.text}
-                            isStreaming={isStreaming && part.state !== "done"}
-                            tableLayout="sidebar-cards"
-                            variant="assistant"
-                          />
-                        </div>
-                      );
-                    }
-
-                    if (part.type === "reasoning") {
-                      const key = `${message.id}:reasoning:${index}`;
-                      const expanded = expandedReasoningKeys.has(key);
-                      return (
-                        <ReasoningTraceCard
-                          key={key}
-                          reasoningText={part.text}
-                          isStreaming={isStreaming && part.state !== "done"}
-                          expanded={expanded}
-                          onToggle={() =>
-                            setExpandedReasoningKeys((current) => {
-                              const next = new Set(current);
-                              if (next.has(key)) {
-                                next.delete(key);
-                              } else {
-                                next.add(key);
-                              }
-                              return next;
-                            })
-                          }
-                        />
-                      );
-                    }
-
-                    const toolName = getToolName(part);
-                    if (!toolName) {
+                message.parts.map((part, index) => {
+                  if (part.type === "text") {
+                    if (!part.text.trim() && !isStreaming) {
                       return null;
                     }
-
-                    if (toolName === "ask_user" && "input" in part && part.input) {
-                      const questionParseMode =
-                        part.state === "input-streaming" ? "streaming" : "strict";
-                      const questions = Array.isArray(
-                        (part.input as { questions?: unknown[] }).questions,
-                      )
-                        ? (part.input as { questions: unknown[] }).questions
-                            .map((question, questionIndex) =>
-                              parseAskUserQuestionWithMode(
-                                question,
-                                questionParseMode,
-                                questionIndex,
-                              ),
-                            )
-                            .filter(
-                              (question): question is AssistantAskUserQuestion => question != null,
-                            )
-                        : [];
-                      const request = {
-                        ...(typeof (part.input as { title?: unknown }).title === "string"
-                          ? { title: (part.input as { title: string }).title }
-                          : {}),
-                        questions,
-                      };
-                      const submittedAnswers =
-                        part.state === "output-available" ? parseAskUserAnswers(part.output) : null;
-
-                      return questions.length > 0 ? (
-                        <AskUserInlineCard
-                          key={`${message.id}:ask-user:${part.toolCallId}`}
-                          entry={{
-                            toolCallId: part.toolCallId,
-                            title: request.title ?? null,
-                            questions: request.questions,
-                            answers: submittedAnswers,
-                          }}
-                          submittedAnswers={submittedAnswers}
-                          isSubmitting={false}
-                          canSubmit={part.state === "input-available"}
-                          isStreamingInput={part.state === "input-streaming"}
-                          onSubmit={(answers) => onSubmitAskUser(part.toolCallId, request, answers)}
-                        />
-                      ) : part.state === "input-streaming" ? (
-                        <AskUserInlineCard
-                          key={`${message.id}:ask-user:${part.toolCallId}`}
-                          entry={{
-                            toolCallId: part.toolCallId,
-                            title:
-                              typeof (part.input as { title?: unknown }).title === "string"
-                                ? (part.input as { title: string }).title
-                                : null,
-                            questions: [],
-                            answers: null,
-                          }}
-                          submittedAnswers={null}
-                          isSubmitting={false}
-                          canSubmit={false}
-                          isStreamingInput
-                          onSubmit={() => {}}
-                        />
-                      ) : null;
-                    }
-
-                    const toolPart = part as any;
-
                     return (
-                      <ToolCard
-                        key={`${message.id}:tool:${toolPart.toolCallId}`}
-                        toolName={toolName}
-                        state={toolPart.state}
-                        input={toolPart.input}
-                        output={toolPart.output}
-                        errorText={toolPart.errorText}
+                      <div key={`${message.id}:text:${index}`} className="text-foreground">
+                        <AiMarkdown
+                          content={part.text}
+                          isStreaming={isStreaming && part.state !== "done"}
+                          tableLayout="sidebar-cards"
+                          variant="assistant"
+                        />
+                      </div>
+                    );
+                  }
+
+                  if (part.type === "reasoning") {
+                    const key = `${message.id}:reasoning:${index}`;
+                    const expanded = expandedReasoningKeys.has(key);
+                    return (
+                      <ReasoningTraceCard
+                        key={key}
+                        reasoningText={part.text}
+                        isStreaming={isStreaming && part.state !== "done"}
+                        expanded={expanded}
+                        onToggle={() =>
+                          setExpandedReasoningKeys((current) => {
+                            const next = new Set(current);
+                            if (next.has(key)) {
+                              next.delete(key);
+                            } else {
+                              next.add(key);
+                            }
+                            return next;
+                          })
+                        }
                       />
                     );
-                  })}
-                </>
+                  }
+
+                  const toolName = getToolName(part);
+                  if (!toolName) {
+                    return null;
+                  }
+
+                  if (toolName === "ask_user" && "input" in part && part.input) {
+                    const questionParseMode =
+                      part.state === "input-streaming" ? "streaming" : "strict";
+                    const questions = Array.isArray(
+                      (part.input as { questions?: unknown[] }).questions,
+                    )
+                      ? (part.input as { questions: unknown[] }).questions
+                          .map((question, questionIndex) =>
+                            parseAskUserQuestionWithMode(
+                              question,
+                              questionParseMode,
+                              questionIndex,
+                            ),
+                          )
+                          .filter(
+                            (question): question is AssistantAskUserQuestion => question != null,
+                          )
+                      : [];
+                    const request = {
+                      ...(typeof (part.input as { title?: unknown }).title === "string"
+                        ? { title: (part.input as { title: string }).title }
+                        : {}),
+                      questions,
+                    };
+                    const submittedAnswers =
+                      part.state === "output-available" ? parseAskUserAnswers(part.output) : null;
+
+                    return questions.length > 0 ? (
+                      <AskUserInlineCard
+                        key={`${message.id}:ask-user:${part.toolCallId}`}
+                        entry={{
+                          toolCallId: part.toolCallId,
+                          title: request.title ?? null,
+                          questions: request.questions,
+                          answers: submittedAnswers,
+                        }}
+                        submittedAnswers={submittedAnswers}
+                        isSubmitting={false}
+                        canSubmit={part.state === "input-available"}
+                        isStreamingInput={part.state === "input-streaming"}
+                        onSubmit={(answers) => onSubmitAskUser(part.toolCallId, request, answers)}
+                      />
+                    ) : part.state === "input-streaming" ? (
+                      <AskUserInlineCard
+                        key={`${message.id}:ask-user:${part.toolCallId}`}
+                        entry={{
+                          toolCallId: part.toolCallId,
+                          title:
+                            typeof (part.input as { title?: unknown }).title === "string"
+                              ? (part.input as { title: string }).title
+                              : null,
+                          questions: [],
+                          answers: null,
+                        }}
+                        submittedAnswers={null}
+                        isSubmitting={false}
+                        canSubmit={false}
+                        isStreamingInput
+                        onSubmit={() => {}}
+                      />
+                    ) : null;
+                  }
+
+                  const toolPart = part as any;
+
+                  return (
+                    <ToolCard
+                      key={`${message.id}:tool:${toolPart.toolCallId}`}
+                      toolName={toolName}
+                      state={toolPart.state}
+                      input={toolPart.input}
+                      output={toolPart.output}
+                      errorText={toolPart.errorText}
+                    />
+                  );
+                })
               )}
 
               {branchGroup && currentBranchIndex >= 0 && branchGroup.messageIds.length > 1 ? (

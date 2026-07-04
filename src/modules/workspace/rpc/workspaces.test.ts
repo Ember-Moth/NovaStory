@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test";
-
-import { seedProjectRecord } from "@/test/project";
 import * as service from "@/modules/workspace/domain";
 import { rpcTags } from "@/rpc/tags";
+import { seedProjectRecord } from "@/test/project";
 import * as workspaceHandlers from "./workspaces";
+
 const requestCtx = { req: new Request("http://localhost/api/rpc") } as unknown as Parameters<
   typeof workspaceHandlers.list.handler
 >[1];

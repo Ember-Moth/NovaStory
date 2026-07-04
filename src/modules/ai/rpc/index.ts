@@ -1,6 +1,4 @@
-import { mutation, type MutationCtx, query } from "@codehz/rpc/core";
-
-import { getModel, getProvider } from "@/modules/ai/domain/catalog-file-store";
+import { type MutationCtx, mutation, query } from "@codehz/rpc/core";
 import {
   assertConnectionSupportsCustomModel,
   ensureAiCatalogFresh,
@@ -10,6 +8,7 @@ import {
   listResolvedModelsForConnection,
   refreshAiCatalog,
 } from "@/modules/ai/domain/catalog";
+import { getModel, getProvider } from "@/modules/ai/domain/catalog-file-store";
 import {
   type AiConnectionConfig,
   normalizeAiConnectionConfig,
@@ -21,7 +20,6 @@ import {
   getAiSdkPackageRecipe,
   SUPPORTED_AI_SDK_PACKAGES,
 } from "@/modules/ai/domain/packages";
-import { createId, invariant, now } from "@/shared/lib/domain";
 import type {
   AiCatalogModelView,
   AiCatalogProviderView,
@@ -33,7 +31,8 @@ import type {
 } from "@/modules/ai/domain/types";
 import * as userConfig from "@/modules/ai/domain/user-config";
 import { assertRpcFound } from "@/rpc/errors";
-import { rpcTags, type RpcTagList } from "@/rpc/tags";
+import { type RpcTagList, rpcTags } from "@/rpc/tags";
+import { createId, invariant, now } from "@/shared/lib/domain";
 
 type ConnectionInsert = AiConnectionRow;
 type CustomModelRow = AiConnectionCustomModelRow;
@@ -283,21 +282,23 @@ export const getCatalogStatus = query<void, AiCatalogStatusView, RpcTagList>({
   handler: () => getAiCatalogStatus(),
 });
 
-export const refreshCatalog = mutation<{ force?: boolean } | void, AiCatalogStatusView, RpcTagList>(
-  async (input, ctx) => {
-    const status = await refreshAiCatalog({ force: input?.force ?? false });
-    ctx.invalidate(
-      rpcTags.aiCatalogStatus(),
-      rpcTags.aiCatalogProviders(),
-      rpcTags.aiConnections(),
-      rpcTags.aiCatalogModels(),
-    );
-    return status;
-  },
-);
+export const refreshCatalog = mutation<
+  { force?: boolean } | undefined,
+  AiCatalogStatusView,
+  RpcTagList
+>(async (input, ctx) => {
+  const status = await refreshAiCatalog({ force: input?.force ?? false });
+  ctx.invalidate(
+    rpcTags.aiCatalogStatus(),
+    rpcTags.aiCatalogProviders(),
+    rpcTags.aiConnections(),
+    rpcTags.aiCatalogModels(),
+  );
+  return status;
+});
 
 export const listCatalogProviders = query<
-  { activeOnly?: boolean; supportedOnly?: boolean } | void,
+  { activeOnly?: boolean; supportedOnly?: boolean } | undefined,
   AiCatalogProviderView[],
   RpcTagList
 >({

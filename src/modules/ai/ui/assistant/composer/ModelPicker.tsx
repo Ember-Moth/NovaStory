@@ -1,9 +1,9 @@
 import {
   autoUpdate,
-  flip,
   FloatingFocusManager,
   FloatingList,
   FloatingPortal,
+  flip,
   offset,
   size,
   useClick,
@@ -70,7 +70,7 @@ function ModelOption({
         } ${selected ? "text-accent-foreground" : "text-foreground-muted"}`}
       />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[12px] font-medium text-foreground">
+        <span className="block truncate font-medium text-[12px] text-foreground">
           {model.displayName}
         </span>
         <span className="block truncate text-[11px]">{model.modelId}</span>
@@ -232,10 +232,10 @@ export function ModelPicker({
             : triggerLabel
         }
         aria-label="选择连接和模型"
-        className="flex h-7 max-w-full min-w-0 flex-1 items-center gap-x-1.5 rounded-md border border-transparent px-1.5 text-left text-[12px] leading-4 font-medium transition outline-none hover:border-border hover:bg-list-hover-background focus:border-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex h-7 min-w-0 max-w-full flex-1 items-center gap-x-1.5 rounded-md border border-transparent px-1.5 text-left font-medium text-[12px] leading-4 outline-none transition hover:border-border hover:bg-list-hover-background focus:border-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
         {...getReferenceProps()}
       >
-        <span className="icon-[material-symbols--token] shrink-0 text-sm text-accent-foreground" />
+        <span className="icon-[material-symbols--token] shrink-0 text-accent-foreground text-sm" />
         <span className="min-w-0 flex-1 truncate">{triggerLabel}</span>
       </button>
 
@@ -258,7 +258,7 @@ export function ModelPicker({
                     groupedOptions.map((group) =>
                       group.models.length > 0 ? (
                         <div key={group.connection.id}>
-                          <div className="sticky top-0 z-10 border-y border-border bg-sidebar-background px-2 py-1 text-[11px] font-medium text-foreground-muted first:border-t-0">
+                          <div className="sticky top-0 z-10 border-border border-y bg-sidebar-background px-2 py-1 font-medium text-[11px] text-foreground-muted first:border-t-0">
                             {group.connection.name}
                           </div>
                           {group.models.map(({ model, optionIndex }) => (

@@ -3,11 +3,11 @@ import { LanguageSupport } from "@codemirror/language";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import {
+  getMainTextEditorAriaLabel,
   MAIN_TEXT_EDITOR_BASIC_SETUP,
   MAIN_TEXT_EDITOR_EXTENSIONS,
   MAIN_TEXT_EDITOR_MARKDOWN_EXTENSIONS,
   MainTextEditor,
-  getMainTextEditorAriaLabel,
 } from "./MainTextEditor";
 
 test("MainTextEditor renders a stable wrapper for the content variant", () => {

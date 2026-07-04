@@ -1,11 +1,16 @@
-import { invariant } from "@/shared/lib/domain";
-
-import { branchRef, touchProjectRepo, getBranchMapping } from "./git-storage/git-store";
-import { getBranch, getBranchHeadCommitId } from "./branches";
-import { listLog } from "./git-storage/git-store";
-import { getWorkspaceForBranchId } from "./lifecycle";
-import { getWorkdirForBranch, setWorkdirForBranch, getOrInitRepo } from "./git-storage/git-store";
 import type { GitAuthor, SHA1 } from "nano-git";
+import { invariant } from "@/shared/lib/domain";
+import { getBranch, getBranchHeadCommitId } from "./branches";
+import {
+  branchRef,
+  getBranchMapping,
+  getOrInitRepo,
+  getWorkdirForBranch,
+  listLog,
+  setWorkdirForBranch,
+  touchProjectRepo,
+} from "./git-storage/git-store";
+import { getWorkspaceForBranchId } from "./lifecycle";
 
 export interface CommitParentRow {
   commitId: string;

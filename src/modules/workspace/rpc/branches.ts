@@ -4,10 +4,10 @@ import {
   createBranch,
   deleteBranch,
   getBranch,
-  listBranchHeads,
   listBranches,
+  listBranchHeads,
 } from "@/modules/workspace/domain";
-import { rpcTags, type RpcTagList } from "@/rpc/tags";
+import { type RpcTagList, rpcTags } from "@/rpc/tags";
 
 export const list = query<{ projectId: string }, ReturnType<typeof listBranches>, RpcTagList>({
   watch: ({ projectId }) => [rpcTags.branchesByProject(projectId)],

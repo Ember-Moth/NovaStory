@@ -1,7 +1,7 @@
 import { query } from "@codehz/rpc/core";
 
 import { getDefaultWorkspace, getWorkspace, listWorkspaces } from "@/modules/workspace/domain";
-import { rpcTags, type RpcTagList } from "@/rpc/tags";
+import { type RpcTagList, rpcTags } from "@/rpc/tags";
 
 export const list = query<{ projectId: string }, ReturnType<typeof listWorkspaces>, RpcTagList>({
   watch: ({ projectId }) => [rpcTags.workspacesByProject(projectId)],

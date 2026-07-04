@@ -161,9 +161,9 @@ function ConnectionDialogForm({
 
   return (
     <form onSubmit={handleSubmit}>
-      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-        <span className="icon-[material-symbols--cable] text-base text-accent-foreground" />
-        <span className="text-sm font-medium">{connection ? "编辑连接" : "新建连接"}</span>
+      <div className="flex items-center gap-2 border-border border-b px-4 py-3">
+        <span className="icon-[material-symbols--cable] text-accent-foreground text-base" />
+        <span className="font-medium text-sm">{connection ? "编辑连接" : "新建连接"}</span>
         <button
           type="button"
           onClick={onCancel}
@@ -191,7 +191,7 @@ function ConnectionDialogForm({
                     setSdkPackage(supportedPackages[0]?.sdkPackage ?? "@ai-sdk/openai-compatible");
                   }
                 }}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                className={`rounded-full px-3 py-1 font-medium text-xs transition ${
                   kind === value
                     ? "bg-accent-background text-foreground"
                     : "bg-editor-background text-foreground-muted hover:text-foreground"
@@ -204,9 +204,8 @@ function ConnectionDialogForm({
         ) : null}
 
         <label className="block space-y-1">
-          <span className="text-[11px] font-medium text-foreground-muted">名称</span>
+          <span className="font-medium text-[11px] text-foreground-muted">名称</span>
           <input
-            autoFocus
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="例如：OpenRouter 主账号"
@@ -216,7 +215,7 @@ function ConnectionDialogForm({
 
         {kind === "registry" ? (
           <label className="block space-y-1">
-            <span className="text-[11px] font-medium text-foreground-muted">Catalog Provider</span>
+            <span className="font-medium text-[11px] text-foreground-muted">Catalog Provider</span>
             <select
               value={catalogProviderId}
               onChange={(event) => setCatalogProviderId(event.target.value)}
@@ -231,7 +230,7 @@ function ConnectionDialogForm({
           </label>
         ) : (
           <label className="block space-y-1">
-            <span className="text-[11px] font-medium text-foreground-muted">AI SDK Package</span>
+            <span className="font-medium text-[11px] text-foreground-muted">AI SDK Package</span>
             <select
               value={sdkPackage}
               onChange={(event) => setSdkPackage(event.target.value)}
@@ -246,7 +245,7 @@ function ConnectionDialogForm({
           </label>
         )}
 
-        <div className="rounded-md border border-border bg-editor-background px-3 py-2 text-xs text-foreground-muted">
+        <div className="rounded-md border border-border bg-editor-background px-3 py-2 text-foreground-muted text-xs">
           <div className="font-mono text-foreground">{effectiveSdkPackage ?? "未选择 package"}</div>
           {recipe ? (
             <div className="mt-1">
@@ -262,7 +261,7 @@ function ConnectionDialogForm({
 
         {showBaseUrl ? (
           <label className="block space-y-1">
-            <span className="text-[11px] font-medium text-foreground-muted">Base URL</span>
+            <span className="font-medium text-[11px] text-foreground-muted">Base URL</span>
             <input
               value={baseUrl}
               onChange={(event) => setBaseUrl(event.target.value)}
@@ -275,7 +274,7 @@ function ConnectionDialogForm({
         {isAzureConfig ? (
           <>
             <label className="block space-y-1">
-              <span className="text-[11px] font-medium text-foreground-muted">Resource Name</span>
+              <span className="font-medium text-[11px] text-foreground-muted">Resource Name</span>
               <input
                 value={config.azure?.resourceName ?? ""}
                 onChange={(event) =>
@@ -293,7 +292,7 @@ function ConnectionDialogForm({
             </label>
 
             <label className="block space-y-1">
-              <span className="text-[11px] font-medium text-foreground-muted">API Version</span>
+              <span className="font-medium text-[11px] text-foreground-muted">API Version</span>
               <input
                 value={config.azure?.apiVersion ?? ""}
                 onChange={(event) =>
@@ -310,7 +309,7 @@ function ConnectionDialogForm({
               />
             </label>
 
-            <label className="flex items-center gap-2 text-sm text-foreground-muted">
+            <label className="flex items-center gap-2 text-foreground-muted text-sm">
               <input
                 type="checkbox"
                 checked={config.azure?.useDeploymentBasedUrls ?? false}
@@ -331,7 +330,7 @@ function ConnectionDialogForm({
         ) : null}
 
         <label className="block space-y-1">
-          <span className="text-[11px] font-medium text-foreground-muted">API Key</span>
+          <span className="font-medium text-[11px] text-foreground-muted">API Key</span>
           <input
             type="password"
             value={apiKey}
@@ -350,7 +349,7 @@ function ConnectionDialogForm({
           />
         </label>
 
-        <label className="flex items-center gap-2 text-sm text-foreground-muted">
+        <label className="flex items-center gap-2 text-foreground-muted text-sm">
           <input
             type="checkbox"
             checked={isEnabled}
@@ -361,25 +360,25 @@ function ConnectionDialogForm({
         </label>
 
         {formError ? (
-          <div className="rounded-md border border-border bg-editor-background px-3 py-2 text-sm text-accent-foreground">
+          <div className="rounded-md border border-border bg-editor-background px-3 py-2 text-accent-foreground text-sm">
             {formError}
           </div>
         ) : null}
       </div>
 
-      <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
+      <div className="flex items-center justify-end gap-2 border-border border-t px-4 py-3">
         <button
           type="button"
           onClick={onCancel}
           disabled={isPending}
-          className="rounded-md border border-border px-3 py-1.5 text-sm text-foreground transition hover:bg-list-hover-background disabled:opacity-40"
+          className="rounded-md border border-border px-3 py-1.5 text-foreground text-sm transition hover:bg-list-hover-background disabled:opacity-40"
         >
           取消
         </button>
         <button
           type="submit"
           disabled={isPending}
-          className="rounded-md bg-accent-background px-3 py-1.5 text-sm font-medium text-foreground transition hover:brightness-110 disabled:opacity-50"
+          className="rounded-md bg-accent-background px-3 py-1.5 font-medium text-foreground text-sm transition hover:brightness-110 disabled:opacity-50"
         >
           {isPending ? "保存中..." : "保存连接"}
         </button>

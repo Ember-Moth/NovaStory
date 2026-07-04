@@ -2,27 +2,27 @@ import { AnimatePresence, motion } from "motion/react";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { AuxNodeIcon } from "@/modules/workspace/ui/editor/components/icons";
+import { actionAnchorId } from "@/modules/workspace/ui/editor/model/action-error";
+import {
+  type AuxHierarchyMoveIntent,
+  buildAuxParentMap,
+  collectAuxSubtreeIds,
+  resolveAuxHierarchyMove,
+} from "@/modules/workspace/ui/editor/model/tree";
+import type { AuxTreeNodeVM } from "@/modules/workspace/ui/editor/model/types";
+import { cn } from "@/shared/lib/cn";
 import { InlineEditableText } from "@/shared/ui/InlineEditableText";
+import { PanelPlaceholder } from "@/shared/ui/PanelPlaceholder";
+import { RefreshOverlay } from "@/shared/ui/RefreshOverlay";
 import {
   ExpandToggle,
   ROW_GESTURE_HIT_AREA_ATTRIBUTE,
   RowActionButton,
   SidebarListRow,
   TreeNodePanel,
-  useRowPointerGesture,
   type TreeRowContext,
+  useRowPointerGesture,
 } from "@/shared/ui/tree";
-import { PanelPlaceholder } from "@/shared/ui/PanelPlaceholder";
-import { RefreshOverlay } from "@/shared/ui/RefreshOverlay";
-import { actionAnchorId } from "@/modules/workspace/ui/editor/model/action-error";
-import {
-  buildAuxParentMap,
-  collectAuxSubtreeIds,
-  resolveAuxHierarchyMove,
-  type AuxHierarchyMoveIntent,
-} from "@/modules/workspace/ui/editor/model/tree";
-import type { AuxTreeNodeVM } from "@/modules/workspace/ui/editor/model/types";
-import { cn } from "@/shared/lib/cn";
 
 import { isPanelBlankAreaDropTarget } from "./panelBlankAreaDrop";
 
@@ -600,7 +600,7 @@ export function AuxTreePanel({
       <div
         inert={isPending}
         className={`transition-opacity duration-150 ease-out motion-reduce:transition-none ${
-          isPending ? "pointer-events-none opacity-70 select-none" : "opacity-100"
+          isPending ? "pointer-events-none select-none opacity-70" : "opacity-100"
         }`}
       >
         <TreeNodePanel

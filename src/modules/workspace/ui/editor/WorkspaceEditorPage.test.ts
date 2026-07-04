@@ -11,8 +11,8 @@ import {
   shouldClearActiveAuxDraftForRefresh,
   shouldClearActiveContentDraftForRefresh,
   shouldHandleWorkspaceRefreshRequested,
-  shouldResetWorkspaceLocalEditorState,
   shouldRefetchActiveAuxForRefresh,
+  shouldResetWorkspaceLocalEditorState,
 } from "./workspaceEditorPageModel";
 
 function createWorkspaceRefreshRequestedEvent(

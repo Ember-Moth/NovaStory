@@ -22,7 +22,7 @@ function scrollViewportToBottom(viewport: HTMLElement, behavior: ScrollBehavior 
   });
 }
 
-export function useAutoFollowScroll(sessionKey: string, contentVersion: string) {
+export function useAutoFollowScroll(_sessionKey: string, contentVersion: string) {
   const viewportRef = useRef<HTMLElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const shouldAutoFollowRef = useRef(true);
@@ -67,7 +67,7 @@ export function useAutoFollowScroll(sessionKey: string, contentVersion: string) 
 
   useEffect(() => {
     updateShouldAutoFollow(true);
-  }, [sessionKey, updateShouldAutoFollow]);
+  }, [updateShouldAutoFollow]);
 
   useLayoutEffect(() => {
     let frameId = 0;
@@ -101,7 +101,7 @@ export function useAutoFollowScroll(sessionKey: string, contentVersion: string) 
       cancelled = true;
       cancelAnimationFrame(frameId);
     };
-  }, [sessionKey]);
+  }, []);
 
   useEffect(() => {
     const didContentChange = lastContentVersionRef.current !== contentVersion;
@@ -138,7 +138,7 @@ export function useAutoFollowScroll(sessionKey: string, contentVersion: string) 
     return () => {
       observer.disconnect();
     };
-  }, [scrollToBottom, sessionKey]);
+  }, [scrollToBottom]);
 
   return {
     viewportRef,

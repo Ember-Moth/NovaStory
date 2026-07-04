@@ -1,20 +1,19 @@
 import type { SHA1 } from "nano-git";
-
+import { getCommit } from "./commits";
 import { readCommitDiff, readFilesAtCommit } from "./git-storage/git-store";
 import { flattenManuscriptNodes, readWorktreeStateFromFiles } from "./git-storage/worktree-state";
-import { getCommit } from "./commits";
+import type { CommitDiff } from "./types";
 import {
   buildStructuredAuxChangeFromDiffEntry,
   compareContentStatesForDiff,
+  compareTimelineStates,
   didContentPathsChange,
   didTimelinePathChange,
-  compareTimelineStates,
   diffEntryPathKind,
   resolveAuxChangeTimelineLabel,
   shouldIgnoreAuxDiffPath,
   shouldIncludeAuxDiffEntry,
 } from "./working-tree-status";
-import type { CommitDiff } from "./types";
 
 /**
  * 计算单个 commit 相对其首个父提交（根提交则相对空树）的语义化差异。

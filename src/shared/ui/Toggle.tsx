@@ -38,7 +38,7 @@ export function Toggle({
         />
       </span>
       <span className="min-w-0">
-        <span className="block text-sm font-medium text-foreground">{label}</span>
+        <span className="block font-medium text-foreground text-sm">{label}</span>
         {description ? (
           <span className="block text-[11px] text-foreground-muted">{description}</span>
         ) : null}

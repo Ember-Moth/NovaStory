@@ -83,8 +83,8 @@ export function ActionErrorBubble({
         transform: position.placement === "above" ? "translateY(-100%)" : undefined,
       }}
     >
-      <span className={`mt-0.5 icon-[material-symbols--warning] shrink-0 ${iconClass}`} />
-      <span className="min-w-0 flex-1 leading-snug whitespace-pre-line">{error.message}</span>
+      <span className={`icon-[material-symbols--warning] mt-0.5 shrink-0 ${iconClass}`} />
+      <span className="min-w-0 flex-1 whitespace-pre-line leading-snug">{error.message}</span>
       <button
         type="button"
         onClick={onDismiss}

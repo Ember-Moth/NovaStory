@@ -1,10 +1,10 @@
 import {
   Children,
-  Fragment,
   type ComponentProps,
+  Fragment,
+  isValidElement,
   type ReactElement,
   type ReactNode,
-  isValidElement,
 } from "react";
 
 import { cn } from "@/shared/lib/cn";
@@ -47,7 +47,7 @@ export function SidebarMarkdownTable({
       {parsedRows.map((row, rowIndex) => (
         <div
           key={row.key}
-          className={cn(rowIndex > 0 ? "border-t border-border/70" : undefined)}
+          className={cn(rowIndex > 0 ? "border-border/70 border-t" : undefined)}
           data-ai-sidebar-table="row"
         >
           {row.cells.map((cell, cellIndex) => (
@@ -57,13 +57,13 @@ export function SidebarMarkdownTable({
               data-ai-sidebar-table="cell"
             >
               <div
-                className="mb-1 text-[10px] leading-4 text-foreground-muted"
+                className="mb-1 text-[10px] text-foreground-muted leading-4"
                 data-ai-sidebar-table="label"
               >
                 {cell.label}
               </div>
               <div
-                className="min-w-0 text-[12px] leading-5 break-words text-foreground"
+                className="min-w-0 break-words text-[12px] text-foreground leading-5"
                 data-ai-sidebar-table="value"
               >
                 {cell.content}

@@ -1,18 +1,18 @@
+import { useChat } from "@ai-sdk/react";
+import {
+  lastAssistantMessageIsCompleteWithApprovalResponses,
+  lastAssistantMessageIsCompleteWithToolCalls,
+} from "ai";
 import {
   createContext,
+  type ReactNode,
   useCallback,
   useContext,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type ReactNode,
 } from "react";
-import { useChat } from "@ai-sdk/react";
-import {
-  lastAssistantMessageIsCompleteWithApprovalResponses,
-  lastAssistantMessageIsCompleteWithToolCalls,
-} from "ai";
 
 import { deriveProjectChatTitleFromText } from "@/modules/ai/domain/project-chat/title";
 import type {
@@ -25,23 +25,22 @@ import type {
   TimelineSelectionUpdatedEvent,
   WorkspaceRefreshRequestedEvent,
 } from "@/modules/ai/domain/types";
-import { FullPageMessage } from "@/shared/ui/FullPageMessage";
-import { createId } from "@/shared/lib/domain";
-import { OverlayScrollbar } from "@/shared/ui/OverlayScrollbar";
 import { rpc } from "@/rpc/client";
-
-import { useAssistantSheetLayout } from "../assistant/layout/useAssistantSheetLayout";
+import { createId } from "@/shared/lib/domain";
+import { FullPageMessage } from "@/shared/ui/FullPageMessage";
+import { OverlayScrollbar } from "@/shared/ui/OverlayScrollbar";
 import type { AssistantComposerSubmitPayload } from "../assistant/composer/AssistantComposer";
+import { useAssistantSheetLayout } from "../assistant/layout/useAssistantSheetLayout";
 import type {
   AssistantAskUserAnswer,
   AssistantAskUserQuestion,
 } from "../assistant/messages/askUserModel";
 import { ChatComposerPane } from "./ChatComposerPane";
-import { MessageList } from "./MessageList";
 import { useAutoFollowScroll } from "./hooks/useAutoFollowScroll";
+import { useChatPathState } from "./hooks/useChatPathState";
+import { MessageList } from "./MessageList";
 import { SessionList } from "./SessionList";
 import { resolveSidebarActiveChat } from "./sidebarSessionState";
-import { useChatPathState } from "./hooks/useChatPathState";
 import { ProjectChatTransport } from "./transport/ProjectChatTransport";
 import type { ProjectChatMessage } from "./types";
 
@@ -456,7 +455,7 @@ function ActiveChatComposerPane() {
       return false;
     }
     const lastMessage = controller.messages[controller.messages.length - 1];
-    if (!lastMessage || lastMessage.role !== "assistant") {
+    if (lastMessage?.role !== "assistant") {
       return false;
     }
     return lastMessage.parts.some(
@@ -608,10 +607,10 @@ export function AiSidebar({
   }, [activeChatId, isComposingNewChat, isLoading, isMutating, visibleChatIds]);
 
   return (
-    <aside className="flex h-full w-96 max-w-[42vw] min-w-72 shrink-0 flex-col overflow-hidden border-l border-border bg-sidebar-background">
-      <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border bg-title-bar-background px-3">
-        <span className="icon-[material-symbols--smart-toy] text-lg text-accent-foreground" />
-        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">
+    <aside className="flex h-full w-96 min-w-72 max-w-[42vw] shrink-0 flex-col overflow-hidden border-border border-l bg-sidebar-background">
+      <div className="flex h-10 shrink-0 items-center gap-2 border-border border-b bg-title-bar-background px-3">
+        <span className="icon-[material-symbols--smart-toy] text-accent-foreground text-lg" />
+        <span className="min-w-0 flex-1 truncate font-medium text-[13px] text-foreground">
           AI 助手
         </span>
         <button
@@ -678,12 +677,12 @@ export function AiSidebar({
 
         <div
           className={`flex min-h-0 flex-1 flex-col overflow-hidden ${
-            layout.sessionSectionHeight > 0 ? "border-t border-border" : ""
+            layout.sessionSectionHeight > 0 ? "border-border border-t" : ""
           }`}
         >
           <div
             aria-label="调整会话列表和消息区域"
-            className="flex h-4 shrink-0 cursor-row-resize touch-none items-center justify-center border-b border-border bg-sidebar-background"
+            className="flex h-4 shrink-0 cursor-row-resize touch-none items-center justify-center border-border border-b bg-sidebar-background"
             onPointerDown={layout.handleSheetPointerDown}
             onPointerMove={layout.handleSheetPointerMove}
             onPointerUp={layout.handleSheetPointerUp}
@@ -714,7 +713,7 @@ export function AiSidebar({
               <div className="relative min-h-0 flex-1 overflow-hidden">
                 <ActiveChatMessagesPane />
               </div>
-              <div className="shrink-0 border-t border-border">
+              <div className="shrink-0 border-border border-t">
                 <ActiveChatComposerPane />
               </div>
             </ActiveChatConversationProvider>
@@ -734,7 +733,7 @@ export function AiSidebar({
                   embedded
                 />
               </div>
-              <div className="shrink-0 border-t border-border">
+              <div className="shrink-0 border-border border-t">
                 <NewChatComposerPane
                   projectId={projectId}
                   createChat={createChat}

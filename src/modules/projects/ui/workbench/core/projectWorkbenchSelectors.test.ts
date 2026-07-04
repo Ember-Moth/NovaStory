@@ -2,8 +2,8 @@ import { expect, test } from "bun:test";
 
 import {
   resolveNewBranchSourceCommitId,
-  resolveSelectedBranchIdAfterDelete,
   resolveSelectedBranchId,
+  resolveSelectedBranchIdAfterDelete,
   resolveWorkspaceRouteAfterBranchDelete,
   sortProjectBranches,
 } from "./projectWorkbenchSelectors";

@@ -1,7 +1,6 @@
 import { useCallback, useState } from "react";
-
-import { omitRecordKey } from "@/modules/workspace/ui/editor/model/tree";
 import { ORIGIN_TIMELINE_POINT_ID } from "@/modules/workspace/domain/constants";
+import { omitRecordKey } from "@/modules/workspace/ui/editor/model/tree";
 
 import { mergeProjectActionGroups } from "../actions/actionGroups";
 import { useWorkspaceStoreApi } from "../molecules/workspaceStore";
@@ -17,8 +16,8 @@ import {
 import { useProjectAuxActions } from "./projectAuxActions";
 import { useProjectContentActions } from "./projectContentActions";
 import {
-  useProjectTimelineActions,
   type TimelineDeleteDialogState,
+  useProjectTimelineActions,
 } from "./projectTimelineActions";
 import type { ProjectWorkspaceState } from "./useProjectWorkspace";
 

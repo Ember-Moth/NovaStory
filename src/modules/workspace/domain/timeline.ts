@@ -1,24 +1,21 @@
+import type { SHA1 } from "nano-git";
 import { ORIGIN_TIMELINE_POINT_ID } from "@/modules/workspace/domain/constants";
 import { createId, invariant } from "@/shared/lib/domain";
-
 import { getBranch, getBranchHeadCommitId } from "./branches";
-import { getWorkspace, touchWorkspaceMeta } from "./lifecycle";
-import { getWorkspaceForBranchId } from "./lifecycle";
-import { getWorkdirForBranch, getBranchMapping } from "./git-storage/git-store";
-import type { TimelinePointRef, TimelinePointView } from "./types";
+import { listAnchoredTimelinePointIds } from "./content";
+import { getBranchMapping, getWorkdirForBranch, readFilesAtCommit } from "./git-storage/git-store";
+import type { WorktreeState } from "./git-storage/worktree-state";
 import {
   AUX_TIMELINE_DIR,
   normalizePointId,
   orderTimelineRows,
   pointIdOrOrigin,
+  readWorktreeStateFromFiles,
   readWorktreeStateFromWorkdir,
   writeWorktreeStateToWorkdir,
 } from "./git-storage/worktree-state";
-import type { WorktreeState } from "./git-storage/worktree-state";
-import { listAnchoredTimelinePointIds } from "./content";
-import { readFilesAtCommit } from "./git-storage/git-store";
-import { readWorktreeStateFromFiles } from "./git-storage/worktree-state";
-import type { SHA1 } from "nano-git";
+import { getWorkspace, getWorkspaceForBranchId, touchWorkspaceMeta } from "./lifecycle";
+import type { TimelinePointRef, TimelinePointView } from "./types";
 
 function touchWorkspaceAsync(projectId: string, workspaceId: string) {
   touchWorkspaceMeta(projectId, workspaceId);

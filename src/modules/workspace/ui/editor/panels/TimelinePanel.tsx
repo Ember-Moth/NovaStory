@@ -1,11 +1,10 @@
 import { AnimatePresence, motion } from "motion/react";
 import { type ReactNode, useLayoutEffect, useMemo, useRef, useState } from "react";
-
+import { actionAnchorId } from "@/modules/workspace/ui/editor/model/action-error";
 import {
   resolveTimelineMoveAfterPointId,
   type TimelineDropPosition,
 } from "@/modules/workspace/ui/editor/model/timeline";
-import { actionAnchorId } from "@/modules/workspace/ui/editor/model/action-error";
 import type { TimelinePointVM } from "@/modules/workspace/ui/editor/model/types";
 import { cn } from "@/shared/lib/cn";
 import { InlineEditableText } from "@/shared/ui/InlineEditableText";
@@ -397,7 +396,7 @@ export function TimelinePanel({
         inert={isPending}
         className={cn(
           "transition-opacity duration-150 ease-out motion-reduce:transition-none",
-          isPending ? "pointer-events-none opacity-70 select-none" : "opacity-100",
+          isPending ? "pointer-events-none select-none opacity-70" : "opacity-100",
         )}
       >
         <AnimatePresence initial={false} mode="popLayout">

@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 
 import { rpcTags } from "@/rpc/tags";
 import * as promptHandlers from "./index";
+
 const requestCtx = { req: new Request("http://localhost/api/rpc") } as unknown as Parameters<
   typeof promptHandlers.listGlobalPrompts.handler
 >[1];

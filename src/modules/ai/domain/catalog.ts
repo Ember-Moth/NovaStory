@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
 
 import { isSupportedAiSdkPackage } from "@/modules/ai/domain/packages";
-import { invariant, now } from "@/shared/lib/domain";
 import type {
   AiCatalogModelView,
   AiCatalogProviderView,
@@ -10,7 +9,10 @@ import type {
   AiResolvedModelView,
 } from "@/modules/ai/domain/types";
 import * as userConfig from "@/modules/ai/domain/user-config";
+import { invariant, now } from "@/shared/lib/domain";
 import {
+  type AiRegistryModelRow,
+  type AiRegistryProviderRow,
   findModelByProviderAndModelId,
   listModels,
   listModelsByProvider,
@@ -20,8 +22,6 @@ import {
   upsertModel,
   upsertProvider,
   writeRegistryState,
-  type AiRegistryModelRow,
-  type AiRegistryProviderRow,
 } from "./catalog-file-store";
 
 const AI_REGISTRY_URL = "https://models.dev/api.json";

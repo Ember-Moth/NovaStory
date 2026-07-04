@@ -1,6 +1,6 @@
-import { type FormEvent, useEffect, useMemo, useState } from "react";
-import CodeMirror from "@uiw/react-codemirror";
 import { EditorView } from "@codemirror/view";
+import CodeMirror from "@uiw/react-codemirror";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 import { AppShell } from "@/app/shell/AppShell";
 import type { GlobalPromptRow } from "@/modules/ai/domain/types";
@@ -45,7 +45,7 @@ export function filterGlobalPrompts(prompts: GlobalPromptRow[], query: string) {
 
 export function PromptLibraryEmptyState({ onCreate }: { onCreate: () => void }) {
   return (
-    <div className="flex min-h-64 flex-col items-center justify-center gap-3 rounded-md border border-dashed border-border px-4 py-10 text-center text-sm text-foreground-muted">
+    <div className="flex min-h-64 flex-col items-center justify-center gap-3 rounded-md border border-border border-dashed px-4 py-10 text-center text-foreground-muted text-sm">
       <span className="icon-[material-symbols--article] text-3xl text-accent-foreground" />
       <div>
         <div className="font-medium text-foreground">还没有 Prompt</div>
@@ -54,7 +54,7 @@ export function PromptLibraryEmptyState({ onCreate }: { onCreate: () => void }) 
       <button
         type="button"
         onClick={onCreate}
-        className="inline-flex items-center gap-1.5 rounded-md bg-accent-background px-3 py-1.5 text-sm font-medium text-foreground transition hover:brightness-110"
+        className="inline-flex items-center gap-1.5 rounded-md bg-accent-background px-3 py-1.5 font-medium text-foreground text-sm transition hover:brightness-110"
       >
         <span className="icon-[material-symbols--add] text-base" />
         新建 Prompt
@@ -158,9 +158,9 @@ export function PromptLibrarySettingsPage() {
   return (
     <AppShell sidebar={<SettingsSidebar />}>
       <div className="flex h-full flex-col overflow-hidden">
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-title-bar-background px-4 py-2">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-border border-b bg-title-bar-background px-4 py-2">
           <div className="min-w-0">
-            <h1 className="text-[14px] font-semibold text-foreground">Prompt 库</h1>
+            <h1 className="font-semibold text-[14px] text-foreground">Prompt 库</h1>
             <p className="text-[11px] text-foreground-muted">
               {allPrompts.length} 条 Prompt ·{" "}
               {allPrompts.filter((prompt) => prompt.isEnabled).length} 条已启用
@@ -170,7 +170,7 @@ export function PromptLibrarySettingsPage() {
           <button
             type="button"
             onClick={startCreate}
-            className="inline-flex items-center gap-1.5 rounded-md bg-accent-background px-3 py-1.5 text-sm font-medium text-foreground transition hover:brightness-110"
+            className="inline-flex items-center gap-1.5 rounded-md bg-accent-background px-3 py-1.5 font-medium text-foreground text-sm transition hover:brightness-110"
           >
             <span className="icon-[material-symbols--add] text-base" />
             新建 Prompt
@@ -178,8 +178,8 @@ export function PromptLibrarySettingsPage() {
         </div>
 
         <div className="grid min-h-0 flex-1 grid-cols-[minmax(18rem,0.36fr)_minmax(0,1fr)] overflow-hidden">
-          <aside className="flex min-h-0 flex-col border-r border-border bg-sidebar-background">
-            <div className="shrink-0 border-b border-border p-3">
+          <aside className="flex min-h-0 flex-col border-border border-r bg-sidebar-background">
+            <div className="shrink-0 border-border border-b p-3">
               <label className="block">
                 <span className="sr-only">搜索 Prompt</span>
                 <div className="flex items-center gap-2 rounded-md border border-border bg-editor-background px-2 py-1.5">
@@ -189,7 +189,7 @@ export function PromptLibrarySettingsPage() {
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder="搜索 Prompt..."
-                    className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-foreground-muted/50"
+                    className="min-w-0 flex-1 bg-transparent text-foreground text-sm outline-none placeholder:text-foreground-muted/50"
                   />
                 </div>
               </label>
@@ -205,7 +205,7 @@ export function PromptLibrarySettingsPage() {
                   <PromptLibraryEmptyState onCreate={startCreate} />
                 </div>
               ) : visiblePrompts.length === 0 ? (
-                <div className="p-4 text-sm text-foreground-muted">没有匹配的 Prompt。</div>
+                <div className="p-4 text-foreground-muted text-sm">没有匹配的 Prompt。</div>
               ) : (
                 <div className="space-y-1 p-2">
                   {visiblePrompts.map((prompt) => (
@@ -229,7 +229,7 @@ export function PromptLibrarySettingsPage() {
 
           <main className="flex min-h-0 flex-col overflow-hidden bg-editor-background">
             {actionError ? (
-              <div className="shrink-0 border-b border-border bg-red-500/10 px-4 py-2 text-sm text-red-200">
+              <div className="shrink-0 border-border border-b bg-red-500/10 px-4 py-2 text-red-200 text-sm">
                 {actionError}
               </div>
             ) : null}
@@ -298,7 +298,7 @@ function PromptListItem({
     >
       <button type="button" onClick={onSelect} className="block w-full min-w-0 text-left">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="truncate text-sm font-medium text-foreground">{prompt.name}</span>
+          <span className="truncate font-medium text-foreground text-sm">{prompt.name}</span>
           {!prompt.isEnabled ? (
             <span className="shrink-0 rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-foreground-muted">
               已禁用
@@ -306,7 +306,7 @@ function PromptListItem({
           ) : null}
         </div>
         {prompt.description ? (
-          <div className="mt-1 max-h-8 overflow-hidden text-xs leading-4 text-foreground-muted">
+          <div className="mt-1 max-h-8 overflow-hidden text-foreground-muted text-xs leading-4">
             {prompt.description}
           </div>
         ) : null}
@@ -324,7 +324,7 @@ function PromptListItem({
           disabled={isBusy}
           onClick={() => onToggleEnabled(!prompt.isEnabled)}
           className={cn(
-            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition disabled:cursor-not-allowed disabled:opacity-50",
+            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium text-[10px] transition disabled:cursor-not-allowed disabled:opacity-50",
             prompt.isEnabled
               ? "bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
               : "bg-white/5 text-foreground-muted hover:bg-white/10",
@@ -388,9 +388,9 @@ function PromptEditor({
 
   return (
     <form onSubmit={handleSubmit} className="flex h-full min-h-0 flex-col overflow-hidden">
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-title-bar-background px-4 py-2">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-border border-b bg-title-bar-background px-4 py-2">
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-foreground">
+          <h2 className="font-semibold text-foreground text-sm">
             {prompt ? "编辑 Prompt" : "新建 Prompt"}
           </h2>
           <p className="text-[11px] text-foreground-muted">
@@ -404,7 +404,7 @@ function PromptEditor({
               type="button"
               onClick={onDelete}
               disabled={isPending}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-list-hover-background disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-medium text-foreground text-sm transition hover:bg-list-hover-background disabled:cursor-not-allowed disabled:opacity-40"
             >
               <span className="icon-[material-symbols--delete-outline] text-base" />
               删除
@@ -414,14 +414,14 @@ function PromptEditor({
             type="button"
             onClick={onCancel}
             disabled={isPending}
-            className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-list-hover-background disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-md border border-border px-3 py-1.5 font-medium text-foreground text-sm transition hover:bg-list-hover-background disabled:cursor-not-allowed disabled:opacity-40"
           >
             取消
           </button>
           <button
             type="submit"
             disabled={isPending}
-            className="inline-flex items-center gap-1.5 rounded-md bg-accent-background px-3 py-1.5 text-sm font-medium text-foreground transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-md bg-accent-background px-3 py-1.5 font-medium text-foreground text-sm transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isPending ? (
               <>
@@ -438,33 +438,32 @@ function PromptEditor({
         </div>
       </div>
 
-      <div className="shrink-0 space-y-3 border-b border-border bg-sidebar-background px-4 py-3">
+      <div className="shrink-0 space-y-3 border-border border-b bg-sidebar-background px-4 py-3">
         {formError ? (
-          <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+          <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-red-200 text-sm">
             {formError}
           </div>
         ) : null}
 
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)]">
           <label className="block space-y-1">
-            <span className="text-[11px] font-medium text-foreground-muted">名称</span>
+            <span className="font-medium text-[11px] text-foreground-muted">名称</span>
             <input
-              autoFocus
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder="例如：章节扩写"
-              className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-sm text-foreground outline-none placeholder:text-foreground-muted/50 focus:border-accent-foreground"
+              className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-foreground text-sm outline-none placeholder:text-foreground-muted/50 focus:border-accent-foreground"
             />
           </label>
         </div>
 
         <label className="block space-y-1">
-          <span className="text-[11px] font-medium text-foreground-muted">说明</span>
+          <span className="font-medium text-[11px] text-foreground-muted">说明</span>
           <input
             value={description}
             onChange={(event) => setDescription(event.target.value)}
             placeholder="可选，用于区分用途"
-            className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-sm text-foreground outline-none placeholder:text-foreground-muted/50 focus:border-accent-foreground"
+            className="w-full rounded-md border border-border bg-editor-background px-3 py-2 text-foreground text-sm outline-none placeholder:text-foreground-muted/50 focus:border-accent-foreground"
           />
         </label>
       </div>

@@ -1,19 +1,10 @@
+import type { SHA1 } from "nano-git";
 import { createId, invariant } from "@/shared/lib/domain";
 
-import type { SHA1 } from "nano-git";
-
 import { getBranch, getBranchHeadCommitId } from "./branches";
-import { getWorkspace, getWorkspaceForBranchId, touchWorkspaceMeta } from "./lifecycle";
-import { readFilesAtCommit, getBranchMapping } from "./git-storage/git-store";
-import { getWorkdirForBranch } from "./git-storage/git-store";
-import type {
-  ExportedContentNode,
-  ExportedContentSubtree,
-  ManuscriptListNode,
-  ManuscriptNodeList,
-  ManuscriptNodeRead,
-  TimelinePointRef,
-} from "./types";
+import { getBranchMapping, getWorkdirForBranch, readFilesAtCommit } from "./git-storage/git-store";
+import type { ManuscriptNodeDiskState } from "./git-storage/types";
+import type { WorktreeState } from "./git-storage/worktree-state";
 import {
   assertTimelinePoint,
   findManuscriptNode,
@@ -22,14 +13,21 @@ import {
   listManuscriptChildren,
   moveManuscriptNode,
   pointIdOrOrigin,
-  removeManuscriptNode,
   readWorktreeStateFromFiles,
   readWorktreeStateFromWorkdir,
+  removeManuscriptNode,
   removeNodeFromTree,
   writeWorktreeStateToWorkdir,
 } from "./git-storage/worktree-state";
-import type { ManuscriptNodeDiskState } from "./git-storage/types";
-import type { WorktreeState } from "./git-storage/worktree-state";
+import { getWorkspace, getWorkspaceForBranchId, touchWorkspaceMeta } from "./lifecycle";
+import type {
+  ExportedContentNode,
+  ExportedContentSubtree,
+  ManuscriptListNode,
+  ManuscriptNodeList,
+  ManuscriptNodeRead,
+  TimelinePointRef,
+} from "./types";
 
 async function touchWorkspace(projectId: string, workspaceId: string) {
   touchWorkspaceMeta(projectId, workspaceId);

@@ -1,15 +1,15 @@
-import { YAML } from "bun";
 import {
   existsSync,
   mkdirSync,
-  readFileSync,
   readdirSync,
+  readFileSync,
   renameSync,
   statSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { basename, join } from "node:path";
+import { YAML } from "bun";
 
 import { ensureConfigDir } from "@/shared/lib/storage-paths";
 import type { GlobalPromptRow } from "../types";

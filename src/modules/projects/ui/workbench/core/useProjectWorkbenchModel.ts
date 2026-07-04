@@ -1,8 +1,6 @@
 import { skipToken } from "@codehz/rpc/react";
 
 import { rpc } from "@/rpc/client";
-
-import { resolveSelectedBranchId, sortProjectBranches } from "./projectWorkbenchSelectors";
 import type {
   BranchHeadList,
   BranchList,
@@ -12,6 +10,7 @@ import type {
   WorkspaceList,
   WorkspaceRow,
 } from "../../shared/projectTypes";
+import { resolveSelectedBranchId, sortProjectBranches } from "./projectWorkbenchSelectors";
 
 export type ProjectWorkbenchModel = {
   project: ProjectRow | null;

@@ -7,8 +7,9 @@ setupMockDatabase();
 
 const workspaceDomain = await import("@/modules/workspace/domain");
 const { createAssistantTools } = await import("./assistant-tools");
-const { normalizeAskUserAnswers, normalizeAskUserInput, validateAskUserSubmission } =
-  await import("./assistant-tools/ask-user");
+const { normalizeAskUserAnswers, normalizeAskUserInput, validateAskUserSubmission } = await import(
+  "./assistant-tools/ask-user"
+);
 const { PROJECT_ASSISTANT_TOOL_NAMES } = await import("@/modules/ai/domain/types");
 
 function createRuntimeContext(

@@ -3,12 +3,12 @@ import { jsonSchema, tool } from "ai";
 import {
   createTimelinePoints,
   deleteTimelinePoint,
-  listTimelinePoints,
   listAuxTimelineChangesAt,
+  listTimelinePoints,
   moveTimelinePoint,
+  ORIGIN_TIMELINE_POINT_ID,
   summarizeAuxTimelineChangesAt,
   updateTimelinePoint,
-  ORIGIN_TIMELINE_POINT_ID,
 } from "@/modules/workspace/domain";
 import { invariant } from "@/shared/lib/domain";
 

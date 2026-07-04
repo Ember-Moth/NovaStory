@@ -54,7 +54,7 @@ export function ChangeAreasView({
 
           return (
             <div key={areaKey}>
-              <div className="text-xs font-medium text-foreground-muted">
+              <div className="font-medium text-foreground-muted text-xs">
                 {workingTreeAreaLabels[areaKey]}
               </div>
               {areaKey === "content"
@@ -82,7 +82,7 @@ function renderContentArea(
       {changes.map((change) => (
         <li
           key={`content-${change.kind}-${change.nodeId}`}
-          className="flex items-start gap-2 text-sm text-foreground"
+          className="flex items-start gap-2 text-foreground text-sm"
         >
           <WorkingTreeChangeBadge
             kind={change.kind}
@@ -114,7 +114,7 @@ function renderTimelineArea(
       {changes.map((change) => (
         <li
           key={`timeline-${change.kind}-${change.pointId}`}
-          className="flex items-start gap-2 text-sm text-foreground"
+          className="flex items-start gap-2 text-foreground text-sm"
         >
           <WorkingTreeChangeBadge
             kind={change.kind}
@@ -147,7 +147,7 @@ function renderPathArea(
       {changes.map((change) => (
         <li
           key={`${change.kind}-${change.label}`}
-          className="flex items-start gap-2 text-sm text-foreground"
+          className="flex items-start gap-2 text-foreground text-sm"
         >
           <WorkingTreeChangeBadge
             kind={change.kind}
@@ -191,17 +191,17 @@ function WorkingTreeChangeLabel({
             className="flex min-w-0 shrink items-center gap-1"
           >
             {index > 0 ? (
-              <span className="shrink-0 text-sm text-foreground-muted/55">{"/"}</span>
+              <span className="shrink-0 text-foreground-muted/55 text-sm">{"/"}</span>
             ) : null}
-            <span className="min-w-0 truncate text-sm text-foreground-muted">{segment}</span>
+            <span className="min-w-0 truncate text-foreground-muted text-sm">{segment}</span>
           </span>
         ))}
         {parents.length > 0 ? (
-          <span className="shrink-0 text-sm text-foreground-muted/55">{"/"}</span>
+          <span className="shrink-0 text-foreground-muted/55 text-sm">{"/"}</span>
         ) : null}
         {isWhiteout ? (
           <>
-            <span className="shrink-0 rounded-sm border border-red-500/20 bg-red-500/10 px-1 py-0.5 text-[10px] leading-none text-red-200/85">
+            <span className="shrink-0 rounded-sm border border-red-500/20 bg-red-500/10 px-1 py-0.5 text-[10px] text-red-200/85 leading-none">
               .wh
             </span>
             <span className="min-w-0 truncate font-medium text-foreground">
@@ -245,7 +245,7 @@ function WorkingTreeChangeBadge({
   return (
     <span
       className={cn(
-        "group relative shrink-0 overflow-hidden rounded px-1.5 py-0.5 text-[10px] font-medium",
+        "group relative shrink-0 overflow-hidden rounded px-1.5 py-0.5 font-medium text-[10px]",
         className,
       )}
     >
@@ -263,7 +263,7 @@ function WorkingTreeChangeBadge({
             }
           }}
           className={cn(
-            "absolute inset-0 flex items-center justify-center rounded px-1.5 text-[10px] font-medium opacity-0 transition-opacity",
+            "absolute inset-0 flex items-center justify-center rounded px-1.5 font-medium text-[10px] opacity-0 transition-opacity",
             "group-hover:opacity-100",
             canRevert ? "cursor-pointer hover:brightness-110" : "cursor-default opacity-30",
           )}
@@ -282,7 +282,7 @@ function WorkingTreeTimelineChangeDetails({
 }) {
   if (change.kind === "added") {
     return (
-      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] leading-relaxed text-foreground-muted">
+      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-foreground-muted leading-relaxed">
         {change.prevPointLabel ? (
           <SemanticPlacementChip label="插入到" value={change.prevPointLabel} tone="sky" />
         ) : null}
@@ -295,7 +295,7 @@ function WorkingTreeTimelineChangeDetails({
 
   if (change.kind === "deleted") {
     return (
-      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] leading-relaxed text-foreground-muted">
+      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-foreground-muted leading-relaxed">
         {change.previousPrevPointLabel ? (
           <SemanticPlacementChip label="原位置" value={change.previousPrevPointLabel} tone="red" />
         ) : null}
@@ -316,7 +316,7 @@ function WorkingTreeTimelineChangeDetails({
   const orderChanged = change.changedAspects.includes("order");
 
   return (
-    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] leading-relaxed text-foreground-muted">
+    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-foreground-muted leading-relaxed">
       {labelChanged ? (
         <SemanticTransitionChip
           label="标题"
@@ -370,7 +370,7 @@ function ContentChangeBreadcrumb({
             className="flex min-w-0 items-center gap-1"
           >
             {index > 0 ? (
-              <span className="shrink-0 text-sm text-foreground-muted/55">{"/"}</span>
+              <span className="shrink-0 text-foreground-muted/55 text-sm">{"/"}</span>
             ) : null}
             <span
               className={cn(
@@ -394,7 +394,7 @@ function WorkingTreeContentChangeDetails({
 }) {
   if (change.kind === "added") {
     return (
-      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] leading-relaxed text-foreground-muted">
+      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-foreground-muted leading-relaxed">
         {change.anchorTimelinePointLabel && change.anchorTimelinePointLabel !== "原点" ? (
           <SemanticPlacementChip
             label="锚定到"
@@ -408,7 +408,7 @@ function WorkingTreeContentChangeDetails({
 
   if (change.kind === "deleted") {
     return (
-      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] leading-relaxed text-foreground-muted">
+      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-foreground-muted leading-relaxed">
         {change.previousAnchorTimelinePointLabel &&
         change.previousAnchorTimelinePointLabel !== "原点" ? (
           <SemanticPlacementChip
@@ -436,7 +436,7 @@ function WorkingTreeContentChangeDetails({
     change.previousTitle &&
     change.previousTitle !== (change.title ?? change.label);
   return (
-    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] leading-relaxed text-foreground-muted">
+    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-foreground-muted leading-relaxed">
       {bodyChanged && change.bodyCharDelta ? (
         <SemanticBodyDeltaChip
           added={change.bodyCharDelta.added}

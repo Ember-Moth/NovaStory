@@ -329,7 +329,7 @@ export function getAssistantToolTrace(
   messageIndex: number,
 ): AssistantToolTraceEntry[] {
   const node = messages[messageIndex];
-  if (!node || node.role !== "assistant") {
+  if (node?.role !== "assistant") {
     return [];
   }
 
@@ -350,7 +350,7 @@ export function getAssistantToolTrace(
 
   for (let index = messageIndex + 1; index < messages.length; index += 1) {
     const toolNode = messages[index];
-    if (!toolNode || toolNode.role !== "tool") {
+    if (toolNode?.role !== "tool") {
       break;
     }
 

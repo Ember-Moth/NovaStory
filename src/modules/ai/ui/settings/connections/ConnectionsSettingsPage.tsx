@@ -128,7 +128,7 @@ export function ConnectionsSettingsPage() {
               setEditingConnection(undefined);
               setConnectionDialogOpen(true);
             }}
-            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-sidebar-background px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-list-hover-background"
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-sidebar-background px-3 py-1.5 font-medium text-foreground text-sm transition hover:bg-list-hover-background"
           >
             <span className="icon-[material-symbols--add] text-base" />
             新建连接
@@ -137,7 +137,7 @@ export function ConnectionsSettingsPage() {
             type="button"
             onClick={() => void refreshCatalog.mutate({ force: true })}
             disabled={refreshCatalog.isPending}
-            className="inline-flex items-center gap-1.5 rounded-md bg-accent-background px-3 py-1.5 text-sm font-medium text-foreground transition hover:brightness-110 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-md bg-accent-background px-3 py-1.5 font-medium text-foreground text-sm transition hover:brightness-110 disabled:opacity-50"
           >
             <span
               className={`text-base ${refreshCatalog.isPending ? "icon-[material-symbols--sync] animate-spin" : "icon-[material-symbols--cloud-sync]"}`}
@@ -148,9 +148,9 @@ export function ConnectionsSettingsPage() {
       }
     >
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
-        <section className="mb-4 grid shrink-0 gap-3 rounded-md border border-border bg-sidebar-background p-3 text-sm text-foreground-muted sm:grid-cols-2 xl:grid-cols-4">
+        <section className="mb-4 grid shrink-0 gap-3 rounded-md border border-border bg-sidebar-background p-3 text-foreground-muted text-sm sm:grid-cols-2 xl:grid-cols-4">
           <div>
-            <div className="text-[11px] tracking-wide text-foreground-muted/70 uppercase">
+            <div className="text-[11px] text-foreground-muted/70 uppercase tracking-wide">
               Last Success
             </div>
             <div className="mt-1 text-foreground">
@@ -158,7 +158,7 @@ export function ConnectionsSettingsPage() {
             </div>
           </div>
           <div>
-            <div className="text-[11px] tracking-wide text-foreground-muted/70 uppercase">
+            <div className="text-[11px] text-foreground-muted/70 uppercase tracking-wide">
               Last Attempt
             </div>
             <div className="mt-1 text-foreground">
@@ -166,7 +166,7 @@ export function ConnectionsSettingsPage() {
             </div>
           </div>
           <div>
-            <div className="text-[11px] tracking-wide text-foreground-muted/70 uppercase">
+            <div className="text-[11px] text-foreground-muted/70 uppercase tracking-wide">
               State
             </div>
             <div className="mt-1 text-foreground">
@@ -174,18 +174,18 @@ export function ConnectionsSettingsPage() {
             </div>
           </div>
           <div>
-            <div className="text-[11px] tracking-wide text-foreground-muted/70 uppercase">
+            <div className="text-[11px] text-foreground-muted/70 uppercase tracking-wide">
               Last Error
             </div>
-            <div className="mt-1 wrap-break-word text-foreground">{status?.lastError ?? "—"}</div>
+            <div className="wrap-break-word mt-1 text-foreground">{status?.lastError ?? "—"}</div>
           </div>
         </section>
 
         <section className="grid min-h-0 flex-1 gap-4 overflow-y-auto xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] xl:overflow-hidden">
           <div className="flex min-h-0 flex-col gap-3 xl:overflow-hidden">
             <div className="shrink-0">
-              <h2 className="text-sm font-semibold text-foreground">Connections</h2>
-              <p className="text-xs text-foreground-muted">
+              <h2 className="font-semibold text-foreground text-sm">Connections</h2>
+              <p className="text-foreground-muted text-xs">
                 这里保存真正会被未来 AI SDK 使用的连接实例。
               </p>
             </div>
@@ -194,7 +194,7 @@ export function ConnectionsSettingsPage() {
               {connectionsLoading ? (
                 <LoadingBlock label="连接加载中..." />
               ) : allConnections.length === 0 ? (
-                <div className="rounded-md border border-dashed border-border px-4 py-10 text-sm text-foreground-muted">
+                <div className="rounded-md border border-border border-dashed px-4 py-10 text-foreground-muted text-sm">
                   还没有任何连接。先创建一个 registry 或 custom connection。
                 </div>
               ) : (
@@ -258,8 +258,8 @@ export function ConnectionsSettingsPage() {
 
           <div className="flex min-h-0 flex-col gap-3 xl:overflow-hidden">
             <div className="shrink-0">
-              <h2 className="text-sm font-semibold text-foreground">Catalog</h2>
-              <p className="text-xs text-foreground-muted">
+              <h2 className="font-semibold text-foreground text-sm">Catalog</h2>
+              <p className="text-foreground-muted text-xs">
                 从支持的 provider Catalog 中快速接入连接，或检查模型快照。
               </p>
             </div>
@@ -274,7 +274,7 @@ export function ConnectionsSettingsPage() {
                     value={providerFilter}
                     onChange={(event) => setProviderFilter(event.target.value)}
                     placeholder="筛选 provider..."
-                    className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-foreground-muted/50"
+                    className="min-w-0 flex-1 bg-transparent text-foreground text-sm outline-none placeholder:text-foreground-muted/50"
                   />
                 </div>
               </label>

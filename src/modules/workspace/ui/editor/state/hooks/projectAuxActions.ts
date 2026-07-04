@@ -1,11 +1,12 @@
 import { useCallback } from "react";
-
+import { ORIGIN_TIMELINE_POINT_ID } from "@/modules/workspace/domain/constants";
 import {
   actionAnchorId,
   clearActionError,
   setActionError,
 } from "@/modules/workspace/ui/editor/model/action-error";
 import {
+  type AuxHierarchyMoveIntent,
   collectAncestorIds,
   collectInvalidAuxSymlinkTargetIds,
   getAuxRenameValidationError,
@@ -14,10 +15,8 @@ import {
   nextAuxFileName,
   nextAuxSymlinkName,
   resolveAuxHierarchyMove,
-  type AuxHierarchyMoveIntent,
 } from "@/modules/workspace/ui/editor/model/tree";
 import type { AuxTreeNodeVM } from "@/modules/workspace/ui/editor/model/types";
-import { ORIGIN_TIMELINE_POINT_ID } from "@/modules/workspace/domain/constants";
 import type { WorkspaceStore } from "@/modules/workspace/ui/editor/state/molecules/workspaceStore";
 
 import { selectAuxPath } from "./projectActionShared";

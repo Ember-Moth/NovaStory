@@ -2,8 +2,8 @@ import { useEffect, useRef } from "react";
 
 import { ProjectDialog } from "../../shared/ProjectDialog";
 import { formatCommitId } from "../../shared/projectUi";
-import { useProjectForkBranchDraft } from "../state/projectWorkbenchStore";
 import { useForkBranchFeature } from "../features/useForkBranchFeature";
+import { useProjectForkBranchDraft } from "../state/projectWorkbenchStore";
 
 export function ForkBranchDialog() {
   const forkBranch = useForkBranchFeature();
@@ -42,17 +42,16 @@ export function ForkBranchDialog() {
       submitLabel="创建 Fork"
       widthClassName="w-[min(42rem,calc(100vw-2rem))]"
     >
-      <div className="min-w-0 rounded-md border border-border bg-editor-background px-3 py-2 text-xs leading-relaxed wrap-break-word text-foreground-muted">
+      <div className="wrap-break-word min-w-0 rounded-md border border-border bg-editor-background px-3 py-2 text-foreground-muted text-xs leading-relaxed">
         来源提交：{forkCommit ? `${forkCommit.message} · ${formatCommitId(forkCommit.id)}` : "—"}
       </div>
       <label className="block space-y-1.5">
-        <span className="text-xs font-medium text-foreground-muted">分支名</span>
+        <span className="font-medium text-foreground-muted text-xs">分支名</span>
         <input
-          autoFocus
           value={forkBranchName}
           onChange={(event) => setForkBranchName(event.target.value)}
           placeholder="例如：fork-alt-ending"
-          className="w-full rounded-md border border-border bg-editor-background px-3 py-1.5 text-sm text-foreground transition outline-none placeholder:text-foreground-muted/50 focus:border-accent-foreground"
+          className="w-full rounded-md border border-border bg-editor-background px-3 py-1.5 text-foreground text-sm outline-none transition placeholder:text-foreground-muted/50 focus:border-accent-foreground"
         />
       </label>
     </ProjectDialog>

@@ -1,9 +1,8 @@
+import type { VirtualWorkdir } from "nano-git/workdir/core";
 import { ORIGIN_TIMELINE_POINT_ID } from "@/modules/workspace/domain/constants";
 import { invariant } from "@/shared/lib/domain";
-
 import { parseJsonl, stringifyJsonl } from "./jsonl";
 import type { ManuscriptNodeDiskState, TimelineMetaRow } from "./types";
-import type { VirtualWorkdir } from "nano-git/workdir/core";
 
 export interface WorktreeState {
   content: ManuscriptNodeDiskState[];

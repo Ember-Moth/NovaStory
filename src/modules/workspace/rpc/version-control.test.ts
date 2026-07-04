@@ -1,10 +1,10 @@
 import { expect, test } from "bun:test";
-
-import { seedProjectRecord } from "@/test/project";
 import * as service from "@/modules/workspace/domain";
 import { rpcTags } from "@/rpc/tags";
+import { seedProjectRecord } from "@/test/project";
 import * as branchHandlers from "./branches";
 import * as commitHandlers from "./commits";
+
 const requestCtx = { req: new Request("http://localhost/api/rpc") } as unknown as Parameters<
   typeof branchHandlers.list.handler
 >[1];

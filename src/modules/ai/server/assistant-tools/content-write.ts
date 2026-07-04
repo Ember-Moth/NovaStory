@@ -10,9 +10,9 @@ import {
 } from "@/modules/workspace/domain";
 
 import type { ToolBuildContext } from "./context";
+import { normalizeOptionalStringToNull } from "./string-args";
 import { getTimelineLabelById, resolveCurrentTimelinePointId } from "./timeline-helpers";
 import type { ContentWriteToolName } from "./tool-names";
-import { normalizeOptionalStringToNull } from "./string-args";
 import { withProjectWorkspace } from "./workspace";
 
 type QueuedCreateAnchor = string | null;

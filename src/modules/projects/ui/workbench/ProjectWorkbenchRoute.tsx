@@ -3,16 +3,15 @@ import { ScopeProvider } from "bunshi/react";
 import { AppShell } from "@/app/shell/AppShell";
 import { FullPageMessage } from "@/shared/ui/FullPageMessage";
 import { SidebarLayoutScope } from "@/shared/ui/sidebar";
-
-import { CreateBranchDialog } from "./dialogs/CreateBranchDialog";
-import { ForkBranchDialog } from "./dialogs/ForkBranchDialog";
+import { ProjectWorkbenchMain } from "./components/ProjectWorkbenchMain";
+import { ProjectWorkbenchSidebar } from "./components/ProjectWorkbenchSidebar";
 import {
   ProjectWorkbenchBranchRouteScope,
   ProjectWorkbenchProjectScope,
 } from "./core/projectWorkbenchScopes";
-import { ProjectWorkbenchMain } from "./components/ProjectWorkbenchMain";
-import { ProjectWorkbenchSidebar } from "./components/ProjectWorkbenchSidebar";
 import { useProjectWorkbenchSync, useProjectWorkbenchViewModel } from "./core/useProjectWorkbench";
+import { CreateBranchDialog } from "./dialogs/CreateBranchDialog";
+import { ForkBranchDialog } from "./dialogs/ForkBranchDialog";
 
 export function ProjectWorkbenchRoute({
   projectId,

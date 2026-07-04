@@ -5,12 +5,11 @@ import { AppShell } from "@/app/shell/AppShell";
 import { useLastProjectStore } from "@/app/state/lastProject";
 import { rpc } from "@/rpc/client";
 import { createProjectId } from "@/shared/lib/domain";
-
-import { CreateProjectDialog } from "./CreateProjectDialog";
 import { insertProjectOptimistically, removeProjectOptimistically } from "../shared/projectCache";
-import { ProjectListView } from "./ProjectListView";
 import type { ProjectList } from "../shared/projectTypes";
 import { InlineError } from "../shared/projectUi";
+import { CreateProjectDialog } from "./CreateProjectDialog";
+import { ProjectListView } from "./ProjectListView";
 import { useProjectListStoreApi } from "./state/projectListStore";
 
 type ProjectListMutationContext = {

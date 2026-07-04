@@ -3,10 +3,10 @@ import { useEffect, useState } from "react";
 import { cn } from "@/shared/lib/cn";
 
 import {
-  formatAskUserAnswer,
   type AssistantAskUserAnswer,
   type AssistantAskUserEntry,
   type AssistantAskUserQuestion,
+  formatAskUserAnswer,
 } from "./askUserModel";
 
 function indexAskUserAnswers(
@@ -35,11 +35,11 @@ function AskUserQuestionBlock({
 
   return (
     <section className="py-2.5 first:pt-2 last:pb-2">
-      <div className="text-[12px] leading-5 text-foreground">{question.prompt}</div>
+      <div className="text-[12px] text-foreground leading-5">{question.prompt}</div>
       {resolved ? (
-        <div className="mt-1.5 flex items-start gap-1.5 text-[12px] leading-5 text-foreground-muted">
-          <span className="mt-0.5 icon-[material-symbols--subdirectory-arrow-right] shrink-0 text-[14px] text-accent-foreground" />
-          <span className="min-w-0 flex-1 wrap-break-word whitespace-pre-wrap">
+        <div className="mt-1.5 flex items-start gap-1.5 text-[12px] text-foreground-muted leading-5">
+          <span className="icon-[material-symbols--subdirectory-arrow-right] mt-0.5 shrink-0 text-[14px] text-accent-foreground" />
+          <span className="wrap-break-word min-w-0 flex-1 whitespace-pre-wrap">
             {formatAskUserAnswer(question, answer)}
           </span>
         </div>
@@ -50,13 +50,13 @@ function AskUserQuestionBlock({
               question.options.map((option) => (
                 <div
                   key={option.id}
-                  className="flex items-start gap-2 rounded-md border border-border bg-sidebar-background/35 px-2 py-2 text-[12px] leading-5 text-foreground-muted"
+                  className="flex items-start gap-2 rounded-md border border-border bg-sidebar-background/35 px-2 py-2 text-[12px] text-foreground-muted leading-5"
                 >
-                  <span className="mt-0.5 icon-[material-symbols--radio-button-unchecked] shrink-0 text-[16px]" />
+                  <span className="icon-[material-symbols--radio-button-unchecked] mt-0.5 shrink-0 text-[16px]" />
                   <span className="min-w-0 flex-1">
                     <span className="block text-foreground">{option.label}</span>
                     {option.description ? (
-                      <span className="mt-0.5 block text-[11px] leading-4 text-foreground-muted">
+                      <span className="mt-0.5 block text-[11px] text-foreground-muted leading-4">
                         {option.description}
                       </span>
                     ) : null}
@@ -101,7 +101,7 @@ function AskUserQuestionBlock({
                 <span className="min-w-0 flex-1">
                   <span className="block text-foreground">{option.label}</span>
                   {option.description ? (
-                    <span className="mt-0.5 block text-[11px] leading-4 text-foreground-muted">
+                    <span className="mt-0.5 block text-[11px] text-foreground-muted leading-4">
                       {option.description}
                     </span>
                   ) : null}
@@ -113,7 +113,7 @@ function AskUserQuestionBlock({
             value={answer?.type === "single_choice" && "text" in answer ? answer.text : ""}
             onChange={(event) => onChange(event.target.value, "text")}
             rows={2}
-            className="mt-1 w-full resize-y rounded-md border border-border bg-editor-background px-2.5 py-2 text-[12px] leading-5 text-foreground outline-none focus:border-accent-foreground"
+            className="mt-1 w-full resize-y rounded-md border border-border bg-editor-background px-2.5 py-2 text-[12px] text-foreground leading-5 outline-none focus:border-accent-foreground"
             placeholder="或输入自定义回答..."
           />
         </div>
@@ -122,7 +122,7 @@ function AskUserQuestionBlock({
           value={answer?.type === "free_text" ? answer.text : ""}
           onChange={(event) => onChange(event.target.value)}
           rows={3}
-          className="mt-2 w-full resize-y rounded-md border border-border bg-editor-background px-2.5 py-2 text-[12px] leading-5 text-foreground outline-none focus:border-accent-foreground"
+          className="mt-2 w-full resize-y rounded-md border border-border bg-editor-background px-2.5 py-2 text-[12px] text-foreground leading-5 outline-none focus:border-accent-foreground"
           placeholder="输入回答..."
         />
       )}
@@ -223,7 +223,7 @@ export function AskUserInlineCard({
 
   return (
     <div className="overflow-hidden rounded-md border border-border bg-editor-background">
-      <div className="flex items-center gap-2 border-b border-border/70 px-2.5 py-2 text-[11px] leading-4 text-foreground-muted">
+      <div className="flex items-center gap-2 border-border/70 border-b px-2.5 py-2 text-[11px] text-foreground-muted leading-4">
         <span className="icon-[material-symbols--help-outline] shrink-0 text-[14px] text-accent-foreground" />
         <span className="min-w-0 flex-1 truncate">
           {entry.title ??
@@ -251,19 +251,19 @@ export function AskUserInlineCard({
             ))}
           </div>
         ) : (
-          <div className="flex min-h-24 items-center gap-2 rounded-md border border-dashed border-border/70 bg-sidebar-background/25 px-3 py-3 text-[12px] leading-5 text-foreground-muted">
+          <div className="flex min-h-24 items-center gap-2 rounded-md border border-border/70 border-dashed bg-sidebar-background/25 px-3 py-3 text-[12px] text-foreground-muted leading-5">
             <span className="icon-[material-symbols--progress-activity] shrink-0 animate-spin text-[16px] text-accent-foreground" />
             <span className="min-w-0 flex-1">正在整理提问内容...</span>
           </div>
         )}
 
         {!isResolved && hasQuestions && !isStreamingInput ? (
-          <div className="flex justify-end border-t border-border/60 py-2">
+          <div className="flex justify-end border-border/60 border-t py-2">
             <button
               type="button"
               disabled={!canSubmit || !isComplete || isSubmitting}
               onClick={() => onSubmit(normalizedAnswers)}
-              className="inline-flex h-8 items-center gap-1 rounded-md bg-accent-foreground px-3 text-[12px] font-medium text-sidebar-background transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-8 items-center gap-1 rounded-md bg-accent-foreground px-3 font-medium text-[12px] text-sidebar-background transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <span
                 className={`text-sm ${

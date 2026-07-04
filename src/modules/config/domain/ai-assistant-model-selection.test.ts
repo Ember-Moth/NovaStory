@@ -1,10 +1,9 @@
 import { expect, test } from "bun:test";
-
-import { setGlobalConfig } from "./global-config";
 import {
   getAiAssistantModelSelection,
   setAiAssistantModelSelection,
 } from "./ai-assistant-model-selection";
+import { setGlobalConfig } from "./global-config";
 
 test("reads back a stored ai assistant model selection", () => {
   const selection = setAiAssistantModelSelection({

@@ -7,32 +7,17 @@ import type {
   TimelineSelectionUpdatedEvent,
   WorkspaceRefreshRequestedEvent,
 } from "@/modules/ai/domain/types";
-import { ActionErrorBubble } from "@/modules/workspace/ui/editor/components/ActionErrorBubble";
 import { AiSidebar } from "@/modules/ai/ui/chat/AiSidebar";
-import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
-import { FullPageMessage } from "@/shared/ui/FullPageMessage";
-import { IconButton } from "@/shared/ui/IconButton";
-import { PanelPlaceholder } from "@/shared/ui/PanelPlaceholder";
-import { SidebarLayoutScope, SidebarPanels } from "@/shared/ui/sidebar";
+import { ORIGIN_TIMELINE_POINT_ID } from "@/modules/workspace/domain/constants";
+import { ActionErrorBubble } from "@/modules/workspace/ui/editor/components/ActionErrorBubble";
 import { actionAnchorId, clearActionError } from "@/modules/workspace/ui/editor/model/action-error";
 import { collectInvalidAuxSymlinkTargetIds } from "@/modules/workspace/ui/editor/model/tree";
-import { buildProjectAssistantEditorContext } from "@/modules/workspace/ui/editor/state/helpers/projectView";
 import { AuxTreePanel } from "@/modules/workspace/ui/editor/panels/AuxTreePanel";
 import { ContentTreePanel } from "@/modules/workspace/ui/editor/panels/ContentTreePanel";
 import { EditorArea } from "@/modules/workspace/ui/editor/panels/EditorArea";
 import { TimelinePanel } from "@/modules/workspace/ui/editor/panels/TimelinePanel";
+import { buildProjectAssistantEditorContext } from "@/modules/workspace/ui/editor/state/helpers/projectView";
 import { useProjectActions } from "@/modules/workspace/ui/editor/state/hooks/useProjectActions";
-import {
-  getAuxRefreshTargetPath,
-  getAuxRefreshTargetTimelinePointId,
-  getContentRefreshTargetNodeId,
-  getContentRefreshTargetTimelinePointId,
-  shouldClearActiveAuxDraftForRefresh,
-  shouldClearActiveContentDraftForRefresh,
-  shouldHandleWorkspaceRefreshRequested,
-  shouldResetWorkspaceLocalEditorState,
-  shouldRefetchActiveAuxForRefresh,
-} from "@/modules/workspace/ui/editor/workspaceEditorPageModel";
 import {
   useProjectAuxData,
   useProjectContentData,
@@ -48,7 +33,22 @@ import {
   useWorkspaceStoreApi,
 } from "@/modules/workspace/ui/editor/state/molecules/workspaceStore";
 import { ProjectScope } from "@/modules/workspace/ui/editor/state/scopes";
-import { ORIGIN_TIMELINE_POINT_ID } from "@/modules/workspace/domain/constants";
+import {
+  getAuxRefreshTargetPath,
+  getAuxRefreshTargetTimelinePointId,
+  getContentRefreshTargetNodeId,
+  getContentRefreshTargetTimelinePointId,
+  shouldClearActiveAuxDraftForRefresh,
+  shouldClearActiveContentDraftForRefresh,
+  shouldHandleWorkspaceRefreshRequested,
+  shouldRefetchActiveAuxForRefresh,
+  shouldResetWorkspaceLocalEditorState,
+} from "@/modules/workspace/ui/editor/workspaceEditorPageModel";
+import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
+import { FullPageMessage } from "@/shared/ui/FullPageMessage";
+import { IconButton } from "@/shared/ui/IconButton";
+import { PanelPlaceholder } from "@/shared/ui/PanelPlaceholder";
+import { SidebarLayoutScope, SidebarPanels } from "@/shared/ui/sidebar";
 
 const CONTENT_CREATE_SIBLING_ANCHOR = actionAnchorId("content", "create-sibling");
 const AUX_CREATE_DIR_ANCHOR = actionAnchorId("aux", "create-dir");

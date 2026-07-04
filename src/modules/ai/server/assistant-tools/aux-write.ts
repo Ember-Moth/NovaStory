@@ -1,5 +1,5 @@
 import { jsonSchema, tool } from "ai";
-
+import type { ResolvedAuxNode } from "@/modules/workspace/domain";
 import {
   deleteAuxNodeAt,
   linkAt,
@@ -10,7 +10,6 @@ import {
   retargetAuxSymlinkAt,
   writeFileAt,
 } from "@/modules/workspace/domain";
-import type { ResolvedAuxNode } from "@/modules/workspace/domain";
 import { invariant } from "@/shared/lib/domain";
 
 import { assertParentDirPath, resolveAuxNodeByPathOrThrow, splitAuxPath } from "./aux-path";

@@ -1,7 +1,6 @@
 import { expect, test } from "bun:test";
-
-import { seedProjectRecord } from "@/test/project";
 import * as workspaceService from "@/modules/workspace/domain";
+import { seedProjectRecord } from "@/test/project";
 
 async function seedProject(projectId: string) {
   seedProjectRecord(projectId);

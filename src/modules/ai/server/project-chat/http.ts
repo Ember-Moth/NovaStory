@@ -4,24 +4,23 @@ import {
   createUIMessageStreamResponse,
   isStepCount,
   streamText,
-  toUIMessageStream,
   type ToolSet,
+  toUIMessageStream,
   type UIMessage,
   type UIMessageStreamWriter,
 } from "ai";
 
 import {
+  deriveProjectChatTitleFromText,
   getProjectChat,
   getProjectChatMessages,
   materializeIncomingProjectChatMessages,
   resolveProjectChatModelSelection,
+  type StoredProjectChatMessage,
   selectProjectChatMessageChild,
   updateProjectChat,
   writeProjectChatMessages,
-  deriveProjectChatTitleFromText,
-  type StoredProjectChatMessage,
 } from "@/modules/ai/domain/project-chat";
-import { streamRegistry } from "./stream-registry";
 import type {
   AssistantMentionInput,
   ProjectAssistantContextSnapshot,
@@ -33,8 +32,8 @@ import type {
 import { getAiAssistantMaxSteps } from "@/modules/config/domain/ai-assistant-options";
 import { getDefaultWorkspace } from "@/modules/workspace/domain";
 import { createId, invariant, now } from "@/shared/lib/domain";
-
 import { createAssistantTools } from "../assistant-tools";
+import { resolveAssistantInputRefs } from "../project-assistant/refs";
 import {
   buildProjectAssistantContextMessage,
   buildProjectAssistantRefsMessage,
@@ -44,8 +43,8 @@ import {
   normalizeError,
   resolveProjectAssistantActiveTools,
 } from "../project-assistant/runtime";
-import { resolveAssistantInputRefs } from "../project-assistant/refs";
 import { createLanguageModelForConnection } from "../provider-factories";
+import { streamRegistry } from "./stream-registry";
 
 type ProjectChatRequestMessageMetadata = {
   mentions?: AssistantMentionInput[];
@@ -149,7 +148,7 @@ async function extractWorkspaceRefreshRequestedEventFromToolResult({
   }
 
   const unwrapped = unwrapToolOutput(output);
-  if (!unwrapped || unwrapped.ok !== true) {
+  if (unwrapped?.ok !== true) {
     return null;
   }
 
@@ -221,7 +220,7 @@ async function extractTimelineSelectionUpdatedEventFromToolResult({
   }
 
   const unwrapped = unwrapToolOutput(output);
-  if (!unwrapped || unwrapped.ok !== true) {
+  if (unwrapped?.ok !== true) {
     return null;
   }
 

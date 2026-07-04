@@ -1,5 +1,5 @@
-import { Activity } from "react";
 import { MotionConfig } from "motion/react";
+import { Activity } from "react";
 
 import { useCachedProjectRoute } from "@/app/routing/useCachedProjectRoute";
 import { ActivityBar, type ActivityBarItem } from "@/app/shell/ActivityBar";
@@ -35,7 +35,7 @@ export function App() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="flex h-dvh w-full overflow-hidden bg-editor-background text-foreground select-none">
+      <div className="flex h-dvh w-full select-none overflow-hidden bg-editor-background text-foreground">
         <ActivityBar active={active} />
 
         <Activity mode={isProjectsPage ? "visible" : "hidden"}>

@@ -2,12 +2,11 @@ import { useCallback } from "react";
 
 import { useLastProjectStore } from "@/app/state/lastProject";
 import { rpc } from "@/rpc/client";
-
+import type { BranchRow } from "../../shared/projectTypes";
 import {
   resolveSelectedBranchIdAfterDelete,
   resolveWorkspaceRouteAfterBranchDelete,
 } from "../core/projectWorkbenchSelectors";
-import type { BranchRow } from "../../shared/projectTypes";
 import {
   useProjectWorkbenchNavigation,
   useProjectWorkbenchProjectId,

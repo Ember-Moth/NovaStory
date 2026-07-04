@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test";
 
 import * as userConfig from "@/modules/ai/domain/user-config";
-import { seedProjectRecord } from "@/test/project";
 import { setupMockDatabase } from "@/test/mock-db";
+import { seedProjectRecord } from "@/test/project";
 
 import {
   createProjectChat,
@@ -11,9 +11,9 @@ import {
   getProjectChatDetail,
   getProjectChatMessages,
   listProjectChats,
+  type StoredProjectChatMessage,
   selectProjectChatMessageChild,
   writeProjectChatMessages,
-  type StoredProjectChatMessage,
 } from "./index";
 
 setupMockDatabase();
@@ -103,96 +103,96 @@ test("persists messages and branch selection under git custom refs", async () =>
 });
 
 test("listProjectChats and getProjectChat return correct results", async () => {
-  seedProjectRecord(PROJECT_ID + "_list");
+  seedProjectRecord(`${PROJECT_ID}_list`);
   const modelConfig = seedModelSelection();
-  const chat = await createProjectChat(PROJECT_ID + "_list", {
+  const chat = await createProjectChat(`${PROJECT_ID}_list`, {
     modelConfig,
     title: "Test Session",
   });
 
   // listProjectChats should include the new chat
-  const list = await listProjectChats(PROJECT_ID + "_list");
+  const list = await listProjectChats(`${PROJECT_ID}_list`);
   expect(list.length).toBe(1);
   expect(list[0]!.id).toBe(chat.id);
   expect(list[0]!.title).toBe("Test Session");
 
   // getProjectChat should return the same chat
-  const fetched = await getProjectChat(PROJECT_ID + "_list", chat.id);
+  const fetched = await getProjectChat(`${PROJECT_ID}_list`, chat.id);
   expect(fetched).not.toBeNull();
   expect(fetched!.title).toBe("Test Session");
   expect(fetched!.modelConfig).toEqual(modelConfig);
 });
 
 test("per-chat I/O isolation: messages for different chats do not interfere", async () => {
-  seedProjectRecord(PROJECT_ID + "_isolation");
+  seedProjectRecord(`${PROJECT_ID}_isolation`);
   const modelConfig = seedModelSelection();
-  const chatA = await createProjectChat(PROJECT_ID + "_isolation", {
+  const chatA = await createProjectChat(`${PROJECT_ID}_isolation`, {
     modelConfig,
     title: "Chat A",
   });
-  const chatB = await createProjectChat(PROJECT_ID + "_isolation", {
+  const chatB = await createProjectChat(`${PROJECT_ID}_isolation`, {
     modelConfig,
     title: "Chat B",
   });
 
   // Write different messages to each chat
   await writeProjectChatMessages(
-    PROJECT_ID + "_isolation",
+    `${PROJECT_ID}_isolation`,
     chatA.id,
     [message("msg_a1", null)],
     "Messages for A",
   );
   await writeProjectChatMessages(
-    PROJECT_ID + "_isolation",
+    `${PROJECT_ID}_isolation`,
     chatB.id,
     [message("msg_b1", null), message("msg_b2", "msg_b1")],
     "Messages for B",
   );
 
   // Verify each chat has only its own messages
-  const messagesA = await getProjectChatMessages(PROJECT_ID + "_isolation", chatA.id);
+  const messagesA = await getProjectChatMessages(`${PROJECT_ID}_isolation`, chatA.id);
   expect(messagesA.map((m) => m.id)).toEqual(["msg_a1"]);
 
-  const messagesB = await getProjectChatMessages(PROJECT_ID + "_isolation", chatB.id);
+  const messagesB = await getProjectChatMessages(`${PROJECT_ID}_isolation`, chatB.id);
   expect(messagesB.map((m) => m.id)).toEqual(["msg_b1", "msg_b2"]);
 
   // list should return both chats
-  const list = await listProjectChats(PROJECT_ID + "_isolation");
+  const list = await listProjectChats(`${PROJECT_ID}_isolation`);
   expect(list.length).toBe(2);
   expect(list.map((c) => c.id).sort()).toEqual([chatA.id, chatB.id].sort());
 });
 
 test("deleteProjectChat removes all associated files", async () => {
-  seedProjectRecord(PROJECT_ID + "_delete");
+  seedProjectRecord(`${PROJECT_ID}_delete`);
   const modelConfig = seedModelSelection();
-  const chat = await createProjectChat(PROJECT_ID + "_delete", {
+  const chat = await createProjectChat(`${PROJECT_ID}_delete`, {
     modelConfig,
     title: "To Delete",
   });
 
   // Write some data first
   await writeProjectChatMessages(
-    PROJECT_ID + "_delete",
+    `${PROJECT_ID}_delete`,
     chat.id,
     [message("user_x", null), message("assistant_x", "user_x")],
     "Seed messages",
   );
-  await selectProjectChatMessageChild(PROJECT_ID + "_delete", chat.id, "user_x", "assistant_x");
+  await selectProjectChatMessageChild(`${PROJECT_ID}_delete`, chat.id, "user_x", "assistant_x");
 
   // Verify data exists
-  expect(await getProjectChat(PROJECT_ID + "_delete", chat.id)).not.toBeNull();
+  expect(await getProjectChat(`${PROJECT_ID}_delete`, chat.id)).not.toBeNull();
 
   // Delete the chat
-  await deleteProjectChat(PROJECT_ID + "_delete", chat.id);
+  await deleteProjectChat(`${PROJECT_ID}_delete`, chat.id);
 
   // Verify chat metadata is gone
-  expect(await getProjectChat(PROJECT_ID + "_delete", chat.id)).toBeNull();
+  expect(await getProjectChat(`${PROJECT_ID}_delete`, chat.id)).toBeNull();
 
   // Verify messages are gone
-  const messages = await getProjectChatMessages(PROJECT_ID + "_delete", chat.id);
+  const messages = await getProjectChatMessages(`${PROJECT_ID}_delete`, chat.id);
   expect(messages).toEqual([]);
 
   // Verify list no longer has the chat
-  const list = await listProjectChats(PROJECT_ID + "_delete");
+  const list = await listProjectChats(`${PROJECT_ID}_delete`);
   expect(list.map((c) => c.id)).not.toContain(chat.id);
 });

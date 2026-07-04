@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import { OverlayScrollbar } from "@/shared/ui/OverlayScrollbar";
 
@@ -23,7 +23,7 @@ export function SidebarSection({
       style={collapsed || height == null ? undefined : { height }}
     >
       <div
-        className="flex h-7 shrink-0 cursor-pointer items-center gap-1 px-2 text-[11px] font-semibold tracking-wider text-foreground-muted uppercase hover:text-foreground"
+        className="flex h-7 shrink-0 cursor-pointer items-center gap-1 px-2 font-semibold text-[11px] text-foreground-muted uppercase tracking-wider hover:text-foreground"
         onClick={onToggleCollapse}
         role="button"
         tabIndex={0}

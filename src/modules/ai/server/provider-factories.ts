@@ -15,8 +15,8 @@ import {
   parseAiConnectionConfig,
 } from "@/modules/ai/domain/config";
 import { type AiProviderFactoryId, getAiSdkPackageRecipe } from "@/modules/ai/domain/packages";
-import { invariant } from "@/shared/lib/domain";
 import type { AiConnectionRow } from "@/modules/ai/domain/types";
+import { invariant } from "@/shared/lib/domain";
 
 interface ProviderFactoryInput {
   connection: AiConnectionRow;

@@ -44,10 +44,10 @@ export function ProjectListView({
             <button
               type="button"
               onClick={onCreateProject}
-              className="group flex min-h-36 flex-col items-center justify-center gap-2 rounded-md border border-dashed border-border bg-sidebar-background p-4 text-foreground-muted transition hover:border-accent-foreground hover:bg-list-hover-background hover:text-foreground"
+              className="group flex min-h-36 flex-col items-center justify-center gap-2 rounded-md border border-border border-dashed bg-sidebar-background p-4 text-foreground-muted transition hover:border-accent-foreground hover:bg-list-hover-background hover:text-foreground"
             >
               <span className="icon-[material-symbols--add-circle-outline] text-3xl text-accent-foreground transition group-hover:scale-105" />
-              <span className="text-sm font-medium">新建项目</span>
+              <span className="font-medium text-sm">新建项目</span>
             </button>
 
             {projectList.map((project) => {
@@ -71,15 +71,15 @@ export function ProjectListView({
                     <div className="flex w-full items-center gap-2">
                       <span className="icon-[material-symbols--folder] text-2xl text-icon-folder" />
                       {isLastViewed ? (
-                        <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-accent-foreground">
+                        <span className="rounded px-1.5 py-0.5 font-medium text-[10px] text-accent-foreground">
                           上次查看
                         </span>
                       ) : null}
                     </div>
-                    <span className="line-clamp-2 text-sm font-medium text-foreground">
+                    <span className="line-clamp-2 font-medium text-foreground text-sm">
                       {project.name}
                     </span>
-                    <p className="line-clamp-2 flex-1 text-xs leading-relaxed text-foreground-muted">
+                    <p className="line-clamp-2 flex-1 text-foreground-muted text-xs leading-relaxed">
                       {project.description?.trim() || "暂无描述"}
                     </p>
                     <span className="text-[11px] text-foreground-muted">
@@ -90,7 +90,7 @@ export function ProjectListView({
                     type="button"
                     onClick={() => onDeleteProject(project.id, project.name)}
                     disabled={isDeleting && deletingId === project.id}
-                    className="absolute top-2 right-2 rounded p-1 text-foreground-muted opacity-0 transition group-hover:opacity-100 hover:bg-button-hover-background hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
+                    className="absolute top-2 right-2 rounded p-1 text-foreground-muted opacity-0 transition hover:bg-button-hover-background hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30 group-hover:opacity-100"
                     title="删除项目"
                   >
                     <span className="icon-[material-symbols--delete] text-base leading-none" />

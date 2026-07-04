@@ -1,7 +1,18 @@
 import posix from "node:path/posix";
+import type { VirtualWorkdir } from "nano-git/workdir/core";
 import { ORIGIN_TIMELINE_POINT_ID } from "@/modules/workspace/domain/constants";
 import { invariant } from "@/shared/lib/domain";
-
+import { getBranch } from "./branches";
+import { getBranchMapping, getWorkdirForBranch } from "./git-storage/git-store";
+import type { WorktreeState } from "./git-storage/worktree-state";
+import {
+  assertTimelinePoint,
+  normalizePointId,
+  orderTimelineRows,
+  pointIdOrOrigin,
+  readWorktreeStateFromWorkdir,
+} from "./git-storage/worktree-state";
+import { getWorkspace, getWorkspaceForBranchId, touchWorkspaceMeta } from "./lifecycle";
 import type {
   AuxDirListTreeNode,
   AuxTimelineChangeSummary,
@@ -12,19 +23,6 @@ import type {
   ResolvedAuxSnapshotNode,
   TimelinePointRef,
 } from "./types";
-import { getWorkspace, touchWorkspaceMeta } from "./lifecycle";
-import { getBranch } from "./branches";
-import { getWorkspaceForBranchId } from "./lifecycle";
-import { getBranchMapping, getWorkdirForBranch } from "./git-storage/git-store";
-import type { VirtualWorkdir } from "nano-git/workdir/core";
-import {
-  assertTimelinePoint,
-  normalizePointId,
-  orderTimelineRows,
-  pointIdOrOrigin,
-  readWorktreeStateFromWorkdir,
-} from "./git-storage/worktree-state";
-import type { WorktreeState } from "./git-storage/worktree-state";
 
 export { ORIGIN_TIMELINE_POINT_ID };
 

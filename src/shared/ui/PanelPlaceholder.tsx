@@ -18,7 +18,7 @@ export function PanelPlaceholder({
   }
 
   return (
-    <div className="flex items-center gap-2 p-3 text-sm text-foreground-muted">
+    <div className="flex items-center gap-2 p-3 text-foreground-muted text-sm">
       {icon ? <span className={`${icon} shrink-0 text-base`} /> : null}
       <span>{label}</span>
     </div>

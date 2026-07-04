@@ -2,28 +2,28 @@ import { AnimatePresence, motion } from "motion/react";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { ContentNodeIcon } from "@/modules/workspace/ui/editor/components/icons";
+import { actionAnchorId } from "@/modules/workspace/ui/editor/model/action-error";
+import {
+  type ContentDropPosition,
+  type ContentMoveIntent,
+  collectContentSubtreeIds,
+  resolveContentMove,
+} from "@/modules/workspace/ui/editor/model/tree";
+import type { ContentTreeNodeVM } from "@/modules/workspace/ui/editor/model/types";
+import { cn } from "@/shared/lib/cn";
 import { InlineEditableText } from "@/shared/ui/InlineEditableText";
+import { PanelPlaceholder } from "@/shared/ui/PanelPlaceholder";
+import { RefreshOverlay } from "@/shared/ui/RefreshOverlay";
 import {
   ExpandToggle,
   ROW_GESTURE_HIT_AREA_ATTRIBUTE,
   RowActionButton,
+  rowPaddingLeft,
   SidebarListRow,
   TreeNodePanel,
-  rowPaddingLeft,
-  useRowPointerGesture,
   type TreeRowContext,
+  useRowPointerGesture,
 } from "@/shared/ui/tree";
-import { PanelPlaceholder } from "@/shared/ui/PanelPlaceholder";
-import { RefreshOverlay } from "@/shared/ui/RefreshOverlay";
-import { actionAnchorId } from "@/modules/workspace/ui/editor/model/action-error";
-import {
-  collectContentSubtreeIds,
-  resolveContentMove,
-  type ContentDropPosition,
-  type ContentMoveIntent,
-} from "@/modules/workspace/ui/editor/model/tree";
-import type { ContentTreeNodeVM } from "@/modules/workspace/ui/editor/model/types";
-import { cn } from "@/shared/lib/cn";
 
 import { isPanelBlankAreaDropTarget } from "./panelBlankAreaDrop";
 
@@ -526,7 +526,7 @@ export function ContentTreePanel({
       <div
         inert={isPending}
         className={`transition-opacity duration-150 ease-out motion-reduce:transition-none ${
-          isPending ? "pointer-events-none opacity-70 select-none" : "opacity-100"
+          isPending ? "pointer-events-none select-none opacity-70" : "opacity-100"
         }`}
       >
         <TreeNodePanel

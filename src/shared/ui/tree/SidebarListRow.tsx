@@ -1,5 +1,5 @@
-import { type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { motion } from "motion/react";
+import type { ReactNode, PointerEvent as ReactPointerEvent } from "react";
 
 import { cn } from "@/shared/lib/cn";
 
@@ -99,7 +99,7 @@ export function SidebarListRow({
             <RowHoverSlot badge={trailing} actions={actions} isEditing={isEditing} />
           </div>
           {description ? (
-            <div className="col-[2/4] row-start-2 min-w-0 text-[11px] leading-4 text-foreground-muted">
+            <div className="col-[2/4] row-start-2 min-w-0 text-[11px] text-foreground-muted leading-4">
               {description}
             </div>
           ) : null}
@@ -132,14 +132,14 @@ function RowHoverSlot({
   return (
     <div className="grid h-5 shrink-0 items-center">
       {actions && !isEditing ? (
-        <div className="pointer-events-none col-start-1 row-start-1 flex w-0 items-center justify-end gap-1 justify-self-end overflow-visible opacity-0 transition-all duration-200 interpolate-size group-hover:pointer-events-auto group-hover:w-auto group-hover:opacity-100">
+        <div className="interpolate-size pointer-events-none col-start-1 row-start-1 flex w-0 items-center justify-end gap-1 justify-self-end overflow-visible opacity-0 transition-all duration-200 group-hover:pointer-events-auto group-hover:w-auto group-hover:opacity-100">
           {actions}
         </div>
       ) : null}
       {badge && !isEditing ? (
         <span
           className={cn(
-            "col-start-1 row-start-1 max-w-20 self-center justify-self-end truncate text-[10px] leading-none text-accent-foreground opacity-70 transition",
+            "col-start-1 row-start-1 max-w-20 self-center justify-self-end truncate text-[10px] text-accent-foreground leading-none opacity-70 transition",
             actions ? "group-hover:pointer-events-none group-hover:opacity-0" : "",
           )}
         >

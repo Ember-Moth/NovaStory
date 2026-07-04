@@ -40,7 +40,7 @@ export function SessionList({
                 key={chat.id}
                 onClick={() => onActivate(chat.id)}
                 className={cn(
-                  "group flex w-full cursor-pointer items-start gap-2 border-b border-border/60 px-3 py-2 text-left transition",
+                  "group flex w-full cursor-pointer items-start gap-2 border-border/60 border-b px-3 py-2 text-left transition",
                   active
                     ? "bg-list-active-background text-foreground"
                     : "text-foreground-muted hover:bg-list-hover-background hover:text-foreground",
@@ -56,7 +56,7 @@ export function SessionList({
                   )}
                 />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[12px] font-medium">{chat.title}</span>
+                  <span className="block truncate font-medium text-[12px]">{chat.title}</span>
                   <span className="mt-0.5 block text-[10px] text-foreground-muted">
                     {formatTimestamp(chat.updatedAt)}
                   </span>

@@ -1,13 +1,12 @@
 import { molecule, useMolecule } from "bunshi/react";
 import { useCallback, useEffect } from "react";
 import { useLocation } from "wouter";
-
+import { useProjectWorkbenchStoreApi } from "../state/projectWorkbenchStore";
 import {
   ProjectWorkbenchBranchRouteScope,
   ProjectWorkbenchProjectScope,
 } from "./projectWorkbenchScopes";
 import { useProjectWorkbenchModel } from "./useProjectWorkbenchModel";
-import { useProjectWorkbenchStoreApi } from "../state/projectWorkbenchStore";
 
 const ProjectWorkbenchProjectIdMolecule = molecule((_, getScope) =>
   getScope(ProjectWorkbenchProjectScope),
@@ -66,7 +65,7 @@ export function useProjectWorkbenchSync() {
 
   useEffect(() => {
     workbenchStore.getState().resetCommitDraft();
-  }, [model.selectedBranchId, workbenchStore]);
+  }, [workbenchStore]);
 
   useEffect(() => {
     if (

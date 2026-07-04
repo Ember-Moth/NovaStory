@@ -4,9 +4,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import { ORIGIN_TIMELINE_POINT_ID } from "@/modules/workspace/domain/constants";
 import type { AuxTreeNodeVM, TimelinePointVM } from "@/modules/workspace/ui/editor/model/types";
-
-import { ProjectScope } from "../scopes";
 import { useWorkspaceStoreApi, type WorkspaceStore } from "../molecules/workspaceStore";
+import { ProjectScope } from "../scopes";
 import { useProjectActions } from "./useProjectActions";
 import type { ProjectWorkspaceState } from "./useProjectWorkspace";
 

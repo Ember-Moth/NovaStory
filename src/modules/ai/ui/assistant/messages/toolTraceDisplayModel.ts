@@ -755,12 +755,12 @@ export function hasAssistantToolTraceSectionContent(
 ): section is AssistantToolTraceSection {
   return Boolean(
     section &&
-    (section.summaryRows.length > 0 ||
-      section.contentPreviews.length > 0 ||
-      section.treeGroups.length > 0 ||
-      section.warningItems.length > 0 ||
-      section.errorMessage != null ||
-      section.errorContextRows.length > 0),
+      (section.summaryRows.length > 0 ||
+        section.contentPreviews.length > 0 ||
+        section.treeGroups.length > 0 ||
+        section.warningItems.length > 0 ||
+        section.errorMessage != null ||
+        section.errorContextRows.length > 0),
   );
 }
 

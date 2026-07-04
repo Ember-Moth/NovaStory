@@ -1,12 +1,4 @@
 import { mutation, query } from "@codehz/rpc/core";
-
-import type {
-  ProjectChatCandidateGroup,
-  ProjectChatInfo,
-  ProjectChatModelConfig,
-  ProjectChatPathState,
-  StoredProjectChatMessage,
-} from "@/modules/ai/domain/project-chat/types";
 import {
   archiveProjectChat,
   createProjectChat,
@@ -19,9 +11,16 @@ import {
   updateProjectChat,
   updateProjectChatDefaultModelConfig,
 } from "@/modules/ai/domain/project-chat/storage";
+import type {
+  ProjectChatCandidateGroup,
+  ProjectChatInfo,
+  ProjectChatModelConfig,
+  ProjectChatPathState,
+  StoredProjectChatMessage,
+} from "@/modules/ai/domain/project-chat/types";
 import { streamRegistry } from "@/modules/ai/server/project-chat/stream-registry";
 import { assertRpcFound } from "@/rpc/errors";
-import { rpcTags, type RpcTagList } from "@/rpc/tags";
+import { type RpcTagList, rpcTags } from "@/rpc/tags";
 
 export const list = query<
   { projectId: string; archived?: boolean | "all" },

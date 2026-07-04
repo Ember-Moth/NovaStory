@@ -1,5 +1,5 @@
-import { test, expect } from "bun:test";
-import { createEditor, $createParagraphNode, $createTextNode, $getRoot } from "lexical";
+import { expect, test } from "bun:test";
+import { $createParagraphNode, $createTextNode, $getRoot, createEditor } from "lexical";
 
 import {
   $createAssistantMentionNode,

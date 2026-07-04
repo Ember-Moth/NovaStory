@@ -5,11 +5,11 @@ import {
   deleteTimelinePoint,
   listTimelinePoints,
   moveTimelinePoint,
-  ORIGIN_TIMELINE_POINT_ID,
+  type ORIGIN_TIMELINE_POINT_ID,
   revertTimelineChange,
   updateTimelinePoint,
 } from "@/modules/workspace/domain";
-import { rpcTags, type RpcTagList } from "@/rpc/tags";
+import { type RpcTagList, rpcTags } from "@/rpc/tags";
 
 export const list = query<
   { projectId: string; workspaceId: string },

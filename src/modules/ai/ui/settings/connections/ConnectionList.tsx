@@ -29,7 +29,7 @@ function ConnectionModelRow({
           if (model.origin !== "catalog") return;
           void onToggleCatalogModel(model, !model.isEnabled);
         }}
-        className={`mt-0.5 rounded-full px-2 py-0.5 text-[10px] font-medium transition ${
+        className={`mt-0.5 rounded-full px-2 py-0.5 font-medium text-[10px] transition ${
           model.origin === "catalog"
             ? model.isEnabled
               ? "bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
@@ -43,7 +43,7 @@ function ConnectionModelRow({
       </button>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="truncate text-sm font-medium text-foreground">{model.displayName}</span>
+          <span className="truncate font-medium text-foreground text-sm">{model.displayName}</span>
           <span className="font-mono text-[11px] text-foreground-muted">{model.modelId}</span>
           {model.origin === "catalog" ? (
             <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-foreground-muted">
@@ -116,7 +116,7 @@ export function ConnectionCard({
         >
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="truncate text-sm font-semibold text-foreground">
+              <span className="truncate font-semibold text-foreground text-sm">
                 {connection.name}
               </span>
               <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-foreground-muted">
@@ -135,7 +135,7 @@ export function ConnectionCard({
             </div>
           </div>
           <span
-            className={`text-xl text-foreground-muted ${expanded ? "icon-[material-symbols--keyboard-arrow-up]" : "icon-[material-symbols--keyboard-arrow-down]"}`}
+            className={`text-foreground-muted text-xl ${expanded ? "icon-[material-symbols--keyboard-arrow-up]" : "icon-[material-symbols--keyboard-arrow-down]"}`}
           />
         </button>
 
@@ -160,7 +160,7 @@ export function ConnectionCard({
       </div>
 
       {expanded ? (
-        <div className="border-t border-border px-4 py-3">
+        <div className="border-border border-t px-4 py-3">
           {connection.baseUrl ? (
             <div className="mb-2 text-[11px] text-foreground-muted">
               Endpoint {connection.baseUrl}
@@ -227,7 +227,7 @@ function ConnectionModelsList({
   }
 
   if ((models ?? []).length === 0) {
-    return <div className="py-4 text-sm text-foreground-muted">这个连接当前没有可见模型。</div>;
+    return <div className="py-4 text-foreground-muted text-sm">这个连接当前没有可见模型。</div>;
   }
 
   return (
@@ -236,7 +236,7 @@ function ConnectionModelsList({
       <div
         inert={isRefreshing}
         className={`space-y-2 transition-opacity ${
-          isRefreshing ? "pointer-events-none opacity-80 select-none" : ""
+          isRefreshing ? "pointer-events-none select-none opacity-80" : ""
         }`}
       >
         {(models ?? []).map((model) => (

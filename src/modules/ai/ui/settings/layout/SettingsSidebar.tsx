@@ -1,7 +1,6 @@
 import { useLocation } from "wouter";
-
-import { AppSidebar } from "@/app/shell/AppShell";
 import { parseAppRoute } from "@/app/routing/useCachedProjectRoute";
+import { AppSidebar } from "@/app/shell/AppShell";
 import { SidebarListRow } from "@/shared/ui/tree/SidebarListRow";
 
 export function SettingsSidebar() {
@@ -11,7 +10,7 @@ export function SettingsSidebar() {
 
   return (
     <AppSidebar>
-      <div className="flex h-7 shrink-0 items-center px-3 text-[11px] font-semibold tracking-wider text-foreground-muted uppercase">
+      <div className="flex h-7 shrink-0 items-center px-3 font-semibold text-[11px] text-foreground-muted uppercase tracking-wider">
         设置
       </div>
       <SidebarListRow

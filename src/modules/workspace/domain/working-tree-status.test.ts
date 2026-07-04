@@ -1,8 +1,8 @@
-import type { SHA1 } from "nano-git";
 import { expect, test } from "bun:test";
+import type { SHA1 } from "nano-git";
 
 import { seedProjectRecord } from "@/test/project";
-import { getWorkdirForBranch, getBranchMapping } from "./git-storage/git-store";
+import { getBranchMapping, getWorkdirForBranch } from "./git-storage/git-store";
 import * as service from "./index";
 
 async function seedProject(projectId: string) {

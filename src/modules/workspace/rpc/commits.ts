@@ -1,5 +1,5 @@
-import type { SHA1 } from "nano-git";
 import { mutation, query } from "@codehz/rpc/core";
+import type { SHA1 } from "nano-git";
 
 import {
   checkoutCommit,
@@ -7,12 +7,12 @@ import {
   getBranch,
   getCommit,
   getCommitDiff,
+  getWorkingTreeStatus,
   getWorkspace,
   getWorkspaceForBranchId,
-  getWorkingTreeStatus,
   listCommits,
 } from "@/modules/workspace/domain";
-import { rpcTags, type RpcTagList } from "@/rpc/tags";
+import { type RpcTagList, rpcTags } from "@/rpc/tags";
 
 export const history = query<
   { projectId: string; branchId: string },

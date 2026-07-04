@@ -100,9 +100,9 @@ function CustomModelDialogForm({
 
   return (
     <form onSubmit={handleSubmit}>
-      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-        <span className="icon-[material-symbols--token] text-base text-accent-foreground" />
-        <span className="text-sm font-medium">{model ? "编辑自定义模型" : "添加自定义模型"}</span>
+      <div className="flex items-center gap-2 border-border border-b px-4 py-3">
+        <span className="icon-[material-symbols--token] text-accent-foreground text-base" />
+        <span className="font-medium text-sm">{model ? "编辑自定义模型" : "添加自定义模型"}</span>
         <button
           type="button"
           onClick={onCancel}
@@ -116,9 +116,8 @@ function CustomModelDialogForm({
       <div className="space-y-4 p-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="block space-y-1">
-            <span className="text-[11px] font-medium text-foreground-muted">模型 ID</span>
+            <span className="font-medium text-[11px] text-foreground-muted">模型 ID</span>
             <input
-              autoFocus
               value={modelId}
               onChange={(event) => setModelId(event.target.value)}
               placeholder="gpt-4o-mini"
@@ -126,7 +125,7 @@ function CustomModelDialogForm({
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-[11px] font-medium text-foreground-muted">显示名称</span>
+            <span className="font-medium text-[11px] text-foreground-muted">显示名称</span>
             <input
               value={displayName}
               onChange={(event) => setDisplayName(event.target.value)}
@@ -138,7 +137,7 @@ function CustomModelDialogForm({
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="block space-y-1">
-            <span className="text-[11px] font-medium text-foreground-muted">上下文窗口</span>
+            <span className="font-medium text-[11px] text-foreground-muted">上下文窗口</span>
             <input
               type="number"
               value={contextWindow}
@@ -147,7 +146,7 @@ function CustomModelDialogForm({
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-[11px] font-medium text-foreground-muted">最大输出</span>
+            <span className="font-medium text-[11px] text-foreground-muted">最大输出</span>
             <input
               type="number"
               value={maxOutputTokens}
@@ -157,7 +156,7 @@ function CustomModelDialogForm({
           </label>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 text-sm text-foreground-muted sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 text-foreground-muted text-sm sm:grid-cols-4">
           <label className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -198,7 +197,7 @@ function CustomModelDialogForm({
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="block space-y-1">
-            <span className="text-[11px] font-medium text-foreground-muted">输入价格 / 1M</span>
+            <span className="font-medium text-[11px] text-foreground-muted">输入价格 / 1M</span>
             <input
               type="number"
               step="0.001"
@@ -209,7 +208,7 @@ function CustomModelDialogForm({
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-[11px] font-medium text-foreground-muted">输出价格 / 1M</span>
+            <span className="font-medium text-[11px] text-foreground-muted">输出价格 / 1M</span>
             <input
               type="number"
               step="0.001"
@@ -221,7 +220,7 @@ function CustomModelDialogForm({
           </label>
         </div>
 
-        <label className="flex items-center gap-2 text-sm text-foreground-muted">
+        <label className="flex items-center gap-2 text-foreground-muted text-sm">
           <input
             type="checkbox"
             checked={isEnabled}
@@ -232,25 +231,25 @@ function CustomModelDialogForm({
         </label>
 
         {formError ? (
-          <div className="rounded-md border border-border bg-editor-background px-3 py-2 text-sm text-accent-foreground">
+          <div className="rounded-md border border-border bg-editor-background px-3 py-2 text-accent-foreground text-sm">
             {formError}
           </div>
         ) : null}
       </div>
 
-      <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
+      <div className="flex items-center justify-end gap-2 border-border border-t px-4 py-3">
         <button
           type="button"
           onClick={onCancel}
           disabled={isPending}
-          className="rounded-md border border-border px-3 py-1.5 text-sm text-foreground transition hover:bg-list-hover-background disabled:opacity-40"
+          className="rounded-md border border-border px-3 py-1.5 text-foreground text-sm transition hover:bg-list-hover-background disabled:opacity-40"
         >
           取消
         </button>
         <button
           type="submit"
           disabled={isPending}
-          className="rounded-md bg-accent-background px-3 py-1.5 text-sm font-medium text-foreground transition hover:brightness-110 disabled:opacity-50"
+          className="rounded-md bg-accent-background px-3 py-1.5 font-medium text-foreground text-sm transition hover:brightness-110 disabled:opacity-50"
         >
           {isPending ? "保存中..." : "保存模型"}
         </button>

@@ -1,5 +1,5 @@
-import SimpleBar from "simplebar-react";
 import { type ComponentProps, type ReactNode, type UIEvent, useEffect } from "react";
+import SimpleBar from "simplebar-react";
 
 import { cn } from "../lib/cn";
 

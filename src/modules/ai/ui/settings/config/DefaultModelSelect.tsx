@@ -49,13 +49,13 @@ export function DefaultModelSelect({
 
   if (!hasModels) {
     return (
-      <div className="rounded-md border border-dashed border-border px-4 py-6 text-sm text-foreground-muted">
+      <div className="rounded-md border border-border border-dashed px-4 py-6 text-foreground-muted text-sm">
         <div className="font-medium text-foreground">没有可用连接模型</div>
         <p className="mt-1 text-xs">先创建并启用一个 AI 连接，再回到这里选择默认模型。</p>
         <button
           type="button"
           onClick={() => navigate("/settings/ai-connections")}
-          className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-accent-background px-3 py-1.5 text-sm font-medium text-foreground transition hover:brightness-110"
+          className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-accent-background px-3 py-1.5 font-medium text-foreground text-sm transition hover:brightness-110"
         >
           <span className="icon-[material-symbols--smart-toy] text-base" />
           打开 AI 连接
@@ -71,7 +71,7 @@ export function DefaultModelSelect({
           {groups.map((group) =>
             group.models.length > 0 ? (
               <div key={group.connection.id}>
-                <div className="sticky top-0 z-10 border-b border-border bg-sidebar-background px-3 py-1.5 text-xs font-medium text-foreground-muted">
+                <div className="sticky top-0 z-10 border-border border-b bg-sidebar-background px-3 py-1.5 font-medium text-foreground-muted text-xs">
                   {group.connection.name}
                 </div>
                 <div className="divide-y divide-border">
@@ -102,7 +102,7 @@ export function DefaultModelSelect({
                           )}
                         />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium text-foreground">
+                          <span className="block truncate font-medium text-foreground text-sm">
                             {model.displayName}
                           </span>
                           <span className="mt-0.5 block truncate text-xs">{model.modelId}</span>
@@ -124,7 +124,7 @@ export function DefaultModelSelect({
         type="button"
         disabled={disabled || (!selectedConnectionId && !selectedModelId)}
         onClick={onClear}
-        className="inline-flex h-8 w-fit items-center gap-1.5 rounded-md border border-border bg-sidebar-background px-2.5 text-sm text-foreground transition hover:bg-list-hover-background disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex h-8 w-fit items-center gap-1.5 rounded-md border border-border bg-sidebar-background px-2.5 text-foreground text-sm transition hover:bg-list-hover-background disabled:cursor-not-allowed disabled:opacity-50"
       >
         <span className="icon-[material-symbols--close] text-base" />
         清除默认模型

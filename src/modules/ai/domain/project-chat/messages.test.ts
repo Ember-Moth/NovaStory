@@ -2,8 +2,8 @@ import { expect, test } from "bun:test";
 
 import {
   buildProjectChatCandidateGroups,
-  resolveVisibleProjectChatPath,
   type ProjectChatPathState,
+  resolveVisibleProjectChatPath,
   type StoredProjectChatMessage,
 } from "./index";
 

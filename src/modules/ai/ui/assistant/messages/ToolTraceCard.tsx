@@ -1,17 +1,14 @@
-import type { AssistantToolTraceEntry } from "./toolTraceModel";
-
 import { AnimatePresence, motion } from "motion/react";
-
 import { cn } from "@/shared/lib/cn";
-
 import {
-  buildAssistantToolTraceDisplayModel,
-  hasAssistantToolTraceSectionContent,
   type AssistantToolTraceContentPreview,
   type AssistantToolTraceSection,
   type AssistantToolTraceTreeGroup,
   type AssistantToolTraceTreeNode,
+  buildAssistantToolTraceDisplayModel,
+  hasAssistantToolTraceSectionContent,
 } from "./toolTraceDisplayModel";
+import type { AssistantToolTraceEntry } from "./toolTraceModel";
 
 function formatToolTracePayload(payload: unknown) {
   if (typeof payload === "string") {
@@ -31,8 +28,8 @@ function formatToolTracePayload(payload: unknown) {
 function RawPayloadBlock({ label, payload }: { label: string; payload: unknown }) {
   return (
     <div className="space-y-1">
-      <div className="text-[10px] font-medium tracking-[0.08em] opacity-70">{label}</div>
-      <pre className="overflow-x-auto rounded bg-sidebar-background/70 px-2 py-1 text-[10px] leading-4 break-all whitespace-pre-wrap text-foreground">
+      <div className="font-medium text-[10px] tracking-[0.08em] opacity-70">{label}</div>
+      <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded bg-sidebar-background/70 px-2 py-1 text-[10px] text-foreground leading-4">
         {formatToolTracePayload(payload)}
       </pre>
     </div>
@@ -74,13 +71,13 @@ function ContentPreviewBlock({ preview }: { preview: AssistantToolTraceContentPr
           {preview.characterCount} 字 / {preview.lineCount} 行
         </div>
       </div>
-      <pre className="overflow-x-auto rounded bg-sidebar-background/70 px-2 py-1 text-[10px] leading-4 break-words whitespace-pre-wrap text-foreground">
+      <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded bg-sidebar-background/70 px-2 py-1 text-[10px] text-foreground leading-4">
         {preview.preview}
       </pre>
       {preview.truncated ? (
         <details className="text-foreground-muted">
           <summary className="cursor-pointer select-none">展开完整内容</summary>
-          <pre className="mt-1 overflow-x-auto rounded bg-sidebar-background/70 px-2 py-1 text-[10px] leading-4 break-words whitespace-pre-wrap text-foreground">
+          <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-words rounded bg-sidebar-background/70 px-2 py-1 text-[10px] text-foreground leading-4">
             {preview.fullContent}
           </pre>
         </details>
@@ -120,14 +117,14 @@ function TreeNodesList({ nodes }: { nodes: AssistantToolTraceTreeNode[] }) {
       {nodes.map((node) => (
         <li key={node.id} className="min-w-0">
           <div className="flex items-start gap-1.5">
-            <span className="mt-0.5 icon-[material-symbols--subdirectory-arrow-right] shrink-0 text-[12px] text-accent-foreground" />
+            <span className="icon-[material-symbols--subdirectory-arrow-right] mt-0.5 shrink-0 text-[12px] text-accent-foreground" />
             <div className="min-w-0">
               <div className="break-words text-foreground">{node.label}</div>
               {node.meta.length > 0 ? (
                 <div className="break-words text-foreground-muted">{node.meta.join(" / ")}</div>
               ) : null}
               {node.children.length > 0 ? (
-                <div className="mt-1 border-l border-current/10 pl-2">
+                <div className="mt-1 border-current/10 border-l pl-2">
                   <TreeNodesList nodes={node.children} />
                 </div>
               ) : null}
@@ -150,7 +147,7 @@ function SectionWarnings({ section }: { section: AssistantToolTraceSection }) {
       <ul className="space-y-1 text-foreground-muted">
         {section.warningItems.map((item) => (
           <li key={item} className="flex items-start gap-1.5">
-            <span className="mt-0.5 icon-[material-symbols--info-outline] shrink-0 text-[12px] text-accent-foreground" />
+            <span className="icon-[material-symbols--info-outline] mt-0.5 shrink-0 text-[12px] text-accent-foreground" />
             <span className="min-w-0 break-words">{item}</span>
           </li>
         ))}
@@ -199,7 +196,7 @@ function ToolTraceSectionBlock({
 
   return (
     <div className="space-y-2 pb-2 last:pb-0" data-ai-tool-trace="section">
-      <div className="text-[10px] font-medium tracking-[0.08em] opacity-70">{label}</div>
+      <div className="font-medium text-[10px] tracking-[0.08em] opacity-70">{label}</div>
       <div className="space-y-2 rounded bg-sidebar-background/35 px-2 py-1.5 text-[10px] leading-4">
         <SectionError section={section} />
         <SectionRows section={section} />
@@ -231,7 +228,7 @@ function RawTraceDisclosure({
 
   return (
     <details className="mt-1 text-[10px] leading-4" data-ai-tool-trace="raw-disclosure">
-      <summary className="cursor-pointer text-foreground-muted select-none">原始数据</summary>
+      <summary className="cursor-pointer select-none text-foreground-muted">原始数据</summary>
       <div className="mt-1 space-y-2">
         {requestPayload != null ? <RawPayloadBlock label="请求" payload={requestPayload} /> : null}
         {responsePayload != null ? (
@@ -287,7 +284,7 @@ export function ToolTraceCard({
       >
         <span className="icon-[material-symbols--build-outline] shrink-0 text-[13px]" />
         <span className="min-w-0 flex-1 truncate">{entry.summary}</span>
-        <span className="shrink-0 text-[10px] tracking-[0.08em] uppercase opacity-70">
+        <span className="shrink-0 text-[10px] uppercase tracking-[0.08em] opacity-70">
           {statusLabel}
         </span>
         {hasDetails && !hideToggle ? (
@@ -305,7 +302,7 @@ export function ToolTraceCard({
       <AnimatePresence initial={false}>
         {isExpanded ? (
           <motion.div
-            className="border-t border-current/10 px-2 py-1.5 text-[10px] leading-4"
+            className="border-current/10 border-t px-2 py-1.5 text-[10px] leading-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

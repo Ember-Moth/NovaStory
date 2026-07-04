@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import {
   AI_ASSISTANT_MAX_STEPS_DEFAULT,
@@ -149,7 +149,7 @@ export function ConfigSettingsPage() {
       }
       actions={
         isSaving ? (
-          <div className="inline-flex items-center gap-1.5 text-xs text-foreground-muted">
+          <div className="inline-flex items-center gap-1.5 text-foreground-muted text-xs">
             <span className="icon-[material-symbols--sync] animate-spin text-base" />
             保存中
           </div>
@@ -159,7 +159,7 @@ export function ConfigSettingsPage() {
       <main className="min-h-0 flex-1 overflow-y-auto bg-editor-background p-4">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
           {actionError ? (
-            <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+            <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-red-200 text-sm">
               {actionError}
             </div>
           ) : null}
@@ -211,9 +211,9 @@ function SettingsSection({
 }) {
   return (
     <section className="rounded-md border border-border bg-sidebar-background">
-      <div className="border-b border-border px-4 py-3">
-        <h2 className="text-sm font-semibold text-foreground">{title}</h2>
-        <p className="mt-1 text-xs text-foreground-muted">{description}</p>
+      <div className="border-border border-b px-4 py-3">
+        <h2 className="font-semibold text-foreground text-sm">{title}</h2>
+        <p className="mt-1 text-foreground-muted text-xs">{description}</p>
       </div>
       <div className="divide-y divide-border">{children}</div>
     </section>
@@ -232,8 +232,8 @@ function SettingsFieldRow({
   return (
     <div className="grid gap-3 px-4 py-4 lg:grid-cols-[minmax(12rem,0.34fr)_minmax(0,1fr)]">
       <div>
-        <div className="text-sm font-medium text-foreground">{label}</div>
-        <div className="mt-1 text-xs leading-5 text-foreground-muted">{description}</div>
+        <div className="font-medium text-foreground text-sm">{label}</div>
+        <div className="mt-1 text-foreground-muted text-xs leading-5">{description}</div>
       </div>
       <div className="min-w-0">{children}</div>
     </div>

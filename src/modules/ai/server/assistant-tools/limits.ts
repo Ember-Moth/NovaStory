@@ -48,7 +48,7 @@ export function limitContentNode(
   state.remaining -= 1;
   const title = trimText(node.title, CONTENT_TITLE_CHAR_LIMIT);
   const body = trimText(node.body, CONTENT_BODY_CHAR_LIMIT);
-  let children: ExportedContentNode[] = [];
+  const children: ExportedContentNode[] = [];
 
   for (const child of node.children) {
     const limitedChild = limitContentNode(child, state);

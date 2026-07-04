@@ -33,8 +33,8 @@ export function WorkingTreeStatusPanel({
   return (
     <section className="relative mt-2 bg-editor-background">
       <div className="flex items-center gap-1">
-        <span className="icon-[material-symbols--difference] text-base text-accent-foreground" />
-        <h4 className="text-xs font-medium text-foreground-muted">未提交变更</h4>
+        <span className="icon-[material-symbols--difference] text-accent-foreground text-base" />
+        <h4 className="font-medium text-foreground-muted text-xs">未提交变更</h4>
       </div>
 
       <div className="mt-2 space-y-2">
@@ -43,7 +43,7 @@ export function WorkingTreeStatusPanel({
         {loading ? (
           <LoadingBlock label="正在对比工作区与 HEAD..." />
         ) : status == null ? null : !status.hasChanges ? (
-          <p className="text-sm text-foreground-muted">
+          <p className="text-foreground-muted text-sm">
             {status.headCommitId == null
               ? "尚无提交，当前工作区无变更。"
               : "工作区与 HEAD 一致，无未提交变更。"}

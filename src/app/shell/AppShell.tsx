@@ -1,4 +1,4 @@
-import { type ComponentPropsWithoutRef, type ReactNode } from "react";
+import type { ComponentPropsWithoutRef, ReactNode } from "react";
 
 import { cn } from "@/shared/lib/cn";
 
@@ -26,7 +26,7 @@ export function AppShell({
 
 export function AppSidebar({ children }: { children: ReactNode }) {
   return (
-    <div className="relative flex w-72 shrink-0 flex-col overflow-hidden border-r border-border bg-sidebar-background">
+    <div className="relative flex w-72 shrink-0 flex-col overflow-hidden border-border border-r bg-sidebar-background">
       {children}
     </div>
   );

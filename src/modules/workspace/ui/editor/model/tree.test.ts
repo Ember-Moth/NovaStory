@@ -2,14 +2,14 @@ import { expect, test } from "bun:test";
 
 import { buildAuxTreeState, buildContentTreeState } from "./normalize";
 import {
-  collectInvalidAuxSymlinkTargetIds,
+  type ContentDropPosition,
   collectAuxSubtreeIds,
+  collectInvalidAuxSymlinkTargetIds,
   nextAuxFileName,
   nextAuxSymlinkName,
   resolveAuxHierarchyMove,
   resolveContentCreateSiblingPlacement,
   resolveContentMove,
-  type ContentDropPosition,
 } from "./tree";
 import type { AuxTreeNodeVM, RawAuxTreeNode, RawContentTreeNode } from "./types";
 

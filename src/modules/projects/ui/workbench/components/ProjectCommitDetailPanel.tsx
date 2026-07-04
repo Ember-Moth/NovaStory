@@ -3,15 +3,14 @@ import { skipToken } from "@codehz/rpc/react";
 import { rpc } from "@/rpc/client";
 import { cn } from "@/shared/lib/cn";
 import { LoadingBlock } from "@/shared/ui/Loading";
-
-import { useProjectWorkbenchProjectId } from "../core/useProjectWorkbench";
 import type { CommitRow } from "../../shared/projectTypes";
 import {
   dateFormatter,
-  formatDateTimePreferredRelative,
   formatCommitId,
+  formatDateTimePreferredRelative,
   InlineError,
 } from "../../shared/projectUi";
+import { useProjectWorkbenchProjectId } from "../core/useProjectWorkbench";
 import { ChangeAreasView } from "./ChangeAreasView";
 
 /**
@@ -51,21 +50,21 @@ export function ProjectCommitDetailPanel({
 
   return (
     <div className="flex min-h-0 flex-col gap-4">
-      <section className="-mx-4 space-y-3 border-b border-border px-4 pb-4">
+      <section className="-mx-4 space-y-3 border-border border-b px-4 pb-4">
         <div className="flex min-w-0 flex-wrap items-start gap-x-2 gap-y-1">
           <div className="flex min-w-0 flex-1 items-start gap-2">
-            <span className="mt-1 icon-[material-symbols--commit] shrink-0 text-base text-accent-foreground" />
-            <h3 className="min-w-0 flex-1 text-base leading-6 font-semibold wrap-break-word whitespace-pre-wrap text-foreground">
+            <span className="icon-[material-symbols--commit] mt-1 shrink-0 text-accent-foreground text-base" />
+            <h3 className="wrap-break-word min-w-0 flex-1 whitespace-pre-wrap font-semibold text-base text-foreground leading-6">
               {subject}
             </h3>
           </div>
           {isHead ? (
-            <span className="shrink-0 text-[10px] font-medium tracking-wide text-accent-foreground uppercase">
+            <span className="shrink-0 font-medium text-[10px] text-accent-foreground uppercase tracking-wide">
               HEAD
             </span>
           ) : null}
           {isMerge ? (
-            <span className="shrink-0 text-[10px] font-medium tracking-wide text-foreground-muted uppercase">
+            <span className="shrink-0 font-medium text-[10px] text-foreground-muted uppercase tracking-wide">
               Merge
             </span>
           ) : null}
@@ -79,7 +78,7 @@ export function ProjectCommitDetailPanel({
         {body ? (
           <pre
             className={cn(
-              "font-sans text-sm leading-6 wrap-break-word whitespace-pre-wrap text-foreground",
+              "wrap-break-word whitespace-pre-wrap font-sans text-foreground text-sm leading-6",
             )}
           >
             {body}
@@ -88,13 +87,13 @@ export function ProjectCommitDetailPanel({
       </section>
 
       <section>
-        <div className="mb-3 flex items-center gap-1 text-[11px] font-semibold tracking-wider text-foreground-muted uppercase">
-          <span className="icon-[material-symbols--info-outline] text-sm text-accent-foreground" />
+        <div className="mb-3 flex items-center gap-1 font-semibold text-[11px] text-foreground-muted uppercase tracking-wider">
+          <span className="icon-[material-symbols--info-outline] text-accent-foreground text-sm" />
           <h4>元信息</h4>
         </div>
         <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
           <MetaRow label="提交">
-            <span className="font-mono break-all">{formatCommitId(commit.id)}</span>
+            <span className="break-all font-mono">{formatCommitId(commit.id)}</span>
           </MetaRow>
           <MetaRow label="作者">{commit.author ?? "—"}</MetaRow>
           <MetaRow label="时间">
@@ -110,7 +109,7 @@ export function ProjectCommitDetailPanel({
               <div className="flex flex-col gap-2">
                 {commit.parents.map((parent) => (
                   <div key={parent.parentId} className="flex flex-wrap items-center gap-1.5">
-                    <span className="font-mono break-all">{formatCommitId(parent.parentId)}</span>
+                    <span className="break-all font-mono">{formatCommitId(parent.parentId)}</span>
                     {parent.mergeRole !== "normal" ? (
                       <span className="text-[10px] text-foreground-muted">
                         {parent.mergeRole === "mainline" ? "主线" : "并入"}
@@ -128,7 +127,7 @@ export function ProjectCommitDetailPanel({
         <button
           type="button"
           onClick={() => onOpenFork(commit)}
-          className="inline-flex items-center gap-1 text-xs text-foreground-muted transition hover:text-foreground disabled:opacity-50"
+          className="inline-flex items-center gap-1 text-foreground-muted text-xs transition hover:text-foreground disabled:opacity-50"
         >
           <span className="icon-[material-symbols--fork-right] text-sm" />
           从这里 Fork
@@ -152,8 +151,8 @@ function MetaRow({
 }) {
   return (
     <div className={className}>
-      <dt className="mb-1 text-[11px] font-medium text-foreground-muted">{label}</dt>
-      <dd className="min-w-0 text-sm text-foreground">{children}</dd>
+      <dt className="mb-1 font-medium text-[11px] text-foreground-muted">{label}</dt>
+      <dd className="min-w-0 text-foreground text-sm">{children}</dd>
     </div>
   );
 }
@@ -181,8 +180,8 @@ function DiffSection({ commitId }: { commitId: string }) {
   return (
     <div className="bg-editor-background">
       <div className="flex items-center gap-1">
-        <span className="icon-[material-symbols--difference] text-base text-accent-foreground" />
-        <h4 className="text-xs font-medium text-foreground-muted">
+        <span className="icon-[material-symbols--difference] text-accent-foreground text-base" />
+        <h4 className="font-medium text-foreground-muted text-xs">
           {diff?.isRoot ? "本次改动（根提交）" : "本次改动"}
         </h4>
       </div>
@@ -193,7 +192,7 @@ function DiffSection({ commitId }: { commitId: string }) {
         ) : diff == null ? (
           <LoadingBlock label="正在计算差异..." />
         ) : !diff.hasChanges ? (
-          <p className="text-sm text-foreground-muted">该提交相对父提交无内容变更。</p>
+          <p className="text-foreground-muted text-sm">该提交相对父提交无内容变更。</p>
         ) : (
           <ChangeAreasView areas={diff.areas} />
         )}

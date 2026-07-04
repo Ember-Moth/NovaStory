@@ -1,5 +1,4 @@
-import { createBranch } from "./branches";
-import { getBranch, listBranches } from "./branches";
+import { createBranch, getBranch, listBranches } from "./branches";
 import { getCurrentBranch, setHeadRef, touchProjectRepo } from "./git-storage/git-store";
 
 // ---------------------------------------------------------------------------

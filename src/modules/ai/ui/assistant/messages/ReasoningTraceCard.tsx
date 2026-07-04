@@ -34,7 +34,7 @@ export function ReasoningTraceCard({
       <AnimatePresence initial={false}>
         {expanded ? (
           <motion.div
-            className="border-t border-current/10 px-2 py-1.5"
+            className="border-current/10 border-t px-2 py-1.5"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

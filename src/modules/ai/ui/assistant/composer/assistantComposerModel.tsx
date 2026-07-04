@@ -19,6 +19,7 @@ import type {
   AssistantMentionKind,
   AssistantMentionMode,
 } from "@/modules/ai/domain/types";
+
 export type {
   AssistantMentionInput,
   AssistantMentionKind,
@@ -115,7 +116,7 @@ export class AssistantMentionNode extends DecoratorNode<ReactNode> {
   override decorate(): ReactNode {
     return (
       <span
-        className="inline-flex h-5 max-w-44 items-center gap-1 rounded-sm border border-accent-foreground/45 bg-accent-background/35 px-1.5 text-[12px] leading-none text-accent-foreground"
+        className="inline-flex h-5 max-w-44 items-center gap-1 rounded-sm border border-accent-foreground/45 bg-accent-background/35 px-1.5 text-[12px] text-accent-foreground leading-none"
         data-assistant-mention-kind={this.__kind}
         data-assistant-mention-target-id={this.__targetId}
       >
