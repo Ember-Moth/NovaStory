@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "vitest";
 import * as workspaceService from "@/modules/workspace/domain";
 import { seedProjectRecord } from "@/test/project";
 

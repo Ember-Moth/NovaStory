@@ -1,8 +1,11 @@
 import { mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export function getStorageRoot() {
-  return process.env.NOVEL_EVOLVER_DATA_DIR ?? join(import.meta.dir, "../../../data");
+  return process.env.NOVEL_EVOLVER_DATA_DIR ?? join(__dirname, "../../../data");
 }
 
 export function ensureStorageRoot() {

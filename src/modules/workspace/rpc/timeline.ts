@@ -1,5 +1,3 @@
-import { mutation, query } from "@codehz/rpc/core";
-
 import {
   createTimelinePoint,
   deleteTimelinePoint,
@@ -9,81 +7,84 @@ import {
   revertTimelineChange,
   updateTimelinePoint,
 } from "@/modules/workspace/domain";
-import { type RpcTagList, rpcTags } from "@/rpc/tags";
+import { rpcTags } from "@/rpc/tags";
 
-export const list = query<
-  { projectId: string; workspaceId: string },
-  Awaited<ReturnType<typeof listTimelinePoints>>,
-  RpcTagList
->({
-  watch: ({ workspaceId }) => [rpcTags.timelineList(workspaceId)],
-  handler: async ({ projectId, workspaceId }) => await listTimelinePoints(projectId, workspaceId),
-});
+export async function list(input: {
+  projectId: string;
+  workspaceId: string;
+}): Promise<{ data: Awaited<ReturnType<typeof listTimelinePoints>>; watch?: unknown[] }> {
+  const data = await listTimelinePoints(input.projectId, input.workspaceId);
+  const watch = [rpcTags.timelineList(input.workspaceId)];
+  return { data, watch };
+}
 
-export const create = mutation<
-  {
-    projectId: string;
-    workspaceId: string;
-    afterPointId?: string | typeof ORIGIN_TIMELINE_POINT_ID;
-    label: string;
-    description?: string | null;
-  },
-  Awaited<ReturnType<typeof createTimelinePoint>>,
-  RpcTagList
->(async (input, ctx) => {
-  const point = await createTimelinePoint(input);
-  ctx.invalidate(rpcTags.timelineList(input.workspaceId), rpcTags.auxWorkspace(input.workspaceId));
-  return point;
-});
+export async function create(input: {
+  projectId: string;
+  workspaceId: string;
+  afterPointId?: string | typeof ORIGIN_TIMELINE_POINT_ID;
+  label: string;
+  description?: string | null;
+}): Promise<{ data: Awaited<ReturnType<typeof createTimelinePoint>>; invalidate?: unknown[] }> {
+  const data = await createTimelinePoint(input);
+  const invalidate = [
+    rpcTags.timelineList(input.workspaceId),
+    rpcTags.auxWorkspace(input.workspaceId),
+  ];
+  return { data, invalidate };
+}
 
-export const move = mutation<
-  {
-    projectId: string;
-    workspaceId: string;
-    pointId: string;
-    afterPointId?: string | typeof ORIGIN_TIMELINE_POINT_ID;
-  },
-  Awaited<ReturnType<typeof moveTimelinePoint>>,
-  RpcTagList
->(async (input, ctx) => {
-  const point = await moveTimelinePoint(input);
-  ctx.invalidate(rpcTags.timelineList(input.workspaceId), rpcTags.auxWorkspace(input.workspaceId));
-  return point;
-});
+export async function move(input: {
+  projectId: string;
+  workspaceId: string;
+  pointId: string;
+  afterPointId?: string | typeof ORIGIN_TIMELINE_POINT_ID;
+}): Promise<{ data: Awaited<ReturnType<typeof moveTimelinePoint>>; invalidate?: unknown[] }> {
+  const data = await moveTimelinePoint(input);
+  const invalidate = [
+    rpcTags.timelineList(input.workspaceId),
+    rpcTags.auxWorkspace(input.workspaceId),
+  ];
+  return { data, invalidate };
+}
 
-export const deleteMutation = mutation<
-  { projectId: string; workspaceId: string; pointId: string; purgeAuxLayers?: boolean },
-  void,
-  RpcTagList
->(async ({ projectId, workspaceId, pointId, purgeAuxLayers }, ctx) => {
-  await deleteTimelinePoint(projectId, workspaceId, pointId, { purgeAuxLayers });
-  ctx.invalidate(rpcTags.timelineList(workspaceId), rpcTags.auxWorkspace(workspaceId));
-});
+export async function deleteMutation(input: {
+  projectId: string;
+  workspaceId: string;
+  pointId: string;
+  purgeAuxLayers?: boolean;
+}): Promise<{ data: void; invalidate?: unknown[] }> {
+  const data = await deleteTimelinePoint(input.projectId, input.workspaceId, input.pointId, {
+    purgeAuxLayers: input.purgeAuxLayers,
+  });
+  const invalidate = [
+    rpcTags.timelineList(input.workspaceId),
+    rpcTags.auxWorkspace(input.workspaceId),
+  ];
+  return { data, invalidate };
+}
 
-export const update = mutation<
-  {
-    projectId: string;
-    workspaceId: string;
-    pointId: string;
-    label?: string;
-    description?: string | null;
-  },
-  Awaited<ReturnType<typeof updateTimelinePoint>>,
-  RpcTagList
->({
-  invalidate: (input) => [rpcTags.timelineList(input.workspaceId)],
-  handler: async (input) => await updateTimelinePoint(input),
-});
+export async function update(input: {
+  projectId: string;
+  workspaceId: string;
+  pointId: string;
+  label?: string;
+  description?: string | null;
+}): Promise<{ data: Awaited<ReturnType<typeof updateTimelinePoint>>; invalidate?: unknown[] }> {
+  const data = await updateTimelinePoint(input);
+  const invalidate = [rpcTags.timelineList(input.workspaceId)];
+  return { data, invalidate };
+}
 
-export const revert = mutation<Parameters<typeof revertTimelineChange>[0], void, RpcTagList>(
-  async (input, ctx) => {
-    await revertTimelineChange(input);
-    const workspaceId = input.branchId;
-    ctx.invalidate(
-      rpcTags.timelineList(workspaceId),
-      rpcTags.contentTree(workspaceId),
-      rpcTags.auxWorkspace(workspaceId),
-      rpcTags.commitHistory(input.branchId),
-    );
-  },
-);
+export async function revert(
+  input: Parameters<typeof revertTimelineChange>[0],
+): Promise<{ data: void; invalidate?: unknown[] }> {
+  const data = await revertTimelineChange(input);
+  const workspaceId = input.branchId;
+  const invalidate = [
+    rpcTags.timelineList(workspaceId),
+    rpcTags.contentTree(workspaceId),
+    rpcTags.auxWorkspace(workspaceId),
+    rpcTags.commitHistory(input.branchId),
+  ];
+  return { data, invalidate };
+}

@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "vitest";
 
 import { setupMockDatabase } from "@/test/mock-db";
 import { seedProjectRecord } from "@/test/project";

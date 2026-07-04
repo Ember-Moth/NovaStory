@@ -1,5 +1,5 @@
-import { expect, test } from "bun:test";
 import { writeFileSync } from "node:fs";
+import { expect, test } from "vitest";
 
 import { getConfigFilePath } from "@/shared/lib/storage-paths";
 import {

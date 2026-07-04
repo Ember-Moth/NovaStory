@@ -1,13 +1,9 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "vitest";
 import * as service from "@/modules/workspace/domain";
 import { rpcTags } from "@/rpc/tags";
 import { seedProjectRecord } from "@/test/project";
 import * as auxHandlers from "./aux";
 import * as timelineHandlers from "./timeline";
-
-const requestCtx = { req: new Request("http://localhost/api/rpc") } as unknown as Parameters<
-  typeof auxHandlers.snapshotTree.handler
->[1];
 
 async function seedProject(projectId: string) {
   seedProjectRecord(projectId);
@@ -26,14 +22,11 @@ test("aux snapshot tree watches the active point snapshot key instead of workspa
     label: "Point A",
   });
 
-  const result = await auxHandlers.snapshotTree.handler(
-    {
-      projectId: workspace.projectId,
-      workspaceId: workspace.id,
-      pointId: point.id,
-    },
-    requestCtx,
-  );
+  const result = await auxHandlers.snapshotTree({
+    projectId: workspace.projectId,
+    workspaceId: workspace.id,
+    pointId: point.id,
+  });
 
   expect(result.watch).toEqual([
     rpcTags.auxWorkspace(workspace.id),
@@ -50,15 +43,12 @@ test("timeline label updates do not invalidate aux snapshots", async () => {
     label: "Point A",
   });
 
-  const result = await timelineHandlers.update.handler(
-    {
-      projectId: workspace.projectId,
-      workspaceId: workspace.id,
-      pointId: point.id,
-      label: "Point A+",
-    },
-    requestCtx,
-  );
+  const result = await timelineHandlers.update({
+    projectId: workspace.projectId,
+    workspaceId: workspace.id,
+    pointId: point.id,
+    label: "Point A+",
+  });
 
   expect(result.invalidate).toEqual([rpcTags.timelineList(workspace.id)]);
 });
@@ -78,14 +68,11 @@ test("deleting a point invalidates the aux workspace cache", async () => {
     label: "Point B",
   });
 
-  const result = await timelineHandlers.deleteMutation.handler(
-    {
-      projectId: workspace.projectId,
-      workspaceId: workspace.id,
-      pointId: pointB.id,
-    },
-    requestCtx,
-  );
+  const result = await timelineHandlers.deleteMutation({
+    projectId: workspace.projectId,
+    workspaceId: workspace.id,
+    pointId: pointB.id,
+  });
 
   expect(result.invalidate).toEqual([
     rpcTags.timelineList(workspace.id),
@@ -108,15 +95,12 @@ test("creating a point invalidates the aux workspace cache", async () => {
     label: "Point B",
   });
 
-  const result = await timelineHandlers.create.handler(
-    {
-      projectId: workspace.projectId,
-      workspaceId: workspace.id,
-      afterPointId: pointB.id,
-      label: "Point C",
-    },
-    requestCtx,
-  );
+  const result = await timelineHandlers.create({
+    projectId: workspace.projectId,
+    workspaceId: workspace.id,
+    afterPointId: pointB.id,
+    label: "Point C",
+  });
 
   expect(result.invalidate).toEqual([
     rpcTags.timelineList(workspace.id),
@@ -146,15 +130,12 @@ test("restoring a deleted aux path invalidates the aux workspace cache", async (
     path: "/notes.md",
   });
 
-  const result = await auxHandlers.restoreDeleted.handler(
-    {
-      projectId: workspace.projectId,
-      workspaceId: workspace.id,
-      timelinePointId: point.id,
-      path: "/notes.md",
-    },
-    requestCtx,
-  );
+  const result = await auxHandlers.restoreDeleted({
+    projectId: workspace.projectId,
+    workspaceId: workspace.id,
+    timelinePointId: point.id,
+    path: "/notes.md",
+  });
 
   expect(result.invalidate).toEqual([rpcTags.auxWorkspace(workspace.id)]);
 });

@@ -1,5 +1,5 @@
-import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
+import { expect, test } from "vitest";
 
 import type { GlobalPromptRow } from "@/modules/ai/domain/types";
 

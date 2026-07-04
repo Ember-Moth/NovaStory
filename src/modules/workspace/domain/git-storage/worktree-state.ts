@@ -1,4 +1,4 @@
-import type { VirtualWorkdir } from "nano-git/workdir/core";
+import type { VirtualWorktree } from "nano-git/worktree/core";
 import { ORIGIN_TIMELINE_POINT_ID } from "@/modules/workspace/domain/constants";
 import { invariant } from "@/shared/lib/domain";
 import { parseJsonl, stringifyJsonl } from "./jsonl";
@@ -15,7 +15,7 @@ const INDEX_FILE = "index.jsonl";
 export const AUX_ORIGIN_DIR = "aux/origin";
 export const AUX_TIMELINE_DIR = "aux/timeline";
 
-function isDirectoryPath(workdir: VirtualWorkdir, path: string) {
+function isDirectoryPath(workdir: VirtualWorktree, path: string) {
   return workdir.stat(path)?.kind === "tree";
 }
 
@@ -257,14 +257,14 @@ export function moveManuscriptNode(
 }
 
 // ---------------------------------------------------------------------------
-// VirtualWorkdir-based I/O (Phase 2)
+// VirtualWorktree-based I/O (Phase 2)
 // ---------------------------------------------------------------------------
 
 /**
- * 从 VirtualWorkdir 读取工作树状态。
- * 等价于 readWorktreeState(dir)，但基于 VirtualWorkdir 而非文件系统。
+ * 从 VirtualWorktree 读取工作树状态。
+ * 等价于 readWorktreeState(dir)，但基于 VirtualWorktree 而非文件系统。
  */
-export function readWorktreeStateFromWorkdir(workdir: VirtualWorkdir): WorktreeState {
+export function readWorktreeStateFromWorkdir(workdir: VirtualWorktree): WorktreeState {
   const indexContent = workdir.exists("index.jsonl")
     ? workdir.readFile("index.jsonl").toString("utf8")
     : "";
@@ -293,10 +293,10 @@ export function readWorktreeStateFromWorkdir(workdir: VirtualWorkdir): WorktreeS
 }
 
 /**
- * 将工作树状态写入 VirtualWorkdir。
- * 等价于 writeWorktreeStateSync(dir, state)，但基于 VirtualWorkdir 而非文件系统。
+ * 将工作树状态写入 VirtualWorktree。
+ * 等价于 writeWorktreeStateSync(dir, state)，但基于 VirtualWorktree 而非文件系统。
  */
-export function writeWorktreeStateToWorkdir(workdir: VirtualWorkdir, state: WorktreeState) {
+export function writeWorktreeStateToWorkdir(workdir: VirtualWorktree, state: WorktreeState) {
   // delete-then-write to work around SQLite root-level overwrite issue
   if (workdir.exists("index.jsonl")) {
     workdir.delete("index.jsonl", { force: true });

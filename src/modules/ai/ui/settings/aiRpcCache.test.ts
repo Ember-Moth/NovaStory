@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "vitest";
 
 import type { AiResolvedModelView } from "@/modules/ai/domain/types";
 import { rpc } from "@/rpc/client";

@@ -1,5 +1,3 @@
-import { mutation, query } from "@codehz/rpc/core";
-
 import {
   createBranch,
   deleteBranch,
@@ -7,50 +5,66 @@ import {
   listBranches,
   listBranchHeads,
 } from "@/modules/workspace/domain";
-import { type RpcTagList, rpcTags } from "@/rpc/tags";
+import { rpcTags } from "@/rpc/tags";
 
-export const list = query<{ projectId: string }, ReturnType<typeof listBranches>, RpcTagList>({
-  watch: ({ projectId }) => [rpcTags.branchesByProject(projectId)],
-  handler: ({ projectId }) => listBranches(projectId),
-});
+export async function list(input: { projectId: string }): Promise<{
+  data: ReturnType<typeof listBranches>;
+  watch?: unknown[];
+}> {
+  const data = await listBranches(input.projectId);
+  const watch = [rpcTags.branchesByProject(input.projectId)];
+  return { data, watch };
+}
 
-export const get = query<
-  { projectId: string; branchId: string },
-  ReturnType<typeof getBranch>,
-  RpcTagList
->({
-  watch: ({ branchId }) => [rpcTags.branch(branchId)],
-  handler: ({ projectId, branchId }) => getBranch(projectId, branchId),
-});
+export async function get(input: { projectId: string; branchId: string }): Promise<{
+  data: ReturnType<typeof getBranch>;
+  watch?: unknown[];
+}> {
+  const data = await getBranch(input.projectId, input.branchId);
+  const watch = [rpcTags.branch(input.branchId)];
+  return { data, watch };
+}
 
-export const heads = query<{ projectId: string }, ReturnType<typeof listBranchHeads>, RpcTagList>({
-  watch: ({ projectId }) => [rpcTags.branchHeadsByProject(projectId)],
-  handler: ({ projectId }) => listBranchHeads(projectId),
-});
+export async function heads(input: { projectId: string }): Promise<{
+  data: ReturnType<typeof listBranchHeads>;
+  watch?: unknown[];
+}> {
+  const data = await listBranchHeads(input.projectId);
+  const watch = [rpcTags.branchHeadsByProject(input.projectId)];
+  return { data, watch };
+}
 
-export const create = mutation<
-  { projectId: string; name: string; fromCommitId?: string | null },
-  Awaited<ReturnType<typeof createBranch>>,
-  RpcTagList
->({
-  invalidate: (input) => [
+export async function create(input: {
+  projectId: string;
+  name: string;
+  fromCommitId?: string | null;
+}): Promise<{
+  data: Awaited<ReturnType<typeof createBranch>>;
+  invalidate?: unknown[];
+}> {
+  const data = await createBranch(input);
+  const invalidate = [
     rpcTags.branchesByProject(input.projectId),
     rpcTags.branchHeadsByProject(input.projectId),
     rpcTags.workspacesByProject(input.projectId),
     rpcTags.project(input.projectId),
     rpcTags.projectsList(),
-  ],
-  handler: async (input) => await createBranch(input),
-});
+  ];
+  return { data, invalidate };
+}
 
-export const deleteMutation = mutation<{ projectId: string; branchId: string }, void, RpcTagList>({
-  invalidate: (input) => [
+export async function deleteMutation(input: { projectId: string; branchId: string }): Promise<{
+  data: void;
+  invalidate?: unknown[];
+}> {
+  const data = await deleteBranch(input.projectId, input.branchId);
+  const invalidate = [
     rpcTags.branchesByProject(input.projectId),
     rpcTags.branchHeadsByProject(input.projectId),
     rpcTags.branch(input.branchId),
     rpcTags.workspacesByProject(input.projectId),
     rpcTags.project(input.projectId),
     rpcTags.projectsList(),
-  ],
-  handler: async ({ projectId, branchId }) => await deleteBranch(projectId, branchId),
-});
+  ];
+  return { data, invalidate };
+}

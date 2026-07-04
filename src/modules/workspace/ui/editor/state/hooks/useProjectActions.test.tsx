@@ -1,6 +1,6 @@
-import { expect, mock, test } from "bun:test";
 import { ScopeProvider } from "bunshi/react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { expect, test, vi } from "vitest";
 
 import { ORIGIN_TIMELINE_POINT_ID } from "@/modules/workspace/domain/constants";
 import type { AuxTreeNodeVM, TimelinePointVM } from "@/modules/workspace/ui/editor/model/types";
@@ -91,10 +91,10 @@ function createWorkspaceState(input: {
       flatNodes: [],
       nodeMap: new Map(),
       parentMap: new Map(),
-      createContent: { isPending: false, mutate: mock(async () => ({ id: "content_new" })) },
-      deleteContent: { isPending: false, mutate: mock(async () => undefined) },
-      moveContent: { isPending: false, mutate: mock(async () => undefined) },
-      updateContent: { isPending: false, mutate: mock(async () => ({ id: "content_1" })) },
+      createContent: { isPending: false, mutate: vi.fn(async () => ({ id: "content_new" })) },
+      deleteContent: { isPending: false, mutate: vi.fn(async () => undefined) },
+      moveContent: { isPending: false, mutate: vi.fn(async () => undefined) },
+      updateContent: { isPending: false, mutate: vi.fn(async () => ({ id: "content_1" })) },
     },
     timeline: {
       points: input.timelinePoints ?? [],

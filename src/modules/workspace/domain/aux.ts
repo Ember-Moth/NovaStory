@@ -1,5 +1,5 @@
 import posix from "node:path/posix";
-import type { VirtualWorkdir } from "nano-git/workdir/core";
+import type { VirtualWorktree } from "nano-git/worktree/core";
 import { ORIGIN_TIMELINE_POINT_ID } from "@/modules/workspace/domain/constants";
 import { invariant } from "@/shared/lib/domain";
 import { getBranch } from "./branches";
@@ -46,7 +46,7 @@ interface OverlaySnapshotNode extends ResolvedAuxSnapshotNode {
   symlinkTargetPath: string | null;
 }
 
-/** 通过 workspaceId（即分支名）解析 workdir key，再获取 VirtualWorkdir */
+/** 通过 workspaceId（即分支名）解析 workdir key，再获取 VirtualWorktree */
 function resolveWorkdir(projectId: string, workspaceId: string) {
   const workdirKey = getBranchMapping(projectId, workspaceId);
   invariant(workdirKey, `没有关联的 workdir key: ${workspaceId}`);
@@ -111,11 +111,11 @@ function auxPathSegments(auxPath: string) {
 }
 
 // ---------------------------------------------------------------------------
-// VirtualWorkdir 同步辅助
+// VirtualWorktree 同步辅助
 // ---------------------------------------------------------------------------
 
 /**
- * 将逻辑 aux 路径转换为 VirtualWorkdir 内的相对路径。
+ * 将逻辑 aux 路径转换为 VirtualWorktree 内的相对路径。
  * 例如 auxPath="/lore/world.md", pointId=null → "aux/origin/lore/world.md"
  */
 function auxWorkdirRelPath(pointId: string | null, auxPath: string): string {
@@ -125,8 +125,8 @@ function auxWorkdirRelPath(pointId: string | null, auxPath: string): string {
   return `${base}/${trimmed}`;
 }
 
-/** 确保 VirtualWorkdir 内路径的所有祖先目录存在 */
-function ensureWorkdirDir(wd: VirtualWorkdir, dirPath: string) {
+/** 确保 VirtualWorktree 内路径的所有祖先目录存在 */
+function ensureWorkdirDir(wd: VirtualWorktree, dirPath: string) {
   wd.mkdir(dirPath, { recursive: true });
 }
 
@@ -154,11 +154,11 @@ function hasAncestorPath(paths: string[], auxPath: string) {
 // readLayerEntries (physical fs) removed — only readLayerEntriesFromWorkdir is used
 
 /**
- * 从 VirtualWorkdir 读取指定层的条目，与 readLayerEntries 语义完全一致。
+ * 从 VirtualWorktree 读取指定层的条目，与 readLayerEntries 语义完全一致。
  * 保留 whiteout（.wh.*）和 .gitkeep 的完整语义。
  */
 function readLayerEntriesFromWorkdir(
-  wd: VirtualWorkdir,
+  wd: VirtualWorktree,
   pointId: string | null,
 ): OverlayLayerEntry[] {
   const rootPath = auxWorkdirRelPath(pointId, "/");
@@ -196,7 +196,7 @@ function readLayerEntriesFromWorkdir(
       }
 
       if (dirent.kind === "tree") {
-        // VirtualWorkdir 中目录由 mkdir 创建，无需 .gitkeep 标记
+        // VirtualWorktree 中目录由 mkdir 创建，无需 .gitkeep 标记
         // 但为了与物理 fs 行为一致，仍需检查 .gitkeep 文件
         if (wd.exists(`${childWdPath}/${KEEP_FILE}`)) {
           entries.push({
@@ -355,7 +355,10 @@ async function currentLayerDeletedEntries(input: {
   });
 }
 
-function currentLayerTouchedPaths(wd: VirtualWorkdir, pointId: string | null): ReadonlySet<string> {
+function currentLayerTouchedPaths(
+  wd: VirtualWorktree,
+  pointId: string | null,
+): ReadonlySet<string> {
   if (pointId == null) {
     return new Set();
   }
@@ -562,7 +565,7 @@ export async function restoreDeletedAuxNodeAt(input: {
     pointId,
   );
   invariant(snapshotHasPathOrDescendant(lowerSnapshot, normalizedPath), "没有可恢复的辅助资料。");
-  // 通过 VirtualWorkdir 删除 whiteout
+  // 通过 VirtualWorktree 删除 whiteout
   const wp = auxWorkdirRelPath(pointId, normalizedPath);
   const whiteoutWp = `${posix.dirname(wp)}/.wh.${posix.basename(normalizedPath)}`;
   invariant(wd.exists(whiteoutWp), "没有可恢复的辅助资料删除标记。");

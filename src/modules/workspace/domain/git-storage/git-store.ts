@@ -5,8 +5,8 @@ import { walkLogEntries } from "nano-git/log";
 import { initRepository, openRepository } from "nano-git/repository/file";
 import { diffTrees, readTree } from "nano-git/repository/tree/tree-diff";
 import { patchTree } from "nano-git/repository/tree/tree-patch";
-import type { VirtualWorkdir } from "nano-git/workdir/core";
-import { deleteSqliteVirtualWorkdir, openSqliteVirtualWorkdir } from "nano-git/workdir/sqlite";
+import type { VirtualWorktree } from "nano-git/worktree/core";
+import { openSqliteVirtualWorktreeDatabase } from "nano-git/worktree/sqlite";
 import type { WorkingTreeStatus } from "@/modules/workspace/domain/types";
 import { getProjectRepoGitDir } from "./paths";
 
@@ -197,7 +197,7 @@ export function readCommitDiff(input: {
   return diffTrees(repo.objects, previousTree, currentCommit.tree);
 }
 
-export function readWorkdirDiff(workdir: VirtualWorkdir): DiffEntry[] {
+export function readWorkdirDiff(workdir: VirtualWorktree): DiffEntry[] {
   return workdir.diff();
 }
 
@@ -309,11 +309,15 @@ export function clearRepoCache(): void {
 }
 
 // ---------------------------------------------------------------------------
-// SQLite VirtualWorkdir — 持久化 per-branch 工作目录
+// SQLite VirtualWorktree — 持久化 per-branch 工作目录
 // workdir.db 存放在 repo git 目录下，各分支通过 workdirKey 隔离
 // ---------------------------------------------------------------------------
 
-const workdirCache = new Map<string, VirtualWorkdir>();
+const workdirDbCache = new Map<
+  string,
+  import("nano-git/worktree/sqlite").SqliteVirtualWorktreeDatabase
+>();
+const workdirCache = new Map<string, VirtualWorktree>();
 
 function workdirCacheKey(projectId: string, workdirKey: string) {
   return `${projectId}:${workdirKey}`;
@@ -323,37 +327,40 @@ function workdirDbPath(projectId: string) {
   return path.join(getProjectRepoGitDir(projectId), "workdir.db");
 }
 
+function getOrOpenWorkdirDb(projectId: string) {
+  const dbPath = workdirDbPath(projectId);
+  let db = workdirDbCache.get(dbPath);
+  if (!db) {
+    db = openSqliteVirtualWorktreeDatabase(dbPath);
+    workdirDbCache.set(dbPath, db);
+  }
+  return db;
+}
+
 /**
- * 通过 workdirKey 获取 VirtualWorkdir 实例。
+ * 通过 workdirKey 获取 VirtualWorktree 实例。
  *
  * workdirKey 是不透明字符串（由 branch-map.json 维护），不依赖分支名。
  */
 export function getWorkdirForBranch(
   projectId: string,
   workdirKey: string,
-): VirtualWorkdir | undefined {
+): VirtualWorktree | undefined {
   const cached = workdirCache.get(workdirCacheKey(projectId, workdirKey));
   if (cached) return cached;
 
-  const dbPath = workdirDbPath(projectId);
-  if (fs.existsSync(dbPath)) {
-    try {
-      const repo = getOrInitRepo(projectId);
-      const workdir = openSqliteVirtualWorkdir(repo.objects, dbPath, workdirKey, {
-        baseTree: ensureEmptyTree(repo),
-      });
-      workdirCache.set(workdirCacheKey(projectId, workdirKey), workdir);
-      return workdir;
-    } catch {
-      // SQLite 中没有该 key 的数据，返回 undefined
-    }
+  const repo = getOrInitRepo(projectId);
+  const db = getOrOpenWorkdirDb(projectId);
+  if (db.hasWorktree(workdirKey)) {
+    const workdir = db.openWorktree(repo.objects, workdirKey);
+    workdirCache.set(workdirCacheKey(projectId, workdirKey), workdir);
+    return workdir;
   }
-
   return undefined;
 }
 
 /**
- * 创建或重置一个 workdirKey 对应的 VirtualWorkdir 实例（持久化到 SQLite）。
+ * 创建或重置一个 workdirKey 对应的 VirtualWorktree 实例（持久化到 SQLite）。
  *
  * @param workdirKey - 不透明 workdir key，不由分支名直接派生
  * @param baseTree - 基线 tree 哈希，不传则使用空树
@@ -362,9 +369,10 @@ export function setWorkdirForBranch(
   projectId: string,
   workdirKey: string,
   baseTree?: SHA1,
-): VirtualWorkdir {
+): VirtualWorktree {
   const repo = getOrInitRepo(projectId);
-  const dbPath = workdirDbPath(projectId);
+  const db = getOrOpenWorkdirDb(projectId);
+  const tree = baseTree ?? ensureEmptyTree(repo);
 
   const key = workdirCacheKey(projectId, workdirKey);
   const existing = workdirCache.get(key);
@@ -373,29 +381,27 @@ export function setWorkdirForBranch(
     disp[Symbol.dispose]?.();
     workdirCache.delete(key);
   }
+
   try {
-    deleteSqliteVirtualWorkdir(dbPath, workdirKey);
+    db.deleteWorktree(workdirKey);
   } catch {
     // 兼容：数据可能不存在
   }
 
-  const workdir = openSqliteVirtualWorkdir(repo.objects, dbPath, workdirKey, {
-    baseTree: baseTree ?? ensureEmptyTree(repo),
-    create: true,
-    walMode: true,
-  });
+  db.createWorktree(workdirKey, { baseTree: tree });
+  const workdir = db.openWorktree(repo.objects, workdirKey);
   workdirCache.set(key, workdir);
   return workdir;
 }
 
 /**
- * 基于已有 commit 的 tree 创建 VirtualWorkdir。
+ * 基于已有 commit 的 tree 创建 VirtualWorktree。
  */
 export function setWorkdirFromCommit(
   projectId: string,
   workdirKey: string,
   commitId: SHA1,
-): VirtualWorkdir {
+): VirtualWorktree {
   const repo = getOrInitRepo(projectId);
   const commit = repo.catFile(commitId);
   if (commit.type !== "commit") {
@@ -405,7 +411,7 @@ export function setWorkdirFromCommit(
 }
 
 /**
- * 删除 workdirKey 对应的 VirtualWorkdir 实例（清理缓存 + SQLite 持久数据）。
+ * 删除 workdirKey 对应的 VirtualWorktree 实例（清理缓存 + SQLite 持久数据）。
  */
 export function deleteWorkdirForBranch(projectId: string, workdirKey: string): void {
   const key = workdirCacheKey(projectId, workdirKey);
@@ -416,7 +422,7 @@ export function deleteWorkdirForBranch(projectId: string, workdirKey: string): v
     workdirCache.delete(key);
   }
   try {
-    deleteSqliteVirtualWorkdir(workdirDbPath(projectId), workdirKey);
+    getOrOpenWorkdirDb(projectId).deleteWorktree(workdirKey);
   } catch {
     // 兼容：数据可能已不存在
   }
@@ -428,6 +434,10 @@ export function clearWorkdirCache(): void {
     disp[Symbol.dispose]?.();
   }
   workdirCache.clear();
+  for (const db of workdirDbCache.values()) {
+    db[Symbol.dispose]?.();
+  }
+  workdirDbCache.clear();
 }
 
 export function clearAllCaches(): void {
@@ -436,7 +446,7 @@ export function clearAllCaches(): void {
 }
 
 /**
- * 基于已有 Repository 创建 VirtualWorkdir 实例。
+ * 基于已有 Repository 创建 VirtualWorktree 实例。
  *
  * 注意：此函数仅用于需要手动控制 dbPath/key 的场景。
  * 通常应使用 setWorkdirForBranch。
@@ -446,12 +456,17 @@ export function createWorkdir(
   dbPath: string,
   key: string,
   baseTree?: SHA1,
-): VirtualWorkdir {
-  return openSqliteVirtualWorkdir(repo.objects, dbPath, key, {
-    baseTree: baseTree ?? ensureEmptyTree(repo),
-    create: true,
-    walMode: true,
-  });
+): VirtualWorktree {
+  const db = openSqliteVirtualWorktreeDatabase(dbPath);
+  workdirDbCache.set(dbPath, db);
+  const tree = baseTree ?? ensureEmptyTree(repo);
+  try {
+    db.deleteWorktree(key);
+  } catch {
+    /* ignore */
+  }
+  db.createWorktree(key, { baseTree: tree });
+  return db.openWorktree(repo.objects, key);
 }
 
 /**

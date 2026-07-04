@@ -1,5 +1,5 @@
 import type { DiffEntry, SHA1 } from "nano-git";
-import type { VirtualWorkdir } from "nano-git/workdir/core";
+import type { VirtualWorktree } from "nano-git/worktree/core";
 import { getBranch, getBranchHeadCommitId } from "./branches";
 import { ORIGIN_TIMELINE_POINT_ID } from "./constants";
 import {
@@ -744,12 +744,12 @@ function emptyStatus(headCommitId: string | null): WorkingTreeStatus {
   };
 }
 
-/** VirtualWorkdir-based status: compare workdir state against HEAD commit */
+/** VirtualWorktree-based status: compare workdir state against HEAD commit */
 async function getWorkingTreeStatusFromWorkdir(
   projectId: string,
   _branchId: string,
   headCommitId: string | null,
-  workdir: VirtualWorkdir,
+  workdir: VirtualWorktree,
 ): Promise<WorkingTreeStatus> {
   const pathDiff = readWorkdirDiff(workdir);
   const state = readWorktreeStateFromWorkdir(workdir);
@@ -814,8 +814,8 @@ async function getWorkingTreeStatusFromWorkdir(
   };
 }
 
-/** Collect all blob paths and their content from a VirtualWorkdir. */
-function collectWorkdirFiles(workdir: VirtualWorkdir): Record<string, string> {
+/** Collect all blob paths and their content from a VirtualWorktree. */
+function collectWorkdirFiles(workdir: VirtualWorktree): Record<string, string> {
   const files: Record<string, string> = {};
   function walk(dirPath: string) {
     for (const entry of workdir.readdir(dirPath)) {

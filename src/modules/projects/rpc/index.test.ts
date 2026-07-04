@@ -1,5 +1,5 @@
-import { expect, test } from "bun:test";
 import { existsSync } from "node:fs";
+import { expect, test } from "vitest";
 import * as workspaceService from "@/modules/workspace/domain";
 import * as auxService from "@/modules/workspace/domain/aux";
 import { listBranches } from "@/modules/workspace/domain/branches";

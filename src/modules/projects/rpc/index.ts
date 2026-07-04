@@ -1,5 +1,4 @@
 import { rmSync } from "node:fs";
-import { mutation, query } from "@codehz/rpc/core";
 
 import { createDefaultWorkspace } from "@/modules/workspace/domain";
 import { getBranch } from "@/modules/workspace/domain/branches";
@@ -12,7 +11,7 @@ import {
   updateProjectMeta,
 } from "@/modules/workspace/domain/git-storage/project-meta-store";
 import type { ProjectIndexRow } from "@/modules/workspace/domain/git-storage/types";
-import { type RpcTagList, rpcTags } from "@/rpc/tags";
+import { rpcTags } from "@/rpc/tags";
 
 type ProjectMutationInput = Pick<ProjectIndexRow, "id" | "name" | "description">;
 
@@ -24,25 +23,30 @@ async function projectRowWithDefaultBranch(row: ProjectIndexRow): Promise<Projec
   return { ...row, defaultBranchName: branchName };
 }
 
-export const list = query<void, ProjectRow[], RpcTagList>({
-  watch: () => [rpcTags.projectsList()],
-  handler: async () => {
+export async function list(_input: undefined): Promise<{ data: ProjectRow[]; watch?: unknown[] }> {
+  const data = await (async () => {
     const rows = await listProjectRows();
     return Promise.all(rows.map(projectRowWithDefaultBranch));
-  },
-});
+  })();
+  const watch = [rpcTags.projectsList()];
+  return { data, watch };
+}
 
-export const get = query<{ projectId: string }, ProjectRow, RpcTagList>({
-  watch: ({ projectId }) => [rpcTags.project(projectId)],
-  handler: async ({ projectId }) => {
-    const row = (await readProjectMeta(projectId)).project;
+export async function get(input: {
+  projectId: string;
+}): Promise<{ data: ProjectRow; watch?: unknown[] }> {
+  const data = await (async () => {
+    const row = (await readProjectMeta(input.projectId)).project;
     return projectRowWithDefaultBranch(row);
-  },
-});
+  })();
+  const watch = [rpcTags.project(input.projectId)];
+  return { data, watch };
+}
 
-export const create = mutation<ProjectMutationInput, { workspaceId: string }, RpcTagList>({
-  invalidate: (input) => [rpcTags.projectsList(), rpcTags.project(input.id)],
-  handler: async (input) => {
+export async function create(
+  input: ProjectMutationInput,
+): Promise<{ data: { workspaceId: string }; invalidate?: unknown[] }> {
+  const data = await (async () => {
     createProjectMeta({
       id: input.id,
       name: input.name,
@@ -51,12 +55,15 @@ export const create = mutation<ProjectMutationInput, { workspaceId: string }, Rp
     });
     const workspace = await createDefaultWorkspace(input.id);
     return { workspaceId: workspace.id };
-  },
-});
+  })();
+  const invalidate = [rpcTags.projectsList(), rpcTags.project(input.id)];
+  return { data, invalidate };
+}
 
-export const update = mutation<ProjectMutationInput, void, RpcTagList>({
-  invalidate: (input) => [rpcTags.projectsList(), rpcTags.project(input.id)],
-  handler: async (input) => {
+export async function update(
+  input: ProjectMutationInput,
+): Promise<{ data: void; invalidate?: unknown[] }> {
+  const data = await (async () => {
     await updateProjectMeta(input.id, (payload) => ({
       ...payload,
       project: {
@@ -65,22 +72,29 @@ export const update = mutation<ProjectMutationInput, void, RpcTagList>({
         description: input.description ?? null,
       },
     }));
-  },
-});
+  })();
+  const invalidate = [rpcTags.projectsList(), rpcTags.project(input.id)];
+  return { data, invalidate };
+}
 
-export const setDefaultBranch = mutation<{ projectId: string; branchId: string }, void, RpcTagList>(
-  {
-    invalidate: ({ projectId }) => [rpcTags.projectsList(), rpcTags.project(projectId)],
-    handler: async ({ projectId, branchId }) => {
-      const branch = getBranch(projectId, branchId);
-      setHeadRef(projectId, branch.name);
-    },
-  },
-);
+export async function setDefaultBranch(input: {
+  projectId: string;
+  branchId: string;
+}): Promise<{ data: void; invalidate?: unknown[] }> {
+  const data = await (async () => {
+    const branch = getBranch(input.projectId, input.branchId);
+    setHeadRef(input.projectId, branch.name);
+  })();
+  const invalidate = [rpcTags.projectsList(), rpcTags.project(input.projectId)];
+  return { data, invalidate };
+}
 
-export const deleteMutation = mutation<{ id: string }, void, RpcTagList>({
-  invalidate: ({ id }) => [rpcTags.projectsList(), rpcTags.project(id)],
-  handler: async ({ id }) => {
-    rmSync(getProjectRepoGitDir(id), { recursive: true, force: true });
-  },
-});
+export async function deleteMutation(input: {
+  id: string;
+}): Promise<{ data: void; invalidate?: unknown[] }> {
+  const data = await (async () => {
+    rmSync(getProjectRepoGitDir(input.id), { recursive: true, force: true });
+  })();
+  const invalidate = [rpcTags.projectsList(), rpcTags.project(input.id)];
+  return { data, invalidate };
+}

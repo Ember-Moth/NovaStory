@@ -1,0 +1,14 @@
+onlyBuiltDependencies:
+  - auto-transition
+  - better-sqlite3
+  - electron
+  - nano-git
+
+allowBuilds:
+  "auto-transition@https://codeload.github.com/Ember-Moth/auto-transition/tar.gz/b44cfda81ab3aa38c884d69ab0d9606ea299b688": true
+  "nano-git@https://codeload.github.com/Ember-Moth/nano-git/tar.gz/6f6d55dba4bee646949c921df5a962474eac5a91": true
+  better-sqlite3: true
+  electron: true
+  core-js: true
+  esbuild: true
+  auto-transition@https://codeload.github.com/Ember-Moth/auto-transition/tar.gz/5fb1308190ac4bba6b71ecc0674a16f3728c2dfb: set this to true or false

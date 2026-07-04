@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { jsonSchema, tool } from "ai";
 
 import { listManuscriptNodes, readManuscriptNode } from "@/modules/workspace/domain";

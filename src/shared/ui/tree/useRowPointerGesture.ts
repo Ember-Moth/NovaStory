@@ -230,7 +230,10 @@ export function useRowPointerGesture({
 
       if (activeGestureRef.current.dragging) {
         event.preventDefault();
-        onDragMoveRef.current(rowId, { x: event.clientX, y: event.clientY });
+        onDragMoveRef.current(rowId, {
+          x: event.clientX,
+          y: event.clientY,
+        });
       }
     };
 
@@ -246,7 +249,10 @@ export function useRowPointerGesture({
         sharedClickCandidate = null;
         if (active.dragging) {
           suppressNextClickRef.current = true;
-          onDragEndRef.current(rowId, { x: active.lastX, y: active.lastY });
+          onDragEndRef.current(rowId, {
+            x: active.lastX,
+            y: active.lastY,
+          });
         }
         return;
       }
@@ -264,7 +270,10 @@ export function useRowPointerGesture({
       if (result.kind === "drag-end") {
         suppressNextClickRef.current = true;
         event.preventDefault();
-        onDragEndRef.current(rowId, { x: event.clientX, y: event.clientY });
+        onDragEndRef.current(rowId, {
+          x: event.clientX,
+          y: event.clientY,
+        });
         return;
       }
 

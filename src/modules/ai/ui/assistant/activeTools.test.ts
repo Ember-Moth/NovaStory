@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "vitest";
 
 import {
   PROJECT_ASSISTANT_READ_ONLY_TOOL_NAMES,

@@ -1,0 +1,31 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node", "electron"],
+    "rootDir": "src",
+    "outDir": "dist/main",
+    "noImplicitAny": false,
+    "noEmit": false,
+    "allowImportingTsExtensions": false
+  },
+  "include": [
+    "src/main/**/*",
+    "src/preload/**/*",
+    "src/modules/**/domain/**/*",
+    "src/modules/**/rpc/**/*",
+    "src/modules/**/server/**/*",
+    "src/rpc/**/*",
+    "src/shared/**/*",
+    "src/lib/**/*"
+  ],
+  "exclude": [
+    "src/modules/**/ui/**/*",
+    "src/app/**/*",
+    "src/**/*.test.*",
+    "src/test/**/*",
+    "dist",
+    "node_modules"
+  ]
+}

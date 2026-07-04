@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "vitest";
 
 import type { WorkspaceRefreshRequestedEvent } from "@/modules/ai/domain/types";
 import type { AuxTreeNodeVM } from "@/modules/workspace/ui/editor/model/types";

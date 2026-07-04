@@ -59,7 +59,7 @@ export async function createBranch(input: {
 
   touchProjectRepo(input.projectId);
 
-  // 创建持久化 VirtualWorkdir
+  // 创建持久化 VirtualWorktree
   if (initialHeadCommitId) {
     setWorkdirFromCommit(input.projectId, workdirKey, initialHeadCommitId as SHA1);
   } else {

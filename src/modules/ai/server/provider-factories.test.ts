@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "vitest";
 
 import { stringifyAiConnectionConfig } from "@/modules/ai/domain/config";
 import { SUPPORTED_AI_SDK_PACKAGES } from "@/modules/ai/domain/packages";

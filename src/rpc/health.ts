@@ -1,3 +1,4 @@
-import { query } from "@codehz/rpc/core";
-
-export const healthcheck = query<void, "ok">(() => "ok");
+export async function healthcheck(_input: undefined): Promise<{ data: "ok" }> {
+  const data = "ok" as const;
+  return { data };
+}

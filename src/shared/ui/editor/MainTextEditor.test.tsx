@@ -1,6 +1,6 @@
-import { expect, test } from "bun:test";
 import { LanguageSupport } from "@codemirror/language";
 import { renderToStaticMarkup } from "react-dom/server";
+import { expect, test } from "vitest";
 
 import {
   getMainTextEditorAriaLabel,

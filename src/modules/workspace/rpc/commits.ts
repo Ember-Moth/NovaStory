@@ -1,4 +1,3 @@
-import { mutation, query } from "@codehz/rpc/core";
 import type { SHA1 } from "nano-git";
 
 import {
@@ -14,90 +13,87 @@ import {
 } from "@/modules/workspace/domain";
 import { type RpcTagList, rpcTags } from "@/rpc/tags";
 
-export const history = query<
-  { projectId: string; branchId: string },
-  ReturnType<typeof listCommits>,
-  RpcTagList
->({
-  watch: ({ branchId }) => [rpcTags.commitHistory(branchId)],
-  handler: ({ projectId, branchId }) => listCommits(projectId, branchId),
-});
+export async function history(input: {
+  projectId: string;
+  branchId: string;
+}): Promise<{ data: ReturnType<typeof listCommits>; watch?: unknown[] }> {
+  const data = listCommits(input.projectId, input.branchId);
+  const watch = [rpcTags.commitHistory(input.branchId)];
+  return { data, watch };
+}
 
-export const workingTreeStatus = query<
-  { projectId: string; branchId: string },
-  Awaited<ReturnType<typeof getWorkingTreeStatus>>,
-  RpcTagList
->({
-  handler: async ({ projectId, branchId }, ctx) => {
-    ctx.watch(rpcTags.branch(branchId), rpcTags.commitHistory(branchId));
-    const workspace = getWorkspaceForBranchId(projectId, branchId);
-    if (workspace) {
-      ctx.watch(
-        rpcTags.contentTree(workspace.id),
-        rpcTags.timelineList(workspace.id),
-        rpcTags.auxWorkspace(workspace.id),
-      );
-    } else {
-      ctx.watch(rpcTags.workspacesByProject(projectId));
-    }
-    return await getWorkingTreeStatus(projectId, branchId);
-  },
-});
+export async function workingTreeStatus(input: {
+  projectId: string;
+  branchId: string;
+}): Promise<{ data: Awaited<ReturnType<typeof getWorkingTreeStatus>>; watch?: unknown[] }> {
+  const watchTags: (string | readonly unknown[])[] = [
+    rpcTags.branch(input.branchId),
+    rpcTags.commitHistory(input.branchId),
+  ];
+  const workspace = getWorkspaceForBranchId(input.projectId, input.branchId);
+  if (workspace) {
+    watchTags.push(
+      rpcTags.contentTree(workspace.id),
+      rpcTags.timelineList(workspace.id),
+      rpcTags.auxWorkspace(workspace.id),
+    );
+  } else {
+    watchTags.push(rpcTags.workspacesByProject(input.projectId));
+  }
+  const data = await getWorkingTreeStatus(input.projectId, input.branchId);
+  return { data, watch: watchTags };
+}
 
-export const get = query<
-  { commitId: string; projectId: string },
-  Awaited<ReturnType<typeof getCommit>>,
-  RpcTagList
->({
-  watch: ({ commitId }) => [rpcTags.commit(commitId)],
-  handler: async ({ commitId, projectId }) => await getCommit(commitId, projectId),
-});
+export async function get(input: {
+  commitId: string;
+  projectId: string;
+}): Promise<{ data: Awaited<ReturnType<typeof getCommit>>; watch?: unknown[] }> {
+  const data = await getCommit(input.commitId, input.projectId);
+  const watch = [rpcTags.commit(input.commitId)];
+  return { data, watch };
+}
 
-export const diff = query<
-  { commitId: string; projectId: string },
-  Awaited<ReturnType<typeof getCommitDiff>>,
-  RpcTagList
->({
-  watch: ({ commitId }) => [rpcTags.commit(commitId)],
-  handler: async ({ commitId, projectId }) => await getCommitDiff(projectId, commitId),
-});
+export async function diff(input: {
+  commitId: string;
+  projectId: string;
+}): Promise<{ data: Awaited<ReturnType<typeof getCommitDiff>>; watch?: unknown[] }> {
+  const data = await getCommitDiff(input.projectId, input.commitId);
+  const watch = [rpcTags.commit(input.commitId)];
+  return { data, watch };
+}
 
-export const create = mutation<
-  {
-    projectId: string;
-    branchId: string;
-    message: string;
-    author?: string | null;
-    extraParents?: Array<{ parentId: string; mergeRole?: "normal" | "mainline" | "merged" }>;
-  },
-  Awaited<ReturnType<typeof createCommit>>,
-  RpcTagList
->(async (input, ctx) => {
-  const commit = await createCommit(input);
+export async function create(input: {
+  projectId: string;
+  branchId: string;
+  message: string;
+  author?: string | null;
+  extraParents?: Array<{ parentId: string; mergeRole?: "normal" | "mainline" | "merged" }>;
+}): Promise<{ data: Awaited<ReturnType<typeof createCommit>>; invalidate?: unknown[] }> {
+  const data = await createCommit(input);
   const branch = getBranch(input.projectId, input.branchId);
-  ctx.invalidate(
+  const invalidate = [
     rpcTags.commitHistory(input.branchId),
     rpcTags.branch(input.branchId),
     rpcTags.branchHeadsByProject(branch.projectId),
     rpcTags.branchesByProject(branch.projectId),
     rpcTags.project(branch.projectId),
     rpcTags.projectsList(),
-  );
-  return commit;
-});
+  ];
+  return { data, invalidate };
+}
 
-export const checkout = mutation<
-  { projectId: string; workspaceId: string; commitId: string },
-  Awaited<ReturnType<typeof checkoutCommit>>,
-  RpcTagList
->(async (input, ctx) => {
-  const commit = await checkoutCommit({ ...input, commitId: input.commitId as SHA1 });
+export async function checkout(input: {
+  projectId: string;
+  workspaceId: string;
+  commitId: string;
+}): Promise<{ data: Awaited<ReturnType<typeof checkoutCommit>>; invalidate?: unknown[] }> {
+  const data = await checkoutCommit({ ...input, commitId: input.commitId as SHA1 });
   const workspace = getWorkspace(input.projectId, input.workspaceId);
-  ctx.invalidate(
+  const invalidate = [
     rpcTags.workspace(workspace.id),
     rpcTags.contentTree(workspace.id),
     rpcTags.timelineList(workspace.id),
     rpcTags.auxWorkspace(workspace.id),
-  );
-  return commit;
-});
+  ];
+  return { data, invalidate };
+}

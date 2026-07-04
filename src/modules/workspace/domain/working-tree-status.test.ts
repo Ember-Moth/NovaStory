@@ -1,5 +1,5 @@
-import { expect, test } from "bun:test";
 import type { SHA1 } from "nano-git";
+import { expect, test } from "vitest";
 
 import { seedProjectRecord } from "@/test/project";
 import { getBranchMapping, getWorkdirForBranch } from "./git-storage/git-store";

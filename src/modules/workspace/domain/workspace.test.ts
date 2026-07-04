@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "vitest";
 
 import { seedProjectRecord } from "@/test/project";
 import { getBranchMapping, getWorkdirForBranch } from "./git-storage/git-store";

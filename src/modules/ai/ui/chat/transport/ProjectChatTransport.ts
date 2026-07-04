@@ -4,8 +4,8 @@ import type {
   ProjectAssistantContextSnapshot,
   ProjectAssistantToolName,
 } from "@/modules/ai/domain/types";
-
 import type { ProjectChatMessage } from "../types";
+import { ipcChatFetch } from "./ipc-chat-fetch";
 
 export class ProjectChatTransport extends DefaultChatTransport<ProjectChatMessage> {
   constructor({
@@ -21,6 +21,7 @@ export class ProjectChatTransport extends DefaultChatTransport<ProjectChatMessag
   }) {
     super({
       api: "/api/chat",
+      fetch: ipcChatFetch,
       prepareSendMessagesRequest: ({ messages, trigger, messageId }) => ({
         body: {
           projectId,
@@ -34,6 +35,7 @@ export class ProjectChatTransport extends DefaultChatTransport<ProjectChatMessag
       }),
       prepareReconnectToStreamRequest: () => ({
         api: "/api/chat",
+        fetch: ipcChatFetch,
       }),
     });
   }

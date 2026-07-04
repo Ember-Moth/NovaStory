@@ -5,12 +5,12 @@ import { Router } from "wouter";
 import { App } from "./App";
 
 const elem = document.getElementById("root")!;
-const app = (
+const root = createRoot(elem);
+
+root.render(
   <StrictMode>
     <Router>
       <App />
     </Router>
-  </StrictMode>
+  </StrictMode>,
 );
-
-(import.meta.hot.data.root ??= createRoot(elem)).render(app);

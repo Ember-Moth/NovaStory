@@ -33,8 +33,8 @@ async function touchWorkspace(projectId: string, workspaceId: string) {
   touchWorkspaceMeta(projectId, workspaceId);
 }
 
-/** 从 VirtualWorkdir 读取状态 */
-/** 通过 workspaceId（即分支名）解析 workdir key，再获取 VirtualWorkdir */
+/** 从 VirtualWorktree 读取状态 */
+/** 通过 workspaceId（即分支名）解析 workdir key，再获取 VirtualWorktree */
 function resolveWorkdir(projectId: string, workspaceId: string) {
   const workdirKey = getBranchMapping(projectId, workspaceId);
   invariant(workdirKey, `没有关联的 workdir key: ${workspaceId}`);
@@ -47,7 +47,7 @@ function readWorkdirState(projectId: string, workspaceId: string): WorktreeState
   return readWorktreeStateFromWorkdir(wd);
 }
 
-/** 写回 VirtualWorkdir */
+/** 写回 VirtualWorktree */
 function writeWorkdirState(projectId: string, workspaceId: string, state: WorktreeState) {
   const wd = resolveWorkdir(projectId, workspaceId);
   invariant(wd, "工作目录未初始化");

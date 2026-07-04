@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "vitest";
 
 import * as userConfig from "@/modules/ai/domain/user-config";
 import { setupMockDatabase } from "@/test/mock-db";

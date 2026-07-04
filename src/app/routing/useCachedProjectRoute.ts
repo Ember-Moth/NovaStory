@@ -106,7 +106,11 @@ export function resolveLastWorkspaceRoute(
 export function resolveProjectRouteTarget(
   route: AppRoute,
   lastProjectId: string | null,
-  lastWorkspaceRoute: { projectId: string; workspaceId: string; branchId?: string | null } | null,
+  lastWorkspaceRoute: {
+    projectId: string;
+    workspaceId: string;
+    branchId?: string | null;
+  } | null,
 ) {
   if (route.kind === "project") {
     return `/project/${route.projectId}`;

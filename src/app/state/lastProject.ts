@@ -33,9 +33,13 @@ export function createLastProjectStore() {
     lastProjectId: null,
     lastWorkspaceRoute: null,
     setLastProjectId: (updater) =>
-      set((state) => ({ lastProjectId: resolveNext(updater, state.lastProjectId) })),
+      set((state) => ({
+        lastProjectId: resolveNext(updater, state.lastProjectId),
+      })),
     setLastWorkspaceRoute: (updater) =>
-      set((state) => ({ lastWorkspaceRoute: resolveNext(updater, state.lastWorkspaceRoute) })),
+      set((state) => ({
+        lastWorkspaceRoute: resolveNext(updater, state.lastWorkspaceRoute),
+      })),
   }));
 }
 

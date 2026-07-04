@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "vitest";
 
 import { PROJECT_ASSISTANT_MAX_STEPS } from "@/modules/ai/domain/types";
 import {

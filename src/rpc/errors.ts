@@ -1,4 +1,4 @@
-import { RpcError, RpcErrorCodes } from "@codehz/rpc/core";
+import { RpcError, RpcErrorCodes } from "@/lib/rpc/core";
 
 export function assertRpcFound<TValue>(
   value: TValue,

@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "vitest";
 
 import {
   parseAppRoute,
@@ -13,13 +13,21 @@ test("parseAppRoute recognizes home, project, workspace, settings, and unknown r
     kind: "settings",
     section: "ai-connections",
   });
-  expect(parseAppRoute("/settings/ai")).toEqual({ kind: "settings", section: "ai" });
-  expect(parseAppRoute("/settings/prompts")).toEqual({ kind: "settings", section: "prompts" });
+  expect(parseAppRoute("/settings/ai")).toEqual({
+    kind: "settings",
+    section: "ai",
+  });
+  expect(parseAppRoute("/settings/prompts")).toEqual({
+    kind: "settings",
+    section: "prompts",
+  });
   expect(parseAppRoute("/project/project_1")).toEqual({
     kind: "project",
     projectId: "project_1",
   });
-  expect(parseAppRoute("/project/project_1/branches")).toEqual({ kind: "unknown" });
+  expect(parseAppRoute("/project/project_1/branches")).toEqual({
+    kind: "unknown",
+  });
   expect(parseAppRoute("/project/project_1/branch/branch_1")).toEqual({
     kind: "project-branch",
     projectId: "project_1",

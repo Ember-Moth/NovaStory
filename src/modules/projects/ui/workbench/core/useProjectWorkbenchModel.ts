@@ -1,4 +1,4 @@
-import { skipToken } from "@codehz/rpc/react";
+import { skipToken } from "@/lib/rpc/react";
 
 import { rpc } from "@/rpc/client";
 import type {

@@ -1,17 +1,22 @@
-import type { rpc } from "@/rpc/client";
+import type * as projectsRpc from "@/modules/projects/rpc";
+import type * as branchesRpc from "@/modules/workspace/rpc/branches";
+import type * as commitsRpc from "@/modules/workspace/rpc/commits";
+import type * as workspacesRpc from "@/modules/workspace/rpc/workspaces";
 
-export type ProjectList = NonNullable<ReturnType<typeof rpc.useQuery<"projects.list">>["data"]>;
-export type ProjectRow = NonNullable<ReturnType<typeof rpc.useQuery<"projects.get">>["data"]>;
-export type BranchList = NonNullable<ReturnType<typeof rpc.useQuery<"branches.list">>["data"]>;
+type Unwrap<T> = T extends Promise<{ data: infer D }> ? D : never;
+
+export type ProjectList = Unwrap<ReturnType<typeof projectsRpc.list>>;
+export type ProjectRow = ProjectList extends (infer R)[]
+  ? R
+  : Unwrap<ReturnType<typeof projectsRpc.get>>;
+export type BranchList = Unwrap<ReturnType<typeof branchesRpc.list>>;
 export type BranchRow = BranchList[number];
-export type BranchHeadList = NonNullable<ReturnType<typeof rpc.useQuery<"branches.heads">>["data"]>;
+export type BranchHeadList = Unwrap<ReturnType<typeof branchesRpc.heads>>;
 export type BranchHeadRow = BranchHeadList[number];
-export type WorkspaceList = NonNullable<ReturnType<typeof rpc.useQuery<"workspaces.list">>["data"]>;
+export type WorkspaceList = Unwrap<ReturnType<typeof workspacesRpc.list>>;
 export type WorkspaceRow = WorkspaceList[number];
-export type CommitHistory = NonNullable<ReturnType<typeof rpc.useQuery<"commits.history">>["data"]>;
+export type CommitHistory = Unwrap<ReturnType<typeof commitsRpc.history>>;
 export type CommitRow = CommitHistory[number];
-export type WorkingTreeStatus = NonNullable<
-  ReturnType<typeof rpc.useQuery<"commits.workingTreeStatus">>["data"]
->;
-export type CommitDiff = NonNullable<ReturnType<typeof rpc.useQuery<"commits.diff">>["data"]>;
+export type WorkingTreeStatus = Unwrap<ReturnType<typeof commitsRpc.workingTreeStatus>>;
+export type CommitDiff = Unwrap<ReturnType<typeof commitsRpc.diff>>;
 export type ChangeAreas = WorkingTreeStatus["areas"];

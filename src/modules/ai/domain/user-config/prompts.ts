@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { basename, join } from "node:path";
-import { YAML } from "bun";
+import YAML from "yaml";
 
 import { ensureConfigDir } from "@/shared/lib/storage-paths";
 import type { GlobalPromptRow } from "../types";

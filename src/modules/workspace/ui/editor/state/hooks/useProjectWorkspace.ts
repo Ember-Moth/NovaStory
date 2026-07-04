@@ -1,5 +1,5 @@
-import { skipToken } from "@codehz/rpc/react";
 import { useEffect, useMemo } from "react";
+import { skipToken } from "@/lib/rpc/react";
 
 import {
   buildAuxTreeState,

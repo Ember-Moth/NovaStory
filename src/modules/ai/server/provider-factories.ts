@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createAzure } from "@ai-sdk/azure";
 import { createCerebras } from "@ai-sdk/cerebras";

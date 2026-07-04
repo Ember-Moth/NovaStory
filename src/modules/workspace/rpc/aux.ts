@@ -1,5 +1,3 @@
-import { mutation, query } from "@codehz/rpc/core";
-
 import {
   deleteAuxNodeAt,
   exportAuxSnapshotTree,
@@ -16,7 +14,7 @@ import {
   revertAuxChange,
   writeFileAt,
 } from "@/modules/workspace/domain";
-import { type RpcTagList, rpcTags } from "@/rpc/tags";
+import { rpcTags } from "@/rpc/tags";
 
 function auxSnapshotTags(input: {
   projectId: string;
@@ -29,124 +27,111 @@ function auxSnapshotTags(input: {
   ];
 }
 
-export const mkdir = mutation<
-  Parameters<typeof mkdirAt>[0],
-  Awaited<ReturnType<typeof mkdirAt>>,
-  RpcTagList
->({
-  invalidate: (input) => [rpcTags.auxWorkspace(input.workspaceId)],
-  handler: async (input) => await mkdirAt(input),
-});
+export async function mkdir(
+  input: Parameters<typeof mkdirAt>[0],
+): Promise<{ data: Awaited<ReturnType<typeof mkdirAt>>; invalidate?: unknown[] }> {
+  const data = await mkdirAt(input);
+  const invalidate = [rpcTags.auxWorkspace(input.workspaceId)];
+  return { data, ...(invalidate ? { invalidate } : {}) };
+}
 
-export const writeFile = mutation<
-  Parameters<typeof writeFileAt>[0],
-  Awaited<ReturnType<typeof writeFileAt>>,
-  RpcTagList
->({
-  invalidate: (input) => [rpcTags.auxWorkspace(input.workspaceId)],
-  handler: async (input) => await writeFileAt(input),
-});
+export async function writeFile(
+  input: Parameters<typeof writeFileAt>[0],
+): Promise<{ data: Awaited<ReturnType<typeof writeFileAt>>; invalidate?: unknown[] }> {
+  const data = await writeFileAt(input);
+  const invalidate = [rpcTags.auxWorkspace(input.workspaceId)];
+  return { data, ...(invalidate ? { invalidate } : {}) };
+}
 
-export const link = mutation<
-  Parameters<typeof linkAt>[0],
-  Awaited<ReturnType<typeof linkAt>>,
-  RpcTagList
->({
-  invalidate: (input) => [rpcTags.auxWorkspace(input.workspaceId)],
-  handler: async (input) => await linkAt(input),
-});
+export async function link(
+  input: Parameters<typeof linkAt>[0],
+): Promise<{ data: Awaited<ReturnType<typeof linkAt>>; invalidate?: unknown[] }> {
+  const data = await linkAt(input);
+  const invalidate = [rpcTags.auxWorkspace(input.workspaceId)];
+  return { data, ...(invalidate ? { invalidate } : {}) };
+}
 
-export const move = mutation<
-  Parameters<typeof moveAuxNodeAt>[0],
-  Awaited<ReturnType<typeof moveAuxNodeAt>>,
-  RpcTagList
->({
-  invalidate: (input) => [rpcTags.auxWorkspace(input.workspaceId)],
-  handler: async (input) => await moveAuxNodeAt(input),
-});
+export async function move(
+  input: Parameters<typeof moveAuxNodeAt>[0],
+): Promise<{ data: Awaited<ReturnType<typeof moveAuxNodeAt>>; invalidate?: unknown[] }> {
+  const data = await moveAuxNodeAt(input);
+  const invalidate = [rpcTags.auxWorkspace(input.workspaceId)];
+  return { data, ...(invalidate ? { invalidate } : {}) };
+}
 
-export const retargetSymlink = mutation<
-  Parameters<typeof retargetAuxSymlinkAt>[0],
-  Awaited<ReturnType<typeof retargetAuxSymlinkAt>>,
-  RpcTagList
->({
-  invalidate: (input) => [rpcTags.auxWorkspace(input.workspaceId)],
-  handler: async (input) => await retargetAuxSymlinkAt(input),
-});
+export async function retargetSymlink(
+  input: Parameters<typeof retargetAuxSymlinkAt>[0],
+): Promise<{ data: Awaited<ReturnType<typeof retargetAuxSymlinkAt>>; invalidate?: unknown[] }> {
+  const data = await retargetAuxSymlinkAt(input);
+  const invalidate = [rpcTags.auxWorkspace(input.workspaceId)];
+  return { data, ...(invalidate ? { invalidate } : {}) };
+}
 
-export const deleteMutation = mutation<Parameters<typeof deleteAuxNodeAt>[0], void, RpcTagList>({
-  invalidate: (input) => [rpcTags.auxWorkspace(input.workspaceId)],
-  handler: async (input) => {
-    await deleteAuxNodeAt(input);
-  },
-});
+export async function deleteMutation(
+  input: Parameters<typeof deleteAuxNodeAt>[0],
+): Promise<{ data: void; invalidate?: unknown[] }> {
+  await deleteAuxNodeAt(input);
+  const invalidate = [rpcTags.auxWorkspace(input.workspaceId)];
+  return { data: undefined, ...(invalidate ? { invalidate } : {}) };
+}
 
-export const restoreDeleted = mutation<
-  Parameters<typeof restoreDeletedAuxNodeAt>[0],
-  Awaited<ReturnType<typeof restoreDeletedAuxNodeAt>>,
-  RpcTagList
->({
-  invalidate: (input) => [rpcTags.auxWorkspace(input.workspaceId)],
-  handler: async (input) => await restoreDeletedAuxNodeAt(input),
-});
+export async function restoreDeleted(
+  input: Parameters<typeof restoreDeletedAuxNodeAt>[0],
+): Promise<{ data: Awaited<ReturnType<typeof restoreDeletedAuxNodeAt>>; invalidate?: unknown[] }> {
+  const data = await restoreDeletedAuxNodeAt(input);
+  const invalidate = [rpcTags.auxWorkspace(input.workspaceId)];
+  return { data, ...(invalidate ? { invalidate } : {}) };
+}
 
-export const revert = mutation<Parameters<typeof revertAuxChange>[0], void, RpcTagList>(
-  async (input, ctx) => {
-    await revertAuxChange(input);
-    const workspaceId = input.branchId;
-    ctx.invalidate(rpcTags.auxWorkspace(workspaceId), rpcTags.commitHistory(input.branchId));
-  },
-);
+export async function revert(
+  input: Parameters<typeof revertAuxChange>[0],
+): Promise<{ data: void; invalidate?: unknown[] }> {
+  await revertAuxChange(input);
+  const workspaceId = input.branchId;
+  const invalidate = [rpcTags.auxWorkspace(workspaceId), rpcTags.commitHistory(input.branchId)];
+  return { data: undefined, ...(invalidate ? { invalidate } : {}) };
+}
 
-export const readByPath = query<
-  {
-    projectId: string;
-    workspaceId: string;
-    pointId?: string | typeof ORIGIN_TIMELINE_POINT_ID;
-    path: string;
-  },
-  Awaited<ReturnType<typeof readAuxByPathAt>>,
-  RpcTagList
->({
-  watch: auxSnapshotTags,
-  handler: async ({ projectId, workspaceId, pointId, path }) =>
-    await readAuxByPathAt(projectId, workspaceId, pointId, path),
-});
+export async function readByPath(input: {
+  projectId: string;
+  workspaceId: string;
+  pointId?: string | typeof ORIGIN_TIMELINE_POINT_ID;
+  path: string;
+}): Promise<{ data: Awaited<ReturnType<typeof readAuxByPathAt>>; watch?: unknown[] }> {
+  const data = await readAuxByPathAt(input.projectId, input.workspaceId, input.pointId, input.path);
+  const watch = auxSnapshotTags(input);
+  return { data, ...(watch ? { watch } : {}) };
+}
 
-export const listDir = query<
-  {
-    projectId: string;
-    workspaceId: string;
-    pointId?: string | typeof ORIGIN_TIMELINE_POINT_ID;
-    path?: string;
-  },
-  Awaited<ReturnType<typeof listAuxDirAt>>,
-  RpcTagList
->({
-  watch: auxSnapshotTags,
-  handler: async ({ projectId, workspaceId, pointId, path }) =>
-    await listAuxDirAt(projectId, workspaceId, pointId, { path }),
-});
+export async function listDir(input: {
+  projectId: string;
+  workspaceId: string;
+  pointId?: string | typeof ORIGIN_TIMELINE_POINT_ID;
+  path?: string;
+}): Promise<{ data: Awaited<ReturnType<typeof listAuxDirAt>>; watch?: unknown[] }> {
+  const data = await listAuxDirAt(input.projectId, input.workspaceId, input.pointId, {
+    path: input.path,
+  });
+  const watch = auxSnapshotTags(input);
+  return { data, ...(watch ? { watch } : {}) };
+}
 
-export const snapshotTree = query<
-  { projectId: string; workspaceId: string; pointId?: string | typeof ORIGIN_TIMELINE_POINT_ID },
-  Awaited<ReturnType<typeof exportAuxSnapshotTree>>,
-  RpcTagList
->({
-  watch: auxSnapshotTags,
-  handler: async ({ projectId, workspaceId, pointId }) =>
-    await exportAuxSnapshotTree(projectId, workspaceId, pointId),
-});
+export async function snapshotTree(input: {
+  projectId: string;
+  workspaceId: string;
+  pointId?: string | typeof ORIGIN_TIMELINE_POINT_ID;
+}): Promise<{ data: Awaited<ReturnType<typeof exportAuxSnapshotTree>>; watch?: unknown[] }> {
+  const data = await exportAuxSnapshotTree(input.projectId, input.workspaceId, input.pointId);
+  const watch = auxSnapshotTags(input);
+  return { data, ...(watch ? { watch } : {}) };
+}
 
-export const listChangesAt = query<
-  { projectId: string; workspaceId: string; pointId: string },
-  Awaited<ReturnType<typeof listAuxChangesAt>>,
-  RpcTagList
->({
-  watch: ({ workspaceId }) => [
-    rpcTags.auxWorkspace(workspaceId),
-    rpcTags.timelineList(workspaceId),
-  ],
-  handler: async ({ projectId, workspaceId, pointId }) =>
-    await listAuxChangesAt(projectId, workspaceId, pointId),
-});
+export async function listChangesAt(input: {
+  projectId: string;
+  workspaceId: string;
+  pointId: string;
+}): Promise<{ data: Awaited<ReturnType<typeof listAuxChangesAt>>; watch?: unknown[] }> {
+  const data = await listAuxChangesAt(input.projectId, input.workspaceId, input.pointId);
+  const watch = [rpcTags.auxWorkspace(input.workspaceId), rpcTags.timelineList(input.workspaceId)];
+  return { data, ...(watch ? { watch } : {}) };
+}
